@@ -16,29 +16,13 @@ const Dashboard = () => import('@/components/Dashboard.vue')
 
 
 const routes = [
-    {
-        name: "login",
-        path: "/login",
-        component: Login,
-        meta: {
-            middleware: "guest",
-            title: `Login`
-        }
-    },
-    {
-        name: "register",
-        path: "/register",
-        component: Register,
-        meta: {
-            middleware: "guest",
-            title: `Register`
-        }
-    },
+
     {
         path: "/",
         component: DahboardLayout,
         meta: {
-            middleware: "auth"
+            //middleware: "guest"
+            //middleware: "auth"
         },
         children: [
             {
@@ -47,6 +31,24 @@ const routes = [
                 component: Dashboard,
                 meta: {
                     title: `Dashboard`
+                }
+            },
+            {
+                name: "login",
+                path: "/login",
+                component: Login,
+                meta: {
+                    //middleware: "guest",
+                    title: `Login`
+                }
+            },
+            {
+                name: "register",
+                path: "/register",
+                component: Register,
+                meta: {
+                    //middleware: "guest",
+                    title: `Register`
                 }
             }
         ]
@@ -58,7 +60,7 @@ const router = createRouter({
     routes, // short for `routes: routes`
 })
 
-router.beforeEach((to, from, next) => {
+/*router.beforeEach((to, from, next) => {
     document.title = to.meta.title
     if (to.meta.middleware == "guest") {
         if (store.state.auth.authenticated) {
@@ -72,6 +74,6 @@ router.beforeEach((to, from, next) => {
             next({ name: "login" })
         }
     }
-})
+})*/
 
 export default router

@@ -16,10 +16,11 @@
                         <ul class="navbar-nav">
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    {{ user.name }}
+                                    {{ user.name || 'User' }}
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
                                     <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
+                                    <router-link  class="dropdown-item" to="/login">Login</router-link>
                                 </div>
                             </li>
                         </ul>
@@ -49,6 +50,7 @@ export default {
         async logout(){
             await axios.post('/logout').then(({data})=>{
                 this.signOut()
+                this.$store.state.auth.user = null
                 this.$router.push({name:"login"})
             })
         }
