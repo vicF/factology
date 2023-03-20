@@ -18,10 +18,15 @@
 <script>
 export default {
     name:"dashboard",
-    data(){
+    /*data(){
         return {
             user:this.$store.state.auth.user
         }
-    }
+    },*/
+    computed: {
+        user: function() {
+            return this.$store.state.auth.user;
+        }
+    },
 }
 </script>
