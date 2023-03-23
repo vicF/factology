@@ -2,7 +2,7 @@
     <div>
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <span style="color:white">{{ user ? user.name : 'guest' }}</span>
+                <span style="color:white">{{ authenticated ? user.name : 'guest' }}</span>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                         data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
                         aria-label="Toggle navigation">
@@ -15,24 +15,25 @@
                                 class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-                    {{ user ? user.name : '' }}
+                    {{ authenticated ? user.name : '' }}
                     <div class="d-flex">
-                        <ul v-if="authenticated" class="navbar-nav">
+                        <ul class="navbar-nav">
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    {{ user ? user.name : 'User' }}
+                                    {{ authenticated ? user.name : 'User' }}
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
-                                    <a v-if="user" class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
-
+                                    <template v-if="authenticated">
+                                        <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
+                                    </template>
+                                    <template v-else>
+                                        <router-link class="dropdown-item" to="/login">Login</router-link>
+                                        <router-link class="dropdown-item" to="/register">Register</router-link>
+                                    </template>
                                 </div>
                             </li>
-                        </ul>
-                        <ul v-else class="navbar-nav me-auto">
-                            <li class="nav-item">
-                                <router-link class="nav-link" to="/login">Login</router-link>
-                            </li>
+
                         </ul>
                     </div>
                 </div>
