@@ -13,6 +13,9 @@ class CreateTableFavourites extends Migration
      */
     public function up()
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->unique('thing_id');
+        });
         Schema::create('favorites', static function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->uuid('user_id');
@@ -30,5 +33,8 @@ class CreateTableFavourites extends Migration
     public function down()
     {
         Schema::dropIfExists('favorites');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropIndex('user_thing_id');
+        });
     }
 }
