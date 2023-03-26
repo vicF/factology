@@ -109,8 +109,22 @@ export default {
             if (this.typeClass) {
                 type.push(2);
             }
-            await axios.post('/api/v1/object').then(response => {
+            //await axios.get('/sanctum/csrf-cookie');
+            await axios.post('/api/v1/object', JSON.stringify({
+                "search": this.searchText,
+                "type": type
+            })).then(response => {
                 this.validationErrors = {}
+                this.objects = JSON.parse(response.data).things
+                for (let i in response.links) {
+                    let link = response.links[i];
+                    if (this.objects[link.thing_id]) {
+                        (this.objects[link.thing_id].links ??= {})[link.other_thing_id] = link;
+                    }
+                    if (this.objects[link.other_thing_id]) {
+                        (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
+                    }
+                }
             }).catch(({response}) => {
                 if (response.status === 422) {
                     this.validationErrors = response.data.errors
@@ -119,7 +133,7 @@ export default {
                     alert(response.data.message)
                 }
             }).finally(() => {
-                this.processing = false
+                this.processing = false;
             })
             /*fetch('/api/v1/object', {
               method: 'POST',
@@ -148,8 +162,25 @@ export default {
                 })
                 .catch(err => alert(err))*/
         },
-        getClasses() {
-            fetch('/api/v1/object', {
+        async getClasses() {
+            await axios.post('/api/v1/object', JSON.stringify({
+                "search": this.searchText,
+                "type": [2]
+            })).then(response => {
+                this.validationErrors = {}
+                this.classes = JSON.parse(response.data).classes
+
+            }).catch(({response}) => {
+                if (response.status === 422) {
+                    this.validationErrors = response.data.errors
+                } else {
+                    this.validationErrors = {}
+                    alert(response.data.message)
+                }
+            }).finally(() => {
+                this.processing = false
+            })
+            /*fetch('/api/v1/object', {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': this.csrf,
@@ -166,7 +197,7 @@ export default {
                     this.classes = response.things
 
                 })
-                .catch(err => alert(err))
+                .catch(err => alert(err))*/
         }
     }
 }
