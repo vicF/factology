@@ -18,3 +18,4 @@ yarn-error.log
 /.vscode
 error.log
 public/thumbs
+database/Dumps

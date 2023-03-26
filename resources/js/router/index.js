@@ -11,7 +11,7 @@ const DahboardLayout = () => import('@/components/layouts/Default.vue')
 /* Layouts */
 
 /* Authenticated Component */
-const Dashboard = () => import('@/components/Dashboard.vue')
+const Search = () => import('@/components/Search.vue')
 /* Authenticated Component */
 
 
@@ -28,7 +28,7 @@ const routes = [
             {
                 name: "dashboard",
                 path: '/',
-                component: Dashboard,
+                component: Search,
                 meta: {
                     title: `Dashboard`
                 }
