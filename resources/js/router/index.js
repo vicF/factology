@@ -14,6 +14,8 @@ const DahboardLayout = () => import('@/components/layouts/Default.vue')
 const Search = () => import('@/components/Search.vue')
 /* Authenticated Component */
 
+const Object = () => import('@/components/Object.vue')
+
 
 const routes = [
 
@@ -38,7 +40,6 @@ const routes = [
                 path: "/login",
                 component: Login,
                 meta: {
-                    //middleware: "guest",
                     title: `Login`
                 }
             },
@@ -47,8 +48,15 @@ const routes = [
                 path: "/register",
                 component: Register,
                 meta: {
-                    //middleware: "guest",
                     title: `Register`
+                }
+            },
+            {
+                name: "object",
+                path: "/object/:uid",
+                component: Object,
+                meta: {
+                    title: `Object`
                 }
             }
         ]
