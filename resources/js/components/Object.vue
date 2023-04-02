@@ -48,10 +48,7 @@
 export default {
     name: "search",
     props: ['searchText', 'typeThing', 'typeClass'],
-    /*setup: () => ({
-      title: ''
-    }),*/
-    data() {
+     data() {
         return {
             object: [],
             classes: [],
@@ -78,27 +75,16 @@ export default {
             let type = [];
             console.log('getObject')
             await axios.get('/api/v1/object/' + this.$route.params.uid).then(response => {
-                //console.log(response.data.data)
                 this.validationErrors = {}
                 this.object = response.data.data
                 this.loaded = true
-                console.log(this.object.thing_id)
-                /*for (let i in response.links) {
-                    let link = response.links[i];
-                    if (this.objects[link.thing_id]) {
-                        (this.objects[link.thing_id].links ??= {})[link.other_thing_id] = link;
-                    }
-                    if (this.objects[link.other_thing_id]) {
-                        (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
-                    }
-                }*/
             }).catch(({response}) => {
-                /*if (response.status === 422) {
+                if (response.status === 422) {
                     this.validationErrors = response.data.errors
                 } else {
                     this.validationErrors = {}
                     alert(response.data.message)
-                }*/
+                }
             }).finally(() => {
                 this.processing = false;
             })

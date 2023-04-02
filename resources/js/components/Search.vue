@@ -1,8 +1,8 @@
 <template>
-    <div class="container" id="search">
+    <div class="container" id="search"  v-cloak>
         <div class="row">
             <div class="col-2">
-                1 of 3
+                <class-tree></class-tree>
             </div>
             <div class="col">
                 <div class="input-group">
@@ -73,9 +73,11 @@
 </template>
 
 <script>
+import ClassTree from './ClassTree.vue';
 export default {
     name: "search",
     props: ['searchText', 'typeThing', 'typeClass'],
+    components: {ClassTree: ClassTree},
     /*setup: () => ({
       title: ''
     }),*/
@@ -135,32 +137,6 @@ export default {
             }).finally(() => {
                 this.processing = false;
             })
-            /*fetch('/api/v1/object', {
-              method: 'POST',
-              headers: {
-                'X-CSRF-TOKEN': this.csrf,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                "search": this.searchText,
-                "type": type
-              })
-            })
-                .then(response => response.json())
-                .then(data => {
-                  let response = JSON.parse(data)
-                  this.objects = response.things
-                  for (let i in response.links) {
-                    let link = response.links[i];
-                    if (this.objects[link.thing_id]) {
-                      (this.objects[link.thing_id].links ??= {})[link.other_thing_id] = link;
-                    }
-                    if (this.objects[link.other_thing_id]) {
-                      (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
-                    }
-                  }
-                })
-                .catch(err => alert(err))*/
         },
         async getClasses() {
             await axios.post('/api/v1/object', JSON.stringify({
@@ -180,24 +156,6 @@ export default {
             }).finally(() => {
                 this.processing = false
             })
-            /*fetch('/api/v1/object', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': this.csrf,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    "search": this.searchText,
-                    "type": [2]
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    let response = JSON.parse(data)
-                    this.classes = response.things
-
-                })
-                .catch(err => alert(err))*/
         }
     }
 }
