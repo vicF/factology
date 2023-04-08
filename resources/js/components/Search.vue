@@ -1,7 +1,11 @@
 <template>
-    <div class="container" id="search"  v-cloak>
+    <div class="container" id="search" v-cloak>
         <div class="row">
             <div class="col-2">
+                <tree-menu
+                    :label="this.classes.label"
+                    :nodes="this.classes.nodes"
+                    :depth="0"></tree-menu>
                 <class-tree></class-tree>
             </div>
             <div class="col">
@@ -74,10 +78,17 @@
 
 <script>
 import ClassTree from './ClassTree.vue';
+import TreeMenu from './TreeMenu.vue';
+
+
+
 export default {
     name: "search",
     props: ['searchText', 'typeThing', 'typeClass'],
-    components: {ClassTree: ClassTree},
+    components: {
+        ClassTree: ClassTree,
+        TreeMenu: TreeMenu
+    },
     /*setup: () => ({
       title: ''
     }),*/
@@ -139,7 +150,32 @@ export default {
             })
         },
         async getClasses() {
-            await axios.post('/api/v1/object', JSON.stringify({
+            this.classes =  {
+                label: 'root',
+                nodes: [
+                    {
+                        label: 'item1',
+                        nodes: [
+                            {
+                                label: 'item1.1'
+                            },
+                            {
+                                label: 'item1.2',
+                                nodes: [
+                                    {
+                                        label: 'item1.2.1'
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        label: 'item2'
+                    }
+                ]
+            }
+
+            /*await axios.post('/api/v1/object', JSON.stringify({
                 "search": this.searchText,
                 "type": [2]
             })).then(response => {
@@ -155,7 +191,7 @@ export default {
                 }
             }).finally(() => {
                 this.processing = false
-            })
+            })*/
         }
     }
 }

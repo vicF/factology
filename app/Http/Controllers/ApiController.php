@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
+use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
@@ -17,7 +18,7 @@ class ApiController extends BaseController
     {
         return response()->json(
             [
-                'data'    => DB::table('things')->limit(100)->get(),
+                'data' => DB::table('things')->limit(100)->get(),
                 'success' => true
             ]);
     }
@@ -26,7 +27,7 @@ class ApiController extends BaseController
     {
         return response()->json(
             [
-                'data'    => Anything::CreateFromId($id)->toArray(),
+                'data' => Anything::CreateFromId($id)->toArray(),
                 'success' => true
             ]);
     }
@@ -44,7 +45,7 @@ class ApiController extends BaseController
             $model->saveLinks($request->toArray());
             return response()->json(
                 [
-                    'data'    => $model->toArray(),
+                    'data' => $model->toArray(),
                     'success' => true
                 ]);
         });
@@ -95,7 +96,7 @@ class ApiController extends BaseController
         return response()->json(
             [
                 'filesStored' => $stored,
-                'success'     => true
+                'success' => true
             ]);
     }
 
@@ -115,7 +116,7 @@ class ApiController extends BaseController
             }
             return response()->json(
                 [
-                    'data'    => $res,
+                    'data' => $res,
                     'success' => true
                 ]);
         } catch (\Throwable $e) {
@@ -138,7 +139,7 @@ class ApiController extends BaseController
 
             return response()->json(
                 [
-                    'data'    => $res,
+                    'data' => $res,
                     'success' => true
                 ]);
         } catch (\Throwable $e) {
@@ -186,8 +187,56 @@ class ApiController extends BaseController
 
         return response()->json(json_encode([
             'things' => $data->toArray(),
-            'links'  => $links,
+            'links' => $links,
         ]));
 
+    }
+
+    public function searchTree()
+    {
+        $requestBody = json_decode(file_get_contents('php://input'), true);
+
+        $rawSql =
+            "with recursive descendants
+                (name, level, id, parent_id, description, translation)  as (
+                    select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
+                    from things c
+                    left join links l on l.thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    where c.type=2 and c.thing_id = '3e15244c-a9e1-4a91-a0ca-1c65722a64df'
+                    union distinct
+                    select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
+                    from descendants d, things c
+                    left join links l on l.thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    where c.type=2 AND d.id = l.other_thing_id AND d.level <2
+                )
+                select * from descendants ORDER BY level;";
+        $results = DB::select($rawSql);
+        return response()->json(json_encode([
+            'things' => $results,
+        ]));
+    }
+
+    public function classes()
+    {
+        $data = collect(DB::table('things')
+            ->selectRaw('things.*, links.other_thing_id')
+            ->auth('links')
+            //->auth()
+            ->leftJoin('links', static function ($join) {
+                $join->on('things.thing_id', 'links.thing_id')
+                    ->whereRaw('links.link_type_id = ?', UUID::PARENT);
+            })
+            ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
+            ->orderByRaw('type = ?, type = ? DESC', [UUID::GENERAL, UUID::G_CLASS])->get())->keyBy('thing_id')->toArray();
+
+        foreach ($data as $id => $node) {
+            if (!empty($node->other_thing_id)) {
+                if (!isset($data[$node->other_thing_id])) {
+                    $data[$node->other_thing_id] = new \stdClass();
+                }
+                $data[$node->other_thing_id]->children[] = &$data[$id];
+            }
+        }
+        return view('classes', ['class' => $data[UUID::ANYTHING]]);
     }
 }
