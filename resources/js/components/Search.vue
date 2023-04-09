@@ -3,10 +3,9 @@
         <div class="row">
             <div class="col-2">
                 <tree-menu
-                    :label="this.classes.label"
+                    :name="this.classes.name"
                     :nodes="this.classes.nodes"
                     :depth="0"></tree-menu>
-                <class-tree></class-tree>
             </div>
             <div class="col">
                 <div class="input-group">
@@ -81,7 +80,6 @@ import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
 
 
-
 export default {
     name: "search",
     props: ['searchText', 'typeThing', 'typeClass'],
@@ -150,48 +148,63 @@ export default {
             })
         },
         async getClasses() {
-            this.classes =  {
-                label: 'root',
+            this.classes = {
+                name: 'root',
                 nodes: [
                     {
-                        label: 'item1',
+                        name: 'item1',
                         nodes: [
                             {
-                                label: 'item1.1'
+                                name: 'item1.1'
                             },
                             {
-                                label: 'item1.2',
+                                name: 'item1.2',
                                 nodes: [
                                     {
-                                        label: 'item1.2.1'
+                                        name: 'item1.2.1'
                                     }
                                 ]
                             }
                         ]
                     },
                     {
-                        label: 'item2'
+                        name: 'item2'
                     }
                 ]
             }
 
-            /*await axios.post('/api/v1/object', JSON.stringify({
+            await axios.post('/api/v1/object', JSON.stringify({
+                "tree": true,
                 "search": this.searchText,
                 "type": [2]
             })).then(response => {
                 this.validationErrors = {}
-                this.classes = JSON.parse(response.data).classes
+                console.log('response', response.data.things);
+                //this.classes = response.data.things
+                for (let i in response.data.things) {
+                    if(response.data.things[i].id == '3e15244c-a9e1-4a91-a0ca-1c65722a64df') {
+                        // First root node
+                        this.classes = response.data.things[i];
+                        this.classes.nodes = [];
+                    } else {
+                        this.classes.nodes.push(response.data.things[i]);
+                    }
 
-            }).catch(({response}) => {
+                }
+                this.classes.name = response.data.things[0].name
+                console.log('this.classes', this.classes)
+
+            }).catch(response => {
+                console.log('catch', response)
                 if (response.status === 422) {
-                    this.validationErrors = response.data.errors
+                    //this.validationErrors = response.data.errors
                 } else {
                     this.validationErrors = {}
                     alert(response.data.message)
                 }
             }).finally(() => {
                 this.processing = false
-            })*/
+            })
         }
     }
 }

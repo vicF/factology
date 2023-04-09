@@ -22,10 +22,10 @@ export default {
             await axios.post('/api/v1/object', JSON.stringify({
                 "type": [2]
             })).then(response => {
-                console.log(response.data);
+                // console.log(response.data);
                 this.validationErrors = {}
                 this.classes = JSON.parse(response.data).things
-                console.log(this.classes);
+                // console.log(this.classes);
             }).catch(({response}) => {
                 if (response.status === 422) {
                     this.validationErrors = response.data.errors

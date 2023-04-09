@@ -1,11 +1,11 @@
 <template>
     <div class="tree-menu">
-        <div :style="indent" @click="toggleChildren">{{showChildren?'-':'+'}}{{ label }}</div>
+        <div :style="indent" @click="toggleChildren">{{showChildren?'-':'+'}}{{ name }}</div>
         <tree-menu
             v-if="showChildren"
             v-for="node in nodes"
             :nodes="node.nodes"
-            :label="node.label"
+            :name="node.name"
             :depth="depth + 1"
         >
         </tree-menu>
@@ -13,10 +13,10 @@
 </template>
 <script>
 export default {
-    props: ['label', 'nodes', 'depth'],
+    props: ['name', 'nodes', 'depth'],
     name: 'tree-menu',
     data() {
-        return { showChildren: false }
+        return { showChildren: true }
     },
     computed: {
         indent() {

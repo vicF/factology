@@ -157,6 +157,9 @@ class ApiController extends BaseController
     public function search()
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
+        if (@$requestBody['tree']) {
+            return $this->searchTree();
+        }
         $query = DB::table('things')
             ->select('things.*')
             ->auth()
@@ -207,13 +210,13 @@ class ApiController extends BaseController
                     select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
                     from descendants d, things c
                     left join links l on l.thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
-                    where c.type=2 AND d.id = l.other_thing_id AND d.level <2
+                    where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
                 )
                 select * from descendants ORDER BY level;";
         $results = DB::select($rawSql);
-        return response()->json(json_encode([
+        return response()->json([
             'things' => $results,
-        ]));
+        ]);
     }
 
     public function classes()
