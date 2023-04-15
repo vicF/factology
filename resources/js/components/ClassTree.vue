@@ -1,14 +1,19 @@
 <template>
     Classes:
-    <ul>
-        <li v-for="thing in this.classes" >{{thing.name}}</li>
-    </ul>
-    {{ this.classes }}
+    <tree-menu
+        :name="this.classes.name"
+        :nodes="this.classes.nodes"
+        :depth="0"></tree-menu>
 </template>
 
 <script>
+import TreeMenu from "./TreeMenu.vue";
+import { useObjectsStore } from '@/stores/objects';
+const objects = useObjectsStore()
+
 export default {
     name: "ClassTree",
+    components: {TreeMenu},
     data() {
         return {
             classes: []
@@ -19,23 +24,8 @@ export default {
     },
     methods: {
         async getClasses() {
-            await axios.post('/api/v1/object', JSON.stringify({
-                "type": [2]
-            })).then(response => {
-                // console.log(response.data);
-                this.validationErrors = {}
-                this.classes = JSON.parse(response.data).things
-                // console.log(this.classes);
-            }).catch(({response}) => {
-                if (response.status === 422) {
-                    this.validationErrors = response.data.errors
-                } else {
-                    this.validationErrors = {}
-                    alert(response.data.message)
-                }
-            }).finally(() => {
-                this.processing = false
-            })
+            await objects.loadClassTree();
+            this.classes = objects.classes;
         }
     }
 }

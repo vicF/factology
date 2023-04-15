@@ -2,10 +2,7 @@
     <div class="container" id="search" v-cloak>
         <div class="row">
             <div class="col-2">
-                <tree-menu
-                    :name="this.classes.name"
-                    :nodes="this.classes.nodes"
-                    :depth="0"></tree-menu>
+                <class-tree></class-tree>
             </div>
             <div class="col">
                 <div class="input-group">
@@ -103,7 +100,6 @@ export default {
     },
     created: function () {
         this.getObjects();
-        this.getClasses();
     },
     methods: {
         getThumbUrl(thing_id) {
@@ -136,7 +132,7 @@ export default {
                         (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
                     }
                 }
-            }).catch(({response}) => {
+            }).catch(response => {
                 if (response.status === 422) {
                     this.validationErrors = response.data.errors
                 } else {
@@ -146,66 +142,8 @@ export default {
             }).finally(() => {
                 this.processing = false;
             })
-        },
-        async getClasses() {
-            this.classes = {
-                name: 'root',
-                nodes: [
-                    {
-                        name: 'item1',
-                        nodes: [
-                            {
-                                name: 'item1.1'
-                            },
-                            {
-                                name: 'item1.2',
-                                nodes: [
-                                    {
-                                        name: 'item1.2.1'
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        name: 'item2'
-                    }
-                ]
-            }
-
-            await axios.post('/api/v1/object', JSON.stringify({
-                "tree": true,
-                "search": this.searchText,
-                "type": [2]
-            })).then(response => {
-                this.validationErrors = {}
-                console.log('response', response.data.things);
-                //this.classes = response.data.things
-                for (let i in response.data.things) {
-                    if(response.data.things[i].id == '3e15244c-a9e1-4a91-a0ca-1c65722a64df') {
-                        // First root node
-                        this.classes = response.data.things[i];
-                        this.classes.nodes = [];
-                    } else {
-                        this.classes.nodes.push(response.data.things[i]);
-                    }
-
-                }
-                this.classes.name = response.data.things[0].name
-                console.log('this.classes', this.classes)
-
-            }).catch(response => {
-                console.log('catch', response)
-                if (response.status === 422) {
-                    //this.validationErrors = response.data.errors
-                } else {
-                    this.validationErrors = {}
-                    alert(response.data.message)
-                }
-            }).finally(() => {
-                this.processing = false
-            })
         }
+
     }
 }
 </script>

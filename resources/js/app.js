@@ -9,14 +9,17 @@ import '../sass/app.scss';
 import Router from '@/router';
 import store from '@/store';
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
  * registering components with the application instance so they are ready
  * to use in your application's views. An example is included for you.
  */
-
+const pinia = createPinia();
 const app = createApp({});
+
+app.use(pinia);
 app.use(Router);
 app.use(store);
 /*import ExampleComponent from './components/ExampleComponent.vue';
