@@ -7,7 +7,8 @@ import {defineStore} from 'pinia'
 export const useObjectsStore = defineStore('objects', {
     state: () => ({
         classes: {
-            name: 'root',
+            id: '939cd822-9e23-450c-8c5e-c23f67cca792',
+            name: 'Anything',
             nodes: [
                 {
                     name: 'item1',
@@ -30,6 +31,9 @@ export const useObjectsStore = defineStore('objects', {
                 }
             ]
         },
+        objects:[
+
+        ],
 
         loading: false,
     }),
