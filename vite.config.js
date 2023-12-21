@@ -28,4 +28,9 @@ export default defineConfig({
             '@': '/resources/js'
         },
     },
+    server: {
+        hmr: {
+            host: '127.0.0.1' /* HERE */
+        }
+    }
 });

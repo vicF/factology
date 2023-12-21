@@ -213,10 +213,26 @@ class ApiController extends BaseController
                     where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
                 )
                 select * from descendants ORDER BY level;";
-        $results = DB::select($rawSql);
+        $results = $this->buildTree((array)DB::select($rawSql));
         return response()->json([
             'things' => $results,
         ]);
+    }
+
+    protected function buildTree($items, $parentId = UUID::ANYTHING)
+    {
+        $tree = [];
+        foreach ($items as $item) {
+            if ($item->parent_id === $parentId) {
+                $children = $this->buildTree($items, $item->id);
+
+                if ($children) {
+                    $item->nodes = $children;
+                }
+                $tree[] = $item;
+            }
+        }
+        return $tree;
     }
 
     public function classes()

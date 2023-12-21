@@ -60,7 +60,7 @@ export const useObjectsStore = defineStore('objects', {
                     if(response.data.things[i].id == '3e15244c-a9e1-4a91-a0ca-1c65722a64df') {
                         // First root node
                         this.classes = response.data.things[i];
-                        this.classes.nodes = [];
+                        //this.classes.nodes = [];
                     } else {
                         this.classes.nodes.push(response.data.things[i]);
                     }
