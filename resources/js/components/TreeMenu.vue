@@ -1,6 +1,9 @@
 <template>
     <div class="tree-menu">
-        <div :style="indent" @click="toggleChildren">{{showChildren?'-':'+'}}{{ name }}</div>
+        <div :style="indent"><span v-if="showToggle" @click="toggleChildren" style="font-size: larger">
+                {{ showChildren ? '-' : '+' }}
+            </span>
+            <input type="checkbox" /> {{ name }}</div>
         <tree-menu
             v-if="showChildren"
             v-for="node in nodes"
@@ -19,6 +22,9 @@ export default {
         return { showChildren: true }
     },
     computed: {
+        showToggle() {
+            return this.nodes && this.nodes.length > 0;
+        },
         indent() {
             return {transform: `translate(${this.depth * 10}px)`}
         }
