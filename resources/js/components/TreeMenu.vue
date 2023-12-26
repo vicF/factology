@@ -1,12 +1,13 @@
 <template>
     <div class="tree-menu">
         <div :style="indent"><span v-if="showToggle" @click="toggleChildren" style="font-size: larger">
-                {{ showChildren ? '-' : '+' }}
+                {{ showChildren ? '- ' : '+ ' }}
             </span>
-            <input type="checkbox" /> {{ name }}</div>
+            <input type="checkbox" name="class"  :value="id" /> {{ name }}</div>
         <tree-menu
             v-if="showChildren"
             v-for="node in nodes"
+            :id="node.id"
             :nodes="node.nodes"
             :name="node.name"
             :depth="depth + 1"
@@ -16,7 +17,7 @@
 </template>
 <script>
 export default {
-    props: ['name', 'nodes', 'depth'],
+    props: ['id', 'name', 'nodes', 'depth'],
     name: 'tree-menu',
     data() {
         return { showChildren: true }

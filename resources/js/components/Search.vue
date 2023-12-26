@@ -119,7 +119,8 @@ export default {
             //await axios.get('/sanctum/csrf-cookie');
             await axios.post('/api/v1/object', JSON.stringify({
                 "search": this.searchText,
-                "type": type
+                "type": type,
+                "classes":''
             })).then(response => {
                 this.validationErrors = {}
                 this.objects = JSON.parse(response.data).things

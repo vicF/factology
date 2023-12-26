@@ -16,7 +16,8 @@ export default {
     components: {TreeMenu},
     data() {
         return {
-            classes: []
+            classes: [],
+            checkedItems: [],
         }
     },
     created: function () {
