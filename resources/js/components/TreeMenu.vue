@@ -4,7 +4,7 @@
             <span v-if="showToggle" @click="toggleChildren" style="font-size: larger">
                 {{ showChildren ? '- ' : '+ ' }}
             </span>
-            <input type="checkbox" :value="id" v-model="checkedItems" /> {{ name }}
+            <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" /> {{ name }}
         </div>
         <tree-menu
             v-if="showChildren"
@@ -36,9 +36,13 @@ export default {
     setup(props, { emit }) {
         const store = useCheckboxStore();
 
-        const isChecked = computed(() => store.checkedItems.includes(props.id));
+        // Computed property to check if the current item is checked
+        const isChecked = computed(() => {
+            return store.checkedItems.includes(props.id);
+        });
 
         function onCheckboxChange() {
+            //console.log('onCheckboxChange');
             store.toggleItem(props.id);
             emit('update-checked', store.checkedItems);
         }
