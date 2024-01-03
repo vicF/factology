@@ -3,8 +3,9 @@
     <tree-menu
         :name="this.classes.name"
         :nodes="this.classes.nodes"
-        :depth="0"></tree-menu>
-        :checked-items="checkboxStore.checkedItems"
+        :depth="0"
+        :checked-items="checkboxStore.checkedItems">
+        </tree-menu>
 </template>
 
 <script>

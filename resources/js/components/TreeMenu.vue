@@ -42,7 +42,6 @@ export default {
         });
 
         function onCheckboxChange() {
-            //console.log('onCheckboxChange');
             store.toggleItem(props.id);
             emit('update-checked', store.checkedItems);
         }
@@ -65,10 +64,6 @@ export default {
             // Update the checkedItems data property based on the emitted value
             this.checkedItems = checkedItems;
         },
-        onCheckboxChange() {
-            // Logic to update checked items
-            this.$emit('update-checked', this.checkedItems);
-        }
     }
 }
 </script>
