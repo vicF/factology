@@ -75,7 +75,7 @@
 <script>
 import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
-
+import { useCheckboxStore } from '../stores/checkboxes';
 
 export default {
     name: "search",
@@ -84,9 +84,6 @@ export default {
         ClassTree: ClassTree,
         TreeMenu: TreeMenu
     },
-    /*setup: () => ({
-      title: ''
-    }),*/
     data() {
         return {
             objects: [],
@@ -109,6 +106,7 @@ export default {
             return date;
         },
         async getObjects() {
+            const store = useCheckboxStore();
             let type = [];
             if (this.typeThing) {
                 type.push(3);
@@ -119,7 +117,8 @@ export default {
             //await axios.get('/sanctum/csrf-cookie');
             await axios.post('/api/v1/object', JSON.stringify({
                 "search": this.searchText,
-                "type": type
+                "type": type,
+                classes: store.checkedItems,
             })).then(response => {
                 this.validationErrors = {}
                 this.objects = JSON.parse(response.data).things
