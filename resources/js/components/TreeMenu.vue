@@ -20,11 +20,15 @@
 <script>
 import { useCheckboxStore } from '../stores/checkboxes';
 import { computed } from 'vue';
+const checkboxStore = useCheckboxStore();
 export default {
     props: ['id', 'name', 'nodes', 'depth'],
     name: 'tree-menu',
     data() {
-        return { showChildren: true }
+        return {
+            showChildren: true,
+            checkedItems: [],
+        }
     },
     setup(props, { emit }) {
         const store = useCheckboxStore();
