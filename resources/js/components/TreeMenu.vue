@@ -3,7 +3,7 @@
         <div :style="indent"><span v-if="showToggle" @click="toggleChildren" style="font-size: larger">
                 {{ showChildren ? '- ' : '+ ' }}
             </span>
-            <input type="checkbox" name="class"  :value="id" /> {{ name }}</div>
+            <input type="checkbox" name="class"  :value="id" v-model="checkedItems" /> {{ name }}</div>
         <tree-menu
             v-if="showChildren"
             v-for="node in nodes"
@@ -11,16 +11,32 @@
             :nodes="node.nodes"
             :name="node.name"
             :depth="depth + 1"
+            :checked-items="checkedItems"
+            @update-checked="handleCheckedUpdate"
         >
         </tree-menu>
     </div>
 </template>
 <script>
+import { useCheckboxStore } from '../stores/checkboxes';
+import { computed } from 'vue';
 export default {
     props: ['id', 'name', 'nodes', 'depth'],
     name: 'tree-menu',
     data() {
         return { showChildren: true }
+    },
+    setup(props, { emit }) {
+        const store = useCheckboxStore();
+
+        const isChecked = computed(() => store.checkedItems.includes(props.id));
+
+        function onCheckboxChange() {
+            store.toggleItem(props.id);
+            emit('update-checked', store.checkedItems);
+        }
+
+        return { isChecked, onCheckboxChange };
     },
     computed: {
         showToggle() {
@@ -33,6 +49,10 @@ export default {
     methods: {
         toggleChildren() {
             this.showChildren = !this.showChildren;
+        },
+        onCheckboxChange() {
+        // Logic to update checked items
+            this.$emit('update-checked', this.checkedItems);
         }
     }
 }
