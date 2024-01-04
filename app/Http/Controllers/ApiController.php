@@ -194,7 +194,12 @@ class ApiController extends BaseController
         $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get()->keyBy('thing_id');
 
         $ids = $data->pluck('thing_id')->toArray();
-        $links = DB::table('links')->whereIn('thing_id', $ids)->orWhere('other_thing_id', $ids)->get()->toArray();
+        $links = DB::table('links')
+            ->select('links.*', 'things.name')
+            ->whereIn('links.thing_id', $ids)
+            ->orWhere('other_thing_id', $ids)
+            ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
+            ->get()->toArray();
 
         return response()->json(json_encode([
             'things' => $data->toArray(),

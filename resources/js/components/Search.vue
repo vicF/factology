@@ -12,7 +12,7 @@
                 <button class="btn btn-primary" @click.prevent="getObjects">Find</button>
             </span>
                 </div>
-                <div class="form-group form-check form-check-inline">
+<!--                <div class="form-group form-check form-check-inline">
                     <input type="checkbox" class="form-check-input" id="checkThing" name="type[]"
                            v-bind:value="typeThing" v-on:input="typeThing= $event.target.value"
                            value="G_THING" checked/>
@@ -28,7 +28,7 @@
                            value="1"/>
                     <label class="form-check-label" for="checkClass">Private</label>
 
-                </div>
+                </div>-->
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1">
                         <table class="table">
@@ -54,12 +54,13 @@
                                 <td>
                                     <div v-for="link in thing.links"
                                          :set="other_id = (link.thing_id == thing.thing_id) ? link.other_thing_id:link.thing_id">
-                                        <a
-                                            :href="'/object/'+other_id">
-                                            <img :src="this.getThumbUrl(other_id)" width="50"/></a>
+
                                         <a :href="'/object/'+link.link_type_id"><img
                                             :src="this.getThumbUrl(link.link_type_id)"
-                                            width="50"/></a>{{ link.translation }}
+                                            width="10"/></a><a
+                                        :href="'/object/'+other_id">
+                                        <img :src="this.getThumbUrl(other_id)" width="10"/></a>{{ link.translation }} <a
+                                        :href="'/object/'+other_id">{{link.name}}</a>
                                     </div>
                                 </td>
                             </tr>
@@ -121,9 +122,12 @@ export default {
                 classes: store.checkedItems,
             })).then(response => {
                 this.validationErrors = {}
-                this.objects = JSON.parse(response.data).things
-                for (let i in response.links) {
-                    let link = response.links[i];
+                let data = JSON.parse(response.data);
+                this.objects = data.things
+                console.log('Links:', data.links);
+                for (let i in data.links) {
+                    let link = data.links[i];
+                    console.log('Link:', link);
                     if (this.objects[link.thing_id]) {
                         (this.objects[link.thing_id].links ??= {})[link.other_thing_id] = link;
                     }
@@ -131,6 +135,7 @@ export default {
                         (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
                     }
                 }
+                console.log('Objects:', this.objects);
             }).catch(response => {
                 if (response.status === 422) {
                     this.validationErrors = response.data.errors
