@@ -165,6 +165,14 @@ class ApiController extends BaseController
             ->auth()
             ->where('things.deleted', 0);
 
+        if (!empty($requestBody['classes'])) {
+            $query->leftJoin('links', function ($join) {
+                $join->on('things.thing_id', '=', 'links.thing_id');
+                $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
+            });
+            $query->whereIn('links.other_thing_id', $requestBody['classes']);
+        }
+
         if (@$requestBody['search']) {
             $query->where('name', 'like', '%' . $requestBody['search'] . '%')
                 ->oRwhere('description', 'like', '%' . $requestBody['search'] . '%');
