@@ -21,7 +21,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::get('/v1/object', [ApiController::class, 'list']);
 Route::post('/v1/object', [ApiController::class, 'search']);
-Route::middleware('auth:sanctum')->get('/v1/object/{id}', [ApiController::class, 'get']);
+Route::get('/v1/object/{id}', [ApiController::class, 'get']);
 Route::middleware('auth:sanctum')->post('/v1/object/{id}', 'ApiController@store');
 Route::middleware('auth:sanctum')->put('/v1/object', 'ApiController@store');
 Route::middleware('auth:sanctum')->delete('/v1/object/{id}', 'ApiController@delete');

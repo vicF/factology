@@ -2,15 +2,10 @@
     <div class="container" id="search">
         <div v-if="!this.loaded" class="row">Loading</div>
         <div v-else class="row">
+            <h1>{{ this.object.name }}</h1>
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
                     <table class="table">
-                        <thead>
-                        <tr>
-                            <th scope="col">Image</th>
-                            <th scope="col">Description</th>
-                        </tr>
-                        </thead>
                         <tbody>
 
                         <tr >
@@ -19,9 +14,8 @@
                             </td>
                             <td>
                                 <div scope="row" style="font-size: x-small">{{ this.object.start }}</div>
-                                <div scope="row" style="font-size: x-small">{{ this.object.thing_id }}</div>
                                 <div scope="row" style="font-size: x-small">{{ this.object.type }}</div>
-                                <div><a :href="'/object/'+ this.object.thing_id">{{ this.object.name }}</a></div>
+                                <div>{{ this.object}}</div>
                                 {{ this.object.description }}
                             </td>
 <!--                            <td>
