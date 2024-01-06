@@ -1,44 +1,38 @@
 <template>
     Classes:
     <tree-menu
-        :name="this.classes.name"
-        :nodes="this.classes.nodes"
-        :depth="0"
-        :checked-items="checkboxStore.checkedItems">
-        </tree-menu>
+        :name="classes.name"
+        :nodes="classes.nodes"
+        :depth="0">
+    </tree-menu>
 </template>
 
 <script>
 import TreeMenu from "./TreeMenu.vue";
 import { useObjectsStore } from '@/stores/objects';
-import { useCheckboxStore } from '../stores/checkboxes';
-const objects = useObjectsStore()
-const checkboxStore = useCheckboxStore();
 
 export default {
     name: "ClassTree",
-    components: {TreeMenu},
+    components: { TreeMenu },
     data() {
         return {
             classes: [],
-            checkedItems: [],
-        }
+            loaded: false,
+        };
     },
-    created: function () {
+    created() {
         this.getClasses();
     },
     methods: {
         async getClasses() {
-            await objects.loadClassTree();
-            this.classes = objects.classes;
-        },
-        handleCheckedUpdate(updatedCheckedItems) {
-            this.checkedItems = updatedCheckedItems;
+            const objectsStore = useObjectsStore();
+            await objectsStore.loadClassTree();
+            this.classes = objectsStore.classes;
+            this.loaded = true;
         }
     }
 }
 </script>
 
 <style scoped>
-
 </style>

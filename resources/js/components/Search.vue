@@ -1,6 +1,7 @@
 <template>
     <div class="container" id="search" v-cloak>
-        <div class="row">
+        <div v-if="!this.loaded" class="row">Loading</div>
+        <div v-else class="row">
             <div class="col-2">
                 <class-tree></class-tree>
             </div>
@@ -88,7 +89,8 @@ export default {
     data() {
         return {
             objects: [],
-            classes: []
+            classes: [],
+            loaded: false,
         }
     },
     computed: {
@@ -145,6 +147,7 @@ export default {
                 }
             }).finally(() => {
                 this.processing = false;
+                this.loaded = true;
             })
         }
 
