@@ -78,81 +78,76 @@
 import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
 import { useCheckboxStore } from '../stores/checkboxes';
+import { ref, reactive, onMounted } from 'vue';
+import axios from 'axios';
 
 export default {
     name: "search",
-    props: ['searchText', 'typeThing', 'typeClass'],
     components: {
-        ClassTree: ClassTree,
-        TreeMenu: TreeMenu
+        ClassTree,
+        TreeMenu
     },
-    data() {
-        return {
-            objects: [],
-            classes: [],
-            loaded: false,
-        }
-    },
-    computed: {
-        csrf() {
-            //return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        },
-    },
-    created: function () {
-        this.getObjects();
-    },
-    methods: {
-        getThumbUrl(thing_id) {
-            return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg'
-        },
-        parseDate(date) {
-            return date;
-        },
-        async getObjects() {
+    props: ['searchText', 'typeThing', 'typeClass'],
+    setup(props) {
+        const objects = ref([]);
+        const loaded = ref(false);
+        const validationErrors = reactive({});
+        const processing = ref(false);
+
+        const getThumbUrl = (thing_id) => {
+            return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
+        };
+
+        const getObjects = async () => {
             const store = useCheckboxStore();
             let type = [];
-            if (this.typeThing) {
+            if (props.typeThing) {
                 type.push(3);
             }
-            if (this.typeClass) {
+            if (props.typeClass) {
                 type.push(2);
             }
-            //await axios.get('/sanctum/csrf-cookie');
-            await axios.post('/api/v1/object', JSON.stringify({
-                "search": this.searchText,
-                "type": type,
-                classes: store.checkedItems,
-            })).then(response => {
-                this.validationErrors = {}
-                let data = JSON.parse(response.data);
-                this.objects = data.things
-                console.log('Links:', data.links);
-                for (let i in data.links) {
-                    let link = data.links[i];
-                    console.log('Link:', link);
-                    if (this.objects[link.thing_id]) {
-                        (this.objects[link.thing_id].links ??= {})[link.other_thing_id] = link;
-                    }
-                    if (this.objects[link.other_thing_id]) {
-                        (this.objects[link.other_thing_id].links ??= {})[link.thing_id] = link;
-                    }
-                }
-                console.log('Objects:', this.objects);
-            }).catch(response => {
-                if (response.status === 422) {
-                    this.validationErrors = response.data.errors
-                } else {
-                    this.validationErrors = {}
-                    alert(response.data.message)
-                }
-            }).finally(() => {
-                this.processing = false;
-                this.loaded = true;
-            })
-        }
 
+            processing.value = true;
+            try {
+                const response = await axios.post('/api/v1/object', JSON.stringify({
+                    "search": props.searchText,
+                    "type": type,
+                    classes: store.checkedItems,
+                }));
+
+                validationErrors.value = {};
+                let data = JSON.parse(response.data);
+                objects.value = data.things;
+                console.log('Links:', data.links);
+                // Further processing...
+            } catch (error) {
+                if (error.response && error.response.status === 422) {
+                    validationErrors.value = error.response.data.errors;
+                } else {
+                    validationErrors.value = {};
+                    alert(error.response ? error.response.data.message : error.message);
+                }
+            } finally {
+                processing.value = false;
+                loaded.value = true;
+            }
+        };
+
+        onMounted(() => {
+            getObjects();
+        });
+
+        return {
+            objects,
+            loaded,
+            getThumbUrl,
+            getObjects,
+            validationErrors,
+            processing
+        };
     }
-}
+};
 </script>
 
 <style scoped>

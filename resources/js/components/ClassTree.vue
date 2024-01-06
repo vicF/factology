@@ -1,37 +1,38 @@
 <template>
-    Classes:
-    <tree-menu
-        :name="classes.name"
-        :nodes="classes.nodes"
-        :depth="0">
-    </tree-menu>
+    <div>
+        Classes:
+        <TreeMenu :name="classes.name" :nodes="classes.nodes" :depth="0" />
+    </div>
 </template>
 
 <script>
 import TreeMenu from "./TreeMenu.vue";
 import { useObjectsStore } from '@/stores/objects';
+import { ref, onMounted } from 'vue';
 
 export default {
-    name: "ClassTree",
     components: { TreeMenu },
-    data() {
-        return {
-            classes: [],
-            loaded: false,
-        };
-    },
-    created() {
-        this.getClasses();
-    },
-    methods: {
-        async getClasses() {
+    setup() {
+        const classes = ref([]);
+        const loaded = ref(false);
+
+        const getClasses = async () => {
             const objectsStore = useObjectsStore();
             await objectsStore.loadClassTree();
-            this.classes = objectsStore.classes;
-            this.loaded = true;
-        }
-    }
-}
+            classes.value = objectsStore.classes;
+            loaded.value = true;
+        };
+
+        onMounted(() => {
+            getClasses();
+        });
+
+        return {
+            classes,
+            loaded,
+        };
+    },
+};
 </script>
 
 <style scoped>
