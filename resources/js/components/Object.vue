@@ -14,9 +14,17 @@
                                 </a>
                             </td>
                             <td>
-                                <div style="font-size: x-small">{{ object.start }}</div>
-                                <div style="font-size: x-small">{{ object.type }}</div>
-                                <div>{{ object }}</div>
+                                <div v-if="object.start">Start: {{ object.start }}</div>
+                                <div v-if="object.end">End: {{ object.end }}</div>
+                                <div v-if="object.class.name">Class: {{ object.class.name }}
+                                    <template v-if="object.class.description">({{ object.class.description }})
+                                    </template>
+                                </div>
+                                <div v-if="object.description">{{ object.description }}</div>
+                                <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
+                                <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
+                                <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
+                                <pre>{{ object }}</pre>
                                 {{ object.description }}
                             </td>
                             <!--

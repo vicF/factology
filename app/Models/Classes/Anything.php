@@ -241,7 +241,7 @@ class Anything
 
     /**
      * @TODO revise
-     * This probably should return the name of PHP class to be instantiated. Looks too complicated for this
+     * This should return the name of PHP class to be instantiated.
      *
      * @param $id
      * @return Model|\Illuminate\Database\Query\Builder|object|null
@@ -249,7 +249,7 @@ class Anything
     public static function getClassDataByObjectId($id)
     {
         return DB::table('links')
-            ->select('other_thing_id as id', 'class_name', 'c.name as any_class_name')
+            //->select('other_thing_id as id', 'class_name', 'c.name as any_class_name')
             ->where('links.thing_id', $id)
             ->where('link_type_id', UUID::LINK_TO_CLASS)
             ->leftJoin('classes', 'links.other_thing_id', 'classes.thing_id')
