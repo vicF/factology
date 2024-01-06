@@ -39,39 +39,47 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex'
+import { reactive, ref, toRefs } from 'vue';
+import { useStore } from 'vuex';
+
 export default {
-    name:"login",
-    data(){
-        return {
-            auth:{
-                email:"",
-                password:""
-            },
-            validationErrors:{},
-            processing:false
-        }
-    },
-    methods:{
-        ...mapActions({
-            signIn:'auth/login'
-        }),
-        async login(){
-            this.processing = true
-            await axios.get('/sanctum/csrf-cookie')
-            await axios.post('/login',this.auth).then(({data})=>{
-                this.signIn()
-            }).catch(({response})=>{
-                if(response.status===422){
-                    this.validationErrors = response.data.errors
-                }else{
-                    this.validationErrors = {}
-                    alert(response.data.message)
+    name: "login",
+    setup() {
+        const store = useStore();
+        const auth = reactive({
+            email: "",
+            password: ""
+        });
+        const validationErrors = ref({});
+        const processing = ref(false);
+
+        const signIn = async () => {
+            await store.dispatch('auth/login');
+        };
+
+        const login = async () => {
+            processing.value = true;
+            await axios.get('/sanctum/csrf-cookie');
+            await axios.post('/login', auth).then(({ data }) => {
+                signIn();
+            }).catch(({ response }) => {
+                if (response.status === 422) {
+                    validationErrors.value = response.data.errors;
+                } else {
+                    validationErrors.value = {};
+                    alert(response.data.message);
                 }
-            }).finally(()=>{
-                this.processing = false
-            })
-        },
+            }).finally(() => {
+                processing.value = false;
+            });
+        };
+
+        return {
+            ...toRefs(auth),
+            validationErrors,
+            processing,
+            login
+        };
     }
 }
 </script>

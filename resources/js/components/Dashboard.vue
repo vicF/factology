@@ -1,13 +1,13 @@
 <template>
-    <div class="container">
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header">
+    <div className="container">
+        <div className="row">
+            <div className="col-12">
+                <div className="card shadow-sm">
+                    <div className="card-header">
                         <h3>Dashboard</h3>
                     </div>
-                    <div class="card-body">
-                        <p class="mb-0">You are logged in as <b>{{user.email || 'guest'}}</b></p>
+                    <div className="card-body">
+                        <p className="mb-0">You are logged in as <b>{{ user.email || 'guest' }}</b></p>
                     </div>
                 </div>
             </div>
@@ -16,17 +16,20 @@
 </template>
 
 <script>
+import {computed} from 'vue';
+import {useStore} from 'vuex';
+
 export default {
-    name:"dashboard",
-    /*data(){
+    name: "dashboard",
+    setup() {
+        const store = useStore();
+
+        // Replace the 'computed' property with a computed ref
+        const user = computed(() => store.state.auth.user);
+
         return {
-            user:this.$store.state.auth.user
-        }
-    },*/
-    computed: {
-        user: function() {
-            return this.$store.state.auth.user;
-        }
+            user
+        };
     },
 }
 </script>
