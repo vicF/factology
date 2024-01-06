@@ -47,42 +47,49 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex'
+import { reactive, toRefs } from 'vue';
+import { mapActions, useStore } from 'vuex';
+
 export default {
-    name:'register',
-    data(){
-        return {
-            user:{
-                name:"",
-                email:"",
-                password:"",
-                password_confirmation:""
+    name: 'register',
+    setup() {
+        const store = useStore();
+        const state = reactive({
+            user: {
+                name: "",
+                email: "",
+                password: "",
+                password_confirmation: ""
             },
-            validationErrors:{},
-            processing:false
-        }
-    },
-    methods:{
-        ...mapActions({
-            signIn:'auth/login'
-        }),
-        async register(){
-            this.processing = true
-            await axios.get('/sanctum/csrf-cookie')
-            await axios.post('/register',this.user).then(response=>{
-                this.validationErrors = {}
-                this.signIn()
-            }).catch(({response})=>{
-                if(response.status===422){
-                    this.validationErrors = response.data.errors
-                }else{
-                    this.validationErrors = {}
-                    alert(response.data.message)
+            validationErrors: {},
+            processing: false
+        });
+
+        const { signIn } = mapActions(store, ['auth/login']);
+
+        const register = async () => {
+            state.processing = true;
+            try {
+                await axios.get('/sanctum/csrf-cookie');
+                await axios.post('/register', state.user);
+                state.validationErrors = {};
+                await signIn();
+            } catch ({ response }) {
+                if (response && response.status === 422) {
+                    state.validationErrors = response.data.errors;
+                } else {
+                    state.validationErrors = {};
+                    alert(response ? response.data.message : "Error during registration");
                 }
-            }).finally(()=>{
-                this.processing = false
-            })
-        }
+            } finally {
+                state.processing = false;
+            }
+        };
+
+        return {
+            ...toRefs(state),
+            register
+        };
     }
-}
+};
 </script>
