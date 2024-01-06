@@ -27,7 +27,7 @@ class ApiController extends BaseController
     {
         return response()->json(
             [
-                'data' => Anything::CreateFromId($id)->toArray(),
+                'data' => Anything::getDataById($id),
                 'success' => true
             ]);
     }

@@ -246,7 +246,7 @@ class Anything
      * @param $id
      * @return Model|\Illuminate\Database\Query\Builder|object|null
      */
-    public static function getClassByObjectId($id)
+    public static function getClassDataByObjectId($id)
     {
         return DB::table('links')
             ->select('other_thing_id as id', 'class_name', 'c.name as any_class_name')
@@ -259,13 +259,22 @@ class Anything
 
     /**
      * @param $id
+     * @return string
+     */
+    public static function getClassNameFromClassdata($classData)
+    {
+        return '\\App\\Models\\Classes\\' . ($classData?->class_name ?? 'Anything');
+    }
+
+    /**
+     * @param $id
      * @return Anything
      */
     public static function CreateFromId($id)
     {
         LOG::debug('Creating object from id: ' . $id);
-        $class = self::getClassByObjectId($id);
-        $className = '\\App\\Models\\Classes\\' . ($class->class_name ?? 'Anything');
+        $class = self::getClassDataByObjectId($id);
+        $className = self::getClassNameFromClassdata($class); //'\\App\\Models\\Classes\\' . ($class->class_name ?? 'Anything');
         try {
             return new $className(['thing_id' => $id], $class);
             /** @var Anything $className */
@@ -276,6 +285,36 @@ class Anything
             abort(404);
             //throw new \RuntimeException('No object with uuid=' . $id, 404, $e);
         }
+    }
+
+    /**
+     * Returns data and links to display object on the web
+     * @return void
+     */
+    public static function getDataById($id): array
+    {
+        LOG::debug('retrieving object data for id: ' . $id);
+        $class = self::getClassDataByObjectId($id);
+        $className = self::getClassNameFromClassdata($class); //'\\App\\Models\\Classes\\' . ($class->class_name ?? 'Anything');
+
+        try {
+            /** @var Anything $className */
+            return $className::getClassSpecificDataById($id, $class);
+
+            /*$thing = $className::_getRow($id)->first();
+            // Keep date in db format to be able to compare
+            return $className::CreateFromData(self::convertToArray($thing));*/
+        } catch (ModelNotFoundException $e) {
+            abort(404);
+            //throw new \RuntimeException('No object with uuid=' . $id, 404, $e);
+        }
+    }
+
+    public static function getClassSpecificDataById($id, $class): array
+    {
+        $thing = (array)static::_getRow($id)->first();
+        $thing['class'] = $class;
+        return $thing;
     }
 
     /**
