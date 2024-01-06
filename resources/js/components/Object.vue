@@ -1,34 +1,37 @@
 <template>
     <div class="container" id="search">
-        <div v-if="!this.loaded" class="row">Loading</div>
+        <div v-if="!loaded" class="row">Loading</div>
         <div v-else class="row">
-            <h1>{{ this.object.name }}</h1>
+            <h1>{{ object.name }}</h1>
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
                     <table class="table">
                         <tbody>
-
-                        <tr >
+                        <tr>
                             <td scope="row" style="font-size: x-small">
-                                <a :href="'/object/'+this.object.thing_id"><img :src="this.getThumbUrl(this.object.thing_id)"/></a>
+                                <a :href="'/object/' + object.thing_id">
+                                    <img :src="getThumbUrl(object.thing_id)" />
+                                </a>
                             </td>
                             <td>
-                                <div scope="row" style="font-size: x-small">{{ this.object.start }}</div>
-                                <div scope="row" style="font-size: x-small">{{ this.object.type }}</div>
-                                <div>{{ this.object}}</div>
-                                {{ this.object.description }}
+                                <div style="font-size: x-small">{{ object.start }}</div>
+                                <div style="font-size: x-small">{{ object.type }}</div>
+                                <div>{{ object }}</div>
+                                {{ object.description }}
                             </td>
-<!--                            <td>
-                                <div v-for="link in thing.links"
-                                     :set="other_id = (link.thing_id == thing.thing_id) ? link.other_thing_id:link.thing_id">
-                                    <a
-                                        :href="'/object/'+other_id">
-                                        <img :src="this.getThumbUrl(other_id)" width="50"/></a>
-                                    <a :href="'/object/'+link.link_type_id"><img
-                                        :src="this.getThumbUrl(link.link_type_id)"
-                                        width="50"/></a>{{ link.translation }}
-                                </div>
-                            </td>-->
+                            <!--
+                            <td>
+                              <div v-for="link in object.links" :key="link.link_type_id">
+                                <a :href="'/object/' + link.other_thing_id">
+                                  <img :src="getThumbUrl(link.other_thing_id)" width="50" />
+                                </a>
+                                <a :href="'/object/' + link.link_type_id">
+                                  <img :src="getThumbUrl(link.link_type_id)" width="50" />
+                                </a>
+                                {{ link.translation }}
+                              </div>
+                            </td>
+                            -->
                         </tr>
                         </tbody>
                     </table>
@@ -41,73 +44,73 @@
 <script>
 export default {
     name: "search",
-    props: ['searchText', 'typeThing', 'typeClass'],
-     data() {
+    props: ["searchText", "typeThing", "typeClass"],
+    data() {
         return {
-            object: [],
+            object: {},
             classes: [],
-            loaded: false
-        }
+            loaded: false,
+            validationErrors: {},
+            processing: false,
+        };
     },
     computed: {
         csrf() {
             //return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         },
     },
-    created: function () {
+    created() {
         this.getObject();
         this.getClasses();
     },
     methods: {
         getThumbUrl(thing_id) {
-            return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg'
+            return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
         },
         parseDate(date) {
             return date;
         },
         async getObject() {
-            let type = [];
-            console.log('getObject')
-            await axios.get('/api/v1/object/' + this.$route.params.uid).then(response => {
-                this.validationErrors = {}
-                this.object = response.data.data
-                this.loaded = true
-            }).catch(({response}) => {
-                if (response.status === 422) {
-                    this.validationErrors = response.data.errors
+            try {
+                const response = await axios.get(`/api/v1/object/${this.$route.params.uid}`);
+                this.validationErrors = {};
+                this.object = response.data.data;
+                this.loaded = true;
+            } catch ({ response }) {
+                if (response && response.status === 422) {
+                    this.validationErrors = response.data.errors;
                 } else {
-                    this.validationErrors = {}
-                    alert(response.data.message)
+                    this.validationErrors = {};
+                    alert(response ? response.data.message : "Error fetching object");
                 }
-            }).finally(() => {
+            } finally {
                 this.processing = false;
-            })
-
+            }
         },
         async getClasses() {
-            /*await axios.post('/api/v1/object', JSON.stringify({
+            /*
+            try {
+              const response = await axios.post('/api/v1/object', JSON.stringify({
                 "search": this.searchText,
                 "type": [2]
-            })).then(response => {
-                this.validationErrors = {}
-                this.classes = JSON.parse(response.data).classes
-
-            }).catch(({response}) => {
-                if (response.status === 422) {
-                    this.validationErrors = response.data.errors
-                } else {
-                    this.validationErrors = {}
-                    alert(response.data.message)
-                }
-            }).finally(() => {
-                this.processing = false
-            })*/
-
-        }
-    }
-}
+              }));
+              this.validationErrors = {};
+              this.classes = JSON.parse(response.data).classes;
+            } catch ({ response }) {
+              if (response && response.status === 422) {
+                this.validationErrors = response.data.errors;
+              } else {
+                this.validationErrors = {};
+                alert(response ? response.data.message : "Error fetching classes");
+              }
+            } finally {
+              this.processing = false;
+            }
+            */
+        },
+    },
+};
 </script>
 
 <style scoped>
-
 </style>
