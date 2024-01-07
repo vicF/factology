@@ -26,6 +26,10 @@
                             <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
+                            <div v-if="isGenealogyVisible">
+                                <div>{{ genealogy.father }}</div>
+                                <div>{{ genealogy.mother }}</div>
+                            </div>
 
                         </div>
                     </div>
@@ -64,6 +68,8 @@ import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
+import { reactive } from 'vue';
+import { computed } from 'vue';
 
 export default {
     name: "search",
@@ -124,6 +130,17 @@ export default {
             }
         });
 
+        const genealogy = ref({
+            father: null,
+            mother: null,
+            // ... other properties
+        });
+
+        const isGenealogyVisible = computed(() => {
+            // Check if any property in genealogy has a value
+            return Object.values(genealogy.value).some(v => v !== null);
+        });
+
         return {
             object,
             loaded,
@@ -131,6 +148,8 @@ export default {
             processing,
             getThumbUrl,
             parseDate,
+            genealogy,
+            isGenealogyVisible,
         };
     },
 };
