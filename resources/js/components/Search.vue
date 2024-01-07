@@ -35,9 +35,9 @@
                         <div class="row mb-3" v-for="thing in objects" :key="thing.thing_id">
                             <!-- Image Column -->
                             <div class="col-md-2" style="font-size: x-small;">
-                                <a :href="'/object/' + thing.thing_id">
+                                <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }">
                                     <img :src="getThumbUrl(thing.thing_id)" />
-                                </a>
+                                </RouterLink>
                             </div>
 
                             <!-- Description and Details Column -->

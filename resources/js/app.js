@@ -22,8 +22,7 @@ const app = createApp({});
 app.use(pinia);
 app.use(Router);
 app.use(store);
-/*import ExampleComponent from './components/ExampleComponent.vue';
-app.component('example-component', ExampleComponent);*/
+
 
 /**
  * The following block of code may be used to automatically register your
@@ -37,13 +36,26 @@ app.component('example-component', ExampleComponent);*/
 //     app.component(path.split('/').pop().replace(/\.\w+$/, ''), definition.default);
 // });
 
-
+/**
+ * Truncates text
+ * @param text
+ * @param length
+ * @returns {*|string}
+ */
 app.config.globalProperties.$truncateText = function(text, length) {
     if (text.length <= length) {
         return text;
     }
     let trimmed = text.substr(0, length);
     return trimmed.substr(0, Math.min(trimmed.length, trimmed.lastIndexOf(" "))) + ' ...';
+};
+
+/**
+ * Router link
+ * @param id
+ */
+app.config.globalProperties.$navigateToObject = function(id) {
+    this.$router.push({ name: 'object', params: { uid: id } });
 };
 
 /**

@@ -313,6 +313,9 @@ class Anything
     public static function getClassSpecificDataById($id, $class): array
     {
         $thing = (array)static::_getRow($id)->first();
+        if (empty($thing)) {
+            abort(404);
+        }
         $thing['class'] = $class;
         $first = DB::table('links') // One way links
         ->where('links.thing_id', $thing['thing_id'])
