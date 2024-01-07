@@ -15,11 +15,10 @@
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
-                            <div v-if="object.start">Start: {{ $dateFromDb(object.start) }}</div>
+                            <div v-if="object.start">{{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}: {{ $dateFromDb(object.start) }}</div>
                             <div v-if="object.end">End: {{ $dateFromDb(object.end) }}</div>
-                            <div v-if="object.class?.name">Class: {{ object.class.name }}
-                                <template v-if="object.class?.description">({{ object.class.description }})
-                                </template>
+                            <div v-if="object.class?.name">Class: <RouterLink :to="{ name: 'object', params: { uid: object.class?.thing_id } }">{{ object.class?.name }}
+                                <template v-if="object.class?.description">({{ object.class.description }})</template></RouterLink>
                             </div>
                             <div v-if="object.description">{{ object.description }}</div>
                             <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
@@ -30,6 +29,7 @@
 
                         </div>
                     </div>
+                    <!-- Going through links -->
                     <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
                         <div class="col-md-2">
                             <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
@@ -60,91 +60,82 @@
 
 
 <script>
+import { ref, onMounted, watch } from 'vue';
+import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
+import { useRouter, useRoute } from 'vue-router';
 
 export default {
     name: "search",
-    components: {ClassTree},
+    components: { ClassTree },
     props: ["searchText", "typeThing", "typeClass"],
-    data() {
-        return {
-            object: {},
-            classes: [],
-            loaded: false,
-            validationErrors: {},
-            processing: false,
-        };
-    },
-    computed: {
-        csrf() {
-            //return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        },
-    },
-    watch: {
-        '$route.params.uid': function(newParam, oldParam) {
-            if (newParam !== oldParam) {
-                // Reload data when route parameters change
-                this.getObject();
-                this.getClasses();
-            }
-        },
-    },
-    created() {
-        this.getObject();
-        this.getClasses();
-    },
-    methods: {
-        getThumbUrl(thing_id) {
+    setup(props) {
+        const router = useRouter();
+        const route = useRoute();
+        const object = ref({});
+        const loaded = ref(false);
+        const validationErrors = ref({});
+        const processing = ref(false);
+
+        const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
-        },
-        parseDate(date) {
+        };
+
+        const parseDate = (date) => {
             return date;
-        },
-        async getObject() {
+        };
+
+        const getObject = async () => {
             try {
-                const response = await axios.get(`/api/v1/object/${this.$route.params.uid}`);
-                this.validationErrors = {};
-                this.object = response.data.data;
-                this.loaded = true;
-            } catch ({ response }) {
+                const response = await axios.get(`/api/v1/object/${route.params.uid}`);
+                validationErrors.value = {};
+                object.value = response.data.data;
+                loaded.value = true;
+            } catch (error) {
+                const response = error.response;
                 if (response && response.status === 422) {
-                    this.validationErrors = response.data.errors;
+                    validationErrors.value = response.data.errors;
                 }
                 else if (response && response.status === 401) {
-                    this.$router.push({ name: 'login' });
+                    router.push({ name: 'login' });
                 }
                 else {
-                    this.validationErrors = {};
+                    validationErrors.value = {};
                     alert(response ? response.data.message : "Error fetching object");
                 }
             } finally {
-                this.processing = false;
+                processing.value = false;
             }
-        },
-        async getClasses() {
-            /*
-            try {
-              const response = await axios.post('/api/v1/object', JSON.stringify({
-                "search": this.searchText,
-                "type": [2]
-              }));
-              this.validationErrors = {};
-              this.classes = JSON.parse(response.data).classes;
-            } catch ({ response }) {
-              if (response && response.status === 422) {
-                this.validationErrors = response.data.errors;
-              } else {
-                this.validationErrors = {};
-                alert(response ? response.data.message : "Error fetching classes");
-              }
-            } finally {
-              this.processing = false;
+        };
+        const getClasse  = async () =>
+        {
+
+        };
+
+        onMounted(() => {
+            getObject();
+            // getClasses();
+        });
+
+        watch(() => route.params.uid, (newParam, oldParam) => {
+            if (newParam !== oldParam) {
+                getObject();
+                // getClasses();
             }
-            */
-        },
+        });
+
+        return {
+            object,
+            loaded,
+            validationErrors,
+            processing,
+            getThumbUrl,
+            parseDate,
+        };
     },
 };
 </script>
+
 
 <style scoped>
 </style>
