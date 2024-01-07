@@ -30,46 +30,45 @@
                     <label class="form-check-label" for="checkClass">Private</label>
 
                 </div>-->
-                <div class="row">
+                <div class="row mt-5">
                     <div class="col-md-10 offset-md-1">
-                        <div class="row">
-                            <div class="col-12" v-for="thing in objects" :key="thing.thing_id">
-                                <div class="row">
-                                    <!-- Image Column -->
-                                    <div class="col-md-2" style="font-size: x-small;">
-                                        <a :href="'/object/' + thing.thing_id">
-                                            <img :src="getThumbUrl(thing.thing_id)" />
-                                        </a>
-                                    </div>
+                        <div class="row mb-3" v-for="thing in objects" :key="thing.thing_id">
+                            <!-- Image Column -->
+                            <div class="col-md-2" style="font-size: x-small;">
+                                <a :href="'/object/' + thing.thing_id">
+                                    <img :src="getThumbUrl(thing.thing_id)" />
+                                </a>
+                            </div>
 
-                                    <!-- Description and Details Column -->
-                                    <div class="col-md-4" style="font-size: x-small;">
-                                        <div>
-                                            <a :href="'/object/' + thing.thing_id">{{ thing.name }}</a>
-                                        </div>
-                                        <div>{{ thing.description }}</div>
-                                    </div>
+                            <!-- Description and Details Column -->
+                            <div class="col-md-4" style="font-size: x-small;">
+                                <div>
+                                    <a :href="'/object/' + thing.thing_id">{{ thing.name }}</a>
+                                </div>
+                                <div>{{ thing.description }}</div>
+                            </div>
 
-                                    <!-- Links Column -->
-                                    <div class="col-md-6">
-                                        <div v-for="link in thing.links" :key="link.link_type_id">
-                                            <a :href="'/object/' + link.link_type_id">
-                                                <img :src="getThumbUrl(link.link_type_id)" width="10" />
-                                            </a>
-                                            <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
-                                                <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
-                                            </a>
-                                            {{ link.translation }}
-                                            <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
-                                                {{ link.name }}
-                                            </a>
-                                        </div>
-                                    </div>
+                            <!-- Links Column -->
+                            <div class="col-md-6">
+                                <div v-for="link in thing.links" :key="link.link_type_id">
+                                    <a :href="'/object/' + link.link_type_id">
+                                        <img :src="getThumbUrl(link.link_type_id)" width="10" />
+                                    </a>
+                                    <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                        <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
+                                    </a>
+                                    {{ link.translation }}
+                                    <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                        {{ link.name }}
+                                    </a>
                                 </div>
                             </div>
+                            <!-- Horizontal Line After Each Row -->
+                            <div class="col-12"><hr></div>
                         </div>
                     </div>
                 </div>
+
 
 
             </div>
