@@ -167,7 +167,7 @@ class ApiController extends BaseController
 
         if (!empty($requestBody['classes'])) {
             $query->leftJoin('links', function ($join) {
-                $join->on('things.thing_id', '=', 'links.thing_id');
+                $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
@@ -196,7 +196,7 @@ class ApiController extends BaseController
         $ids = $data->pluck('thing_id')->toArray();
         $links = DB::table('links')
             ->select('links.*', 'things.name')
-            ->whereIn('links.thing_id', $ids)
+            ->whereIn('links.one_thing_id', $ids)
             ->orWhere('other_thing_id', $ids)
             ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
             ->get()->toArray();
@@ -217,12 +217,12 @@ class ApiController extends BaseController
                 (name, level, id, parent_id, description, translation)  as (
                     select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
                     from things c
-                    left join links l on l.thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
                     where c.type=2 and c.thing_id = '3e15244c-a9e1-4a91-a0ca-1c65722a64df'
                     union distinct
                     select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
                     from descendants d, things c
-                    left join links l on l.thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
                     where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
                 )
                 select * from descendants ORDER BY level;";
@@ -255,7 +255,7 @@ class ApiController extends BaseController
             ->auth('links')
             //->auth()
             ->leftJoin('links', static function ($join) {
-                $join->on('things.thing_id', 'links.thing_id')
+                $join->on('things.thing_id', 'links.one_thing_id')
                     ->whereRaw('links.link_type_id = ?', UUID::PARENT);
             })
             ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])

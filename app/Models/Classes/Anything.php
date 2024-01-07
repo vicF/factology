@@ -250,7 +250,7 @@ class Anything
     {
         return DB::table('links')
             //->select('other_thing_id as id', 'class_name', 'c.name as any_class_name')
-            ->where('links.thing_id', $id)
+            ->where('links.one_thing_id', $id)
             ->where('link_type_id', UUID::LINK_TO_CLASS)
             ->leftJoin('classes', 'links.other_thing_id', 'classes.thing_id')
             ->leftJoin('things as c', 'links.other_thing_id', 'c.thing_id')
@@ -318,13 +318,13 @@ class Anything
         }
         $thing['class'] = $class;
         $first = DB::table('links') // One way links
-        ->where('links.thing_id', $thing['thing_id'])
+        ->where('links.one_thing_id', $thing['thing_id'])
             ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
             ->limit(50);
 
         $second = DB::table('links') // other way links
         ->where('links.other_thing_id', $thing['thing_id'])
-            ->leftJoin('things', 'links.thing_id', '=', 'things.thing_id')
+            ->leftJoin('things', 'links.one_thing_id', '=', 'things.thing_id')
             ->limit(50);
 
         $thing['links'] = $first
@@ -758,7 +758,7 @@ class Anything
     {
         return DB::table('links')
             ->auth()
-            ->where('links.thing_id', $this->thing_id)
+            ->where('links.one_thing_id', $this->thing_id)
             ->where('link_type_id', UUID::LINK_TO_CLASS)
             ->where('things.deleted', 0)
             ->where('links.deleted', 0)
@@ -771,9 +771,9 @@ class Anything
     {
         if (empty($this->_classes)) {
             $this->_classes = DB::table('links')
-                ->join('things', 'links.thing_id', 'things.thing_id') // For auth
+                ->join('things', 'links.one_thing_id', 'things.thing_id') // For auth
                 ->auth('links')
-                ->where('links.thing_id', $this->thing_id)
+                ->where('links.one_thing_id', $this->thing_id)
                 ->where('link_type_id', UUID::LINK_TO_CLASS)
                 ->where('links.deleted', 0)
                 ->pluck('other_thing_id')->toArray();
@@ -789,9 +789,9 @@ class Anything
     public function getParents()
     {
         return DB::table('links')
-            ->join('things', 'links.thing_id', 'things.thing_id') // For auth
+            ->join('things', 'links.one_thing_id', 'things.thing_id') // For auth
             ->auth()
-            ->where('links.thing_id', $this->thing_id)
+            ->where('links.one_thing_id', $this->thing_id)
             ->where('link_type_id', UUID::PARENT)
             ->get('other_thing_id')->toArray();
     }

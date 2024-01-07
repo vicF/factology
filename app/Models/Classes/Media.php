@@ -139,7 +139,7 @@ class Media extends \App\Models\Classes\Thing
             ->where('media_thing_id', $this->thing_id)
             ->leftJoin('things AS folder', 'folder_id', 'thing_id')
             ->leftJoin('links', function ($join) {
-                $join->on('links.thing_id', 'folder_id');
+                $join->on('links.one_thing_id', 'folder_id');
                 $join->on('link_type_id', DB::raw("'" . UUID::INSIDE . "'"));
             })
             ->leftJoin('things AS machine', 'links.other_thing_id', 'machine.thing_id')

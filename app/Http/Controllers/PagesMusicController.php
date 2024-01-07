@@ -22,7 +22,7 @@ class PagesMusicController extends Controller
             ->where('links.other_thing_id', UUID::MUSIC_BAND)
             ->where('things.deleted', 0)
             ->auth('links')
-            ->join('things', 'links.thing_id', 'things.thing_id')
+            ->join('things', 'links.one_thing_id', 'things.thing_id')
             ->auth('things')
             ->orderBy('name')
             ->get()->toArray();
@@ -42,7 +42,7 @@ class PagesMusicController extends Controller
             ->where('links.other_thing_id', $id)
             ->where('things.deleted', 0)
             ->auth('links')
-            ->join('things', 'links.thing_id', 'things.thing_id')
+            ->join('things', 'links.one_thing_id', 'things.thing_id')
             ->auth('things')
             ->orderBy('start', 'desc')
             ->get()->toArray();
@@ -56,7 +56,7 @@ class PagesMusicController extends Controller
             ->where('links.other_thing_id', $id)
             ->where('things.deleted', 0)
             ->auth('links')
-            ->join('things', 'links.thing_id', 'things.thing_id')
+            ->join('things', 'links.one_thing_id', 'things.thing_id')
             ->auth('things')
             ->orderBy('start', 'desc')
             ->get()->toArray();
