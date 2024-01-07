@@ -2,14 +2,12 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DatabaseTest extends TestCase
 {
-    use RefreshDatabase;
     /**
      * Just a simple check that some query works, i.e. database exists
      */

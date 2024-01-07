@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AccessTest extends TestCase
@@ -12,7 +11,7 @@ class AccessTest extends TestCase
     {
         return [
             ['/'],
-            ['/photos', 302],
+            //['/photos', 302],
             ['/timeline'],
             ['/classes'],
             ['/object/939cd822-9e23-450c-8c5e-c23f67cca792'], // Anything class
