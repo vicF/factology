@@ -16,8 +16,8 @@
                             <td>
                                 <div v-if="object.start">Start: {{ object.start }}</div>
                                 <div v-if="object.end">End: {{ object.end }}</div>
-                                <div v-if="object.class.name">Class: {{ object.class.name }}
-                                    <template v-if="object.class.description">({{ object.class.description }})
+                                <div v-if="object.class?.name">Class: {{ object.class.name }}
+                                    <template v-if="object.class?.description">({{ object.class.description }})
                                     </template>
                                 </div>
                                 <div v-if="object.description">{{ object.description }}</div>
@@ -27,23 +27,26 @@
                                 <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                                 {{ object.description }}
                             </td>
+                        </tr>
+                        <tr v-for="link in object.links" :key="link.link_type_id">
                             <td>
-                                <div v-for="link in object.links" :key="link.link_type_id">
-                                    <div v-if="link.name">{{ link.name }} </div>
-                                    <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
-                                    <a :href="'/object/' + link.thing_id">
-                                        <img :src="getThumbUrl(link.thing_id)" width="50"/>
-                                    </a>
-                                    <a :href="'/object/' + link.other_thing_id">
-                                        <img :src="getThumbUrl(link.other_thing_id)" width="50"/>
-                                    </a>
-                                    <a :href="'/object/' + link.link_type_id">
-                                        <img :src="getThumbUrl(link.link_type_id)" width="50"/>
-                                    </a>
-                                    {{ link.translation }}
-                                </div>
+                                <a v-if="link.thing_id !=object.thing_id" :href="'/object/' + link.thing_id">
+                                    <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                </a>
+                                <a v-if="link.other_thing_id !=object.thing_id" :href="'/object/' + link.other_thing_id">
+                                    <img :src="getThumbUrl(link.other_thing_id)" width="50"/>
+                                </a>
+                                <a :href="'/object/' + link.link_type_id">
+                                    <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                </a>
+                            </td>
+                            <td>
+                                <div v-if="link.name"><a :href="'/object/' + link.thing_id">{{ link.name }}</a></div>
+                                <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
+                                {{ link.translation }}
                             </td>
                         </tr>
+
                         </tbody>
                     </table>
                 </div>
