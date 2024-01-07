@@ -76,6 +76,15 @@ export default {
             //return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         },
     },
+    watch: {
+        '$route.params.uid': function(newParam, oldParam) {
+            if (newParam !== oldParam) {
+                // Reload data when route parameters change
+                this.getObject();
+                this.getClasses();
+            }
+        },
+    },
     created() {
         this.getObject();
         this.getClasses();
