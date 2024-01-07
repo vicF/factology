@@ -31,44 +31,47 @@
 
                 </div>-->
                 <div class="row">
-                    <div class="col-md-10 col-md-offset-1">
-                        <table class="table">
-                            <thead>
-                            <tr>
-                                <th scope="col">Image</th>
-                                <th scope="col">Description</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-
-                            <tr v-for="thing in this.objects" :key="thing.thing_id">
-                                <td scope="row" style="font-size: x-small">
-                                    <a :href="'/object/'+thing.thing_id"><img :src="this.getThumbUrl(thing.thing_id)"/></a>
-                                </td>
-                                <td>
-                                    <div scope="row" style="font-size: x-small">{{ thing.start }}</div>
-                                    <div scope="row" style="font-size: x-small">{{ thing.thing_id }}</div>
-                                    <div scope="row" style="font-size: x-small">{{ thing.type }}</div>
-                                    <div><a :href="'/object/'+ thing.thing_id">{{ thing.name }}</a></div>
-                                    {{ thing.description }}
-                                </td>
-                                <td>
-                                    <div v-for="link in thing.links"
-                                         :set="other_id = (link.thing_id == thing.thing_id) ? link.other_thing_id:link.thing_id">
-
-                                        <a :href="'/object/'+link.link_type_id"><img
-                                            :src="this.getThumbUrl(link.link_type_id)"
-                                            width="10"/></a><a
-                                        :href="'/object/'+other_id">
-                                        <img :src="this.getThumbUrl(other_id)" width="10"/></a>{{ link.translation }} <a
-                                        :href="'/object/'+other_id">{{link.name}}</a>
+                    <div class="col-md-10 offset-md-1">
+                        <div class="row">
+                            <div class="col-12" v-for="thing in objects" :key="thing.thing_id">
+                                <div class="row">
+                                    <!-- Image Column -->
+                                    <div class="col-md-2" style="font-size: x-small;">
+                                        <a :href="'/object/' + thing.thing_id">
+                                            <img :src="getThumbUrl(thing.thing_id)" />
+                                        </a>
                                     </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+
+                                    <!-- Description and Details Column -->
+                                    <div class="col-md-4" style="font-size: x-small;">
+                                        <div>
+                                            <a :href="'/object/' + thing.thing_id">{{ thing.name }}</a>
+                                        </div>
+                                        <div>{{ thing.description }}</div>
+                                    </div>
+
+                                    <!-- Links Column -->
+                                    <div class="col-md-6">
+                                        <div v-for="link in thing.links" :key="link.link_type_id">
+                                            <a :href="'/object/' + link.link_type_id">
+                                                <img :src="getThumbUrl(link.link_type_id)" width="10" />
+                                            </a>
+                                            <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                                <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
+                                            </a>
+                                            {{ link.translation }}
+                                            <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                                {{ link.name }}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+
             </div>
         </div>
     </div>
