@@ -11,12 +11,12 @@
                     <div class="row rounded border p-3 rounded-4">
                         <div class="col-md-2" style="font-size: x-small">
                             <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                <img :src="getThumbUrl(object.thing_id)" />
+                                <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
-                            <div v-if="object.start">Start: {{ object.start }}</div>
-                            <div v-if="object.end">End: {{ object.end }}</div>
+                            <div v-if="object.start">Start: {{ $dateFromDb(object.start) }}</div>
+                            <div v-if="object.end">End: {{ $dateFromDb(object.end) }}</div>
                             <div v-if="object.class?.name">Class: {{ object.class.name }}
                                 <template v-if="object.class?.description">({{ object.class.description }})
                                 </template>
@@ -43,6 +43,10 @@
                             <div v-if="link.name">
                                 <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
                             </div>
+                            <div v-if="link.start">Start: {{ $dateFromDb(link.start) }}</div>
+                            <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
+                            <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
+                            <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
                             <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
                             {{ link.translation }}
                         </div>

@@ -11,6 +11,7 @@ import store from '@/store';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
+import { dateFromDb } from './utils/dateUtils.js';
 
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
@@ -71,6 +72,8 @@ axios.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+app.config.globalProperties.$dateFromDb = dateFromDb;
 
 /**
  * Finally, we will attach the application instance to a HTML element with
