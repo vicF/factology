@@ -15,7 +15,19 @@
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
-                            <!-- ... (other object details) ... -->
+                            <div v-if="object.start">Start: {{ object.start }}</div>
+                            <div v-if="object.end">End: {{ object.end }}</div>
+                            <div v-if="object.class?.name">Class: {{ object.class.name }}
+                                <template v-if="object.class?.description">({{ object.class.description }})
+                                </template>
+                            </div>
+                            <div v-if="object.description">{{ object.description }}</div>
+                            <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
+                            <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
+                            <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
+                            <!--<pre style="font-size: x-small">{{ object }}</pre>-->
+                            {{ object.description }}
+
                         </div>
                     </div>
                     <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
