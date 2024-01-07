@@ -39,12 +39,14 @@
 </template>
 
 <script>
-import { reactive, ref, toRefs } from 'vue';
+import { reactive, ref, computed, toRefs } from 'vue';
 import { useStore } from 'vuex';
+import { useAuthStore } from './../stores/auth';
 
 export default {
     name: "login",
     setup() {
+        const authStore = useAuthStore();
         const store = useStore();
         const auth = reactive({
             email: "",
@@ -74,11 +76,14 @@ export default {
             });
         };
 
+        const showLoginDialog = computed(() => authStore.showLoginDialog);
+
         return {
             ...toRefs(auth),
             validationErrors,
             processing,
-            login
+            login,
+            showLoginDialog
         };
     }
 }

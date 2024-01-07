@@ -1,8 +1,11 @@
 <template>
     <div class="tree-menu">
         <div :style="indent">
-            <span v-if="showToggle" @click="toggleChildren" style="font-size: larger">
+            <span v-if="showToggle" @click="toggleChildren" style="font-size: larger; cursor: pointer;">
                 {{ showChildren ? '- ' : '+ ' }}
+            </span>
+            <span v-else style="font-size: larger">
+                &nbsp;
             </span>
             <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" /> {{ name }}
         </div>

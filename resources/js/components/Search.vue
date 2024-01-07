@@ -1,6 +1,6 @@
 <template>
     <div class="container" id="search" v-cloak>
-        <div v-if="!this.loaded" class="row">Loading</div>
+        <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
             <div class="col-2">
                 <class-tree></class-tree>
@@ -43,7 +43,7 @@
                             <!-- Description and Details Column -->
                             <div class="col-md-4" style="font-size: x-small;">
                                 <div>
-                                    <a :href="'/object/' + thing.thing_id">{{ thing.name }}</a>
+                                    <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }">{{ thing.name }}</RouterLink>
                                 </div>
                                 <div>{{ thing.description }}</div>
                             </div>
@@ -51,18 +51,20 @@
                             <!-- Links Column -->
                             <div class="col-md-6">
                                 <div v-for="link in thing.links" :key="link.link_type_id">
-                                    <a :href="'/object/' + link.link_type_id">
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
-                                    </a>
-                                    <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                    </RouterLink>
+
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
                                         <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
-                                    </a>
+                                    </RouterLink>
                                     {{ link.translation }}
-                                    <a :href="'/object/' + (link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)">
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
                                         {{ link.name }}
-                                    </a>
+                                    </RouterLink>
                                 </div>
                             </div>
+
                             <!-- Horizontal Line After Each Row -->
                             <div class="col-12"><hr></div>
                         </div>

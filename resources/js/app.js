@@ -10,6 +10,7 @@ import Router from '@/router';
 import store from '@/store';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
+import { useAuthStore } from './stores/auth';
 
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
@@ -57,6 +58,19 @@ app.config.globalProperties.$truncateText = function(text, length) {
 app.config.globalProperties.$navigateToObject = function(id) {
     this.$router.push({ name: 'object', params: { uid: id } });
 };
+
+
+
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response && error.response.status === 401) {
+            const authStore = useAuthStore();
+            authStore.setShowLogin(true);
+        }
+        return Promise.reject(error);
+    }
+);
 
 /**
  * Finally, we will attach the application instance to a HTML element with

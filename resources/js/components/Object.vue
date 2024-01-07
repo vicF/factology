@@ -1,63 +1,54 @@
 <template>
     <div class="container" id="search">
-        <div v-if="!loaded" class="row">Loading</div>
+        <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
-            <h1>{{ object.name }}</h1>
-            <div class="row">
+            <div class="col-2">
+                <class-tree></class-tree>
+            </div>
+            <div class="col">
+                <h1>{{ object.name }}</h1>
                 <div class="col-md-10 col-md-offset-1">
-                    <table class="table">
-                        <tbody>
-                        <tr>
-                            <td scope="row" style="font-size: x-small">
-                                <a :href="'/object/' + object.thing_id">
-                                    <img :src="getThumbUrl(object.thing_id)" />
-                                </a>
-                            </td>
-                            <td>
-                                <div v-if="object.start">Start: {{ object.start }}</div>
-                                <div v-if="object.end">End: {{ object.end }}</div>
-                                <div v-if="object.class?.name">Class: {{ object.class.name }}
-                                    <template v-if="object.class?.description">({{ object.class.description }})
-                                    </template>
-                                </div>
-                                <div v-if="object.description">{{ object.description }}</div>
-                                <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
-                                <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
-                                <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
-                                <!--<pre style="font-size: x-small">{{ object }}</pre>-->
-                                {{ object.description }}
-                            </td>
-                        </tr>
-                        <tr v-for="link in object.links" :key="link.link_type_id">
-                            <td>
-                                <a v-if="link.thing_id !=object.thing_id" :href="'/object/' + link.thing_id">
-                                    <img :src="getThumbUrl(link.thing_id)" width="50"/>
-                                </a>
-                                <a v-if="link.other_thing_id !=object.thing_id" :href="'/object/' + link.other_thing_id">
-                                    <img :src="getThumbUrl(link.other_thing_id)" width="50"/>
-                                </a>
-                                <a :href="'/object/' + link.link_type_id">
-                                    <img :src="getThumbUrl(link.link_type_id)" width="50"/>
-                                </a>
-                            </td>
-                            <td>
-                                <div v-if="link.name"><a :href="'/object/' + link.thing_id">{{ link.name }}</a></div>
-                                <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
-                                {{ link.translation }}
-                            </td>
-                        </tr>
-
-                        </tbody>
-                    </table>
+                    <div class="row rounded border p-3 rounded-4">
+                        <div class="col-md-2" style="font-size: x-small">
+                            <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
+                                <img :src="getThumbUrl(object.thing_id)" />
+                            </RouterLink>
+                        </div>
+                        <div class="col-md-10">
+                            <!-- ... (other object details) ... -->
+                        </div>
+                    </div>
+                    <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
+                        <div class="col-md-2">
+                            <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                            </RouterLink>
+                            <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
+                                <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                            </RouterLink>
+                        </div>
+                        <div class="col-md-10">
+                            <div v-if="link.name">
+                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
+                            </div>
+                            <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
+                            {{ link.translation }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </template>
 
+
+
 <script>
+import ClassTree from "./ClassTree.vue";
+
 export default {
     name: "search",
+    components: {ClassTree},
     props: ["searchText", "typeThing", "typeClass"],
     data() {
         return {
@@ -93,7 +84,11 @@ export default {
             } catch ({ response }) {
                 if (response && response.status === 422) {
                     this.validationErrors = response.data.errors;
-                } else {
+                }
+                else if (response && response.status === 401) {
+                    this.$router.push({ name: 'login' });
+                }
+                else {
                     this.validationErrors = {};
                     alert(response ? response.data.message : "Error fetching object");
                 }
