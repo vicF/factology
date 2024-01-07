@@ -24,22 +24,25 @@
                                 <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
                                 <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
                                 <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
-                                <pre>{{ object }}</pre>
+                                <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                                 {{ object.description }}
                             </td>
-                            <!--
                             <td>
-                              <div v-for="link in object.links" :key="link.link_type_id">
-                                <a :href="'/object/' + link.other_thing_id">
-                                  <img :src="getThumbUrl(link.other_thing_id)" width="50" />
-                                </a>
-                                <a :href="'/object/' + link.link_type_id">
-                                  <img :src="getThumbUrl(link.link_type_id)" width="50" />
-                                </a>
-                                {{ link.translation }}
-                              </div>
+                                <div v-for="link in object.links" :key="link.link_type_id">
+                                    <div v-if="link.name">{{ link.name }} </div>
+                                    <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
+                                    <a :href="'/object/' + link.thing_id">
+                                        <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                    </a>
+                                    <a :href="'/object/' + link.other_thing_id">
+                                        <img :src="getThumbUrl(link.other_thing_id)" width="50"/>
+                                    </a>
+                                    <a :href="'/object/' + link.link_type_id">
+                                        <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                    </a>
+                                    {{ link.translation }}
+                                </div>
                             </td>
-                            -->
                         </tr>
                         </tbody>
                     </table>

@@ -314,6 +314,20 @@ class Anything
     {
         $thing = (array)static::_getRow($id)->first();
         $thing['class'] = $class;
+        $first = DB::table('links') // One way links
+        ->where('links.thing_id', $thing['thing_id'])
+            ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
+            ->limit(50);
+
+        $second = DB::table('links') // other way links
+        ->where('links.other_thing_id', $thing['thing_id'])
+            ->leftJoin('things', 'links.thing_id', '=', 'things.thing_id')
+            ->limit(50);
+
+        $thing['links'] = $first
+            ->union($second)
+            ->orderBy('start') // replace 'your_column_name' with the column you want to use for ordering
+            ->get();
         return $thing;
     }
 

@@ -37,6 +37,15 @@ app.component('example-component', ExampleComponent);*/
 //     app.component(path.split('/').pop().replace(/\.\w+$/, ''), definition.default);
 // });
 
+
+app.config.globalProperties.$truncateText = function(text, length) {
+    if (text.length <= length) {
+        return text;
+    }
+    let trimmed = text.substr(0, length);
+    return trimmed.substr(0, Math.min(trimmed.length, trimmed.lastIndexOf(" "))) + ' ...';
+};
+
 /**
  * Finally, we will attach the application instance to a HTML element with
  * an "id" attribute of "app". This element is included with the "auth"
