@@ -16,11 +16,11 @@
                             </div>
                             <div class="form-group col-12">
                                 <label for="email" class="font-weight-bold">Email</label>
-                                <input type="text" v-model="auth.email" name="email" id="email" class="form-control">
+                                <input type="text" v-model="email" name="email" id="email" class="form-control">
                             </div>
                             <div class="form-group col-12 my-2">
                                 <label for="password" class="font-weight-bold">Password</label>
-                                <input type="password" v-model="auth.password" name="password" id="password" class="form-control">
+                                <input type="password" v-model="password" name="password" id="password" class="form-control">
                             </div>
                             <div class="col-12 mb-2">
                                 <button type="submit" :disabled="processing" @click="login" class="btn btn-primary btn-block">
