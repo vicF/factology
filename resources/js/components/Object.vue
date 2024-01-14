@@ -15,10 +15,21 @@
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
-                            <div v-if="object.start">{{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}: {{ $dateFromDb(object.start) }}</div>
+                            <div v-if="object.start">
+                                {{
+                                    object.class?.thing_id == '4c8ee41a-9912-4dff-8b44-7779a66e4fcf' ? 'Birth' : 'Start'
+                                }}:
+                                {{ $dateFromDb(object.start) }}
+                            </div>
                             <div v-if="object.end">End: {{ $dateFromDb(object.end) }}</div>
-                            <div v-if="object.class?.name">Class: <RouterLink :to="{ name: 'object', params: { uid: object.class?.thing_id } }">{{ object.class?.name }}
-                                <template v-if="object.class?.description">({{ object.class.description }})</template></RouterLink>
+                            <div v-if="object.class?.name">Class:
+                                <RouterLink :to="{ name: 'object', params: { uid: object.class?.thing_id } }">
+                                    {{ object.class?.name }}
+                                    <template v-if="object.class?.description">({{
+                                            object.class.description
+                                        }})
+                                    </template>
+                                </RouterLink>
                             </div>
                             <div v-if="object.description">{{ object.description }}</div>
                             <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
@@ -26,35 +37,47 @@
                             <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
-                            <div v-if="isGenealogyVisible">
-                                <div>{{ genealogy.father }}</div>
-                                <div>{{ genealogy.mother }}</div>
+                            <div v-if="true || isGenealogyVisible">
+                                Genealogy {{genealogy}}
+                                <div class="family-tree">
+                                    <div v-for="parent in genealogy.parents" class="parents">
+                                        <div class="person">{{ parent }}</div>
+                                    </div>
+                                    <div v-for="child in genealogy.children" class="children">
+                                        <div class="person">{{ child }}</div>
+                                    </div>
+                                </div>
                             </div>
-
                         </div>
                     </div>
                     <!-- Going through links -->
-                    <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
-                        <div class="col-md-2">
-                            <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                <img :src="getThumbUrl(link.thing_id)" width="50"/>
-                            </RouterLink>
-                            <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                <img :src="getThumbUrl(link.link_type_id)" width="50"/>
-                            </RouterLink>
-                        </div>
-                        <div class="col-md-10">
-                            <div v-if="link.name">
-                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
+                    {{object.links}}
+                    <template v-for="link in object.links">
+                        <div v-if="processLink(link)" :key="link.link_type_id" class="row p-3">
+                            <div class="col-md-2">
+                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                    <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                </RouterLink>
+                                <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
+                                    <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                </RouterLink>
                             </div>
-                            <div v-if="link.start">Start: {{ $dateFromDb(link.start) }}</div>
-                            <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
-                            <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
-                            <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
-                            <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
-                            {{ link.translation }}
+                            <div class="col-md-10">
+                                <div v-if="link.name">
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{
+                                            link.name
+                                        }}
+                                    </RouterLink>
+                                </div>
+                                <div v-if="link.start">Start: {{ $dateFromDb(link.start) }}</div>
+                                <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
+                                <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
+                                <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
+                                <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
+                                {{ link.translation }}
+                            </div>
                         </div>
-                    </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -64,16 +87,16 @@
 
 
 <script>
-import { ref, onMounted, watch } from 'vue';
+import {ref, onMounted, watch} from 'vue';
 import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
-import { useRouter, useRoute } from 'vue-router';
-import { reactive } from 'vue';
-import { computed } from 'vue';
+import {useRouter, useRoute} from 'vue-router';
+import {computed} from 'vue';
+import {UUID} from '@/data/uuid';
 
 export default {
     name: "search",
-    components: { ClassTree },
+    components: {ClassTree},
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
@@ -113,14 +136,9 @@ export default {
                 processing.value = false;
             }
         };
-        const getClasse  = async () =>
-        {
-
-        };
 
         onMounted(() => {
             getObject();
-            // getClasses();
         });
 
         watch(() => route.params.uid, (newParam, oldParam) => {
@@ -131,15 +149,34 @@ export default {
         });
 
         const genealogy = ref({
-            father: null,
-            mother: null,
-            // ... other properties
+            parents: [],
+            children: [],
         });
 
         const isGenealogyVisible = computed(() => {
             // Check if any property in genealogy has a value
             return Object.values(genealogy.value).some(v => v !== null);
         });
+
+        const processLink = (link) => {
+            console.log('link:', link);
+            genealogy.value.children.push(link);
+            // geneaology
+            if (link.link_type_id === UUID.PARENT) {
+                console.log('link.link_type_id === UUID.PARENT');
+                if (link.one_thing_id === object.thing_id) {
+                    genealogy.value.parents.push(link);
+                    console.log('parent');
+                } else {
+                    genealogy.value.children.push(link);
+                    console.log('child');
+                }
+                return false;
+            } else {
+                console.log('link.link_type_id !== UUID.PARENT');
+            }
+            return true;
+        };
 
         return {
             object,
@@ -150,6 +187,7 @@ export default {
             parseDate,
             genealogy,
             isGenealogyVisible,
+            processLink,
         };
     },
 };
