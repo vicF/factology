@@ -118,7 +118,7 @@ export default {
             try {
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
                 validationErrors.value = {};
-                object.value = response.data.data;
+                object.value = processLinks(response.data.data);
                 loaded.value = true;
             } catch (error) {
                 const response = error.response;
@@ -136,6 +136,28 @@ export default {
                 processing.value = false;
             }
         };
+
+        const processLinks = (object) => {
+            let links = object.links;
+            for (const i in links) {
+                let link = links[1];
+                if (link.link_type_id === UUID.PARENT) {
+                    console.log('link.link_type_id === UUID.PARENT');
+                    if (link.one_thing_id === object.thing_id) {
+                        object.genealogy.parents.push(link);
+                        console.log('parent');
+                    } else {
+                        object.genealogy.children.push(link);
+                        console.log('child');
+                    }
+                    continue;
+                } else {
+                    console.log('link.link_type_id !== UUID.PARENT');
+                }
+                object.links.push(link);
+            }
+            return object;
+        }
 
         onMounted(() => {
             getObject();
