@@ -6,13 +6,14 @@
 
 import './bootstrap';
 import '../sass/app.scss';
-import Router from '@/router';
-import store from '@/store';
+//import Router from 'vue-router';
+//import store from 'store';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { dateFromDb } from './utils/dateUtils.js';
 
+console.log('after import');
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
  * registering components with the application instance so they are ready
@@ -22,10 +23,10 @@ const pinia = createPinia();
 const app = createApp({});
 
 app.use(pinia);
-app.use(Router);
+//app.use(Router);
 app.use(store);
 
-
+console.log('after use');
 /**
  * The following block of code may be used to automatically register your
  * Vue components. It will recursively scan this directory for the Vue
@@ -73,7 +74,7 @@ axios.interceptors.response.use(
     }
 );
 
-app.config.globalProperties.$dateFromDb = dateFromDb;
+/*app.config.globalProperties.$dateFromDb = dateFromDb;
 
 /**
  * Finally, we will attach the application instance to a HTML element with

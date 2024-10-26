@@ -75,7 +75,8 @@ export const useObjectsStore = defineStore('objects', {
                     //this.validationErrors = response.data.errors
                 } else {
                     this.validationErrors = {}
-                    alert(response.data.message)
+                    alert(response)
+                    //alert(response.data.message)
                 }
             }).finally(() => {
                 this.loading = false

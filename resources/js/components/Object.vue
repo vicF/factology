@@ -11,7 +11,7 @@
                     <div class="row rounded border p-3 rounded-4">
                         <div class="col-md-2" style="font-size: x-small">
                             <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
+                                <img :src="getThumbUrl(object.thing_id)" class="img-fluid"/>
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
@@ -38,7 +38,7 @@
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
                             <div v-if="true || isGenealogyVisible">
-                                Genealogy {{genealogy}}
+                                Genealogy {{ genealogy }}
                                 <div class="family-tree">
                                     <div v-for="parent in genealogy.parents" class="parents">
                                         <div class="person">{{ parent }}</div>
@@ -51,7 +51,7 @@
                         </div>
                     </div>
                     <!-- Going through links -->
-                    {{object.links}}
+                    {{ object.links }}
                     <template v-for="link in object.links">
                         <div v-if="processLink(link)" :key="link.link_type_id" class="row p-3">
                             <div class="col-md-2">
@@ -85,7 +85,6 @@
 </template>
 
 
-
 <script>
 import {ref, onMounted, watch} from 'vue';
 import axios from 'axios';
@@ -117,18 +116,18 @@ export default {
         const getObject = async () => {
             try {
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
+                console.log('route.params',route.params);
+                console.log('response', response);
                 validationErrors.value = {};
-                object.value = processLinks(response.data.data);
+                object.value = response; //processLinks(response.data.data);
                 loaded.value = true;
             } catch (error) {
                 const response = error.response;
                 if (response && response.status === 422) {
                     validationErrors.value = response.data.errors;
-                }
-                else if (response && response.status === 401) {
-                    router.push({ name: 'login' });
-                }
-                else {
+                } else if (response && response.status === 401) {
+                    router.push({name: 'login'});
+                } else {
                     validationErrors.value = {};
                     alert(response ? response.data.message : "Error fetching object");
                 }
@@ -139,6 +138,7 @@ export default {
 
         const processLinks = (object) => {
             let links = object.links;
+            console.log('Links count:', links.count);
             for (const i in links) {
                 let link = links[1];
                 if (link.link_type_id === UUID.PARENT) {
@@ -182,7 +182,7 @@ export default {
 
         const processLink = (link) => {
             console.log('link:', link);
-            genealogy.value.children.push(link);
+            // genealogy.value.children.push(link);
             // geneaology
             if (link.link_type_id === UUID.PARENT) {
                 console.log('link.link_type_id === UUID.PARENT');

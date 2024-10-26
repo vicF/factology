@@ -29,8 +29,14 @@ export default defineConfig({
         },
     },
     server: {
+        host: 'localhost',  // Ensure it's set to localhost
+        port: 5173,
         hmr: {
-            host: '127.0.0.1' /* HERE */
-        }
+            host: 'localhost',  // HMR should be localhost
+        },
+        sourcemap: true
+    },
+    build: {
+        sourcemap: true // Enable source maps for build
     }
 });
