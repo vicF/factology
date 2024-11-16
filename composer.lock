@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6f56fae78fca9064695e1ea9ccce0624",
+    "content-hash": "108d29881dbd4878c96e83f968a9cd52",
     "packages": [
         {
             "name": "brick/math",
@@ -6258,16 +6258,16 @@
     "packages-dev": [
         {
             "name": "barryvdh/laravel-debugbar",
-            "version": "v3.9.2",
+            "version": "v3.9.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/barryvdh/laravel-debugbar.git",
-                "reference": "bfd0131c146973cab164e50f5cdd8a67cc60cab1"
+                "reference": "afa2c4108df23b92a71fa4afd6d0c499e361eaa0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/barryvdh/laravel-debugbar/zipball/bfd0131c146973cab164e50f5cdd8a67cc60cab1",
-                "reference": "bfd0131c146973cab164e50f5cdd8a67cc60cab1",
+                "url": "https://api.github.com/repos/barryvdh/laravel-debugbar/zipball/afa2c4108df23b92a71fa4afd6d0c499e361eaa0",
+                "reference": "afa2c4108df23b92a71fa4afd6d0c499e361eaa0",
                 "shasum": ""
             },
             "require": {
@@ -6326,7 +6326,7 @@
             ],
             "support": {
                 "issues": "https://github.com/barryvdh/laravel-debugbar/issues",
-                "source": "https://github.com/barryvdh/laravel-debugbar/tree/v3.9.2"
+                "source": "https://github.com/barryvdh/laravel-debugbar/tree/v3.9.3"
             },
             "funding": [
                 {
@@ -6338,7 +6338,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-08-25T18:43:57+00:00"
+            "time": "2024-02-12T10:45:12+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -8852,5 +8852,5 @@
         "php": "^8.0.2"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.6.0"
 }
