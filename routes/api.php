@@ -22,9 +22,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/v1/object', [ApiController::class, 'list']);
 Route::post('/v1/object', [ApiController::class, 'search']);
 Route::get('/v1/object/{id}', [ApiController::class, 'get']);
-Route::middleware('auth:sanctum')->post('/v1/object/{id}', 'ApiController@store');
-Route::middleware('auth:sanctum')->put('/v1/object', 'ApiController@store');
-Route::middleware('auth:sanctum')->delete('/v1/object/{id}', 'ApiController@delete');
-Route::middleware('auth:sanctum')->post('/v1/photos', 'ApiController@photos');
-Route::middleware('auth:sanctum')->post('/v1/check_photos', 'ApiController@checkPhotos');
-Route::middleware('auth:sanctum')->post('/v1/photos/thumbs_upload', 'ApiController@upload');
+Route::middleware('auth:sanctum')->post('/v1/object/{id}', [ApiController::class, 'store']);
+Route::middleware('auth:sanctum')->put('/v1/object', [ApiController::class, 'store']);
+Route::middleware('auth:sanctum')->delete('/v1/object/{id}', [ApiController::class, 'delete']);
+Route::middleware('auth:sanctum')->post('/v1/photos', [ApiController::class, 'photos']);
+Route::middleware('auth:sanctum')->post('/v1/check_photos', [ApiController::class, 'checkPhotos']);
+Route::middleware('auth:sanctum')->post('/v1/photos/thumbs_upload', [ApiController::class, 'upload']);
