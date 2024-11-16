@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\Classes\Anything;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
 
@@ -39,11 +39,19 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Blade::directive('edit', static function ($varName) {
-            return '<?PHP 
+            return '<?PHP
             if (Auth::check()) {
             echo \'<a href="/object/\'.'.$varName.'.\'" target="_blank">📝</a>\';
               }
              ?>';
+        });
+
+        DB::listen(function ($query) {
+            logger()->info('Query executed', [
+                'sql' => $query->sql,
+                'bindings' => $query->bindings,
+                'time' => $query->time,
+            ]);
         });
     }
 }
