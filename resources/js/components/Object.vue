@@ -6,7 +6,19 @@
                 <class-tree></class-tree>
             </div>
             <div class="col">
-                <h1>{{ object.name }}</h1>
+                <h1>
+                    <template v-if="isEditing">
+                        <input v-model="object.name" class="form-control" />
+                    </template>
+                    <template v-else>
+                        {{ object.name }}
+                    </template>
+                </h1>
+                <button @click="toggleEditMode" class="btn btn-primary">
+                    {{ isEditing ? "Cancel" : "Edit" }}
+                </button>
+                <button v-if="isEditing" @click="saveChanges" class="btn btn-success">Save</button>
+
                 <div class="col-md-10 col-md-offset-1">
                     <div class="row rounded border p-3 rounded-4">
                         <div class="col-md-2" style="font-size: x-small">
@@ -15,44 +27,32 @@
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
-                            <div v-if="object.start">{{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}: {{ $dateFromDb(object.start) }}</div>
-                            <div v-if="object.end">End: {{ $dateFromDb(object.end) }}</div>
-                            <div v-if="object.class?.name">Class: <RouterLink :to="{ name: 'object', params: { uid: object.class?.thing_id } }">{{ object.class?.name }}
-                                <template v-if="object.class?.description">({{ object.class.description }})</template></RouterLink>
+                            <div v-if="object.start">
+                                {{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}:
+                                <template v-if="isEditing">
+                                    <input type="date" v-model="object.start" class="form-control" />
+                                </template>
+                                <template v-else>
+                                    {{ $dateFromDb(object.start) }}
+                                </template>
                             </div>
-                            <div v-if="object.description">{{ object.description }}</div>
-                            <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
-                            <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
-                            <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
-                            <!--<pre style="font-size: x-small">{{ object }}</pre>-->
-                            {{ object.description }}
-                            <div v-if="isGenealogyVisible">
-                                <div>{{ genealogy.father }}</div>
-                                <div>{{ genealogy.mother }}</div>
+                            <div v-if="object.end">
+                                End:
+                                <template v-if="isEditing">
+                                    <input type="date" v-model="object.end" class="form-control" />
+                                </template>
+                                <template v-else>
+                                    {{ $dateFromDb(object.end) }}
+                                </template>
                             </div>
-
-                        </div>
-                    </div>
-                    <!-- Going through links -->
-                    <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
-                        <div class="col-md-2">
-                            <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                <img :src="getThumbUrl(link.thing_id)" width="50"/>
-                            </RouterLink>
-                            <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                <img :src="getThumbUrl(link.link_type_id)" width="50"/>
-                            </RouterLink>
-                        </div>
-                        <div class="col-md-10">
-                            <div v-if="link.name">
-                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
+                            <div v-if="object.description">
+                                <template v-if="isEditing">
+                                    <textarea v-model="object.description" class="form-control"></textarea>
+                                </template>
+                                <template v-else>
+                                    {{ object.description }}
+                                </template>
                             </div>
-                            <div v-if="link.start">Start: {{ $dateFromDb(link.start) }}</div>
-                            <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
-                            <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
-                            <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
-                            <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
-                            {{ link.translation }}
                         </div>
                     </div>
                 </div>
@@ -60,6 +60,7 @@
         </div>
     </div>
 </template>
+
 
 
 
@@ -80,6 +81,8 @@ export default {
         const route = useRoute();
         const object = ref({});
         const loaded = ref(false);
+        const isEditing = ref(false); // Edit mode state
+        const originalObject = ref({}); // Backup for cancel
         const validationErrors = ref({});
         const processing = ref(false);
 
@@ -87,72 +90,67 @@ export default {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
         };
 
-        const parseDate = (date) => {
-            return date;
-        };
-
         const getObject = async () => {
             try {
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
-                validationErrors.value = {};
                 object.value = response.data.data;
+                originalObject.value = JSON.parse(JSON.stringify(response.data.data)); // Create a backup
                 loaded.value = true;
             } catch (error) {
-                const response = error.response;
-                if (response && response.status === 422) {
-                    validationErrors.value = response.data.errors;
-                }
-                else if (response && response.status === 401) {
-                    router.push({ name: 'login' });
-                }
-                else {
-                    validationErrors.value = {};
-                    alert(response ? response.data.message : "Error fetching object");
-                }
-            } finally {
-                processing.value = false;
+                handleApiError(error);
             }
         };
-        const getClasse  = async () =>
-        {
 
+        const toggleEditMode = () => {
+            if (isEditing.value) {
+                object.value = JSON.parse(JSON.stringify(originalObject.value)); // Revert changes
+            }
+            isEditing.value = !isEditing.value;
+        };
+
+        const saveChanges = async () => {
+            try {
+                const response = await axios.put(`/api/v1/object/${route.params.uid}`, object.value);
+                originalObject.value = JSON.parse(JSON.stringify(object.value)); // Update backup
+                isEditing.value = false;
+                alert("Changes saved successfully.");
+            } catch (error) {
+                handleApiError(error);
+            }
+        };
+
+        const handleApiError = (error) => {
+            const response = error.response;
+            if (response && response.status === 422) {
+                validationErrors.value = response.data.errors;
+            } else if (response && response.status === 401) {
+                router.push({ name: 'login' });
+            } else {
+                alert(response ? response.data.message : "An error occurred.");
+            }
         };
 
         onMounted(() => {
             getObject();
-            // getClasses();
         });
 
         watch(() => route.params.uid, (newParam, oldParam) => {
             if (newParam !== oldParam) {
                 getObject();
-                // getClasses();
             }
-        });
-
-        const genealogy = ref({
-            father: null,
-            mother: null,
-            // ... other properties
-        });
-
-        const isGenealogyVisible = computed(() => {
-            // Check if any property in genealogy has a value
-            return Object.values(genealogy.value).some(v => v !== null);
         });
 
         return {
             object,
             loaded,
-            validationErrors,
-            processing,
+            isEditing,
+            toggleEditMode,
+            saveChanges,
             getThumbUrl,
-            parseDate,
-            genealogy,
-            isGenealogyVisible,
         };
     },
 };
+
 </script>
 
 
