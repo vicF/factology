@@ -36,23 +36,39 @@
                                     {{ $dateFromDb(object.start) }}
                                 </template>
                             </div>
-                            <div v-if="object.end">
-                                End:
-                                <template v-if="isEditing">
-                                    <input type="date" v-model="object.end" class="form-control" />
-                                </template>
-                                <template v-else>
-                                    {{ $dateFromDb(object.end) }}
-                                </template>
+                            <div v-if="object.description">{{ object.description }}</div>
+                            <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
+                            <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
+                            <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
+                            <!--<pre style="font-size: x-small">{{ object }}</pre>-->
+                            {{ object.description }}
+                            <div v-if="isGenealogyVisible">
+                                <div>{{ genealogy.father }}</div>
+                                <div>{{ genealogy.mother }}</div>
                             </div>
-                            <div v-if="object.description">
-                                <template v-if="isEditing">
-                                    <textarea v-model="object.description" class="form-control"></textarea>
-                                </template>
-                                <template v-else>
-                                    {{ object.description }}
-                                </template>
+
+                        </div>
+                    </div>
+                    <!-- Going through links -->
+                    <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
+                        <div class="col-md-2">
+                            <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                            </RouterLink>
+                            <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
+                                <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                            </RouterLink>
+                        </div>
+                        <div class="col-md-10">
+                            <div v-if="link.name">
+                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
                             </div>
+                            <div v-if="link.start">Start: {{ $dateFromDb(link.start) }}</div>
+                            <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
+                            <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
+                            <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
+                            <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
+                            {{ link.translation }}
                         </div>
                     </div>
                 </div>
