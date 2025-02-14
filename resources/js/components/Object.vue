@@ -7,13 +7,13 @@
             </div>
             <div class="col">
                 <h1>
-                    <template v-if="isEditing">
-                        <input v-model="object.name" class="form-control" />
-                    </template>
-                    <template v-else>
-                        {{ object.name }}
-                    </template>
+                    <TextField
+                        fieldName="name"
+                        v-model="object.name"
+                        :isEditable="isEditing"
+                    />
                 </h1>
+
                 <button @click="toggleEditMode" class="btn btn-primary">
                     {{ isEditing ? "Cancel" : "Edit" }}
                 </button>
@@ -24,9 +24,15 @@
                         <div class="col-md-2" style="font-size: x-small">
                             <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
                                 <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
+                                <template v-if="isEditing">upload</template>
                             </RouterLink>
                         </div>
                         <div class="col-md-10">
+                            <DateField
+                                fieldName="start"
+                                v-model="object.start"
+                                :isEditable="isEditing"
+                            />
                             <div v-if="object.start">
                                 {{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}:
                                 <template v-if="isEditing">
@@ -36,10 +42,29 @@
                                     {{ $dateFromDb(object.start) }}
                                 </template>
                             </div>
-                            <div v-if="object.description">{{ object.description }}</div>
+                            <div v-if="object.end">
+                                {{ object.class?.thing_id == '4c8ee41a-9912-4dff-8b44-7779a66e4fcf' ? 'Death' : 'End' }}:
+                                <template v-if="isEditing">
+                                    <input type="date" v-model="object.end" class="form-control"/>
+                                </template>
+                                <template v-else>
+                                    {{ $dateFromDb(object.end) }}
+                                </template>
+                            </div>
+                            <TextField
+                                fieldName="description"
+                                v-model="object.description"
+                                :isEditable="isEditing"
+                            />
                             <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
                             <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
-                            <div>Access: {{ object.public == 1 ? 'Public' : 'Private' }}</div>
+                            <div>Access:
+                                <template v-if="isEditing"><input type="radio">Public <input type="radio">Private
+                                </template>
+                                <template v-else>
+                                    {{ object.public == 1 ? 'Public' : 'Private' }}
+                                </template>
+                            </div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
                             <div v-if="isGenealogyVisible">
@@ -87,10 +112,12 @@ import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { reactive } from 'vue';
 import { computed } from 'vue';
+import TextField from "./Fields/TextField.vue";
+import DateField from "./Fields/DateField.vue";
 
 export default {
     name: "search",
-    components: { ClassTree },
+    components: {DateField, TextField, ClassTree },
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
