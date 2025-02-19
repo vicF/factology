@@ -16,8 +16,9 @@ const messages = {
 };
 
 const i18n = createI18n({
-    legacy: false, // Обязательно отключаем Legacy API
-    locale: 'en',
+    legacy: false,
+    globalInjection: true,
+    locale: localStorage.getItem('locale') || 'en',
     fallbackLocale: 'en',
     messages,
 });
@@ -25,6 +26,8 @@ const i18n = createI18n({
 export function setLanguage(lang) {
     i18n.global.locale = lang;
     localStorage.setItem("locale", lang);
+    // Instead of reload, you might want to use:
+    // window.location.reload();
 }
 
 export default i18n;
