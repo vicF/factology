@@ -32,7 +32,7 @@
                                 fieldName="start"
                                 v-model="object.start"
                                 :isEditable="isEditing"
-                                :label="$t('start')"
+                                :label="$t('Start')"
                             />
                             <div v-if="object.start">
                                 {{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}:
@@ -59,7 +59,7 @@
                             />
                             <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
                             <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
-                            <div>Access:
+                            <div>{{$t("Access")}}:---{{$t("Start")}}
                                 <template v-if="isEditing"><input type="radio">Public <input type="radio">Private
                                 </template>
                                 <template v-else>
@@ -68,10 +68,6 @@
                             </div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
-                            <div v-if="isGenealogyVisible">
-                                <div>{{ genealogy.father }}</div>
-                                <div>{{ genealogy.mother }}</div>
-                            </div>
 
                         </div>
                     </div>
