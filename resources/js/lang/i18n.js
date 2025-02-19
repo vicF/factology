@@ -29,7 +29,7 @@ export function setLanguage(lang) {
     i18n.global.locale = lang;
     localStorage.setItem("locale", lang);
     // Instead of reload, you might want to use:
-    // window.location.reload();
+    window.location.reload();
 }
 
 export default i18n;
