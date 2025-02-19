@@ -1,0 +1,30 @@
+import { createI18n } from 'vue-i18n';
+
+const messages = {
+    en: {
+        start: "Start",
+        start_context: {
+            "4c8ee41a-9912-4dff-8b44-7779a66e4fcf": "Birth"
+        }
+    },
+    ru: {
+        start: "Старт",
+        start_context: {
+            "4c8ee41a-9912-4dff-8b44-7779a66e4fcf": "Рождение"
+        }
+    }
+};
+
+const i18n = createI18n({
+    legacy: false, // Обязательно отключаем Legacy API
+    locale: 'en',
+    fallbackLocale: 'en',
+    messages,
+});
+
+export function setLanguage(lang) {
+    i18n.global.locale = lang;
+    localStorage.setItem("locale", lang);
+}
+
+export default i18n;

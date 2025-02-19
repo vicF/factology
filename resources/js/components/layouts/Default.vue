@@ -16,6 +16,7 @@
                         </li>
                     </ul>
                     {{ authenticated ? user.name : '' }}
+                    <LanguageSwitcher />
                     <div class="d-flex">
                         <ul class="navbar-nav">
                             <li class="nav-item dropdown">
@@ -47,9 +48,11 @@
 
 <script>
 import {mapActions} from 'vuex'
+import LanguageSwitcher from "../LanguageSwitcher.vue";
 
 export default {
     name: "default-layout",
+    components: {LanguageSwitcher},
     /*data(){
         return {
             user:this.$store.state.auth.user

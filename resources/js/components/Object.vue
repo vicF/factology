@@ -32,6 +32,7 @@
                                 fieldName="start"
                                 v-model="object.start"
                                 :isEditable="isEditing"
+                                :label="$t('start')"
                             />
                             <div v-if="object.start">
                                 {{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}:
@@ -114,6 +115,7 @@ import { reactive } from 'vue';
 import { computed } from 'vue';
 import TextField from "./Fields/TextField.vue";
 import DateField from "./Fields/DateField.vue";
+import { useI18n } from 'vue-i18n';
 
 export default {
     name: "search",
