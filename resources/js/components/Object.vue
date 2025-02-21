@@ -47,6 +47,12 @@
                             />
                             <div v-if="object.record_created">{{$t('Record created')}}: {{ object.record_created }}</div>
                             <div v-if="object.record_updated">{{$t('Record updated')}}: {{ object.record_updated }}</div>
+                            <RadioGroupField
+                                fieldName="visibility"
+                                v-model="object.public"
+                                :options="{ 0: 'Private', 1: 'Public' }"
+                                :isEditable="isEditing"
+                            />
                             <div>{{$t("Access")}}:
                                 <template v-if="isEditing"><input type="radio">Public <input type="radio">Private
                                 </template>
@@ -100,10 +106,11 @@ import { computed } from 'vue';
 import TextField from "./Fields/TextField.vue";
 import DateField from "./Fields/DateField.vue";
 import { useI18n } from 'vue-i18n';
+import RadioGroupField from "./Fields/RadioGroupField.vue";
 
 export default {
     name: "search",
-    components: {DateField, TextField, ClassTree },
+    components: {RadioGroupField, DateField, TextField, ClassTree },
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
