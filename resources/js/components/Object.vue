@@ -32,33 +32,22 @@
                                 fieldName="start"
                                 v-model="object.start"
                                 :isEditable="isEditing"
+                                :label="tc('Start', object.class?.thing_id)"
                             />
-                            <div v-if="object.start">
-                                {{ object.class?.thing_id=='4c8ee41a-9912-4dff-8b44-7779a66e4fcf'? 'Birth':'Start'}}:
-                                <template v-if="isEditing">
-                                    <input type="date" v-model="object.start" class="form-control" />
-                                </template>
-                                <template v-else>
-                                    {{ $dateFromDb(object.start) }}
-                                </template>
-                            </div>
-                            <div v-if="object.end">
-                                {{ object.class?.thing_id == '4c8ee41a-9912-4dff-8b44-7779a66e4fcf' ? 'Death' : 'End' }}:
-                                <template v-if="isEditing">
-                                    <input type="date" v-model="object.end" class="form-control"/>
-                                </template>
-                                <template v-else>
-                                    {{ $dateFromDb(object.end) }}
-                                </template>
-                            </div>
+                            <DateField
+                                fieldName="end"
+                                v-model="object.start"
+                                :isEditable="isEditing"
+                                :label="tc('End', object.class?.thing_id)"
+                            />
                             <TextField
                                 fieldName="description"
                                 v-model="object.description"
                                 :isEditable="isEditing"
                             />
-                            <div v-if="object.record_created">Record created: {{ object.record_created }}</div>
-                            <div v-if="object.record_updated">Record updated: {{ object.record_updated }}</div>
-                            <div>Access:
+                            <div v-if="object.record_created">{{$t('Record created')}}: {{ object.record_created }}</div>
+                            <div v-if="object.record_updated">{{$t('Record updated')}}: {{ object.record_updated }}</div>
+                            <div>{{$t("Access")}}:
                                 <template v-if="isEditing"><input type="radio">Public <input type="radio">Private
                                 </template>
                                 <template v-else>
@@ -67,10 +56,6 @@
                             </div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
-                            <div v-if="isGenealogyVisible">
-                                <div>{{ genealogy.father }}</div>
-                                <div>{{ genealogy.mother }}</div>
-                            </div>
 
                         </div>
                     </div>
@@ -114,6 +99,7 @@ import { reactive } from 'vue';
 import { computed } from 'vue';
 import TextField from "./Fields/TextField.vue";
 import DateField from "./Fields/DateField.vue";
+import { useI18n } from 'vue-i18n';
 
 export default {
     name: "search",
@@ -128,6 +114,7 @@ export default {
         const originalObject = ref({}); // Backup for cancel
         const validationErrors = ref({});
         const processing = ref(false);
+        const { t, tc } = useI18n();
 
         const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
@@ -190,6 +177,8 @@ export default {
             toggleEditMode,
             saveChanges,
             getThumbUrl,
+            t,
+            tc
         };
     },
 };

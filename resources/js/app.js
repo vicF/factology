@@ -12,6 +12,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { dateFromDb } from './utils/dateUtils.js';
+import i18n from './lang/i18n';
 
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
@@ -24,7 +25,7 @@ const app = createApp({});
 app.use(pinia);
 app.use(Router);
 app.use(store);
-
+app.use(i18n);
 
 /**
  * The following block of code may be used to automatically register your

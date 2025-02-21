@@ -26,8 +26,8 @@ const emit = defineEmits(["update:modelValue"]);
         /></div>
     </template>
     <template v-else>
-        <div v-if="modelValue">{{label}}:
-            {{ modelValue }}
+        <div v-if="modelValue">{{label}}<template v-if="label">:</template>
+            {{$dateFromDb(modelValue) }}
         </div>
     </template>
 </template>
