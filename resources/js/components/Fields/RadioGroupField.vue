@@ -6,9 +6,10 @@ const props = defineProps({
     modelValue: [String, Number], // Supports text, numbers
     isEditable: Boolean, // Controls edit mode
     options: {
-        type: Object, // Now an object with key-value pairs
+        type: Object, // Object with key-value pairs
         required: true,
     },
+    label: String
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -21,17 +22,19 @@ const handleInput = (event) => {
 
 <template>
     <template v-if="isEditable">
-        <div v-for="(label, value) in options" :key="value">
-            <label>
-                <input
-                    type="radio"
-                    :name="fieldName"
-                    :value="value"
-                    :checked="modelValue === value"
+        <div class="radio-group"><template v-if="label">{{label}}:</template>
+            <div v-for="(label, value) in options" :key="value" class="radio-option">
+                <label>
+                    <input
+                        type="radio"
+                        :name="fieldName"
+                        :value="value"
+                    :checked="modelValue == value"
                     @input="handleInput"
-                />
-                {{ label }}
-            </label>
+                    />
+                    {{ label }}
+                </label>
+            </div>
         </div>
     </template>
     <template v-else>
@@ -40,3 +43,14 @@ const handleInput = (event) => {
         </div>
     </template>
 </template>
+
+<style scoped>
+.radio-group {
+    display: flex; /* Makes the container a flexbox */
+    gap: 10px; /* Adds spacing between radio buttons */
+}
+
+.radio-option {
+    display: inline-block; /* Ensures each radio button is inline */
+}
+</style>

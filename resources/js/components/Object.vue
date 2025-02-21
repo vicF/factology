@@ -52,14 +52,8 @@
                                 v-model="object.public"
                                 :options="{ 0: 'Private', 1: 'Public' }"
                                 :isEditable="isEditing"
+                                :label="t('Access')"
                             />
-                            <div>{{$t("Access")}}:
-                                <template v-if="isEditing"><input type="radio">Public <input type="radio">Private
-                                </template>
-                                <template v-else>
-                                    {{ object.public == 1 ? 'Public' : 'Private' }}
-                                </template>
-                            </div>
                             <!--<pre style="font-size: x-small">{{ object }}</pre>-->
                             {{ object.description }}
 
