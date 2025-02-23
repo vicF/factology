@@ -39,7 +39,7 @@ const handleInput = (event) => {
     </template>
     <template v-else>
         <div>
-            {{ options[modelValue] || "No selection" }}
+            {{label}}: {{ options[modelValue] || "No selection" }}
         </div>
     </template>
 </template>

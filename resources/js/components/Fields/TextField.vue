@@ -9,6 +9,7 @@ const props = defineProps({
         type: String,
         default: "text", // Default is text field, but can be overridden
     },
+    label: String,
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -16,7 +17,7 @@ const emit = defineEmits(["update:modelValue"]);
 
 <template>
     <template v-if="isEditable">
-        <div><input
+        <div>{{label}}<template v-if="label">:</template><input
             :type="type"
             :name="fieldName"
             :value="modelValue"
@@ -25,7 +26,7 @@ const emit = defineEmits(["update:modelValue"]);
         /></div>
     </template>
     <template v-else>
-        <div v-if="modelValue">
+        <div v-if="modelValue">{{label}}<template v-if="label">:</template>
             {{ modelValue }}
         </div>
     </template>

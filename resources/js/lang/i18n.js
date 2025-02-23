@@ -16,6 +16,8 @@ const messages = {
         "Record created":"Запись создана",
         "Record updated":"Последнее изменение",
         Access: "Доступ",
+        Public:"Публичный",
+        Private:"Приватный",
     }
 };
 
@@ -43,6 +45,8 @@ i18n.global.tc = function(key, contextId) {
                     newKey = "Death";
                     break;
                 // Add more cases here if needed
+                default:
+                    newKey = key;
             }
             break;
     }

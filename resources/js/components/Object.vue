@@ -44,13 +44,14 @@
                                 fieldName="description"
                                 v-model="object.description"
                                 :isEditable="isEditing"
+                                :label="tc('Description', object.class?.thing_id)"
                             />
                             <div v-if="object.record_created">{{$t('Record created')}}: {{ object.record_created }}</div>
                             <div v-if="object.record_updated">{{$t('Record updated')}}: {{ object.record_updated }}</div>
                             <RadioGroupField
                                 fieldName="visibility"
                                 v-model="object.public"
-                                :options="{ 0: 'Private', 1: 'Public' }"
+                                :options="{ 0: t('Private'), 1: t('Public') }"
                                 :isEditable="isEditing"
                                 :label="t('Access')"
                             />
