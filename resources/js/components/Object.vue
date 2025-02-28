@@ -15,9 +15,10 @@
                 </h1>
 
                 <button @click="toggleEditMode" class="btn btn-primary">
-                    {{ isEditing ? "Cancel" : "Edit" }}
+                    {{ isEditing ? t("Cancel") : t("Edit") }}
                 </button>
-                <button v-if="isEditing" @click="saveChanges" class="btn btn-success">Save</button>
+                <button v-if="isEditing" @click="saveChanges" class="btn btn-success">{{ t('Save') }}</button>
+                <button @click="newForm" class="btn btn-primary">{{ t('Create') }}</button>
 
                 <div class="col-md-10 col-md-offset-1">
                     <div class="row rounded border p-3 rounded-4">
@@ -78,6 +79,12 @@
                             <div v-if="link.end">End: {{ $dateFromDb(link.end) }}</div>
                             <div v-if="link.link_start">Link start: {{ $dateFromDb(link.link_start) }}</div>
                             <div v-if="link.link_end">Link end: {{ $dateFromDb(link.link_end) }}</div>
+                            <TextField
+                                fieldName="description"
+                                v-model="link.description"
+                                :isEditable="isEditing"
+                                :label="tc('Description', object.class?.thing_id)"
+                            />
                             <div v-if="link.description">{{ $truncateText(link.description, 300) }}</div>
                             {{ link.translation }}
                         </div>

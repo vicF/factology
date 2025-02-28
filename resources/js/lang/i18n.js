@@ -9,7 +9,11 @@ const messages = {
 
     },
     ru: {
+        Save: "Сохранить",
+        Cancel: "Отменить",
+        Create: "Создать",
         Start: "Старт",
+        Edit: "Редактировать",
         End: "Конец",
         Birth: "Рождение",
         Death: "Смерть",
