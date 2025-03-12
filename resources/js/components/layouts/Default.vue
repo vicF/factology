@@ -45,7 +45,18 @@
             </div>
         </nav>
         <main class="mt-3">
-            <router-view></router-view>
+            <div class="container">
+                <div class="row">
+                    <!-- Left Column: ClassTree -->
+                    <div class="col-2">
+                        <class-tree></class-tree>
+                    </div>
+                    <!-- Right Column: Search Results via RouterView -->
+                    <div class="col-10">
+                        <router-view></router-view>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 </template>
@@ -53,18 +64,18 @@
 <script>
 import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
+import ClassTree from "..//ClassTree.vue"; // Adjust path as needed
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch } from 'vue';
 
 export default {
     name: "default-layout",
-    components: { LanguageSwitcher },
+    components: { LanguageSwitcher, ClassTree },
     setup() {
         const router = useRouter();
         const route = useRoute();
-        const searchQuery = ref(route.query.q || ''); // Sync with initial query
+        const searchQuery = ref(route.query.q || '');
 
-        // Watch route query changes to sync searchQuery
         watch(() => route.query.q, (newQuery) => {
             searchQuery.value = newQuery || '';
         });
@@ -94,7 +105,7 @@ export default {
             if (this.searchQuery.trim()) {
                 try {
                     await this.$router.push({
-                        path: '/', // Use path instead of name since it's root
+                        path: '/',
                         query: { q: this.searchQuery }
                     });
                 } catch (error) {

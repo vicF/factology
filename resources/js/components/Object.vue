@@ -2,9 +2,6 @@
     <div class="container" id="search">
         <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
-            <div class="col-2">
-                <class-tree></class-tree>
-            </div>
             <div class="col">
                 <h1>
                     <TextField

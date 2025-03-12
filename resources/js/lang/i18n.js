@@ -12,7 +12,7 @@ const messages = {
         Save: "Сохранить",
         Cancel: "Отменить",
         Create: "Создать",
-        Start: "Старт",
+        Start: "Начало",
         Edit: "Редактировать",
         End: "Конец",
         Birth: "Рождение",
@@ -22,6 +22,7 @@ const messages = {
         Access: "Доступ",
         Public:"Публичный",
         Private:"Приватный",
+        Description: "Описание"
     }
 };
 

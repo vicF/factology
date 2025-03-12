@@ -1,14 +1,11 @@
 <template>
-    <div class="container" id="search" v-cloak>
+    <div id="search" v-cloak>
         <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
-            <div class="col-2">
-                <class-tree></class-tree>
-            </div>
             <div class="col">
                 <div class="row mt-5">
                     <div class="col-md-10 offset-md-1">
-                        <div class="row mb-3" v-for="thing in objects" :key="thing.thing_id">
+                        <div class="row mb-3" v-for="(thing, thingIndex) in objects" :key="`${thing.thing_id}-${thingIndex}`">
                             <!-- Image Column -->
                             <div class="col-md-2" style="font-size: x-small;">
                                 <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }">
@@ -26,11 +23,10 @@
 
                             <!-- Links Column -->
                             <div class="col-md-6">
-                                <div v-for="link in thing.links" :key="link.link_type_id">
+                                <div v-for="(link, linkIndex) in thing.links" :key="`${link.link_type_id}-${link.thing_id}-${link.other_thing_id}-${linkIndex}`">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
                                     </RouterLink>
-
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
                                         <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
                                     </RouterLink>
@@ -46,16 +42,12 @@
                         </div>
                     </div>
                 </div>
-
-
-
             </div>
         </div>
     </div>
 </template>
 
 <script>
-import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
 import { useCheckboxStore } from '../stores/checkboxes';
 import { ref, reactive, onMounted, watch } from 'vue';
@@ -65,7 +57,6 @@ import { useRoute } from 'vue-router';
 export default {
     name: "search",
     components: {
-        ClassTree,
         TreeMenu
     },
     props: ['searchText', 'typeThing', 'typeClass'],
