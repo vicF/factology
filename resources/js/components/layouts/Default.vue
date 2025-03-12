@@ -2,29 +2,40 @@
     <div>
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <span style="color:white">{{ authenticated ? user.name : 'guest' }}</span>
+                <span style="color:white" class="me-3">{{ authenticated ? user.name : 'guest' }}</span>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                         data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
                         aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="collapse navbar-collapse" id="navbarNavDropdown">
-                    <ul class="navbar-nav me-auto">
+                <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
+                    <!-- Left Section -->
+                    <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
                             <router-link :to="{name:'dashboard'}" class="nav-link">Home <span
                                 class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-                    {{ authenticated ? user.name : '' }}
-                    <LanguageSwitcher />
-                    <div class="d-flex">
-                        <ul class="navbar-nav">
+
+                    <!-- Middle Section (Search) -->
+                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="handleSearch">
+                        <input class="form-control me-2" type="search" placeholder="Search"
+                               v-model="searchQuery" aria-label="Search">
+                        <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
+                    </form>
+
+                    <!-- Right Section -->
+                    <div class="d-flex flex-shrink-0">
+                        <LanguageSwitcher />
+                        <ul class="navbar-nav ms-3">
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
-                                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
+                                   role="button" data-bs-toggle="dropdown" aria-haspopup="true"
+                                   aria-expanded="false">
                                     {{ authenticated ? user.name : 'User' }}
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                                <div class="dropdown-menu dropdown-menu-end"
+                                     aria-labelledby="navbarDropdownMenuLink">
                                     <template v-if="authenticated">
                                         <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
                                     </template>
@@ -34,7 +45,6 @@
                                     </template>
                                 </div>
                             </li>
-
                         </ul>
                     </div>
                 </div>
@@ -53,11 +63,11 @@ import LanguageSwitcher from "../LanguageSwitcher.vue";
 export default {
     name: "default-layout",
     components: {LanguageSwitcher},
-    /*data(){
+    data() {
         return {
-            user:this.$store.state.auth.user
+            searchQuery: ''
         }
-    },*/
+    },
     computed: {
         user: function () {
             return this.$store.state.auth.user;
@@ -76,6 +86,15 @@ export default {
                 this.$store.state.auth.user = null
                 this.$router.push({name: "/"})
             })
+        },
+        handleSearch() {
+            // Add your search handling logic here
+            console.log('Searching for:', this.searchQuery);
+            // You might want to:
+            // 1. Emit an event
+            // 2. Call an API
+            // 3. Update route with query params
+            // Example: this.$router.push({ name: 'search', query: { q: this.searchQuery } })
         }
     }
 }
