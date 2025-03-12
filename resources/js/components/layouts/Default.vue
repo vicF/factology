@@ -57,16 +57,17 @@
 </template>
 
 <script>
-import {mapActions} from 'vuex'
+import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
+import { useRouter } from 'vue-router';
 
 export default {
     name: "default-layout",
-    components: {LanguageSwitcher},
+    components: { LanguageSwitcher },
     data() {
         return {
             searchQuery: ''
-        }
+        };
     },
     computed: {
         user: function () {
@@ -82,20 +83,24 @@ export default {
         }),
         async logout() {
             await axios.post('/logout').then(({data}) => {
-                this.signOut()
-                this.$store.state.auth.user = null
-                this.$router.push({name: "/"})
-            })
+                this.signOut();
+                this.$store.state.auth.user = null;
+                this.$router.push({ name: "/" });
+            });
         },
         handleSearch() {
-            // Add your search handling logic here
-            console.log('Searching for:', this.searchQuery);
-            // You might want to:
-            // 1. Emit an event
-            // 2. Call an API
-            // 3. Update route with query params
-            // Example: this.$router.push({ name: 'search', query: { q: this.searchQuery } })
+            if (this.searchQuery.trim()) {
+                // Navigate to search route with query param
+                this.$router.push({
+                    name: '',
+                    query: { q: this.searchQuery }
+                });
+            }
         }
+    },
+    setup() {
+        const router = useRouter();
+        return { router };
     }
-}
+};
 </script>
