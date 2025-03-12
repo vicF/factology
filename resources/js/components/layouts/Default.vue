@@ -9,22 +9,16 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
-                    <!-- Left Section -->
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span
-                                class="sr-only">(current)</span></router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-
-                    <!-- Middle Section (Search) -->
                     <form class="d-flex flex-grow-1 mx-3" @submit.prevent="handleSearch">
                         <input class="form-control me-2" type="search" placeholder="Search"
                                v-model="searchQuery" aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
-
-                    <!-- Right Section -->
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher />
                         <ul class="navbar-nav ms-3">
@@ -59,15 +53,23 @@
 <script>
 import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import { ref, watch } from 'vue';
 
 export default {
     name: "default-layout",
     components: { LanguageSwitcher },
-    data() {
-        return {
-            searchQuery: ''
-        };
+    setup() {
+        const router = useRouter();
+        const route = useRoute();
+        const searchQuery = ref(route.query.q || ''); // Sync with initial query
+
+        // Watch route query changes to sync searchQuery
+        watch(() => route.query.q, (newQuery) => {
+            searchQuery.value = newQuery || '';
+        });
+
+        return { router, route, searchQuery };
     },
     computed: {
         user: function () {
@@ -82,25 +84,24 @@ export default {
             signOut: "auth/logout"
         }),
         async logout() {
-            await axios.post('/logout').then(({data}) => {
+            await axios.post('/logout').then(() => {
                 this.signOut();
                 this.$store.state.auth.user = null;
-                this.$router.push({ name: "/" });
+                this.$router.push({ name: "dashboard" });
             });
         },
-        handleSearch() {
+        async handleSearch() {
             if (this.searchQuery.trim()) {
-                // Navigate to search route with query param
-                this.$router.push({
-                    name: '',
-                    query: { q: this.searchQuery }
-                });
+                try {
+                    await this.$router.push({
+                        path: '/', // Use path instead of name since it's root
+                        query: { q: this.searchQuery }
+                    });
+                } catch (error) {
+                    console.error('Navigation error:', error);
+                }
             }
         }
-    },
-    setup() {
-        const router = useRouter();
-        return { router };
     }
 };
 </script>

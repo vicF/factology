@@ -58,7 +58,7 @@
 import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
 import { useCheckboxStore } from '../stores/checkboxes';
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
 
@@ -110,8 +110,15 @@ export default {
             }
         };
 
+        // Watch for changes in the 'q' query parameter
+        watch(() => route.query.q, (newQuery, oldQuery) => {
+            if (newQuery !== oldQuery) {
+                getObjects(newQuery);
+            }
+        });
+
         onMounted(() => {
-            getObjects(route.query.q); // Use query param if available
+            getObjects(route.query.q); // Initial fetch based on URL
         });
 
         return {
