@@ -7,11 +7,11 @@
             </div>
             <div class="col">
                 <div class="input-group">
-                    <input type="text" name="search" class="form-control" v-bind:value="searchText"
-                           v-on:input="searchText= $event.target.value">
+                    <input type="text" name="search" class="form-control" v-model="localSearchText"
+                           placeholder="Search">
                     <span class="input-group-btn">
-                <button class="btn btn-primary" @click.prevent="getObjects">Find</button>
-            </span>
+                        <button class="btn btn-primary" @click.prevent="getObjects">Find</button>
+                    </span>
                 </div>
 <!--                <div class="form-group form-check form-check-inline">
                     <input type="checkbox" class="form-check-input" id="checkThing" name="type[]"
@@ -82,7 +82,7 @@
 import ClassTree from './ClassTree.vue';
 import TreeMenu from './TreeMenu.vue';
 import { useCheckboxStore } from '../stores/checkboxes';
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 export default {
@@ -92,11 +92,12 @@ export default {
         TreeMenu
     },
     props: ['searchText', 'typeThing', 'typeClass'],
-    setup(props) {
+    setup(props, { emit }) {
         const objects = ref([]);
         const loaded = ref(false);
         const validationErrors = reactive({});
         const processing = ref(false);
+        const localSearchText = ref(props.searchText || ''); // Local state for search input
 
         const getThumbUrl = (thing_id) => {
             return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
@@ -115,7 +116,7 @@ export default {
             processing.value = true;
             try {
                 const response = await axios.post('/api/v1/object', JSON.stringify({
-                    "search": props.searchText,
+                    "search": localSearchText.value, // Use local state instead of prop
                     "type": type,
                     classes: store.checkedItems,
                 }));
@@ -124,7 +125,6 @@ export default {
                 let data = JSON.parse(response.data);
                 objects.value = data.things;
                 console.log('Links:', data.links);
-                // Further processing...
             } catch (error) {
                 if (error.response && error.response.status === 422) {
                     validationErrors.value = error.response.data.errors;
@@ -138,6 +138,16 @@ export default {
             }
         };
 
+        // Sync localSearchText with props.searchText if it changes from parent
+        watch(() => props.searchText, (newValue) => {
+            localSearchText.value = newValue;
+        });
+
+        // Emit changes to parent if needed
+        watch(localSearchText, (newValue) => {
+            emit('update:searchText', newValue);
+        });
+
         onMounted(() => {
             getObjects();
         });
@@ -148,12 +158,12 @@ export default {
             getThumbUrl,
             getObjects,
             validationErrors,
-            processing
+            processing,
+            localSearchText
         };
     }
 };
 </script>
 
 <style scoped>
-
 </style>
