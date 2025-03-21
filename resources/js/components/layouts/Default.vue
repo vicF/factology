@@ -1,5 +1,6 @@
 <template>
     <div>
+        <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
                 <span style="color:white" class="me-3">{{ authenticated ? user.name : 'guest' }}</span>
@@ -44,20 +45,35 @@
                 </div>
             </div>
         </nav>
+
+        <!-- Secondary Navbar for Create Links -->
+        <nav class="navbar navbar-light bg-light">
+            <div class="container-fluid">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" @click="openCreateModal('Class')">Class</button>
+                    <button class="btn btn-outline-primary" @click="openCreateModal('Person')">Person</button>
+                    <button class="btn btn-outline-primary" @click="openCreateModal('Event')">Event</button>
+                    <button class="btn btn-outline-primary" @click="openCreateModal('Something')">Something</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
         <main class="mt-3">
             <div class="container">
                 <div class="row">
-                    <!-- Left Column: ClassTree -->
                     <div class="col-2">
                         <class-tree></class-tree>
                     </div>
-                    <!-- Right Column: Search Results via RouterView -->
                     <div class="col-10">
                         <router-view></router-view>
                     </div>
                 </div>
             </div>
         </main>
+
+        <!-- Modal Component -->
+        <create-object-modal v-if="showModal" :type="selectedType" @close="closeModal" @object-created="handleObjectCreated" />
     </div>
 </template>
 
@@ -65,22 +81,25 @@
 import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "..//ClassTree.vue"; // Adjust path as needed
+import CreateObjectModal from "../CreateObjectModal.vue"; // Adjust path as needed
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch } from 'vue';
 
 export default {
     name: "default-layout",
-    components: { LanguageSwitcher, ClassTree },
+    components: { LanguageSwitcher, ClassTree, CreateObjectModal },
     setup() {
         const router = useRouter();
         const route = useRoute();
         const searchQuery = ref(route.query.q || '');
+        const showModal = ref(false);
+        const selectedType = ref('');
 
         watch(() => route.query.q, (newQuery) => {
             searchQuery.value = newQuery || '';
         });
 
-        return { router, route, searchQuery };
+        return { router, route, searchQuery, showModal, selectedType };
     },
     computed: {
         user: function () {
@@ -112,7 +131,26 @@ export default {
                     console.error('Navigation error:', error);
                 }
             }
+        },
+        openCreateModal(type) {
+            this.selectedType = type;
+            this.showModal = true;
+        },
+        closeModal() {
+            this.showModal = false;
+            this.selectedType = '';
+        },
+        handleObjectCreated(object) {
+            console.log('Object created:', object);
+            // Optionally refresh search results or redirect
+            this.$router.push({ path: '/', query: { q: this.searchQuery } }); // Refresh current search
         }
     }
 };
 </script>
+
+<style scoped>
+.navbar-light .btn {
+    margin-right: 0.5rem;
+}
+</style>
