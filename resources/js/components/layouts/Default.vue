@@ -80,10 +80,11 @@
 <script>
 import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
-import ClassTree from "..//ClassTree.vue"; // Adjust path as needed
-import CreateObjectModal from "../CreateObjectModal.vue"; // Adjust path as needed
+import ClassTree from "../ClassTree.vue";
+import CreateObjectModal from "../CreateObjectModal.vue";
 import { useRouter, useRoute } from 'vue-router';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
+import { eventBus } from '../../eventBus.js'; // Import the event bus
 
 export default {
     name: "default-layout",
@@ -94,6 +95,14 @@ export default {
         const searchQuery = ref(route.query.q || '');
         const showModal = ref(false);
         const selectedType = ref('');
+
+        // Listen for open-create-modal event
+        onMounted(() => {
+            eventBus.on('open-create-modal', (type) => {
+                selectedType.value = type;
+                showModal.value = true;
+            });
+        });
 
         watch(() => route.query.q, (newQuery) => {
             searchQuery.value = newQuery || '';
@@ -125,7 +134,7 @@ export default {
                 try {
                     await this.$router.push({
                         path: '/',
-                        query: { q: this.searchQuery }
+                        query: {q: this.searchQuery}
                     });
                 } catch (error) {
                     console.error('Navigation error:', error);

@@ -9,14 +9,12 @@
                         v-model="object.name"
                         :isEditable="isEditing"
                     />
+                    <button class="btn btn-outline-primary" @click="openCreateModal('Class')">Class</button>
+                    <button @click="toggleEditMode" class="btn btn-primary">
+                        {{ isEditing ? t("Cancel") : t("Edit") }}
+                    </button>
                 </h1>
-
-                <button @click="toggleEditMode" class="btn btn-primary">
-                    {{ isEditing ? t("Cancel") : t("Edit") }}
-                </button>
                 <button v-if="isEditing" @click="saveChanges" class="btn btn-success">{{ t('Save') }}</button>
-                <button @click="newForm" class="btn btn-primary">{{ t('Create') }}</button>
-
                 <div class="col-md-10 col-md-offset-1">
                     <div class="row rounded border p-3 rounded-4">
                         <div class="col-md-2" style="font-size: x-small">
@@ -34,7 +32,7 @@
                             />
                             <DateField
                                 fieldName="end"
-                                v-model="object.start"
+                                v-model="object.end"
                                 :isEditable="isEditing"
                                 :label="tc('End', object.class?.thing_id)"
                             />
@@ -44,8 +42,8 @@
                                 :isEditable="isEditing"
                                 :label="tc('Description', object.class?.thing_id)"
                             />
-                            <div v-if="object.record_created">{{$t('Record created')}}: {{ object.record_created }}</div>
-                            <div v-if="object.record_updated">{{$t('Record updated')}}: {{ object.record_updated }}</div>
+                            <div v-if="object.record_created">{{ $t('Record created') }}: {{ object.record_created }}</div>
+                            <div v-if="object.record_updated">{{ $t('Record updated') }}: {{ object.record_updated }}</div>
                             <RadioGroupField
                                 fieldName="visibility"
                                 v-model="object.public"
@@ -53,13 +51,13 @@
                                 :isEditable="isEditing"
                                 :label="t('Access')"
                             />
-                            <!--<pre style="font-size: x-small">{{ object }}</pre>-->
+                            <!-- <pre style="font-size: x-small">{{ object }}</pre> -->
                             {{ object.description }}
 
                         </div>
                     </div>
                     <!-- Going through links -->
-                    <div v-for="link in object.links" :key="link.link_type_id" class="row  p-3">
+                    <div v-for="link in object.links" :key="link.link_type_id" class="row p-3">
                         <div class="col-md-2">
                             <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
                                 <img :src="getThumbUrl(link.thing_id)" width="50"/>
@@ -106,10 +104,11 @@ import TextField from "./Fields/TextField.vue";
 import DateField from "./Fields/DateField.vue";
 import { useI18n } from 'vue-i18n';
 import RadioGroupField from "./Fields/RadioGroupField.vue";
+import { eventBus } from '../eventBus'; // Import the event bus
 
 export default {
     name: "search",
-    components: {RadioGroupField, DateField, TextField, ClassTree },
+    components: { RadioGroupField, DateField, TextField, ClassTree },
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
@@ -166,6 +165,10 @@ export default {
             }
         };
 
+        const openCreateModal = (type) => {
+            eventBus.emit('open-create-modal', type); // Emit event to open modal
+        };
+
         onMounted(() => {
             getObject();
         });
@@ -184,7 +187,8 @@ export default {
             saveChanges,
             getThumbUrl,
             t,
-            tc
+            tc,
+            openCreateModal
         };
     },
 };
