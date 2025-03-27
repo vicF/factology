@@ -13,7 +13,7 @@
             </span>
             <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
             {{ name }}
-            <span class="action-icons" v-show="showIcons">
+            <span class="action-icons" :class="{ 'visible': showIcons }">
                 <span class="add-subclass" @click="openCreateSubclassModal">+</span>
                 <span class="add-object" @click="openCreateObjectModal">📦</span>
             </span>
@@ -33,9 +33,9 @@
 </template>
 
 <script>
-import { useCheckboxStore } from '../stores/checkboxes';
-import { computed, ref } from 'vue';
-import { eventBus } from '../eventBus';
+import {useCheckboxStore} from '../stores/checkboxes';
+import {computed, ref} from 'vue';
+import {eventBus} from '../eventBus';
 
 export default {
     props: ['id', 'name', 'nodes', 'depth'],
@@ -46,9 +46,9 @@ export default {
             checkedItems: [],
         };
     },
-    setup(props, { emit }) {
+    setup(props, {emit}) {
         const store = useCheckboxStore();
-        const showIcons = ref(false); // Independent hover state for each node
+        const showIcons = ref(false);
 
         const isChecked = computed(() => {
             return store.checkedItems.includes(props.id);
@@ -60,21 +60,21 @@ export default {
         }
 
         const openCreateSubclassModal = () => {
-            eventBus.emit('open-create-modal', `Subclass of ${props.name}`, { parentId: props.id });
+            eventBus.emit('open-create-modal', `Subclass of ${props.name}`, {parentId: props.id});
         };
 
         const openCreateObjectModal = () => {
-            eventBus.emit('open-create-modal', props.name, { classId: props.id });
+            eventBus.emit('open-create-modal', props.name, {classId: props.id});
         };
 
-        return { isChecked, onCheckboxChange, showIcons, openCreateSubclassModal, openCreateObjectModal };
+        return {isChecked, onCheckboxChange, showIcons, openCreateSubclassModal, openCreateObjectModal};
     },
     computed: {
         showToggle() {
             return this.nodes && this.nodes.length > 0;
         },
         indent() {
-            return { transform: `translate(${this.depth * 10}px)` };
+            return {transform: `translate(${this.depth * 10}px)`};
         }
     },
     methods: {
@@ -96,10 +96,18 @@ export default {
 .tree-node {
     display: flex;
     align-items: center;
+    white-space: nowrap; /* Prevent text wrapping */
 }
 
 .action-icons {
     margin-left: 5px;
+    display: inline-flex; /* Keep icons inline and reserve space */
+    width: 40px; /* Fixed width to reserve space (adjust as needed) */
+    visibility: hidden; /* Hidden but still takes up space */
+}
+
+.action-icons.visible {
+    visibility: visible; /* Show when hovered */
 }
 
 .add-subclass, .add-object {
