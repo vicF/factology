@@ -1,13 +1,22 @@
 <template>
     <div class="tree-menu">
-        <div :style="indent">
+        <div
+            class="tree-node"
+            @mouseenter.stop="showIcons = true"
+            @mouseleave.stop="showIcons = false"
+        >
             <span v-if="showToggle" @click="toggleChildren" style="font-size: larger; cursor: pointer;">
                 {{ showChildren ? '- ' : '+ ' }}
             </span>
             <span v-else style="font-size: larger">
-                &nbsp;
+                 
             </span>
-            <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" /> {{ name }}
+            <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
+            {{ name }}
+            <span class="action-icons" v-show="showIcons">
+                <span class="add-subclass" @click="openCreateSubclassModal">+</span>
+                <span class="add-object" @click="openCreateObjectModal">📦</span>
+            </span>
         </div>
         <tree-menu
             v-if="showChildren"
@@ -25,7 +34,8 @@
 
 <script>
 import { useCheckboxStore } from '../stores/checkboxes';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { eventBus } from '../eventBus';
 
 export default {
     props: ['id', 'name', 'nodes', 'depth'],
@@ -34,12 +44,12 @@ export default {
         return {
             showChildren: true,
             checkedItems: [],
-        }
+        };
     },
     setup(props, { emit }) {
         const store = useCheckboxStore();
+        const showIcons = ref(false); // Independent hover state for each node
 
-        // Computed property to check if the current item is checked
         const isChecked = computed(() => {
             return store.checkedItems.includes(props.id);
         });
@@ -49,14 +59,22 @@ export default {
             emit('update-checked', store.checkedItems);
         }
 
-        return { isChecked, onCheckboxChange };
+        const openCreateSubclassModal = () => {
+            eventBus.emit('open-create-modal', `Subclass of ${props.name}`, { parentId: props.id });
+        };
+
+        const openCreateObjectModal = () => {
+            eventBus.emit('open-create-modal', props.name, { classId: props.id });
+        };
+
+        return { isChecked, onCheckboxChange, showIcons, openCreateSubclassModal, openCreateObjectModal };
     },
     computed: {
         showToggle() {
             return this.nodes && this.nodes.length > 0;
         },
         indent() {
-            return {transform: `translate(${this.depth * 10}px)`}
+            return { transform: `translate(${this.depth * 10}px)` };
         }
     },
     methods: {
@@ -64,13 +82,33 @@ export default {
             this.showChildren = !this.showChildren;
         },
         handleCheckedUpdate(checkedItems) {
-            // Update the checkedItems data property based on the emitted value
             this.checkedItems = checkedItems;
-        },
+        }
     }
-}
+};
 </script>
 
 <style scoped>
+.tree-menu {
+    position: relative;
+}
 
+.tree-node {
+    display: flex;
+    align-items: center;
+}
+
+.action-icons {
+    margin-left: 5px;
+}
+
+.add-subclass, .add-object {
+    cursor: pointer;
+    font-size: larger;
+    margin-left: 5px;
+}
+
+.add-subclass:hover, .add-object:hover {
+    color: #007bff;
+}
 </style>
