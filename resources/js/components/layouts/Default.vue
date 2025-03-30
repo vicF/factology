@@ -62,10 +62,10 @@
         <main class="mt-3">
             <div class="container">
                 <div class="row">
-                    <div class="col-2">
+                    <div class="col-3 ps-0">
                         <class-tree></class-tree>
                     </div>
-                    <div class="col-10">
+                    <div class="col-9">
                         <router-view></router-view>
                     </div>
                 </div>

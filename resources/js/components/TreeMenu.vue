@@ -93,11 +93,12 @@ export default {
 .tree-menu {
     position: relative;
     margin-left: 0;
+    padding-left: 0; /* Ensure no internal padding */
 }
 
 .tree-node {
     display: flex;
-    align-items: center; /* Center all elements vertically */
+    align-items: center;
     padding: 1px 0;
 }
 
@@ -122,7 +123,7 @@ input[type="checkbox"] {
 
 .node-content {
     display: flex;
-    align-items: center; /* Align name and icons with checkbox */
+    align-items: center;
     flex-grow: 1;
 }
 
@@ -154,6 +155,6 @@ input[type="checkbox"] {
 }
 
 .children {
-    /* No extra padding/margin; indent comes from .tree-node */
+    padding-left: 0; /* No extra padding for children */
 }
 </style>
