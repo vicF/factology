@@ -9,10 +9,10 @@
                 {{ showChildren ? '- ' : '+ ' }}
             </span>
             <span v-else style="font-size: larger">
-                 
+                &nbsp;&nbsp;
             </span>
-            <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
-            {{ name }}
+            &nbsp;<input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
+            &nbsp;{{ name }}
             <span class="action-icons" :class="{ 'visible': showIcons }">
                 <span class="add-subclass" @click="openCreateSubclassModal">+</span>
                 <span class="add-object" @click="openCreateObjectModal">📦</span>
