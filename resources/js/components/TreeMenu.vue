@@ -97,41 +97,46 @@ export default {
 
 .tree-node {
     display: flex;
-    align-items: flex-start; /* Align to top for multi-line consistency */
-    padding: 2px 0;
+    align-items: center; /* Center all elements vertically */
+    padding: 1px 0;
 }
 
 .toggle {
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 16px;
-    text-align: center;
+    height: 16px;
     font-size: larger;
     cursor: pointer;
     user-select: none;
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 
 input[type="checkbox"] {
-    margin: 2px 6px 0 0; /* Align checkbox with first line */
+    margin: 0 6px 0 0;
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
 }
 
 .node-content {
     display: flex;
-    align-items: flex-start; /* Ensure name and icons align with first line */
-    flex-grow: 1; /* Take up remaining space */
+    align-items: center; /* Align name and icons with checkbox */
+    flex-grow: 1;
 }
 
 .node-name {
     margin-right: 5px;
-    word-wrap: break-word; /* Allow wrapping */
+    word-wrap: break-word;
+    line-height: 1.1;
 }
 
 .action-icons {
     display: inline-flex;
     align-items: center;
     visibility: hidden;
-    flex-shrink: 0; /* Prevent icons from shrinking */
+    flex-shrink: 0;
 }
 
 .action-icons.visible {
