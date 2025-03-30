@@ -60,7 +60,7 @@
 
         <!-- Main Content -->
         <main class="mt-3">
-            <div class="container">
+            <div class="container ps-5"> <!-- Small left padding instead of ps-0 -->
                 <div class="row">
                     <div class="col-3 ps-0">
                         <class-tree></class-tree>
@@ -84,7 +84,7 @@ import ClassTree from "../ClassTree.vue";
 import CreateObjectModal from "../CreateObjectModal.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
-import { eventBus } from '../../eventBus.js'; // Import the event bus
+import { eventBus } from '../../eventBus.js';
 
 export default {
     name: "default-layout",
@@ -96,7 +96,6 @@ export default {
         const showModal = ref(false);
         const selectedType = ref('');
 
-        // Listen for open-create-modal event
         onMounted(() => {
             eventBus.on('open-create-modal', (type) => {
                 selectedType.value = type;
@@ -134,7 +133,7 @@ export default {
                 try {
                     await this.$router.push({
                         path: '/',
-                        query: {q: this.searchQuery}
+                        query: { q: this.searchQuery }
                     });
                 } catch (error) {
                     console.error('Navigation error:', error);
@@ -151,8 +150,7 @@ export default {
         },
         handleObjectCreated(object) {
             console.log('Object created:', object);
-            // Optionally refresh search results or redirect
-            this.$router.push({ path: '/', query: { q: this.searchQuery } }); // Refresh current search
+            this.$router.push({ path: '/', query: { q: this.searchQuery } });
         }
     }
 };
@@ -161,5 +159,9 @@ export default {
 <style scoped>
 .navbar-light .btn {
     margin-right: 0.5rem;
+}
+
+.container {
+    max-width: 100%; /* Optional: Full width */
 }
 </style>
