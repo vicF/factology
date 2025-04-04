@@ -3,7 +3,7 @@
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <span style="color:white" class="me-3">{{ authenticated ? user.name : 'guest' }}</span>
+                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                         data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
                         aria-label="Toggle navigation">
@@ -27,7 +27,7 @@
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
                                    role="button" data-bs-toggle="dropdown" aria-haspopup="true"
                                    aria-expanded="false">
-                                    {{ authenticated ? user.name : 'User' }}
+                                    {{ authenticated && user ? user.name : 'User' }}
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end"
                                      aria-labelledby="navbarDropdownMenuLink">
@@ -45,8 +45,7 @@
                 </div>
             </div>
         </nav>
-
-        <!-- Secondary Navbar for Create Links -->
+        <!-- Rest of the template remains unchanged -->
         <nav class="navbar navbar-light bg-light">
             <div class="container-fluid">
                 <div class="d-flex gap-2">
@@ -57,10 +56,8 @@
                 </div>
             </div>
         </nav>
-
-        <!-- Main Content -->
         <main class="mt-3">
-            <div class="container ps-5"> <!-- Small left padding instead of ps-0 -->
+            <div class="container ps-5">
                 <div class="row">
                     <div class="col-3 ps-0">
                         <class-tree></class-tree>
@@ -71,20 +68,19 @@
                 </div>
             </div>
         </main>
-
-        <!-- Modal Component -->
         <create-object-modal v-if="showModal" :type="selectedType" @close="closeModal" @object-created="handleObjectCreated" />
     </div>
 </template>
 
 <script>
-import { mapActions } from 'vuex';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "../ClassTree.vue";
 import CreateObjectModal from "../CreateObjectModal.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
 import { eventBus } from '../../eventBus.js';
+import { useAuthStore } from '../../stores/auth';
+import axios from 'axios';
 
 export default {
     name: "default-layout",
@@ -92,40 +88,65 @@ export default {
     setup() {
         const router = useRouter();
         const route = useRoute();
+        const authStore = useAuthStore();
         const searchQuery = ref(route.query.q || '');
         const showModal = ref(false);
         const selectedType = ref('');
 
+        const checkAuth = async () => {
+            try {
+                await axios.get('/sanctum/csrf-cookie');
+                const response = await axios.get('/api/user');
+                if (response.data && !authStore.authenticated) {
+                    authStore.login(response.data);
+                }
+                console.log('Authenticated:', authStore.authenticated);
+                console.log('User:', authStore.user);
+            } catch (error) {
+                if (error.response?.status === 401) {
+                    console.log('Not authenticated yet (401)');
+                } else {
+                    console.error('Auth check failed:', error.response?.status);
+                }
+                if (authStore.authenticated) {
+                    authStore.logout(); // Clear stale state
+                }
+            }
+        };
+
         onMounted(() => {
+            checkAuth();
             eventBus.on('open-create-modal', (type) => {
                 selectedType.value = type;
                 showModal.value = true;
             });
         });
 
+        watch(() => route.path, () => {
+            checkAuth();
+        });
+
         watch(() => route.query.q, (newQuery) => {
             searchQuery.value = newQuery || '';
         });
 
-        return { router, route, searchQuery, showModal, selectedType };
+        return { router, route, searchQuery, showModal, selectedType, authStore, checkAuth };
     },
     computed: {
-        user: function () {
-            return this.$store.state.auth.user;
+        user() {
+            return this.authStore.user || null; // Ensure null if undefined
         },
-        authenticated: function () {
-            return this.$store.state.auth.authenticated;
+        authenticated() {
+            return this.authStore.authenticated;
         }
     },
     methods: {
-        ...mapActions({
-            signOut: "auth/logout"
-        }),
         async logout() {
             await axios.post('/logout').then(() => {
-                this.signOut();
-                this.$store.state.auth.user = null;
+                this.authStore.logout();
                 this.$router.push({ name: "dashboard" });
+            }).catch(error => {
+                console.error('Logout failed:', error);
             });
         },
         async handleSearch() {
@@ -150,7 +171,7 @@ export default {
         },
         handleObjectCreated(object) {
             console.log('Object created:', object);
-            this.$router.push({ path: '/', query: { q: this.searchQuery } });
+            this.$router.push({path: '/', query: {q: this.searchQuery}});
         }
     }
 };
@@ -162,6 +183,6 @@ export default {
 }
 
 .container {
-    max-width: 100%; /* Optional: Full width */
+    max-width: 100%;
 }
 </style>

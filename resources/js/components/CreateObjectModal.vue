@@ -37,68 +37,54 @@ import { Modal } from 'bootstrap';
 export default {
     name: 'CreateObjectModal',
     props: {
-        type: {
-            type: String,
-            required: true
-        }
+        type: { type: String, required: true },
+        params: { type: Object, default: () => ({}) }
     },
     emits: ['close', 'object-created'],
     setup(props, { emit }) {
         const formData = ref({
             name: '',
             description: '',
-            type: props.type // Pass type to backend
+            type: props.type,
+            parentId: props.params.parentId || null,
+            classId: props.params.classId || null
         });
         const modalId = 'createObjectModal';
         let modalInstance = null;
 
-        // Initialize Bootstrap modal on mount
         onMounted(() => {
             const modalElement = document.getElementById(modalId);
             modalInstance = new Modal(modalElement);
             modalInstance.show();
-
-            // Listen for modal hidden event to emit close
-            modalElement.addEventListener('hidden.bs.modal', () => {
-                emit('close');
-            });
+            modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
         });
 
-        // Clean up event listener
         onUnmounted(() => {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
-                modalElement.removeEventListener('hidden.bs.modal', () => {});
+                modalElement.removeEventListener('hidden.bs.modal', () => {
+                });
             }
         });
 
         const closeModal = () => {
-            if (modalInstance) {
-                modalInstance.hide();
-            }
+            if (modalInstance) modalInstance.hide();
         };
 
         const submitForm = async () => {
             try {
-                const response = await axios.post('/api/v1/object/create', formData.value); // Adjust endpoint as needed
+                await axios.get('/sanctum/csrf-cookie');
+                const id = props.params.classId || props.params.parentId || 'create';
+                const response = await axios.post(`/api/v1/object/${id}`, formData.value);
                 emit('object-created', response.data);
                 closeModal();
             } catch (error) {
-                console.error('Error creating object:', error);
-                alert('Failed to create object: ' + (error.response?.data?.message || error.message));
+                console.error('Error:', error);
+                alert('Failed: ' + (error.response?.data?.message || error.message));
             }
         };
 
-        return {
-            formData,
-            modalId,
-            closeModal,
-            submitForm
-        };
+        return {formData, modalId, closeModal, submitForm};
     }
 };
 </script>
-
-<style scoped>
-/* Optional: Customize modal styles if needed */
-</style>

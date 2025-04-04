@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+use Illuminate\Support\Facades\Auth;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -28,3 +29,11 @@ Route::middleware('auth:sanctum')->delete('/v1/object/{id}', [ApiController::cla
 Route::middleware('auth:sanctum')->post('/v1/photos', [ApiController::class, 'photos']);
 Route::middleware('auth:sanctum')->post('/v1/check_photos', [ApiController::class, 'checkPhotos']);
 Route::middleware('auth:sanctum')->post('/v1/photos/thumbs_upload', [ApiController::class, 'upload']);
+Route::post('/login', function (Request $request) {
+$credentials = $request->only('email', 'password');
+if (Auth::attempt($credentials)) {
+$request->session()->regenerate();
+return response()->json(['user' => Auth::user()], 200);
+}
+return response()->json(['message' => 'Invalid credentials'], 401);
+});
