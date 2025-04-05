@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,4 +30,4 @@ Route::middleware('auth:sanctum')->delete('/v1/object/{id}', [ApiController::cla
 Route::middleware('auth:sanctum')->post('/v1/photos', [ApiController::class, 'photos']);
 Route::middleware('auth:sanctum')->post('/v1/check_photos', [ApiController::class, 'checkPhotos']);
 Route::middleware('auth:sanctum')->post('/v1/photos/thumbs_upload', [ApiController::class, 'upload']);
-
+Route::middleware('auth:sanctum')->get('/user', [LoginController::class, 'user']);

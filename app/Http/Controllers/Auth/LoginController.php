@@ -18,7 +18,7 @@ class LoginController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('guest')->except('logout');
+        $this->middleware('guest')->except('logout', 'user'); // Allow user method for authenticated users
     }
 
     /**
@@ -50,6 +50,15 @@ class LoginController extends Controller
      * @param  mixed  $user
      * @return void
      */
+    public function user(Request $request)
+    {
+        $user = Auth::user();
+        if ($user) {
+            return response()->json($user);
+        }
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
+
     protected function authenticated(Request $request, $user)
     {
         // No redirect needed for SPA, handled in login method
