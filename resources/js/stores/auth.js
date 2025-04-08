@@ -29,6 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
         localStorage.removeItem('authenticated');
         localStorage.removeItem('user');
+        axios.post('/logout') // Call Laravel logout route
+            .catch(() => {});
     }
 
     return { authenticated, user, login, logout };
