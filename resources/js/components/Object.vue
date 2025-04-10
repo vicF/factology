@@ -90,9 +90,6 @@
     </div>
 </template>
 
-
-
-
 <script>
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
@@ -156,13 +153,12 @@ export default {
 
         const handleApiError = (error) => {
             const response = error.response;
-            if (response && response.status === 422) {
+            if (response?.status === 422) {
                 validationErrors.value = response.data.errors;
-            } else if (response && response.status === 401) {
-                router.push({ name: 'login' });
-            } else {
-                alert(response ? response.data.message : "An error occurred.");
+            } else if (response?.data?.message) {
+                alert(response.data.message); // Only show alert if there's a specific message
             }
+            // Let interceptor handle 401/419
         };
 
         const openCreateModal = (type) => {

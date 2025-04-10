@@ -63,14 +63,18 @@ app.config.globalProperties.$navigateToObject = function(id) {
 
 
 
+// Response interceptor for 401 and 419
 axios.interceptors.response.use(
     response => response,
     error => {
-        if (error.response && error.response.status === 401) {
+        const status = error.response?.status;
+        if (status === 401 || status === 419) {
             const authStore = useAuthStore();
-            authStore.setShowLogin(true);
+            authStore.logout(); // Clear auth state
+            router.push({ name: 'login' }); // Redirect to login
+            return Promise.reject(new Error('Session expired or unauthorized. Please log in.'));
         }
-        return Promise.reject(error);
+        return Promise.reject(error); // Pass other errors to component
     }
 );
 
