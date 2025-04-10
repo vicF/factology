@@ -9,3 +9,7 @@ Route::get('{any}', function () {
 Auth::routes();
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::post('/login', [LoginController::class, 'login']);
+Route::post('/logout', function () {
+    Auth::logout();
+    return response()->json(['message' => 'Logged out'], 200);
+})->middleware('auth:sanctum');

@@ -1,9 +1,3 @@
-/**
- * First we will load all of this project's JavaScript dependencies which
- * includes Vue and other libraries. It is a great starting point when
- * building robust, powerful web applications using Vue and Laravel.
- */
-
 import './bootstrap';
 import '../sass/app.scss';
 import Router from '@/router';
@@ -13,12 +7,6 @@ import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { dateFromDb } from './utils/dateUtils.js';
 import i18n from './lang/i18n';
-
-/**
- * Next, we will create a fresh Vue application instance. You may then begin
- * registering components with the application instance so they are ready
- * to use in your application's views. An example is included for you.
- */
 const pinia = createPinia();
 const app = createApp({});
 
@@ -61,11 +49,15 @@ app.config.globalProperties.$navigateToObject = function(id) {
     this.$router.push({ name: 'object', params: { uid: id } });
 };
 
+import axios from 'axios';
 
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.baseURL = 'http://localhost:8003';
 
 // Response interceptor for 401 and 419
 axios.interceptors.response.use(
-    response => response,
+    response => response, // Pass successful responses through
     error => {
         const status = error.response?.status;
         if (status === 401 || status === 419) {

@@ -10,6 +10,10 @@
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
                         <div class="mb-3">
+                            <label for="name" class="form-label">Link</label>
+                            <input type="text" class="form-control" id="name" v-model="formData.link" required>
+                        </div>
+                        <div class="mb-3">
                             <label for="name" class="form-label">Name</label>
                             <input type="text" class="form-control" id="name" v-model="formData.name" required>
                         </div>
