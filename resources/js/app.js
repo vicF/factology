@@ -63,7 +63,7 @@ axios.interceptors.response.use(
         if (status === 401 || status === 419) {
             const authStore = useAuthStore();
             authStore.logout(); // Clear auth state
-            router.push({ name: 'login' }); // Redirect to login
+            Router.push({ name: 'login' }); // Redirect to login
             return Promise.reject(new Error('Session expired or unauthorized. Please log in.'));
         }
         return Promise.reject(error); // Pass other errors to component
