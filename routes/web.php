@@ -9,7 +9,14 @@ Route::get('{any}', function () {
 Auth::routes();
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::post('/login', [LoginController::class, 'login']);
-Route::post('/logout', function () {
-    Auth::logout();
-    return response()->json(['message' => 'Logged out'], 200);
-})->middleware('auth:sanctum');
+Route::post('/logout', function (Request $request) {
+    try {
+        Auth::guard('web')->logout(); // Explicitly use 'web' guard
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return response()->json(['message' => 'Logged out'], 200);
+    } catch (\Exception $e) {
+        // If session is already gone, just return success
+        return response()->json(['message' => 'Logged out'], 200);
+    }
+})->name('logout');
