@@ -32,6 +32,16 @@ const i18n = createI18n({
     locale: localStorage.getItem('locale') || 'en',
     fallbackLocale: 'en',
     messages,
+    missing: (locale, key) => {
+        // Suppress warnings for English by returning the key
+        if (locale === 'en') {
+            return key; // Use key as translation (e.g., "Access")
+        }
+        // For other locales, allow default warning behavior
+        console.warn(`[vue-i18n] Missing translation for "${key}" in "${locale}"`);
+        return key;
+    },
+    silentTranslationWarn: false, // Keep warnings for non-English locales
 });
 
 // Custom translation function for context
