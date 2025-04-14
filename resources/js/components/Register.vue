@@ -28,7 +28,7 @@
                             </div>
                             <div class="form-group col-12 my-2">
                                 <label for="password_confirmation" class="font-weight-bold">Confirm Password</label>
-                                <input type="password_confirmation" name="password_confirmation" v-model="user.password_confirmation" id="password_confirmation" placeholder="Enter Password" class="form-control">
+                                <input type="password" name="password_confirmation" v-model="user.password_confirmation" id="password_confirmation" placeholder="Enter Password" class="form-control">
                             </div>
                             <div class="col-12 mb-2">
                                 <button type="submit" :disabled="processing" class="btn btn-primary btn-block">
@@ -48,38 +48,41 @@
 
 <script>
 import { reactive, toRefs } from 'vue';
-import { mapActions, useStore } from 'vuex';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
+import axios from 'axios';
 
 export default {
     name: 'register',
     setup() {
-        const store = useStore();
+        const router = useRouter();
+        const authStore = useAuthStore();
+
         const state = reactive({
             user: {
-                name: "",
-                email: "",
-                password: "",
-                password_confirmation: ""
+                name: '',
+                email: '',
+                password: '',
+                password_confirmation: ''
             },
             validationErrors: {},
             processing: false
         });
 
-        const { signIn } = mapActions(store, ['auth/login']);
-
         const register = async () => {
             state.processing = true;
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                await axios.post('/register', state.user);
+                const response = await axios.post('/register', state.user);
                 state.validationErrors = {};
-                await signIn();
-            } catch ({ response }) {
+                authStore.login(response.data.user || {name: state.user.name, email: state.user.email});
+                router.push({name: 'dashboard'});
+            } catch ({response}) {
                 if (response && response.status === 422) {
                     state.validationErrors = response.data.errors;
                 } else {
                     state.validationErrors = {};
-                    alert(response ? response.data.message : "Error during registration");
+                    alert(response ? response.data.message : 'Error during registration');
                 }
             } finally {
                 state.processing = false;
