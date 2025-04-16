@@ -47,11 +47,13 @@ class AppServiceProvider extends ServiceProvider
         });
 
         DB::listen(function ($query) {
+            if (!str_contains($query->sql, 'telescope_')) {
             logger()->info('Query executed', [
                 'sql' => $query->sql,
                 'bindings' => $query->bindings,
                 'time' => $query->time,
             ]);
+            }
         });
     }
 }
