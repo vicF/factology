@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import axios from 'axios';
 
 export const useAuthStore = defineStore('auth', () => {
-    // Safely parse localStorage, default to null if invalid
     let initialUser = null;
     try {
         const storedUser = localStorage.getItem('user');
@@ -29,8 +29,16 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
         localStorage.removeItem('authenticated');
         localStorage.removeItem('user');
-        axios.post('/logout') // Call Laravel logout route
-            .catch(() => {});
+        axios.post('/logout')
+            .then(() => {
+                document.cookie.split(';').forEach(cookie => {
+                    const name = cookie.split('=')[0].trim();
+                    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+                });
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+            });
     }
 
     return { authenticated, user, login, logout };

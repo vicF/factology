@@ -47,4 +47,15 @@ class Handler extends ExceptionHandler
             //
         });
     }
+
+    public function render($request, Throwable $exception)
+    {
+        if ($exception instanceof HttpException && $request->wantsJson()) {
+            return response()->json([
+                'message' => $exception->getMessage() ?: 'Unauthorized',
+            ], $exception->getStatusCode());
+        }
+
+        return parent::render($request, $exception);
+    }
 }

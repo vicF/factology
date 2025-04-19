@@ -58,16 +58,22 @@ axios.interceptors.response.use(
     response => response, // Pass successful responses through
     error => {
         const status = error.response?.status;
-        if (status === 401 || status === 419) {
+        if (status === 401 && !error.config.url.includes('/login')) {
             const authStore = useAuthStore();
-            authStore.logout(); // Clear client-side state
-            // Attempt logout, ignore errors
-            axios.post('/logout')
-                .catch(() => console.log('Logout request failed, proceeding to login'));
-            router.push({ name: 'login' })
-                .then(() => console.log('Redirected to login'))
-                .catch(err => console.error('Redirect failed:', err));
-            return Promise.reject(new Error('Session expired or unauthorized.'));
+            if (!authStore.authenticated) {
+                // Redirect to login with current route as redirect query
+                router.push({
+                    name: 'login',
+                    query: { redirect: router.currentRoute.value.fullPath }
+                });
+            } else {
+                // Authenticated but unauthorized
+                router.push({ name: 'dashboard' });
+            }
+        } else if (status === 400 && error.message.includes('header')) {
+            const authStore = useAuthStore();
+            authStore.logout();
+            router.push({ name: 'dashboard' });
         }
         return Promise.reject(error); // Pass other errors to component
     }

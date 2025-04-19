@@ -1,9 +1,10 @@
+<!-- factology/resources/js/components/Login.vue -->
 <template>
     <div class="container d-flex justify-content-center align-items-start min-vh-100 py-4">
         <div class="col-12 col-md-6">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h1 class="text-center">Login</h1>
+                    <h1 class="text-center">{{ $t('Login') }}</h1>
                     <hr/>
                     <form @submit.prevent="login" class="row">
                         <div class="col-12" v-if="Object.keys(validationErrors).length > 0">
@@ -14,20 +15,23 @@
                             </div>
                         </div>
                         <div class="form-group col-12">
-                            <label for="email" class="font-weight-bold">Email</label>
-                            <input type="text" v-model="auth.email" name="email" id="email" class="form-control">
+                            <label for="email" class="font-weight-bold">{{ $t('Email') }}</label>
+                            <input type="email" v-model="auth.email" name="email" id="email" class="form-control" required>
                         </div>
                         <div class="form-group col-12 my-2">
-                            <label for="password" class="font-weight-bold">Password</label>
-                            <input type="password" v-model="auth.password" name="password" id="password" class="form-control">
+                            <label for="password" class="font-weight-bold">{{ $t('Password') }}</label>
+                            <input type="password" v-model="auth.password" name="password" id="password" class="form-control" required>
                         </div>
                         <div class="col-12 mb-2">
                             <button type="submit" :disabled="processing" class="btn btn-primary btn-block">
-                                {{ processing ? "Please wait" : "Login" }}
+                                {{ processing ? $t('Please wait') : $t('Login') }}
                             </button>
                         </div>
+                        <div class="col-12 mb-2">
+                            <button type="button" class="btn btn-secondary btn-block" @click="cancel">{{ $t('Cancel') }}</button>
+                        </div>
                         <div class="col-12 text-center">
-                            <label>Don't have an account? <router-link :to="{name:'register'}">Register Now!</router-link></label>
+                            <label>{{ $t('Don\'t have an account?') }} <router-link :to="{name:'register'}">{{ $t('Register Now!') }}</router-link></label>
                         </div>
                     </form>
                 </div>
@@ -38,7 +42,8 @@
 
 <script>
 import { reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 
@@ -46,6 +51,8 @@ export default {
     name: "login",
     setup() {
         const router = useRouter();
+        const route = useRoute();
+        const { t } = useI18n();
         const authStore = useAuthStore();
         const auth = reactive({
             email: "",
@@ -57,54 +64,81 @@ export default {
         const login = async () => {
             processing.value = true;
             try {
-                await axios.get('/sanctum/csrf-cookie');
-                const response = await axios.post('/login', auth);
+                console.log('Fetching CSRF cookie...');
+                const csrfResponse = await axios.get('/sanctum/csrf-cookie');
+                console.log('CSRF response:', csrfResponse);
+                console.log('CSRF cookie fetched, sending login request...');
+                const response = await axios.post('/login', auth, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN')
+                    }
+                });
+                console.log('Login response:', response.data);
                 const user = response.data.user;
+                if (!user) {
+                    throw new Error('User data missing in response');
+                }
                 authStore.login(user);
                 console.log('Login successful, user:', user);
                 console.log('Cookies after login:', document.cookie);
-                router.push({ name: 'dashboard' });
+                const redirect = route.query.redirect || { name: 'dashboard' };
+                router.push(redirect);
             } catch (error) {
+                console.error('Login error:', {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                    message: error.message,
+                    headers: error.response?.headers
+                });
                 if (error.response?.status === 422) {
                     validationErrors.value = error.response.data.errors;
                 } else {
                     validationErrors.value = {};
-                    alert(error.response?.data?.message || 'Login failed');
+                    alert(error.response?.data?.message || error.message || t('Login failed'));
                 }
             } finally {
                 processing.value = false;
             }
         };
 
+        const cancel = () => {
+            router.push({ name: 'dashboard' });
+        };
+
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        };
+
         return {
-            auth, // Return the reactive object directly
+            auth,
             validationErrors,
             processing,
-            login
+            login,
+            cancel,
+            t
         };
     }
 };
 </script>
 
 <style scoped>
-/* Ensure the container doesn’t shrink below content */
 .min-vh-100 {
     min-height: 100vh;
 }
-
-/* Optional: Limit card width for better readability */
 .card {
-    max-width: 400px; /* Adjust as needed */
+    max-width: 400px;
     width: 100%;
 }
-
-/* Ensure the form is visible on small screens */
 @media (max-height: 600px) {
     .align-items-start {
-        align-items: flex-start !important; /* Override center on small heights */
+        align-items: flex-start !important;
     }
     .py-4 {
-        padding-top: 1rem !important; /* Reduce padding on small screens */
+        padding-top: 1rem !important;
     }
 }
 </style>

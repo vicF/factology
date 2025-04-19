@@ -3,14 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
-    use AuthenticatesUsers;
-
     /**
      * Create a new controller instance.
      *
@@ -18,62 +16,78 @@ class LoginController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('guest')->except('logout', 'user'); // Allow user method for authenticated users
+        $this->middleware('auth:sanctum')->only(['logout', 'user']);
     }
 
     /**
      * Handle a login request to the application.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\JsonResponse
+     * @throws \Illuminate\Validation\ValidationException
      */
     public function login(Request $request)
     {
-        $this->validateLogin($request);
+        \Log::info('Login attempt', [
+            'input' => $request->except('password'),
+            'headers' => $request->headers->all()
+        ]);
 
-        if ($this->attemptLogin($request)) {
-            $user = $this->guard()->user();
-            $request->session()->regenerate(); // Ensure fresh session
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
+            $user = Auth::user();
+            \Log::info('Login successful', ['user_id' => $user->id]);
             return response()->json([
                 'user' => $user,
                 'message' => 'Login successful'
             ], 200);
         }
 
-        return $this->sendFailedLoginResponse($request);
+        \Log::warning('Login failed: Invalid credentials', ['email' => $request->email]);
+        throw ValidationException::withMessages([
+            'email' => ['The provided credentials do not match our records.'],
+        ]);
     }
 
     /**
-     * Send the response after the user was authenticated.
+     * Log the user out of the application.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  mixed  $user
-     * @return void
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout(Request $request)
+    {
+        try {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            \Log::info('Logout successful');
+            return response()->json(['message' => 'Logged out'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Logout error: ' . $e->getMessage());
+            return response()->json(['message' => 'Logged out'], 200);
+        }
+    }
+
+    /**
+     * Get the authenticated user.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function user(Request $request)
     {
         $user = Auth::user();
         if ($user) {
+            \Log::info('User fetched', ['user_id' => $user->id]);
             return response()->json($user);
         }
+        \Log::warning('User fetch failed: Unauthenticated');
         return response()->json(['message' => 'Unauthenticated'], 401);
-    }
-
-    protected function authenticated(Request $request, $user)
-    {
-        // No redirect needed for SPA, handled in login method
-    }
-
-    /**
-     * Get the failed login response instance.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function sendFailedLoginResponse(Request $request)
-    {
-        return response()->json([
-            'message' => 'Invalid credentials'
-        ], 401);
     }
 }

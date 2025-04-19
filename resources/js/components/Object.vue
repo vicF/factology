@@ -1,32 +1,7 @@
 <!-- resources/js/components/Object.vue -->
 <template>
     <div class="container" id="search">
-        <div v-if="!loaded && !showLoginModal" class="row">Loading...</div>
-        <div v-else-if="showLoginModal" class="row">
-            <!-- Simple login modal -->
-            <div class="col-md-6 offset-md-3">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <h3 class="text-center">{{ $t('Login Required') }}</h3>
-                        <form @submit.prevent="handleLogin">
-                            <div class="mb-3">
-                                <label for="email" class="form-label">{{ $t('Email') }}</label>
-                                <input type="email" class="form-control" id="email" v-model="loginForm.email" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">{{ $t('Password') }}</label>
-                                <input type="password" class="form-control" id="password" v-model="loginForm.password" required>
-                            </div>
-                            <div v-if="loginError" class="alert alert-danger">{{ loginError }}</div>
-                            <div class="d-flex justify-content-between">
-                                <button type="button" class="btn btn-secondary" @click="cancelLogin">{{ $t('Cancel') }}</button>
-                                <button type="submit" class="btn btn-primary" :disabled="processing">{{ processing ? $t('Logging in...') : $t('Login') }}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div v-if="!loaded" class="row">{{ $t('Loading...') }}</div>
         <div v-else class="row">
             <div class="col">
                 <h1>
@@ -77,7 +52,6 @@
                                 :isEditable="isEditing"
                                 :label="$t('Access')"
                             />
-                            <!-- <pre style="font-size: x-small">{{ object }}</pre> -->
                             {{ object.description }}
                         </div>
                     </div>
@@ -120,11 +94,10 @@ import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
-import { reactive } from 'vue';
-import TextField from "./Fields/TextField.vue";
-import DateField from "./Fields/DateField.vue";
 import { useI18n } from 'vue-i18n';
 import RadioGroupField from "./Fields/RadioGroupField.vue";
+import TextField from "./Fields/TextField.vue";
+import DateField from "./Fields/DateField.vue";
 import { eventBus } from '../eventBus';
 import { useAuthStore } from '../stores/auth';
 
@@ -144,12 +117,6 @@ export default {
         const originalObject = ref({});
         const validationErrors = ref({});
         const processing = ref(false);
-        const showLoginModal = ref(false);
-        const loginForm = reactive({
-            email: '',
-            password: ''
-        });
-        const loginError = ref('');
 
         const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
@@ -158,7 +125,6 @@ export default {
         const getObject = async () => {
             try {
                 loaded.value = false;
-                showLoginModal.value = false;
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
                 object.value = response.data.data;
                 originalObject.value = JSON.parse(JSON.stringify(response.data.data));
@@ -170,42 +136,28 @@ export default {
 
         const handleApiError = (error) => {
             const response = error.response;
-            if (response?.status === 401 && !authStore.authenticated) {
-                // Restricted object, unauthenticated user
-                if (object.value.public === 1) {
-                    // Public object: should already be loaded
+            if (response?.status === 400 && error.message.includes('header')) {
+                alert($t('Session error. Please try again.'));
+                authStore.logout();
+                router.push({ name: 'dashboard' });
+            } else if (response?.status === 401) {
+                if (response?.data?.data?.public === 1) {
+                    object.value = response.data.data;
                     loaded.value = true;
                 } else {
-                    // Private object: show login
-                    showLoginModal.value = true;
+                    // Redirect to login, preserving intended route
+                    router.push({
+                        name: 'login',
+                        query: { redirect: route.fullPath }
+                    });
                 }
             } else if (response?.status === 422) {
                 validationErrors.value = response.data.errors;
                 loaded.value = true;
             } else {
-                alert(response?.data?.message || 'Error loading object');
+                alert(response?.data?.message || $t('Error loading object'));
                 loaded.value = true;
             }
-        };
-
-        const handleLogin = async () => {
-            try {
-                processing.value = true;
-                loginError.value = '';
-                await axios.get('/sanctum/csrf-cookie');
-                const response = await axios.post('/login', loginForm);
-                authStore.login(response.data.user || { email: loginForm.email });
-                showLoginModal.value = false;
-                await getObject(); // Retry loading object
-            } catch (error) {
-                loginError.value = error.response?.data?.message || 'Login failed';
-                processing.value = false;
-            }
-        };
-
-        const cancelLogin = () => {
-            showLoginModal.value = false;
-            router.push({ name: 'dashboard' });
         };
 
         const toggleEditMode = () => {
@@ -221,7 +173,7 @@ export default {
                 const response = await axios.put(`/api/v1/object/${route.params.uid}`, object.value);
                 originalObject.value = JSON.parse(JSON.stringify(object.value));
                 isEditing.value = false;
-                alert(t('Changes saved successfully'));
+                alert($t('Changes saved successfully'));
             } catch (error) {
                 handleApiError(error);
             } finally {
@@ -253,12 +205,8 @@ export default {
             t,
             tc,
             openCreateModal,
-            showLoginModal,
-            loginForm,
-            loginError,
-            processing,
-            handleLogin,
-            cancelLogin
+            validationErrors,
+            processing
         };
     },
 };
