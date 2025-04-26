@@ -1,6 +1,6 @@
 import './bootstrap';
 import '../sass/app.scss';
-import Router from '@/router';
+import router from '@/router';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
@@ -10,7 +10,7 @@ const pinia = createPinia();
 const app = createApp({});
 
 app.use(pinia);
-app.use(Router);
+app.use(router);
 app.use(i18n);
 
 /**

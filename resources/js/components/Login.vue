@@ -61,6 +61,11 @@ export default {
         const validationErrors = ref({});
         const processing = ref(false);
 
+        // Debug route and query
+        console.log('Login.vue setup - Route:', route);
+        console.log('Login.vue setup - Query:', route.query);
+        console.log('Login.vue setup - Redirect:', route.query.redirect);
+
         const login = async () => {
             processing.value = true;
             try {
@@ -74,16 +79,31 @@ export default {
                         'X-XSRF-TOKEN': getCookie('XSRF-TOKEN')
                     }
                 });
-                console.log('Login response:', response.data);
-                const user = response.data.user;
-                if (!user) {
+                console.log('Login response:', response);
+                if (!response.data.user) {
                     throw new Error('User data missing in response');
                 }
-                authStore.login(user);
-                console.log('Login successful, user:', user);
+                if (typeof authStore.login !== 'function') {
+                    throw new Error('authStore.login is not a function');
+                }
+                authStore.login(response.data.user);
+                console.log('Login successful, user:', response.data.user);
                 console.log('Cookies after login:', document.cookie);
-                const redirect = route.query.redirect || { name: 'dashboard' };
-                router.push(redirect);
+
+                // Handle redirect
+                const redirect = route.query.redirect || '/dashboard';
+                console.log('Login.vue login - Redirect value:', redirect);
+                if (!redirect) {
+                    console.warn('Redirect is empty, defaulting to /dashboard');
+                }
+                try {
+                    console.log('Attempting router.push to:', redirect);
+                    await router.push(redirect);
+                    console.log('Navigation successful');
+                } catch (error) {
+                    console.error('Navigation error:', error);
+                    window.location.href = redirect;
+                }
             } catch (error) {
                 console.error('Login error:', {
                     status: error.response?.status,
@@ -95,7 +115,7 @@ export default {
                     validationErrors.value = error.response.data.errors;
                 } else {
                     validationErrors.value = {};
-                    alert(error.response?.data?.message || error.message || t('Login failed'));
+                    alert(error.message || error.response?.data?.message || t('Login failed'));
                 }
             } finally {
                 processing.value = false;

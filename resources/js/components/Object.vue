@@ -1,4 +1,4 @@
-<!-- resources/js/components/Object.vue -->
+<!-- factology/resources/js/components/Object.vue -->
 <template>
     <div class="container" id="search">
         <div v-if="!loaded" class="row">{{ $t('Loading...') }}</div>
@@ -130,22 +130,33 @@ export default {
                 originalObject.value = JSON.parse(JSON.stringify(response.data.data));
                 loaded.value = true;
             } catch (error) {
+                console.error('Get object error:', {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                    message: error.message,
+                    config: error.config
+                });
                 handleApiError(error);
             }
         };
 
         const handleApiError = (error) => {
-            const response = error.response;
-            if (response?.status === 400 && error.message.includes('header')) {
-                alert($t('Session error. Please try again.'));
-                authStore.logout();
-                router.push({ name: 'dashboard' });
-            } else if (response?.status === 401) {
-                if (response?.data?.data?.public === 1) {
-                    object.value = response.data.data;
+            console.log('handleApiError - Router:', router);
+            if (!router) {
+                console.error('Router is undefined in handleApiError');
+                window.location.href = `/login?redirect=${encodeURIComponent(route.fullPath)}`;
+                return;
+            }
+
+            const status = error.response?.status;
+            const data = error.response?.data;
+
+            if (status === 401) {
+                if (data?.data?.public === 1) {
+                    object.value = data.data;
                     loaded.value = true;
                 } else {
-                    // Redirect to login, preserving intended route
+                    console.log('Redirecting to login due to 401 for private object');
                     router.push({
                         name: 'login',
                         query: { redirect: route.fullPath }
@@ -186,11 +197,13 @@ export default {
         };
 
         onMounted(() => {
+            console.log('Object.vue mounted - Calling getObject');
             getObject();
         });
 
         watch(() => route.params.uid, (newParam, oldParam) => {
             if (newParam !== oldParam) {
+                console.log('Object.vue watch - UID changed:', newParam);
                 getObject();
             }
         });
