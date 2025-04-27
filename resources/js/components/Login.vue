@@ -91,10 +91,10 @@ export default {
                 console.log('Cookies after login:', document.cookie);
 
                 // Handle redirect
-                const redirect = route.query.redirect || '/dashboard';
+                const redirect = route.query.redirect || '/';
                 console.log('Login.vue login - Redirect value:', redirect);
                 if (!redirect) {
-                    console.warn('Redirect is empty, defaulting to /dashboard');
+                    console.warn('Redirect is empty, defaulting to /');
                 }
                 try {
                     console.log('Attempting router.push to:', redirect);

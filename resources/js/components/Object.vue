@@ -141,10 +141,10 @@ export default {
         };
 
         const handleApiError = (error) => {
-            console.log('handleApiError - Router:', router);
+            console.log('handleApiError - Current route:', route.path, 'Query:', route.query);
             if (!router) {
                 console.error('Router is undefined in handleApiError');
-                window.location.href = `/login?redirect=${encodeURIComponent(route.fullPath)}`;
+                window.location.href = '/login';
                 return;
             }
 
@@ -156,17 +156,24 @@ export default {
                     object.value = data.data;
                     loaded.value = true;
                 } else {
+                    // Avoid redirect loop if already on /login
+                    if (route.path === '/login') {
+                        console.log('Already on login page, skipping redirect');
+                        return;
+                    }
                     console.log('Redirecting to login due to 401 for private object');
                     router.push({
-                        name: 'login',
+                        path: '/login',
                         query: { redirect: route.fullPath }
                     });
                 }
-            } else if (response?.status === 422) {
-                validationErrors.value = response.data.errors;
-                loaded.value = true;
             } else {
-                alert(response?.data?.message || $t('Error loading object'));
+                console.error('Unhandled error in handleApiError:', {
+                    status,
+                    data,
+                    message: error.message
+                });
+                alert(data?.message || t('Error loading object'));
                 loaded.value = true;
             }
         };
