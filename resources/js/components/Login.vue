@@ -22,13 +22,11 @@
                             <label for="password" class="font-weight-bold">{{ $t('Password') }}</label>
                             <input type="password" v-model="auth.password" name="password" id="password" class="form-control" required>
                         </div>
-                        <div class="col-12 mb-2">
-                            <button type="submit" :disabled="processing" class="btn btn-primary btn-block">
+                        <div class="col-12 mb-2 d-flex gap-2">
+                            <button type="submit" :disabled="processing" class="btn btn-primary flex-fill">
                                 {{ processing ? $t('Please wait') : $t('Login') }}
                             </button>
-                        </div>
-                        <div class="col-12 mb-2">
-                            <button type="button" class="btn btn-secondary btn-block" @click="cancel">{{ $t('Cancel') }}</button>
+                            <button type="button" class="btn btn-secondary flex-fill" @click="cancel">{{ $t('Cancel') }}</button>
                         </div>
                         <div class="col-12 text-center">
                             <label>{{ $t('Don\'t have an account?') }} <router-link :to="{name:'register'}">{{ $t('Register Now!') }}</router-link></label>
