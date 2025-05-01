@@ -24,8 +24,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/v1/object', [ApiController::class, 'list']);
 Route::post('/v1/object', [ApiController::class, 'search']);
 Route::get('/v1/object/{id}', [ApiController::class, 'get']);
+// New object with uuid generated on client
 Route::middleware('auth:sanctum')->post('/v1/object/{id}', [ApiController::class, 'store']);
-Route::middleware('auth:sanctum')->put('/v1/object', [ApiController::class, 'store']);
+// Save existing object
+Route::middleware('auth:sanctum')->put('/v1/object/{id}', [ApiController::class, 'store']);
 Route::middleware('auth:sanctum')->delete('/v1/object/{id}', [ApiController::class, 'delete']);
 Route::middleware('auth:sanctum')->post('/v1/photos', [ApiController::class, 'photos']);
 Route::middleware('auth:sanctum')->post('/v1/check_photos', [ApiController::class, 'checkPhotos']);

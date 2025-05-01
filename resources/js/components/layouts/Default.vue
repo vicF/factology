@@ -68,14 +68,12 @@
                 </div>
             </div>
         </main>
-        <create-object-modal v-if="showModal" :type="selectedType" @close="closeModal" @object-created="handleObjectCreated" />
     </div>
 </template>
 
 <script>
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "../ClassTree.vue";
-import CreateObjectModal from "../CreateObjectModal.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
 import { eventBus } from '../../eventBus.js';
@@ -84,7 +82,7 @@ import axios from 'axios';
 
 export default {
     name: "default-layout",
-    components: { LanguageSwitcher, ClassTree, CreateObjectModal },
+    components: { LanguageSwitcher, ClassTree },
     setup() {
         const router = useRouter();
         const route = useRoute();

@@ -42,7 +42,7 @@ class ApiController extends BaseController
         return DB::transaction(static function () use ($request) {
             $model = new Anything($request->toArray());
             $model->save();
-            $model->saveLinks($request->toArray());
+            //$model->saveLinks($request->toArray());
             return response()->json(
                 [
                     'data' => $model->toArray(),
