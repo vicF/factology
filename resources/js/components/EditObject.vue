@@ -11,6 +11,15 @@
                     <form @submit.prevent="submitForm">
                         <div class="mb-3">
                             <TextField
+                                fieldName="class"
+                                v-model="formData.class"
+                                :isEditable="true"
+                                :label="$t('Class')"
+                                required
+                            />
+                        </div>
+                        <div class="mb-3">
+                            <TextField
                                 fieldName="name"
                                 v-model="formData.name"
                                 :isEditable="true"
@@ -85,8 +94,10 @@ export default {
         const isEditMode = computed(() => !!props.object);
 
         // Initialize form data
+        console.log('EditObject.vue - Props object:', props.object);
+
         const formData = ref({
-            id: isEditMode.value ? props.object.id : uuidv4(),
+            thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
             name: isEditMode.value ? props.object.name || '' : '',
             description: isEditMode.value ? props.object.description || '' : '',
             start: isEditMode.value ? props.object.start || '' : '',
@@ -127,18 +138,33 @@ export default {
             try {
                 await axios.get('/sanctum/csrf-cookie');
                 let response;
-                if (isEditMode.value) {
-                    // Edit mode: PUT request
-                    response = await axios.put(`/api/v1/object/${formData.value.id}`, formData.value);
+
+                // Prepare payload
+                const payload = {
+                    thing_id: formData.value.thing_id,
+                    name: formData.value.name,
+                    description: formData.value.description,
+                    start: formData.value.start,
+                    end: formData.value.end,
+                    public: formData.value.public,
+                    parentId: formData.value.parentId,
+                    classId: formData.value.classId,
+                    type: 3,
+                };
+
+                //if (isEditMode.value) {
+                    // Edit mode: PUT request to /api/v1/object/{uuid}
+                    console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.id + ' with body:', payload);
+                    response = await axios.put(`/api/v1/object/${formData.value.id}`, payload);
                     console.log('EditObject.vue - Object updated:', response.data);
                     emit('object-updated', response.data);
-                } else {
-                    // Create mode: POST request
-                    const id = props.params.classId || props.params.parentId || 'create';
-                    response = await axios.post(`/api/v1/object/${id}`, formData.value);
+                /*} else {
+                    // Create mode: POST request to /api/v1/object
+                    console.log('EditObject.vue - Sending POST to /api/v1/object with body:', payload);
+                    response = await axios.post('/api/v1/object', payload);
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
-                }
+                }*/
                 closeModal();
             } catch (error) {
                 console.error('EditObject.vue - Submit error:', {

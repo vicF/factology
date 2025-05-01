@@ -68,7 +68,6 @@
                 </div>
             </div>
         </main>
-        <create-object-modal v-if="showModal" :type="selectedType" @close="closeModal" @object-created="handleObjectCreated" />
     </div>
 </template>
 

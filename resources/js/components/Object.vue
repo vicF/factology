@@ -6,7 +6,7 @@
             <div class="col">
                 <h1>
                     {{ object.name }}
-                    <button class="btn btn-outline-primary ms-2" @click="openCreateModal('Class')">{{ $t('Class') }}</button>
+                    <button class="btn btn-outline-primary ms-2" @click="openCreateModal('Class')">{{ $t('Create') }}</button>
                     <button class="btn btn-primary ms-2" @click="openEditModal">{{ $t('Edit') }}</button>
                 </h1>
                 <div class="col-md-10 col-md-offset-1">
@@ -96,6 +96,7 @@ export default {
                 loaded.value = false;
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
                 object.value = response.data.data;
+                console.log('Object.vue - Fetched object:', object.value);
                 loaded.value = true;
             } catch (error) {
                 console.error('Get object error:', {
@@ -124,7 +125,6 @@ export default {
                     object.value = data.data;
                     loaded.value = true;
                 } else {
-                    // Avoid redirect loop if already on /login
                     if (route.path === '/login') {
                         console.log('Already on login page, skipping redirect');
                         return;
@@ -155,7 +155,15 @@ export default {
 
         const openEditModal = () => {
             console.log('Object.vue - Opening edit modal for object:', object.value);
-            editObject.value = { ...object.value }; // Pass current object for edit mode
+            editObject.value = {
+                thing_id: object.value.thing_id,
+                name: object.value.name,
+                description: object.value.description,
+                start: object.value.start,
+                end: object.value.end,
+                public: object.value.public,
+                class: object.value.class,
+            };
             modalParams.value = { classId: object.value.class?.thing_id };
             showEditModal.value = true;
         };
