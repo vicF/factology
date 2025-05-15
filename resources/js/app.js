@@ -58,7 +58,7 @@ axios.interceptors.response.use(
     response => response, // Pass successful responses through
     error => {
         const status = error.response?.status;
-        if (status === 401 && !error.config.url.includes('/login')) {
+        if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')) {
             const authStore = useAuthStore();
             if (!authStore.authenticated) {
                 // Redirect to login with current route as redirect query
@@ -68,7 +68,7 @@ axios.interceptors.response.use(
                 });
             } else {
                 // Authenticated but unauthorized
-                router.push({ name: 'dashboard' });
+                //router.push({ name: '/' });
             }
         } else if (status === 400 && error.message.includes('header')) {
             const authStore = useAuthStore();

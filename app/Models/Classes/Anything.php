@@ -10,9 +10,9 @@ namespace App\Models\Classes;
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
 use Fokin\Facts\Data\UUID;
-use http\Exception\RuntimeException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -522,9 +522,28 @@ class Anything
             $this->_eloquentModel->fill($this->_data);*/
             DB::table('things')->insert($data);
         } else {
-            unset($data->thing_id);
-            DB::table('things')->where('thing_id', $this->thing_id)->update($data);
-            //$this->_eloquentModel->exists = true;
+            //unset($data->thing_id);
+            //DB::table('things')->where('thing_id', $this->thing_id)->update($data);
+            // Prepare data for upsert
+            $upsertData = [
+                'thing_id' => $data['thing_id'],
+                'name' => $data['name'] ?? null,
+                'description' => $data['description'] ?? null,
+                'public' => $data['public'] ?? 0,
+                'start' => $data['start'] ?? null,
+                'end' => $data['end'] ?? null,
+                'parent_id' => $data['parent_id'] ?? null,
+                // Add other fields as needed
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            // Perform upsert
+            DB::table('things')->upsert(
+                [$upsertData], // Array of records to insert/update
+                ['thing_id'], // Unique key(s) to check for conflicts
+                array_keys(Arr::except($upsertData, ['thing_id', 'created_at'])) // Columns to update on conflict
+            );
         }
         //$this->_eloquentModel->save();
         // Symlink to class icon if self icon is not available
