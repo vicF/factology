@@ -60,17 +60,27 @@
             @object-updated="handleObjectUpdated"
             @close="showEditModal = false"
         />
+        <!-- Modal for ClassTree events -->
+        <EditObject
+            v-if="showTreeModal"
+            :object="null"
+            :params="treeModalParams"
+            @object-created="handleObjectCreated"
+            @object-updated="handleObjectUpdated"
+            @close="showTreeModal = false"
+        />
     </div>
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import { useAuthStore } from '../stores/auth';
+import { eventBus } from '../eventBus';
 
 export default {
     name: "Object",
@@ -80,13 +90,15 @@ export default {
         const router = useRouter();
         const route = useRoute();
         const { t } = useI18n();
-        //const authStore = useAuthStore();
+        const authStore = useAuthStore();
 
         const object = ref({});
         const loaded = ref(false);
         const showEditModal = ref(false);
         const editObject = ref(null);
         const modalParams = ref({});
+        const showTreeModal = ref(false);
+        const treeModalParams = ref({});
 
         const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
@@ -150,8 +162,8 @@ export default {
 
         const openCreateModal = (type) => {
             console.log('Object.vue - Opening create modal for type:', type);
-            editObject.value = null; // No object for create mode
-            modalParams.value = { classId: object.value.class?.thing_id }; // Pass classId if needed
+            editObject.value = null;
+            modalParams.value = { classId: object.value.class?.thing_id, type: type === 'Class' ? 2 : 3 };
             showEditModal.value = true;
         };
 
@@ -164,9 +176,10 @@ export default {
                 start: object.value.start,
                 end: object.value.end,
                 public: object.value.public,
-                class: object.value.class,
+                class_id: object.value.class?.thing_id,
+                type: object.value.type || 3,
             };
-            modalParams.value = { classId: object.value.class?.thing_id };
+            modalParams.value = { classId: object.value.class?.thing_id, type: object.value.type || 3 };
             showEditModal.value = true;
         };
 
@@ -196,18 +209,32 @@ export default {
         const handleObjectCreated = (newObject) => {
             console.log('Object.vue - Object created:', newObject);
             showEditModal.value = false;
-            router.push({ name: 'object', params: { uid: newObject.data.id } });
+            showTreeModal.value = false;
+            router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
         };
 
         const handleObjectUpdated = (updatedObject) => {
             console.log('Object.vue - Object updated:', updatedObject);
             object.value = updatedObject.data;
             showEditModal.value = false;
+            showTreeModal.value = false;
+        };
+
+        // Listen for ClassTree events
+        const handleOpenCreateModal = ({ title, params }) => {
+            console.log('Object.vue - Received open-create-modal:', { title, params });
+            treeModalParams.value = params;
+            showTreeModal.value = true;
         };
 
         onMounted(() => {
             console.log('Object.vue mounted - Calling getObject');
             getObject();
+            eventBus.on('open-create-modal', handleOpenCreateModal);
+        });
+
+        onUnmounted(() => {
+            eventBus.off('open-create-modal', handleOpenCreateModal);
         });
 
         watch(() => route.params.uid, (newParam, oldParam) => {
@@ -223,6 +250,8 @@ export default {
             showEditModal,
             editObject,
             modalParams,
+            showTreeModal,
+            treeModalParams,
             getThumbUrl,
             openCreateModal,
             openEditModal,

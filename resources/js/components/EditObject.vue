@@ -85,16 +85,15 @@ export default {
     name: 'EditObject',
     components: { TextField, DateField, RadioGroupField },
     props: {
-        object: { type: Object, default: null }, // Existing object for editing
-        params: { type: Object, default: () => ({}) }, // Additional params (e.g., parentId, classId)
+        object: { type: Object, default: null },
+        params: { type: Object, default: () => ({}) },
     },
     emits: ['close', 'object-created', 'object-updated'],
     setup(props, { emit }) {
         const { t } = useI18n();
         const isEditMode = computed(() => !!props.object);
 
-        // Initialize form data
-        console.log('EditObject.vue - Props object:', props.object);
+        console.log('EditObject.vue - Props:', { object: props.object, params: props.params });
 
         const formData = ref({
             thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
@@ -103,21 +102,24 @@ export default {
             start: isEditMode.value ? props.object.start || '' : '',
             end: isEditMode.value ? props.object.end || '' : '',
             public: isEditMode.value ? props.object.public || 0 : 0,
-            parentId: props.params.parentId || null,
-            classId: props.params.classId || null,
+            parent_id: props.params.parentId || null,
+            class_id: props.params.classId || null,
+            type: props.params.type || 3, // Default to 3 for objects, override for subclasses
         });
 
-        console.log('EditObject.vue - Form data initialized:', formData.value);
-
-        const modalId = 'editObjectModal';
-        const modalLabelId = 'editObjectModalLabel';
+        const modalId = `editObjectModal-${formData.value.thing_id}`; // Unique ID to avoid conflicts
+        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
         let modalInstance = null;
 
         onMounted(() => {
             const modalElement = document.getElementById(modalId);
-            modalInstance = new Modal(modalElement);
-            modalInstance.show();
-            modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
+            if (modalElement) {
+                modalInstance = new Modal(modalElement);
+                modalInstance.show();
+                modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
+            } else {
+                console.error('EditObject.vue - Modal element not found:', modalId);
+            }
         });
 
         onUnmounted(() => {
@@ -139,7 +141,6 @@ export default {
                 await axios.get('/sanctum/csrf-cookie');
                 let response;
 
-                // Prepare payload
                 const payload = {
                     thing_id: formData.value.thing_id,
                     name: formData.value.name,
@@ -147,24 +148,23 @@ export default {
                     start: formData.value.start,
                     end: formData.value.end,
                     public: formData.value.public,
-                    parentId: formData.value.parentId,
-                    classId: formData.value.classId,
-                    type: 3,
+                    parent_id: formData.value.parent_id,
+                    class_id: formData.value.class_id,
+                    type: formData.value.type,
                 };
 
-                //if (isEditMode.value) {
-                    // Edit mode: PUT request to /api/v1/object/{uuid}
-                    console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.id + ' with body:', payload);
-                    response = await axios.put(`/api/v1/object/${formData.value.id}`, payload);
+                if (isEditMode.value) {
+                    console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);
+                    response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object updated:', response.data);
                     emit('object-updated', response.data);
-                /*} else {
-                    // Create mode: POST request to /api/v1/object
-                    console.log('EditObject.vue - Sending POST to /api/v1/object with body:', payload);
-                    response = await axios.post('/api/v1/object', payload);
+                } else {
+                    console.log('EditObject.vue - Sending POST to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);
+                    response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
-                }*/
+                }
+
                 closeModal();
             } catch (error) {
                 console.error('EditObject.vue - Submit error:', {
@@ -172,7 +172,7 @@ export default {
                     data: error.response?.data,
                     message: error.message,
                 });
-                alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
+                alert(t('Failed') + ': ' + (error.response?.data?.message || error.response?.data?.error || error.message));
             }
         };
 

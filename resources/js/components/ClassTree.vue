@@ -27,10 +27,25 @@ export default {
             getClasses();
         });
 
-        return {
-            classes,
-            loaded,
+        const openCreateSubclassModal = () => {
+            eventBus.emit('open-create-modal', {
+                title: `Subclass of ${props.name}`,
+                params: {parentId: props.id, type: 2}
+            });
         };
+
+        const openCreateObjectModal = () => {
+            console.log('ClassTree.vue - Emitting open-create-modal for object:', {
+                title: `Object of ${props.name}`,
+                params: {classId: props.id, type: 3}
+            });
+            eventBus.emit('open-create-modal', {
+                title: `Object of ${props.name}`,
+                params: {classId: props.id, type: 3} // Type 3 for objects
+            });
+        };
+
+        return {classes, loaded, openCreateSubclassModal, openCreateObjectModal};
     },
 };
 </script>
