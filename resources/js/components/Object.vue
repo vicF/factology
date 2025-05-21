@@ -230,11 +230,6 @@ export default {
         onMounted(() => {
             console.log('Object.vue mounted - Calling getObject');
             getObject();
-            eventBus.on('open-create-modal', handleOpenCreateModal);
-        });
-
-        onUnmounted(() => {
-            eventBus.off('open-create-modal', handleOpenCreateModal);
         });
 
         watch(() => route.params.uid, (newParam, oldParam) => {
