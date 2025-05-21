@@ -1,17 +1,42 @@
 import './bootstrap';
 import '../sass/app.scss';
-import router from '@/router';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { dateFromDb } from './utils/dateUtils.js';
-import i18n from './lang/i18n';
 const pinia = createPinia();
-const app = createApp({});
 
-app.use(pinia);
+import App from './components/App.vue';
+import router from './router'; // Adjust if router is defined elsewhere
+import { createI18n } from 'vue-i18n';
+
+// Configure i18n (adjust messages as per your setup)
+const i18n = createI18n({
+    locale: 'en', // Default locale
+    messages: {
+        en: {
+            // Your translations
+            'Create Object': 'Create Object',
+            'Edit Object': 'Edit Object',
+            'Name': 'Name',
+            'Description': 'Description',
+            'Start': 'Start',
+            'End': 'End',
+            'Access': 'Access',
+            'Private': 'Private',
+            'Public': 'Public',
+            'Close': 'Close',
+            'Save': 'Save',
+            'Update': 'Update',
+            'Failed': 'Failed',
+        },
+    },
+});
+
+const app = createApp(App);
 app.use(router);
 app.use(i18n);
+app.use(pinia);
 
 /**
  * The following block of code may be used to automatically register your

@@ -61,11 +61,31 @@ export default {
         }
 
         const openCreateSubclassModal = () => {
-            eventBus.emit('open-create-modal', `Subclass of ${props.name}`, { parentId: props.id });
+            console.log('TreeMenu.vue - openCreateSubclassModal triggered');
+            console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
+            if (!props.id) {
+                console.warn('TreeMenu.vue - Warning: props.id is undefined for subclass creation');
+            }
+            const payload = {
+                title: `Subclass of ${props.name || 'Unnamed'}`,
+                params: { parentId: props.id, type: 2 }
+            };
+            console.log('TreeMenu.vue - Emitting open-create-modal for subclass:', payload);
+            eventBus.emit('open-create-modal', payload);
         };
 
         const openCreateObjectModal = () => {
-            eventBus.emit('open-create-modal', props.name, { classId: props.id });
+            console.log('TreeMenu.vue - openCreateObjectModal triggered');
+            console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
+            if (!props.id) {
+                console.warn('TreeMenu.vue - Warning: props.id is undefined for object creation');
+            }
+            const payload = {
+                title: `Object of ${props.name || 'Unnamed'}`,
+                params: { classId: props.id, type: 3 }
+            };
+            console.log('TreeMenu.vue - Emitting open-create-modal for object:', payload);
+            eventBus.emit('open-create-modal', payload);
         };
 
         return { isChecked, onCheckboxChange, showIcons, openCreateSubclassModal, openCreateObjectModal };

@@ -1,10 +1,9 @@
-<!-- factology/resources/js/components/EditObject.vue -->
 <template>
     <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" :id="modalLabelId">{{ isEditMode ? $t('Edit Object') : $t('Create Object') }}</h5>
+                    <h5 class="modal-title" :id="modalLabelId">{{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @click="closeModal"></button>
                 </div>
                 <div class="modal-body">
@@ -75,25 +74,26 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
-import { v4 as uuidv4 } from 'uuid';
-import { useI18n } from 'vue-i18n';
+import { v4 as uuidv4} from 'uuid';
+import {useI18n} from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 
 export default {
     name: 'EditObject',
-    components: { TextField, DateField, RadioGroupField },
+    components: {TextField, DateField, RadioGroupField},
     props: {
-        object: { type: Object, default: null },
-        params: { type: Object, default: () => ({}) },
+        object: {type: Object, default: null},
+        params: {type: Object, default: () => ({})},
+        title: {type: String, default: ''}, // Title from event
     },
     emits: ['close', 'object-created', 'object-updated'],
-    setup(props, { emit }) {
-        const { t } = useI18n();
+    setup(props, {emit}) {
+        const {t} = useI18n();
         const isEditMode = computed(() => !!props.object);
 
-        console.log('EditObject.vue - Props:', { object: props.object, params: props.params });
+        console.log('EditObject.vue - Props:', {object: props.object, params: props.params, title: props.title});
 
         const formData = ref({
             thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),

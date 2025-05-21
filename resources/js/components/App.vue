@@ -1,13 +1,11 @@
-<!-- factology/resources/js/components/App.vue -->
 <template>
     <div id="app">
-        <!-- Render page content -->
         <router-view></router-view>
-        <!-- Global EditObject modal -->
         <EditObject
             v-if="showModal"
             :object="null"
             :params="modalParams"
+            :title="modalTitle"
             @object-created="handleObjectCreated"
             @object-updated="handleObjectUpdated"
             @close="showModal = false"
@@ -28,25 +26,36 @@ export default {
         const router = useRouter();
         const showModal = ref(false);
         const modalParams = ref({});
+        const modalTitle = ref('');
 
         const handleObjectCreated = (newObject) => {
             console.log('App.vue - Object created:', newObject);
             showModal.value = false;
+            modalTitle.value = '';
             router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
         };
 
         const handleObjectUpdated = (updatedObject) => {
             console.log('App.vue - Object updated:', updatedObject);
             showModal.value = false;
+            modalTitle.value = '';
         };
 
-        const handleOpenCreateModal = ({ title, params }) => {
-            console.log('App.vue - Received open-create-modal:', { title, params });
+        const handleOpenCreateModal = (...args) => {
+            console.log('App.vue - Raw open-create-modal args:', args);
+            const eventData = args[0] || {};
+            const { title = 'Untitled', params = {} } = eventData;
+            console.log('App.vue - Parsed open-create-modal:', { title, params });
+            if (!params.parentId && !params.classId) {
+                console.warn('App.vue - Warning: params is missing parentId or classId', params);
+            }
             modalParams.value = params;
+            modalTitle.value = title;
             showModal.value = true;
         };
 
         onMounted(() => {
+            console.log('App.vue - Mounting, registering eventBus listener');
             eventBus.on('open-create-modal', handleOpenCreateModal);
         });
 
@@ -57,6 +66,7 @@ export default {
         return {
             showModal,
             modalParams,
+            modalTitle,
             handleObjectCreated,
             handleObjectUpdated,
         };
