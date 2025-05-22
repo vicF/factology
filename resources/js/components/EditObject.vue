@@ -11,7 +11,7 @@
                         <div class="mb-3">
                             <TextField
                                 fieldName="class"
-                                v-model="formData.class"
+                                v-model="formData.class_id"
                                 :isEditable="true"
                                 :label="$t('Class')"
                                 required

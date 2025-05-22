@@ -114,10 +114,10 @@ export default {
 
         onMounted(() => {
             checkAuth();
-            eventBus.on('open-create-modal', (type) => {
+            /*eventBus.on('open-create-modal', (type) => {
                 selectedType.value = type;
                 showModal.value = true;
-            });
+            });*/
         });
 
         watch(() => route.path, () => {
