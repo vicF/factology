@@ -12,16 +12,17 @@
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span class="sr-only">(current)</span></router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span
+                                class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="handleSearch">
+                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="eventBus.emit('trigger-search')">
                         <input class="form-control me-2" type="search" placeholder="Search"
                                v-model="searchQuery" aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
                     <div class="d-flex flex-shrink-0">
-                        <LanguageSwitcher />
+                        <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
@@ -78,6 +79,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
 import { eventBus } from '../../eventBus.js';
 import { useAuthStore } from '../../stores/auth';
+import {useCheckboxStore} from '../../stores/checkboxes';
 import axios from 'axios';
 
 export default {
@@ -90,6 +92,7 @@ export default {
         const searchQuery = ref(route.query.q || '');
         const showModal = ref(false);
         const selectedType = ref('');
+        const checkboxStore = useCheckboxStore();
 
         const checkAuth = async () => {
             try {
@@ -112,11 +115,41 @@ export default {
             }
         };
 
+// Define handleSearch within setup
+        /*const handleSearch = async (classIds = []) => {
+            const selectedClassIds = classIds.length > 0 ? classIds : checkboxStore.checkedItems;
+            const queryParams = {};
+
+            if (searchQuery.value.trim()) {
+                queryParams.q = searchQuery.value.trim();
+            }
+
+            if (selectedClassIds.length > 0) {
+                queryParams.classIds = selectedClassIds.join(',');
+            }
+
+            try {
+                await router.push({
+                    path: '/',
+                    query: queryParams,
+                });
+
+                const response = await axios.get('/api/search', {
+                    params: queryParams,
+                });
+
+                console.log('Search results:', response.data);
+                eventBus.emit('search-results', response.data);
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        };*/
+
         onMounted(() => {
             checkAuth();
-            /*eventBus.on('open-create-modal', (type) => {
-                selectedType.value = type;
-                showModal.value = true;
+// Use the handleSearch function defined in setup
+            /* eventBus.on('trigger-search', (classIds) => {
+                handleSearch(classIds);
             });*/
         });
 
@@ -128,36 +161,36 @@ export default {
             searchQuery.value = newQuery || '';
         });
 
-        return { router, route, searchQuery, showModal, selectedType, authStore, checkAuth };
+        return {
+            router,
+            route,
+            searchQuery,
+            showModal,
+            selectedType,
+            authStore,
+            checkAuth,
+            // handleSearch, // Return handleSearch so it’s available in the template
+        };
     },
     computed: {
+        eventBus() {
+            return eventBus
+        },
         user() {
-            return this.authStore.user || null; // Ensure null if undefined
+            return this.authStore.user || null;
         },
         authenticated() {
             return this.authStore.authenticated;
-        }
+        },
     },
     methods: {
         async logout() {
             await axios.post('/logout').then(() => {
                 this.authStore.logout();
-                this.$router.push({ name: "dashboard" });
+                this.$router.push({name: "dashboard"});
             }).catch(error => {
                 console.error('Logout failed:', error);
             });
-        },
-        async handleSearch() {
-            if (this.searchQuery.trim()) {
-                try {
-                    await this.$router.push({
-                        path: '/',
-                        query: { q: this.searchQuery }
-                    });
-                } catch (error) {
-                    console.error('Navigation error:', error);
-                }
-            }
         },
         openCreateModal(type) {
             this.selectedType = type;
@@ -170,8 +203,8 @@ export default {
         handleObjectCreated(object) {
             console.log('Object created:', object);
             this.$router.push({path: '/', query: {q: this.searchQuery}});
-        }
-    }
+        },
+    },
 };
 </script>
 

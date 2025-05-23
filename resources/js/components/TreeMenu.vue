@@ -58,6 +58,8 @@ export default {
         function onCheckboxChange() {
             store.toggleItem(props.id);
             emit('update-checked', store.checkedItems);
+            // Emit a new event to trigger search with selected class IDs
+            eventBus.emit('trigger-search', store.checkedItems);
         }
 
         const openCreateSubclassModal = () => {

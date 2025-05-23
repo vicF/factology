@@ -53,6 +53,7 @@ import { useCheckboxStore } from '../stores/checkboxes';
 import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
+import {eventBus} from "../eventBus";
 
 export default {
     name: "search",
@@ -109,6 +110,9 @@ export default {
         });
 
         onMounted(() => {
+            eventBus.on('trigger-search', (classIds) => {
+                getObjects(route.query.q);
+            });
             getObjects(route.query.q); // Initial fetch based on URL
         });
 
