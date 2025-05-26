@@ -1,6 +1,7 @@
 <template>
     <div class="tree-menu">
         <div
+            :id="id"
             class="tree-node"
             :style="indent"
             @mouseenter.stop="showIcons = true"
@@ -78,7 +79,7 @@ export default {
 
         const openCreateObjectModal = () => {
             console.log('TreeMenu.vue - openCreateObjectModal triggered');
-            console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
+             console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
             if (!props.id) {
                 console.warn('TreeMenu.vue - Warning: props.id is undefined for object creation');
             }

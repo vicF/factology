@@ -1,7 +1,7 @@
 <template>
     <div>
         Classes:
-        <TreeMenu :name="classes.name" :nodes="classes.nodes" :depth="0" />
+        <TreeMenu :id="classes.id" :name="classes.name" :nodes="classes.nodes" :depth="0" />
     </div>
 </template>
 

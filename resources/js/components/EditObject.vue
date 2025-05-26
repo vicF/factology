@@ -10,6 +10,15 @@
                     <form @submit.prevent="submitForm">
                         <div class="mb-3">
                             <TextField
+                                fieldName="parent"
+                                v-model="formData.parent_id"
+                                :isEditable="true"
+                                :label="$t('Parent')"
+                                required
+                            />
+                        </div>
+                        <div class="mb-3">
+                            <TextField
                                 fieldName="class"
                                 v-model="formData.class_id"
                                 :isEditable="true"
@@ -148,7 +157,7 @@ export default {
                     start: formData.value.start,
                     end: formData.value.end,
                     public: formData.value.public,
-                    parent_id: formData.value.parent_id,
+                    parentId: formData.value.parentId,
                     class_id: formData.value.class_id,
                     type: formData.value.type,
                 };
