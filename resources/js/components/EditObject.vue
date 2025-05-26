@@ -8,7 +8,7 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
-                        <div class="mb-3">
+                        <div class="mb-3" v-if="formData.type === 2">
                             <TextField
                                 fieldName="parent"
                                 v-model="formData.parent_id"
@@ -17,7 +17,7 @@
                                 required
                             />
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3" v-if="formData.type === 3">
                             <TextField
                                 fieldName="class"
                                 v-model="formData.class_id"
