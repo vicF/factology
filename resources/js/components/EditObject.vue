@@ -10,7 +10,7 @@
                     <form @submit.prevent="submitForm">
                         <div class="mb-3" v-if="formData.type === 2">
                             <TextField
-                                fieldName="parent"
+                                fieldName="parent_id"
                                 v-model="formData.parent_id"
                                 :isEditable="true"
                                 :label="$t('Parent')"
@@ -19,7 +19,7 @@
                         </div>
                         <div class="mb-3" v-if="formData.type === 3">
                             <TextField
-                                fieldName="class"
+                                fieldName="class_id"
                                 v-model="formData.class_id"
                                 :isEditable="true"
                                 :label="$t('Class')"
@@ -157,7 +157,7 @@ export default {
                     start: formData.value.start,
                     end: formData.value.end,
                     public: formData.value.public,
-                    parentId: formData.value.parentId,
+                    parent_id: formData.value.parent_id,
                     class_id: formData.value.class_id,
                     type: formData.value.type,
                 };

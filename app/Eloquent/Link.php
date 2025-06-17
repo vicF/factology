@@ -9,11 +9,10 @@ use Illuminate\Database\Eloquent\Model;
  * Class Link
  *
  * @package App\Eloquent
- * @property $thing_id
+ * @property string $one_thing_id
  * @property $link_type_id
  * @property $other_thing_id
  * @property $translation
- *
  * @method static \Illuminate\Database\Query\Builder ofClass($class)
  */
 class Link extends Model

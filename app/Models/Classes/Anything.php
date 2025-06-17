@@ -532,10 +532,9 @@ class Anything
                 'public' => $data['public'] ?? 0,
                 'start' => $data['start'] ?? null,
                 'end' => $data['end'] ?? null,
-                'parent_id' => $data['parent_id'] ?? null,
-                // Add other fields as needed
-                'created_at' => now(),
-                'updated_at' => now(),
+                'type' => $data['type'],
+                'record_created' => now(),
+                'record_updated' => now(),
             ];
 
             // Perform upsert
@@ -594,7 +593,7 @@ class Anything
     public function setLink($type, $target, $translation): bool
     {
         $link = new Link();
-        $link->thing_id = $this->thing_id;
+        $link->one_thing_id = $this->thing_id;
         $link->link_type_id = $type;
         $link->other_thing_id = $target;
         $link->translation = $translation;
