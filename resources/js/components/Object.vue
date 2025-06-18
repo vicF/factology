@@ -195,7 +195,7 @@ export default {
                 console.log('Object.vue - Object deleted:', object.value.thing_id);
 
                 // Redirect to a default route or parent object
-                router.push({ name: '/' }); // Adjust to your route name
+                router.push('/'); // Adjust to your route name
             } catch (error) {
                 console.error('Object.vue - Delete error:', {
                     status: error.response?.status,
