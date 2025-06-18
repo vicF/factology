@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Eloquent\Link;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -18,7 +19,7 @@ class ApiController extends BaseController
     {
         return response()->json(
             [
-                'data' => DB::table('things')->limit(100)->get(),
+                'data'    => DB::table('things')->limit(100)->get(),
                 'success' => true
             ]);
     }
@@ -27,7 +28,7 @@ class ApiController extends BaseController
     {
         return response()->json(
             [
-                'data' => Anything::getDataById($id),
+                'data'    => Anything::getDataById($id),
                 'success' => true
             ]);
     }
@@ -42,10 +43,16 @@ class ApiController extends BaseController
         return DB::transaction(static function () use ($request) {
             $model = new Anything($request->toArray());
             $model->save();
-            $model->saveLinks($request->toArray());
+            if ($request->parent_id) {
+                $model->setLink(UUID::PARENT, $request->parent_id, 'Child of');
+            }
+            if ($request->class_id) {
+                $model->setLink(UUID::LINK_TO_CLASS, $request->class_id, 'Class of');
+            }
+            //$model->saveLinks($request->toArray());
             return response()->json(
                 [
-                    'data' => $model->toArray(),
+                    'data'    => $model->toArray(),
                     'success' => true
                 ]);
         });
@@ -96,7 +103,7 @@ class ApiController extends BaseController
         return response()->json(
             [
                 'filesStored' => $stored,
-                'success' => true
+                'success'     => true
             ]);
     }
 
@@ -116,7 +123,7 @@ class ApiController extends BaseController
             }
             return response()->json(
                 [
-                    'data' => $res,
+                    'data'    => $res,
                     'success' => true
                 ]);
         } catch (\Throwable $e) {
@@ -139,7 +146,7 @@ class ApiController extends BaseController
 
             return response()->json(
                 [
-                    'data' => $res,
+                    'data'    => $res,
                     'success' => true
                 ]);
         } catch (\Throwable $e) {
@@ -203,7 +210,7 @@ class ApiController extends BaseController
 
         return response()->json(json_encode([
             'things' => $data->toArray(),
-            'links' => $links,
+            'links'  => $links,
         ]));
 
     }
@@ -272,3 +279,4 @@ class ApiController extends BaseController
         return view('classes', ['class' => $data[UUID::ANYTHING]]);
     }
 }
+

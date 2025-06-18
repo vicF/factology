@@ -1,22 +1,18 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Auth\LoginController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
-*/
+Route::post('/login', [LoginController::class, 'login'])->name('login')->middleware('web');
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('web');
+Route::get('/user', [LoginController::class, 'user'])->name('user')->middleware('auth:sanctum');
 
+// SPA route, exclude static assets
 Route::get('{any}', function () {
     return view('welcome');
-})->where('any', '.*');
+})->where('any', '^(?!build|js|css|images|fonts|storage|api|sanctum).*')->name('spa');
 
-Auth::routes();
-
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+// Remove Auth::routes() to avoid conflicts
+// Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');

@@ -1,30 +1,21 @@
-/**
- * First we will load all of this project's JavaScript dependencies which
- * includes Vue and other libraries. It is a great starting point when
- * building robust, powerful web applications using Vue and Laravel.
- */
-
 import './bootstrap';
 import '../sass/app.scss';
-import Router from '@/router';
-import store from '@/store';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { dateFromDb } from './utils/dateUtils.js';
-
-/**
- * Next, we will create a fresh Vue application instance. You may then begin
- * registering components with the application instance so they are ready
- * to use in your application's views. An example is included for you.
- */
 const pinia = createPinia();
-const app = createApp({});
 
+import App from './components/App.vue';
+import router from './router'; // Adjust if router is defined elsewhere
+import i18n from './lang/i18n';
+
+
+
+const app = createApp(App);
+app.use(router);
+app.use(i18n);
 app.use(pinia);
-app.use(Router);
-app.use(store);
-
 
 /**
  * The following block of code may be used to automatically register your
@@ -60,16 +51,35 @@ app.config.globalProperties.$navigateToObject = function(id) {
     this.$router.push({ name: 'object', params: { uid: id } });
 };
 
+import axios from 'axios';
 
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.baseURL = 'http://localhost:8003';
 
+// Response interceptor for 401 and 419
 axios.interceptors.response.use(
-    response => response,
+    response => response, // Pass successful responses through
     error => {
-        if (error.response && error.response.status === 401) {
+        const status = error.response?.status;
+        if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')) {
             const authStore = useAuthStore();
-            authStore.setShowLogin(true);
+            if (!authStore.authenticated) {
+                // Redirect to login with current route as redirect query
+                router.push({
+                    name: 'login',
+                    query: { redirect: router.currentRoute.value.fullPath }
+                });
+            } else {
+                // Authenticated but unauthorized
+                //router.push({ name: '/' });
+            }
+        } else if (status === 400 && error.message.includes('header')) {
+            const authStore = useAuthStore();
+            authStore.logout();
+            router.push({ name: 'dashboard' });
         }
-        return Promise.reject(error);
+        return Promise.reject(error); // Pass other errors to component
     }
 );
 
