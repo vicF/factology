@@ -50,7 +50,7 @@
 <script>
 import TreeMenu from './TreeMenu.vue';
 import { useCheckboxStore } from '../stores/checkboxes';
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
 import {eventBus} from "../eventBus";
@@ -64,23 +64,23 @@ export default {
     setup(props) {
         const objects = ref([]);
         const loaded = ref(false);
-        const validationErrors = reactive({});
+        const validationErrors = ref({});
         const processing = ref(false);
         const route = useRoute();
+        const store = useCheckboxStore();
 
         const getThumbUrl = (thing_id) => {
             return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
         };
 
-        const getObjects = async (searchQuery) => {
-            const store = useCheckboxStore();
+        const getObjects = async (searchQuery, classIds) => {
             let type = [];
             if (props.typeThing) type.push(3);
             if (props.typeClass) type.push(2);
 
             processing.value = true;
             try {
-                const response = await axios.post('/api/v1/object', JSON.stringify({
+                 const response = await axios.post('/api/v1/object', JSON.stringify({
                     "search": searchQuery || props.searchText || route.query.q || '',
                     "type": type,
                     classes: store.checkedItems,
@@ -94,7 +94,7 @@ export default {
                     validationErrors.value = error.response.data.errors;
                 } else {
                     validationErrors.value = {};
-                    alert(error.response ? error.response.data.message : error.message);
+                alert(error.response ? error.response.data.message : error.message);
                 }
             } finally {
                 processing.value = false;
@@ -105,15 +105,18 @@ export default {
         // Watch for changes in the 'q' query parameter
         watch(() => route.query.q, (newQuery, oldQuery) => {
             if (newQuery !== oldQuery) {
-                getObjects(newQuery);
+                getObjects(newQuery, store.checkedItems);
             }
         });
 
         onMounted(() => {
-            eventBus.on('trigger-search', (classIds) => {
-                getObjects(route.query.q);
+            eventBus.on('trigger-search', (payload) => {
+                console.log('Search.vue - trigger-search received:', payload);
+                const searchQuery = payload?.searchQuery || route.query.q || '';
+                const classIds = payload?.classIds || store.checkedItems;
+                getObjects(searchQuery, classIds);
             });
-            getObjects(route.query.q); // Initial fetch based on URL
+            getObjects(route.query.q, store.checkedItems); // Initial fetch
         });
 
         return {

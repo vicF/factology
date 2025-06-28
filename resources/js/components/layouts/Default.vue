@@ -16,9 +16,8 @@
                                 class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="eventBus.emit('trigger-search')">
-                        <input class="form-control me-2" type="search" placeholder="Search"
-                               v-model="searchQuery" aria-label="Search">
+                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="eventBus.emit('trigger-search', { searchQuery })">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
                     <div class="d-flex flex-shrink-0">
