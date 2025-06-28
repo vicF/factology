@@ -16,10 +16,10 @@
                                 class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="eventBus.emit('trigger-search', { searchQuery })">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-                        <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
-                    </form>
+        <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
+            <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
+            <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
+        </form>
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
@@ -63,8 +63,8 @@
                         <class-tree></class-tree>
                     </div>
                     <div class="col-9">
-                        <router-view></router-view>
-                    </div>
+        <router-view></router-view>
+    </div>
                 </div>
             </div>
         </main>
@@ -72,14 +72,15 @@
 </template>
 
 <script>
+import { computed } from 'vue';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "../ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
 import { eventBus } from '../../eventBus.js';
 import { useAuthStore } from '../../stores/auth';
-import {useCheckboxStore} from '../../stores/checkboxes';
 import axios from 'axios';
+import { useSearchStore } from '../../stores/search';
 
 export default {
     name: "default-layout",
@@ -88,10 +89,9 @@ export default {
         const router = useRouter();
         const route = useRoute();
         const authStore = useAuthStore();
-        const searchQuery = ref(route.query.q || '');
         const showModal = ref(false);
         const selectedType = ref('');
-        const checkboxStore = useCheckboxStore();
+        const searchStore = useSearchStore();
 
         const checkAuth = async () => {
             try {
@@ -113,36 +113,22 @@ export default {
                 }
             }
         };
-
-// Define handleSearch within setup
-        /*const handleSearch = async (classIds = []) => {
-            const selectedClassIds = classIds.length > 0 ? classIds : checkboxStore.checkedItems;
-            const queryParams = {};
-
-            if (searchQuery.value.trim()) {
-                queryParams.q = searchQuery.value.trim();
+        // Use computed to create a two-way binding with searchStore.searchQuery
+        const searchQuery = computed({
+            get() {
+                return searchStore.searchQuery;
+            },
+            set(value) {
+                console.log('default.vue - Updating searchQuery:', value);
+                searchStore.setSearchQuery(value);
             }
+        });
 
-            if (selectedClassIds.length > 0) {
-                queryParams.classIds = selectedClassIds.join(',');
-            }
+        const submitSearch = () => {
+            console.log('default.vue - Emitting trigger-search');
+            eventBus.emit('trigger-search');
+        };
 
-            try {
-                await router.push({
-                    path: '/',
-                    query: queryParams,
-                });
-
-                const response = await axios.get('/api/search', {
-                    params: queryParams,
-                });
-
-                console.log('Search results:', response.data);
-                eventBus.emit('search-results', response.data);
-            } catch (error) {
-                console.error('Search failed:', error);
-            }
-        };*/
 
         onMounted(() => {
             checkAuth();
@@ -161,15 +147,15 @@ export default {
         });
 
         return {
-            router,
-            route,
-            searchQuery,
-            showModal,
-            selectedType,
             authStore,
             checkAuth,
-            // handleSearch, // Return handleSearch so it’s available in the template
-        };
+            route,
+            router,
+            searchQuery,
+            selectedType,
+            showModal,
+            submitSearch,
+            };
     },
     computed: {
         eventBus() {

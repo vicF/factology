@@ -35,7 +35,7 @@
 </template>
 
 <script>
-import { useCheckboxStore } from '../stores/checkboxes';
+import { useSearchStore } from '../stores/search';
 import { computed, ref } from 'vue';
 import { eventBus } from '../eventBus';
 
@@ -49,7 +49,7 @@ export default {
         };
     },
     setup(props, { emit }) {
-        const store = useCheckboxStore();
+        const store = useSearchStore();
         const showIcons = ref(false);
 
         const isChecked = computed(() => {
@@ -60,7 +60,7 @@ export default {
             store.toggleItem(props.id);
             emit('update-checked', store.checkedItems);
             // Emit a new event to trigger search with selected class IDs
-            eventBus.emit('trigger-search', store.checkedItems);
+            eventBus.emit('trigger-search');
         }
 
         const openCreateSubclassModal = () => {

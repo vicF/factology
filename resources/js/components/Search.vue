@@ -49,17 +49,15 @@
 
 <script>
 import TreeMenu from './TreeMenu.vue';
-import { useCheckboxStore } from '../stores/checkboxes';
+import { useSearchStore } from '../stores/search';
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRoute } from 'vue-router';
 import {eventBus} from "../eventBus";
 
 export default {
-    name: "search",
-    components: {
-        TreeMenu
-    },
+    name: "Search",
+    components: { TreeMenu },
     props: ['searchText', 'typeThing', 'typeClass'],
     setup(props) {
         const objects = ref([]);
@@ -67,29 +65,34 @@ export default {
         const validationErrors = ref({});
         const processing = ref(false);
         const route = useRoute();
-        const store = useCheckboxStore();
+        const searchStore = useSearchStore();
+
+        // Sync props with store
+        if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
+        if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
 
         const getThumbUrl = (thing_id) => {
             return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
         };
 
-        const getObjects = async (searchQuery, classIds) => {
+        const getObjects = async () => {
             let type = [];
-            if (props.typeThing) type.push(3);
-            if (props.typeClass) type.push(2);
+            if (searchStore.typeThing) type.push(3);
+            if (searchStore.typeClass) type.push(2);
 
             processing.value = true;
             try {
                  const response = await axios.post('/api/v1/object', JSON.stringify({
-                    "search": searchQuery || props.searchText || route.query.q || '',
+                    "search": searchStore.searchQuery || props.searchText || route.query.q || '',
                     "type": type,
-                    classes: store.checkedItems,
+                    classes: searchStore.checkedItems,
                 }));
                 validationErrors.value = {};
                 let data = JSON.parse(response.data);
                 objects.value = data.things;
                 console.log('Links:', data.links);
             } catch (error) {
+                console.error(error);
                 if (error.response && error.response.status === 422) {
                     validationErrors.value = error.response.data.errors;
                 } else {
@@ -102,21 +105,20 @@ export default {
             }
         };
 
-        // Watch for changes in the 'q' query parameter
         watch(() => route.query.q, (newQuery, oldQuery) => {
             if (newQuery !== oldQuery) {
-                getObjects(newQuery, store.checkedItems);
+                console.log('Search.vue - Query param changed:', newQuery);
+                searchStore.setSearchQuery(newQuery || '');
+                getObjects();
             }
         });
 
         onMounted(() => {
-            eventBus.on('trigger-search', (payload) => {
-                console.log('Search.vue - trigger-search received:', payload);
-                const searchQuery = payload?.searchQuery || route.query.q || '';
-                const classIds = payload?.classIds || store.checkedItems;
-                getObjects(searchQuery, classIds);
+            eventBus.on('trigger-search', () => {
+                console.log('Search.vue - trigger-search received, searchQuery:', searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
+                getObjects();
             });
-            getObjects(route.query.q, store.checkedItems); // Initial fetch
+            getObjects();
         });
 
         return {
