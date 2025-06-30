@@ -7,7 +7,7 @@ use Tests\TestCase;
 class AccessTest extends TestCase
 {
 
-    public function urlDataProvider()
+    public static function urlDataProvider()
     {
         return [
             ['/'],
