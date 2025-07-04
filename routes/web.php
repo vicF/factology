@@ -1,13 +1,13 @@
 <?php
 
+use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Auth\LoginController;
 
 Route::post('/login', [LoginController::class, 'login'])->name('login')->middleware('web');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('web');
 Route::get('/user', [LoginController::class, 'user'])->name('user')->middleware('auth:sanctum');
+Route::post('/register', [RegisterController::class, 'create'])->name('create')->middleware('web');
 
 // SPA route, exclude static assets
 Route::get('{any}', function () {
