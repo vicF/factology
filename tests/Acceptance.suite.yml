@@ -1,0 +1,50 @@
+# Codeception Acceptance Test Suite Configuration
+#
+# Perform tests in a browser by either emulating one using PhpBrowser, or in a real browser using WebDriver.
+# If you need both WebDriver and PhpBrowser tests, create a separate suite for each.
+
+actor: AcceptanceTester
+modules:
+    enabled:
+      - WebDriver:
+          url: "%TESTED_URL%"
+          window_size: 1280x1024
+          port: 9515   # 9515 for chromedriver
+          path: '/wd/hub'  # this value may differ between servers. Some work without it
+          browser: "%BROWSER%"
+          host: "%TEST_BROWSER_HOST%"   # "localhost" to use chromium and chromedriver installed inside docker container
+          timeout: 60
+          capabilities:
+            acceptSslCerts: true
+            acceptInsecureCerts: true
+            timeouts:
+              pageLoad: 500000
+            chromeOptions:
+              args: [
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-ipv6",
+                "--disable-software-rasterizer",
+                "--dns-prefetch-disable",
+                "--no-sandbox",
+                "--remote-debugging-pipe",
+                "--window-size=1920x1080",
+                #"--user-data-dir=/tmp/chrome-user-data",  # Sets custom user data directory
+                #"--data-path=/tmp/chrome-data",           # Sets custom data path
+                #"--disk-cache-dir=/tmp/chrome-cache",     # Sets custom cache directory
+                "--enable-logging",
+                "--v=1",                                  # logging level
+                "start-maximized",
+                "%CHROME_ARGS%"  # here you can set if you run Chrome in headless mode
+              ]
+              excludeSwitches: [ "enable-automation" ]
+              useAutomationExtension: false
+              prefs:
+                download.default_directory: "tmp"
+            moz:firefoxOptions:
+              args: [ "%FIREFOX_ARGS%" ]
+# Add Codeception\Step\Retry trait to AcceptanceTester to enable retries
+step_decorators:
+    - Codeception\Step\ConditionalAssertion
+    - Codeception\Step\TryTo
+    - Codeception\Step\Retry

@@ -62,7 +62,7 @@ axios.interceptors.response.use(
     response => response, // Pass successful responses through
     error => {
         const status = error.response?.status;
-        if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')) {
+        if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')  && !router.currentRoute.value.fullPath.includes('/register')) {
             const authStore = useAuthStore();
             if (!authStore.authenticated) {
                 // Redirect to login with current route as redirect query
