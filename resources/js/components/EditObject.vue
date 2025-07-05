@@ -18,11 +18,12 @@
                             />
                         </div>
                         <div class="mb-3" v-if="formData.type === 3">
-                            <TextField
+                            <ObjectField
                                 fieldName="class_id"
                                 v-model="formData.class_id"
                                 :isEditable="true"
                                 :label="$t('Class')"
+                                :name="formData.class_name"
                                 required
                             />
                         </div>
@@ -86,12 +87,13 @@ import { Modal } from 'bootstrap';
 import { v4 as uuidv4} from 'uuid';
 import {useI18n} from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
+import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 
 export default {
     name: 'EditObject',
-    components: {TextField, DateField, RadioGroupField},
+    components: {ObjectField, TextField, DateField, RadioGroupField},
     props: {
         object: {type: Object, default: null},
         params: {type: Object, default: () => ({})},
@@ -113,6 +115,7 @@ export default {
             public: isEditMode.value ? props.object.public || 0 : 0,
             parent_id: props.params.parentId || null,
             class_id: props.params.classId || null,
+            class_name: props.params.className || null,
             type: props.params.type || 3, // Default to 3 for objects, override for subclasses
         });
 

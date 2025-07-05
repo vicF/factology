@@ -41,7 +41,7 @@ export default {
             });
             eventBus.emit('open-create-modal', {
                 title: `Object of ${props.name}`,
-                params: {classId: props.id, type: 3} // Type 3 for objects
+                params: {classId: props.id, className:props.name, type: 3} // Type 3 for objects
             });
         };
 

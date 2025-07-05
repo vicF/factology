@@ -85,7 +85,7 @@ export default {
             }
             const payload = {
                 title: `Object of ${props.name || 'Unnamed'}`,
-                params: { classId: props.id, type: 3 }
+                params: { classId: props.id, className: props.name, type: 3 }
             };
             console.log('TreeMenu.vue - Emitting open-create-modal for object:', payload);
             eventBus.emit('open-create-modal', payload);
