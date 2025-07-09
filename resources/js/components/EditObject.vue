@@ -8,6 +8,20 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
+                        <div v-for="(item, index) in linkedObjects" :key="index">
+                            <LinkedObject
+                                :current-object-u-u-i-d="formData.thing_id"
+                                :linked-object-u-u-i-d="item.linkedObjectUUID"
+                                :link-type-u-u-i-d="item.linkTypeUUID"
+                                :comment="item.comment"
+                                :index="index"
+                                @update="updateItem"
+                                @remove="removeItem"
+                            />
+                        </div>
+                        <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+                            {{ $t('Add Link') }}
+                        </button>
                         <div class="mb-3" v-if="formData.type === 2">
                             <TextField
                                 fieldName="parent_id"
@@ -84,20 +98,25 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
-import { v4 as uuidv4} from 'uuid';
-import {useI18n} from 'vue-i18n';
+import { v4 as uuidv4 } from 'uuid';
+import { useI18n } from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
+import LinkedObject from './Fields/LinkedObject.vue';
 
 export default {
     name: 'EditObject',
-    components: {ObjectField, TextField, DateField, RadioGroupField},
+    components: { LinkedObject, ObjectField, TextField, DateField, RadioGroupField },
     props: {
-        object: {type: Object, default: null},
-        params: {type: Object, default: () => ({})},
+        object: { type: Object, default: null },
+        params: { type: Object, default: () => ({})},
         title: {type: String, default: ''}, // Title from event
+        initialLinkedObjects: {
+            type: Array,
+            default: () => [],
+        },
     },
     emits: ['close', 'object-created', 'object-updated'],
     setup(props, {emit}) {
@@ -119,11 +138,21 @@ export default {
             type: props.params.type || 3, // Default to 3 for objects, override for subclasses
         });
 
-        const modalId = `editObjectModal-${formData.value.thing_id}`; // Unique ID to avoid conflicts
-        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
-        let modalInstance = null;
+        const linkedObjects = ref([]);
 
+        // Initialize linkedObjects with initial data
         onMounted(() => {
+            linkedObjects.value = props.initialLinkedObjects.map((item) => ({
+                currentObjectUUID: formData.value.thing_id,
+                linkedObjectUUID: item.linkedObjectUUID || '',
+                linkTypeUUID: item.linkTypeUUID || '',
+                comment: item.comment || '',
+            }));
+            // Add an empty linked object if none exist
+            if (linkedObjects.value.length === 0) {
+                addNewLinkedObject();
+            }
+
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
@@ -134,15 +163,37 @@ export default {
             }
         });
 
+        const modalId = `editObjectModal-${formData.value.thing_id}`;
+        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
+        let modalInstance = null;
+
         onUnmounted(() => {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
-                modalElement.removeEventListener('hidden.bs.modal', () => {});
+                modalElement.removeEventListener('hidden.bs.modal', () => {
+                });
             }
             if (modalInstance) {
                 modalInstance.dispose();
             }
         });
+
+        const addNewLinkedObject = () => {
+            linkedObjects.value.push({
+                currentObjectUUID: formData.value.thing_id,
+                linkedObjectUUID: '',
+                linkTypeUUID: '',
+                comment: '',
+            });
+        };
+
+        const updateItem = ({index, data}) => {
+            linkedObjects.value[index] = data;
+        };
+
+        const removeItem = (index) => {
+            linkedObjects.value.splice(index, 1);
+        };
 
         const closeModal = () => {
             if (modalInstance) modalInstance.hide();
@@ -152,6 +203,11 @@ export default {
             try {
                 await axios.get('/sanctum/csrf-cookie');
                 let response;
+
+                // Filter out empty linked objects and prepare payload
+                const validLinkedObjects = linkedObjects.value.filter(
+                    (item) => item.linkedObjectUUID || item.linkTypeUUID || item.comment
+                );
 
                 const payload = {
                     thing_id: formData.value.thing_id,
@@ -163,6 +219,11 @@ export default {
                     parent_id: formData.value.parent_id,
                     class_id: formData.value.class_id,
                     type: formData.value.type,
+                    linked_objects: validLinkedObjects.map((item) => ({
+                        linked_object_id: item.linkedObjectUUID,
+                        link_type_id: item.linkTypeUUID,
+                        comment: item.comment,
+                    })),
                 };
 
                 if (isEditMode.value) {
@@ -188,7 +249,52 @@ export default {
             }
         };
 
-        return { formData, modalId, modalLabelId, closeModal, submitForm, isEditMode, t };
+        return {
+            formData,
+            linkedObjects,
+            modalId,
+            modalLabelId,
+            closeModal,
+            submitForm,
+            isEditMode,
+            addNewLinkedObject,
+            updateItem,
+            removeItem,
+            t,
+        };
     },
 };
 </script>
+
+<style scoped>
+.modal-dialog {
+    max-width: 800px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+</style>
