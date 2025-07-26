@@ -68,7 +68,7 @@ export default {
         return {
             localCurrentObjectUUID: this.currentObjectUUID,
             localLinkedObjectUUID: this.linkedObjectUUID,
-            localLinkTypeUUID: this.linkTypeUUID,
+            localLinkTypeUUID: this.linkTypeUUID ,
             localComment: this.comment,
         };
     },

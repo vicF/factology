@@ -96,6 +96,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
 import { v4 as uuidv4 } from 'uuid';
@@ -111,19 +112,20 @@ export default {
     components: { LinkedObject, ObjectField, TextField, DateField, RadioGroupField },
     props: {
         object: { type: Object, default: null },
-        params: { type: Object, default: () => ({})},
-        title: {type: String, default: ''}, // Title from event
+        params: { type: Object, default: () => ({}) },
+        title: { type: String, default: '' },
         initialLinkedObjects: {
             type: Array,
             default: () => [],
         },
     },
     emits: ['close', 'object-created', 'object-updated'],
-    setup(props, {emit}) {
-        const {t} = useI18n();
+    setup(props, { emit }) {
+        const { t } = useI18n();
+        const route = useRoute();
         const isEditMode = computed(() => !!props.object);
 
-        console.log('EditObject.vue - Props:', {object: props.object, params: props.params, title: props.title});
+        console.log('EditObject.vue - Props:', { object: props.object, params: props.params, title: props.title });
 
         const formData = ref({
             thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
@@ -179,15 +181,19 @@ export default {
         });
 
         const addNewLinkedObject = () => {
+            // Get UUID from URL or props.object.thing_id
+            const uuidFromUrl = route.params.uid;
+            const linkedObjectUUID = uuidFromUrl || (props.object?.thing_id || props.object?.id || '');
+
             linkedObjects.value.push({
                 currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: '',
-                linkTypeUUID: '',
+                linkedObjectUUID: linkedObjectUUID,
+                linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
             });
         };
 
-        const updateItem = ({index, data}) => {
+        const updateItem = ({ index, data }) => {
             linkedObjects.value[index] = data;
         };
 
@@ -219,10 +225,10 @@ export default {
                     parent_id: formData.value.parent_id,
                     class_id: formData.value.class_id,
                     type: formData.value.type,
-                    linked_objects: validLinkedObjects.map((item) => ({
+                    link: validLinkedObjects.map((item) => ({
                         linked_object_id: item.linkedObjectUUID,
                         link_type_id: item.linkTypeUUID,
-                        comment: item.comment,
+                        description: item.comment,
                     })),
                 };
 

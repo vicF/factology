@@ -49,7 +49,9 @@ class ApiController extends BaseController
             if ($request->class_id) {
                 $model->setLink(UUID::LINK_TO_CLASS, $request->class_id, 'Class of');
             }
-            //$model->saveLinks($request->toArray());
+            foreach($request['link'] as $link) {
+                $model->setLink($link['link_type_id'], $link['linked_object_id'], $link['description']);
+            }
             return response()->json(
                 [
                     'data'    => $model->toArray(),
