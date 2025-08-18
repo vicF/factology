@@ -15,7 +15,7 @@ use App\Http\Controllers\Auth\LoginController;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-use Illuminate\Support\Facades\Auth;
+
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
