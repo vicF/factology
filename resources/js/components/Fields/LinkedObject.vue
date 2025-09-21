@@ -1,13 +1,13 @@
 <template>
     <div class="linked-object">
         <div class="form-group">
-            <label>UUID текущего объекта</label>
+            <label>UUID текущего объекта:</label>
             <input
                 type="text"
                 v-model="localCurrentObjectUUID"
                 readonly
                 class="form-control"
-            />
+            />{{localCurrentObjectName}}
         </div>
         <div class="form-group">
             <label>UUID связанного объекта</label>
@@ -47,6 +47,10 @@ export default {
             type: String,
             required: true,
         },
+        currentObjectName: {
+            type: String,
+            required: false,
+        },
         linkedObjectUUID: {
             type: String,
             default: '',
@@ -67,6 +71,7 @@ export default {
     data() {
         return {
             localCurrentObjectUUID: this.currentObjectUUID,
+            localCurrentObjectName: this.currentObjectName,
             localLinkedObjectUUID: this.linkedObjectUUID,
             localLinkTypeUUID: this.linkTypeUUID ,
             localComment: this.comment,
