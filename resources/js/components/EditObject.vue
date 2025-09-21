@@ -8,20 +8,6 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
-                        <div v-for="(item, index) in linkedObjects" :key="index">
-                            <LinkedObject
-                                :current-object-u-u-i-d="formData.thing_id"
-                                :linked-object-u-u-i-d="item.linkedObjectUUID"
-                                :link-type-u-u-i-d="item.linkTypeUUID"
-                                :comment="item.comment"
-                                :index="index"
-                                @update="updateItem"
-                                @remove="removeItem"
-                            />
-                        </div>
-                        <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
-                            {{ $t('Add Link') }}
-                        </button>
                         <div class="mb-3" v-if="formData.type === 2">
                             <TextField
                                 fieldName="parent_id"
@@ -81,6 +67,21 @@
                                 :options="{ 0: $t('Private'), 1: $t('Public') }"
                                 :isEditable="true"
                                 :label="$t('Access')"
+                            />
+                        </div>
+                        <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+                            {{ $t('Add Link') }}
+                        </button>
+                        <div v-for="(item, index) in linkedObjects" :key="index">
+                            <LinkedObject
+                                :current-object-u-u-i-d="formData.thing_id"
+                                :current-object-name="formData.name"
+                                :linked-object-u-u-i-d="item.linkedObjectUUID"
+                                :link-type-u-u-i-d="item.linkTypeUUID"
+                                :comment="item.comment"
+                                :index="index"
+                                @update="updateItem"
+                                @remove="removeItem"
                             />
                         </div>
                         <div class="modal-footer">
