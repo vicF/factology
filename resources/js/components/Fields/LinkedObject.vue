@@ -7,7 +7,7 @@
                 v-model="localCurrentObjectUUID"
                 readonly
                 class="form-control"
-            />{{localCurrentObjectName}}
+            />{{ currentObjectName }}
         </div>
         <div class="form-group">
             <label>UUID связанного объекта</label>
@@ -16,7 +16,7 @@
                 v-model="localLinkedObjectUUID"
                 class="form-control"
                 placeholder="Введите UUID связанного объекта"
-            />
+            />{{ linkedObjectName }}
         </div>
         <div class="form-group">
             <label>UUID типа связи</label>
@@ -25,7 +25,7 @@
                 v-model="localLinkTypeUUID"
                 class="form-control"
                 placeholder="Введите UUID типа связи"
-            />
+            />{{ linkTypeName }}
         </div>
         <div class="form-group">
             <label>Комментарий</label>
@@ -39,85 +39,122 @@
     </div>
 </template>
 
-<script>
-export default {
-    name: 'LinkedObject',
-    props: {
-        currentObjectUUID: {
-            type: String,
-            required: true,
-        },
-        currentObjectName: {
-            type: String,
-            required: false,
-        },
-        linkedObjectUUID: {
-            type: String,
-            default: '',
-        },
-        linkTypeUUID: {
-            type: String,
-            default: '',
-        },
-        comment: {
-            type: String,
-            default: '',
-        },
-        index: {
-            type: Number,
-            required: true,
-        },
+<script setup>
+import { ref, computed, watch } from 'vue';
+
+
+import { useObjectCacheStore } from '@/stores/objectCache.js'; //
+
+// Props
+const props = defineProps({
+    currentObjectUUID: { type: String, required: true },
+    currentObjectName: { type: String, required: false },
+    linkedObjectUUID: { type: String, default: '' },
+    linkTypeUUID: { type: String, default: '' },
+    comment: { type: String, default: '' },
+    index: { type: Number, required: true },
+});
+
+// Emits
+const emit = defineEmits(['update', 'remove']);
+
+// Local reactive state
+const localCurrentObjectUUID = ref(props.currentObjectUUID);
+const localLinkedObjectUUID = ref(props.linkedObjectUUID);
+const localLinkTypeUUID = ref(props.linkTypeUUID);
+const localComment = ref(props.comment);
+
+// Pinia store
+const store = useObjectCacheStore();
+
+// Computed properties for object names
+const currentObjectName = computed(() => {
+    const obj = store.cache.get(props.currentObjectUUID);
+    return obj?.name || props.currentObjectName || 'Loading...';
+});
+
+const linkedObjectName = computed(() => {
+    const obj = store.cache.get(props.linkedObjectUUID);
+    return obj?.name || 'Not set';
+});
+
+const linkTypeName = computed(() => {
+    const obj = store.cache.get(props.linkTypeUUID);
+    return obj?.name || 'Not set';
+});
+
+// Fetch names for UUIDs when they change
+async function fetchObjectName(uuid) {
+    if (uuid) {
+        try {
+            await store.getObject(uuid);
+        } catch (error) {
+            console.error(`Failed to fetch object for UUID ${uuid}:`, error);
+        }
+    }
+}
+
+// Watch for UUID changes and fetch names
+watch(
+    () => props.currentObjectUUID,
+    (newVal) => {
+        localCurrentObjectUUID.value = newVal;
+        fetchObjectName(newVal);
     },
-    data() {
-        return {
-            localCurrentObjectUUID: this.currentObjectUUID,
-            localCurrentObjectName: this.currentObjectName,
-            localLinkedObjectUUID: this.linkedObjectUUID,
-            localLinkTypeUUID: this.linkTypeUUID ,
-            localComment: this.comment,
-        };
-    },
-    watch: {
-        localLinkedObjectUUID(newVal) {
-            this.$emit('update', {
-                index: this.index,
-                data: {
-                    currentObjectUUID: this.localCurrentObjectUUID,
-                    linkedObjectUUID: newVal,
-                    linkTypeUUID: this.localLinkTypeUUID,
-                    comment: this.localComment,
-                },
-            });
-        },
-        localLinkTypeUUID(newVal) {
-            this.$emit('update', {
-                index: this.index,
-                data: {
-                    currentObjectUUID: this.localCurrentObjectUUID,
-                    linkedObjectUUID: this.localLinkedObjectUUID,
-                    linkTypeUUID: newVal,
-                    comment: this.localComment,
-                },
-            });
-        },
-        localComment(newVal) {
-            this.$emit('update', {
-                index: this.index,
-                data: {
-                    currentObjectUUID: this.localCurrentObjectUUID,
-                    linkedObjectUUID: this.localLinkedObjectUUID,
-                    linkTypeUUID: this.localLinkTypeUUID,
-                    comment: newVal,
-                },
-            });
-        },
-    },
-    methods: {
-        removeSelf() {
-            this.$emit('remove', this.index);
-        },
-    },
-};
+    { immediate: true }
+);
+
+watch(
+    () => localLinkedObjectUUID.value,
+    (newVal) => {
+        fetchObjectName(newVal);
+        emit('update', {
+            index: props.index,
+            data: {
+                currentObjectUUID: localCurrentObjectUUID.value,
+                linkedObjectUUID: newVal,
+                linkTypeUUID: localLinkTypeUUID.value,
+                comment: localComment.value,
+            },
+        });
+    }
+);
+
+watch(
+    () => localLinkTypeUUID.value,
+    (newVal) => {
+        fetchObjectName(newVal);
+        emit('update', {
+            index: props.index,
+            data: {
+                currentObjectUUID: localCurrentObjectUUID.value,
+                linkedObjectUUID: localLinkedObjectUUID.value,
+                linkTypeUUID: newVal,
+                comment: localComment.value,
+            },
+        });
+    }
+);
+
+watch(
+    () => localComment.value,
+    (newVal) => {
+        emit('update', {
+            index: props.index,
+            data: {
+                currentObjectUUID: localCurrentObjectUUID.value,
+                linkedObjectUUID: localLinkedObjectUUID.value,
+                linkTypeUUID: localLinkTypeUUID.value,
+                comment: newVal,
+            },
+        });
+    }
+);
+
+// Methods
+function removeSelf() {
+    emit('remove', props.index);
+}
 </script>
 
 <style scoped>
