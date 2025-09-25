@@ -75,12 +75,12 @@ const currentObjectName = computed(() => {
 
 const linkedObjectName = computed(() => {
     const obj = store.cache.get(props.linkedObjectUUID);
-    return obj?.name || 'Not set';
+    return obj?.data?.name || 'Not set';
 });
 
 const linkTypeName = computed(() => {
     const obj = store.cache.get(props.linkTypeUUID);
-    return obj?.name || 'Not set';
+    return obj?.data?.name || 'Not set';
 });
 
 // Fetch names for UUIDs when they change
