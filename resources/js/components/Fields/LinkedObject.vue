@@ -40,19 +40,18 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import {ref, computed, watch} from 'vue';
 
-
-import { useObjectCacheStore } from '@/stores/objectCache.js'; //
+import {useObjectCacheStore} from '@/stores/objectCache.js'; //
 
 // Props
 const props = defineProps({
-    currentObjectUUID: { type: String, required: true },
-    currentObjectName: { type: String, required: false },
-    linkedObjectUUID: { type: String, default: '' },
-    linkTypeUUID: { type: String, default: '' },
-    comment: { type: String, default: '' },
-    index: { type: Number, required: true },
+    currentObjectUUID: {type: String, required: true},
+    currentObjectName: {type: String, required: false},
+    linkedObjectUUID: {type: String, default: ''},
+    linkTypeUUID: {type: String, default: ''},
+    comment: {type: String, default: ''},
+    index: {type: Number, required: true},
 });
 
 // Emits
@@ -101,7 +100,16 @@ watch(
         localCurrentObjectUUID.value = newVal;
         fetchObjectName(newVal);
     },
-    { immediate: true }
+    {immediate: true}
+);
+
+watch(
+    () => props.linkTypeUUID,
+    (newVal) => {
+        localLinkTypeUUID.value = newVal;
+        fetchObjectName(newVal);
+    },
+    {immediate: true} // Added to fetch linkTypeUUID on mount
 );
 
 watch(
@@ -164,15 +172,18 @@ function removeSelf() {
     margin-bottom: 15px;
     border-radius: 4px;
 }
+
 .form-group {
     margin-bottom: 10px;
 }
+
 .form-control {
     width: 100%;
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
 }
+
 .btn-danger {
     background-color: #dc3545;
     color: white;
@@ -181,6 +192,7 @@ function removeSelf() {
     border-radius: 4px;
     cursor: pointer;
 }
+
 .btn-danger:hover {
     background-color: #c82333;
 }
