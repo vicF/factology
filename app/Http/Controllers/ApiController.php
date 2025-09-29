@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Eloquent\Link;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -115,6 +114,23 @@ class ApiController extends BaseController
         return response()->json(['success' => true]);
     }
 
+    public function deleteLink(Request $request, $id)
+    {
+        try {
+            $deleted = DB::table('links')
+                ->where('link_id', $id)
+                ->update(['deleted' => 1]);
+
+            if ($deleted) {
+                return response()->json(['message' => 'Link deleted successfully'], 200);
+            }
+
+            return response()->json(['message' => 'Link not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to delete link', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function photos(Request $request)
     {
         try {
@@ -178,6 +194,7 @@ class ApiController extends BaseController
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
+                $join->where('links.deleted', '=', 0);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
         }
@@ -209,7 +226,10 @@ class ApiController extends BaseController
             ->select('links.*', 'things.name')
             ->whereIn('links.one_thing_id', $ids)
             ->orWhere('other_thing_id', $ids)
-            ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
+            ->leftJoin('things', function ($join) {
+                $join->on('links.other_thing_id', '=', 'things.thing_id');
+                $join->where('links.deleted', '=', 0);
+            })
             ->get()->toArray();
 
         return response()->json(json_encode([

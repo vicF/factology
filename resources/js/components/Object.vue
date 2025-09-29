@@ -1,4 +1,3 @@
-<!-- factology/resources/js/components/Object.vue -->
 <template>
     <div class="container" id="search">
         <div v-if="!loaded" class="row">{{ $t('Loading...') }}</div>
@@ -46,6 +45,9 @@
                             <div v-if="link.link_end">{{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}</div>
                             <div v-if="link.description">{{ $t('Description') }}: {{ $truncateText(link.description, 300) }}</div>
                             <div v-if="link.translation">{{ link.translation }}</div>
+                            <div>
+                                <button class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -206,6 +208,27 @@ export default {
             }
         };
 
+        const deleteLink = async (link_id) => {
+            if (!window.confirm(t('Are you sure you want to delete this link?'))) {
+                return;
+            }
+
+            try {
+                await axios.get('/sanctum/csrf-cookie');
+                console.log('Object.vue - Sending DELETE to /api/v1/link/' + link_id);
+                await axios.delete(`/api/v1/link/${link_id}`);
+                console.log('Object.vue - Link deleted:', link_id);
+                await getObject(); // Refresh object data to update links
+            } catch (error) {
+                console.error('Object.vue - Delete link error:', {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                    message: error.message,
+                });
+                alert(t('Failed to delete link') + ': ' + (error.response?.data?.message || error.response?.data?.error || error.message));
+            }
+        };
+
         const handleObjectCreated = (newObject) => {
             console.log('Object.vue - Object created:', newObject);
             showEditModal.value = false;
@@ -251,6 +274,7 @@ export default {
             openCreateModal,
             openEditModal,
             deleteObject,
+            deleteLink,
             handleObjectCreated,
             handleObjectUpdated,
             t,
