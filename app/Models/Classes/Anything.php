@@ -432,6 +432,7 @@ class Anything
             $this->_data[$key] = $value;
             // set dependant fields
             switch ($key) {
+                // Object has dates  in both user format and database format. Setting one initiates another.
                 case 'start':
                     Log::debug('start: ' . $value);
                     $this->_data['start_date'] = self::dateFromDb($value);

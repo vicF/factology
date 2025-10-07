@@ -145,17 +145,7 @@ export default {
 
         // Initialize linkedObjects with initial data
         onMounted(() => {
-            linkedObjects.value = props.initialLinkedObjects.map((item) => ({
-                currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: item.linkedObjectUUID || '',
-                linkTypeUUID: item.linkTypeUUID || '',
-                comment: item.comment || '',
-            }));
-            // Add an empty linked object if none exist
-            if (linkedObjects.value.length === 0) {
-                addNewLinkedObject();
-            }
-
+            linkedObjects.value = [];
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
@@ -183,12 +173,9 @@ export default {
 
         const addNewLinkedObject = () => {
             // Get UUID from URL or props.object.thing_id
-            const uuidFromUrl = route.params.uid;
-            const linkedObjectUUID = uuidFromUrl || (props.object?.thing_id || props.object?.id || '');
-
             linkedObjects.value.push({
                 currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: linkedObjectUUID,
+                linkedObjectUUID: '',
                 linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
             });
@@ -220,8 +207,8 @@ export default {
                     thing_id: formData.value.thing_id,
                     name: formData.value.name,
                     description: formData.value.description,
-                    start: formData.value.start,
-                    end: formData.value.end,
+                    start_date: formData.value.start,
+                    end_date: formData.value.end,
                     public: formData.value.public,
                     parent_id: formData.value.parent_id,
                     class_id: formData.value.class_id,
