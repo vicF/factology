@@ -319,6 +319,7 @@ class Anything
         $thing['class'] = $class;
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
+            ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
             ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
             ->limit(50);
 
@@ -533,8 +534,6 @@ class Anything
                 'public' => $data['public'] ?? 0,
                 'start' => $data['start'] ?? null,
                 'end' => $data['end'] ?? null,
-                'type' => $data['type'],
-                'record_created' => now(),
                 'record_updated' => now(),
             ];
 
@@ -598,7 +597,7 @@ class Anything
         $link->link_type_id = $type;
         $link->other_thing_id = $target;
         $link->translation = $translation;
-        return $link->save();
+        return $link->where();
     }
 
     public function setAsChildOf($parentClass): bool
@@ -614,7 +613,16 @@ class Anything
         } catch (\ErrorException $e) {
             throw new \RuntimeException("Unable to get name for class $class", 500, $e);
         }
-        return $this->setLink(UUID::LINK_TO_CLASS, $class, "{$this->name} is of class \"{$className}\"");
+        return DB::table('links')->updateOrInsert(
+            [
+                'one_thing_id' => $this->id,
+                'link_type'    => UUID::LINK_TO_CLASS
+            ],
+            [
+                'other_thing_id' => $class,
+                'translation'    => "{$this->name} is of class \"{$className}\""
+            ]
+        );
     }
 
     public function getClassByClassId($classId)

@@ -139,13 +139,22 @@ export default {
             class_id: props.params.classId || null,
             class_name: props.params.className || null,
             type: props.params.type || 3, // Default to 3 for objects, override for subclasses
+            link_id: null, // Store the link_id for an existing class link
         });
 
         const linkedObjects = ref([]);
 
-        // Initialize linkedObjects with initial data
+        // Initialize linkedObjects and check for existing class link
         onMounted(() => {
             linkedObjects.value = [];
+            // Check if initialLinkedObjects contains a class link and store its link_id
+            const classLink = props.initialLinkedObjects.find(
+                (item) => item.linkedObjectUUID === formData.value.class_id
+            );
+            if (classLink && isEditMode.value) {
+                formData.value.link_id = classLink.link_id || null;
+            }
+
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
@@ -219,6 +228,19 @@ export default {
                         description: item.comment,
                     })),
                 };
+
+                // Include class link with link_id if it exists
+                if (formData.value.class_id) {
+                    const classLink = {
+                        linked_object_id: formData.value.class_id,
+                        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5', // Assuming this is the class link type UUID
+                        description: '',
+                    };
+                    if (formData.value.link_id) {
+                        classLink.link_id = formData.value.link_id;
+                    }
+                    payload.link.push(classLink);
+                }
 
                 if (isEditMode.value) {
                     console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);

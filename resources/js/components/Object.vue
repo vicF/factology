@@ -25,6 +25,24 @@
                             <div>{{ $t('Access') }}: {{ object.public ? $t('Public') : $t('Private') }}</div>
                         </div>
                     </div>
+                    <!-- class -->
+                    <div  class="row p-3">
+                        <div class="col-md-2">
+                            <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
+                                <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
+                            </RouterLink>
+                            <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
+                                <img :src="getThumbUrl(object.class.link_type_id)" width="50"/>
+                            </RouterLink>
+                        </div>
+                        <div class="col-md-10">
+                            <div v-if="object.class.name">
+                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">{{ object.class.name }}</RouterLink>
+                            </div>
+                            <div v-if="object.class.description">{{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}</div>
+                            <div v-if="object.class.translation">{{ object.class.translation }}</div>
+                        </div>
+                    </div>
                     <!-- Going through links -->
                     <div v-for="link in object.links" :key="link.link_type_id" class="row p-3">
                         <div class="col-md-2">
