@@ -528,12 +528,13 @@ class Anything
             //DB::table('things')->where('thing_id', $this->thing_id)->update($data);
             // Prepare data for upsert
             $upsertData = [
-                'thing_id' => $data['thing_id'],
-                'name' => $data['name'] ?? null,
-                'description' => $data['description'] ?? null,
-                'public' => $data['public'] ?? 0,
-                'start' => $data['start'] ?? null,
-                'end' => $data['end'] ?? null,
+                'thing_id'       => $data['thing_id'],
+                'name'           => $data['name'] ?? null,
+                'description'    => $data['description'] ?? null,
+                'public'         => $data['public'] ?? 0,
+                'start'          => $data['start'] ?? null,
+                'end'            => $data['end'] ?? null,
+                'type'           => $data['type'],
                 'record_updated' => now(),
             ];
 

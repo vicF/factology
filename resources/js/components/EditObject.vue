@@ -79,6 +79,7 @@
                                 :linked-object-u-u-i-d="item.linkedObjectUUID"
                                 :link-type-u-u-i-d="item.linkTypeUUID"
                                 :comment="item.comment"
+                                :link-id="item.link_id"
                                 :index="index"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -146,7 +147,13 @@ export default {
 
         // Initialize linkedObjects and check for existing class link
         onMounted(() => {
-            linkedObjects.value = [];
+            linkedObjects.value = props.initialLinkedObjects.map((item) => ({
+                currentObjectUUID: formData.value.thing_id,
+                linkedObjectUUID: item.linkedObjectUUID || '',
+                linkTypeUUID: item.linkTypeUUID || '',
+                comment: item.comment || '',
+                link_id: item.link_id || null, // Include link_id for existing links
+            }));
             // Check if initialLinkedObjects contains a class link and store its link_id
             const classLink = props.initialLinkedObjects.find(
                 (item) => item.linkedObjectUUID === formData.value.class_id
@@ -187,6 +194,7 @@ export default {
                 linkedObjectUUID: '',
                 linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
+                link_id: null, // New links have no link_id
             });
         };
 
@@ -226,6 +234,7 @@ export default {
                         linked_object_id: item.linkedObjectUUID,
                         link_type_id: item.linkTypeUUID,
                         description: item.comment,
+                        link_id: item.link_id || undefined, // Include link_id if it exists
                     })),
                 };
 
@@ -233,12 +242,10 @@ export default {
                 if (formData.value.class_id) {
                     const classLink = {
                         linked_object_id: formData.value.class_id,
-                        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5', // Assuming this is the class link type UUID
+                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea', // Use the class link type UUID from provided object
                         description: '',
+                        link_id: formData.value.link_id || undefined, // Include link_id if it exists
                     };
-                    if (formData.value.link_id) {
-                        classLink.link_id = formData.value.link_id;
-                    }
                     payload.link.push(classLink);
                 }
 
