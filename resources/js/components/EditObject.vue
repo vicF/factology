@@ -139,25 +139,24 @@ export default {
             parent_id: props.params.parentId || null,
             class_id: props.params.classId || null,
             class_name: props.params.className || null,
-            type: props.params.type || 3, // Default to 3 for objects, override for subclasses
-            link_id: props.object?.class?.link_id || null, // Store the link_id for an existing class link
+            type: props.params.type || 3,
+            link_id: props.object?.class?.link_id || null,
         });
 
         const linkedObjects = ref([]);
 
-        // Initialize linkedObjects and check for existing class link
         onMounted(() => {
             console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
             console.log('EditObject.vue - Class link_id:', formData.value.link_id);
-            // Only initialize with non-class links to allow adding new links in edit mode
+
             linkedObjects.value = props.initialLinkedObjects
                 .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
                 .map((item) => ({
                     currentObjectUUID: formData.value.thing_id,
-                    linkedObjectUUID: item.other_thing_id || item.linkedObjectUUID || '',
-                    linkTypeUUID: item.link_type_id || item.linkTypeUUID || '',
-                    comment: item.description || item.comment || '',
-                    link_id: item.link_id || null, // Include link_id for existing links
+                    linkedObjectUUID: item.other_thing_id || '',
+                    linkTypeUUID: item.link_type_id || '',
+                    comment: item.description || '',
+                    link_id: item.link_id || null,
                 }));
 
             const modalElement = document.getElementById(modalId);
@@ -177,8 +176,7 @@ export default {
         onUnmounted(() => {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
-                modalElement.removeEventListener('hidden.bs.modal', () => {
-                });
+                modalElement.removeEventListener('hidden.bs.modal', () => {});
             }
             if (modalInstance) {
                 modalInstance.dispose();
@@ -186,13 +184,12 @@ export default {
         });
 
         const addNewLinkedObject = () => {
-            // Get UUID from URL or props.object.thing_id
             linkedObjects.value.push({
                 currentObjectUUID: formData.value.thing_id,
                 linkedObjectUUID: '',
                 linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
-                link_id: null, // New links have no link_id
+                link_id: null,
             });
         };
 
@@ -213,39 +210,36 @@ export default {
                 await axios.get('/sanctum/csrf-cookie');
                 let response;
 
-                // Prepare existing links from initialLinkedObjects, excluding class link
                 const existingLinks = props.initialLinkedObjects
                     .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
                     .map((item) => ({
                         one_thing_id: formData.value.thing_id,
-                        link_type_id: item.link_type_id || item.linkTypeUUID,
-                        other_thing_id: item.other_thing_id || item.linkedObjectUUID,
-                        description: item.description || item.comment || '',
-                        link_id: item.link_id || undefined, // Include link_id if it exists
-                        public: item.public || 0, // Include public field
+                        link_type_id: item.link_type_id,
+                        other_thing_id: item.other_thing_id,
+                        description: item.description || '',
+                        link_id: item.link_id || undefined,
+                        public: item.public || 0,
                         link_start: item.link_start || null,
                         link_end: item.link_end || null,
                         link_start_variety: item.link_start_variety || null,
                         link_end_variety: item.link_end_variety || null,
                     }));
 
-                // Filter out empty new linked objects
                 const newLinkedObjects = linkedObjects.value
-                    .filter((item) => item.linkedObjectUUID) // Only include links with a valid linkedObjectUUID
+                    .filter((item) => item.linkedObjectUUID)
                     .map((item) => ({
                         one_thing_id: formData.value.thing_id,
                         link_type_id: item.linkTypeUUID,
                         other_thing_id: item.linkedObjectUUID,
                         description: item.comment || '',
-                        link_id: item.link_id || undefined, // Include link_id if it exists
-                        public: 0, // Default for new links
+                        link_id: item.link_id || undefined,
+                        public: 0,
                         link_start: null,
                         link_end: null,
                         link_start_variety: null,
                         link_end_variety: null,
                     }));
 
-                // Combine existing and new links
                 const validLinkedObjects = [...existingLinks, ...newLinkedObjects];
 
                 const payload = {
@@ -259,11 +253,11 @@ export default {
                     type: formData.value.type,
                     class: formData.value.class_id ? {
                         one_thing_id: formData.value.thing_id,
-                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea', // Class link type UUID
+                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
                         other_thing_id: formData.value.class_id,
                         description: '',
-                        link_id: formData.value.link_id || undefined, // Explicitly include link_id
-                        public: props.object?.class?.public || 1, // Include public field from object.class
+                        link_id: formData.value.link_id || undefined,
+                        public: props.object?.class?.public || 1,
                         link_start: props.object?.class?.link_start || null,
                         link_end: props.object?.class?.link_end || null,
                         link_start_variety: props.object?.class?.link_start_variety || null,

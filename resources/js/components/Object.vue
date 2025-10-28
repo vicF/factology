@@ -76,7 +76,7 @@
             v-if="showEditModal"
             :object="editObject"
             :params="modalParams"
-            :initialLinkedObjects="object.links"
+            :initialLinkedObjects="linkRecords"
             @object-created="handleObjectCreated"
             @object-updated="handleObjectUpdated"
             @close="showEditModal = false"
@@ -95,7 +95,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, onUnmounted } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import axios from 'axios';
 import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
@@ -198,15 +198,15 @@ export default {
                 start: object.value.start,
                 end: object.value.end,
                 public: object.value.public,
-                class: {
-                    thing_id: object.value.class?.thing_id,
-                    link_id: object.value.class?.link_id,
-                    public: object.value.class?.public,
-                    link_start: object.value.class?.link_start,
-                    link_end: object.value.class?.link_end,
-                    link_start_variety: object.value.class?.link_start_variety,
-                    link_end_variety: object.value.class?.link_end_variety,
-                },
+                class: object.value.class ? {
+                    thing_id: object.value.class.thing_id,
+                    link_id:  object.value.class.link_id,
+                    public:   object.value.class.public ?? 1,
+                    link_start: object.value.class.link_start ?? null,
+                    link_end:   object.value.class.link_end ?? null,
+                    link_start_variety: object.value.class.link_start_variety ?? null,
+                    link_end_variety:   object.value.class.link_end_variety ?? null,
+                } : null,
                 type: object.value.type || 3,
             };
             modalParams.value = { classId: object.value.class?.thing_id, type: object.value.type || 3 };
@@ -266,10 +266,38 @@ export default {
 
         const handleObjectUpdated = (updatedObject) => {
             console.log('Object.vue - Object updated:', updatedObject);
-            object.value = updatedObject.data;
+            const payload = updatedObject.data;
+
+            object.value = {
+                ...object.value,
+                ...payload,
+                class: payload.class ? {
+                    ...payload.class,
+                    thing_id: payload.class.other_thing_id,
+                } : object.value.class,
+                links: payload.links ?? object.value.links ?? [],
+            };
+
             showEditModal.value = false;
             showTreeModal.value = false;
         };
+
+        // ------------------------------------------------
+        // Build an array of *link records* that EditObject expects
+        const linkRecords = computed(() => {
+            if (!Array.isArray(object.value.links)) return [];
+            return object.value.links.map(l => ({
+                link_id:            l.link_id,
+                link_type_id:       l.link_type_id,
+                other_thing_id:     l.thing_id,
+                description:        l.description || '',
+                public:             l.public ?? 0,
+                link_start:         l.link_start ?? null,
+                link_end:           l.link_end ?? null,
+                link_start_variety: l.link_start_variety ?? null,
+                link_end_variety:   l.link_end_variety ?? null,
+            }));
+        });
 
         // Listen for ClassTree events
         const handleOpenCreateModal = ({ title, params }) => {
@@ -306,6 +334,7 @@ export default {
             handleObjectCreated,
             handleObjectUpdated,
             t,
+            linkRecords,
         };
     },
 };
