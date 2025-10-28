@@ -26,7 +26,7 @@
                         </div>
                     </div>
                     <!-- class -->
-                    <div  class="row p-3">
+                    <div class="row p-3">
                         <div class="col-md-2">
                             <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
                                 <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
@@ -76,6 +76,7 @@
             v-if="showEditModal"
             :object="editObject"
             :params="modalParams"
+            :initialLinkedObjects="object.links"
             @object-created="handleObjectCreated"
             @object-updated="handleObjectUpdated"
             @close="showEditModal = false"
@@ -85,6 +86,7 @@
             v-if="showTreeModal"
             :object="null"
             :params="treeModalParams"
+            :initialLinkedObjects="[]"
             @object-created="handleObjectCreated"
             @object-updated="handleObjectUpdated"
             @close="showTreeModal = false"
@@ -196,7 +198,15 @@ export default {
                 start: object.value.start,
                 end: object.value.end,
                 public: object.value.public,
-                class_id: object.value.class?.thing_id,
+                class: {
+                    thing_id: object.value.class?.thing_id,
+                    link_id: object.value.class?.link_id,
+                    public: object.value.class?.public,
+                    link_start: object.value.class?.link_start,
+                    link_end: object.value.class?.link_end,
+                    link_start_variety: object.value.class?.link_start_variety,
+                    link_end_variety: object.value.class?.link_end_variety,
+                },
                 type: object.value.type || 3,
             };
             modalParams.value = { classId: object.value.class?.thing_id, type: object.value.type || 3 };

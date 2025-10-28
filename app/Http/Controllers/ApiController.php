@@ -45,11 +45,11 @@ class ApiController extends BaseController
             if ($request->parent_id) {
                 $model->setLink(UUID::PARENT, $request->parent_id, 'Child of');
             }
-            if ($request->class_id) {
-                $model->setClass($request->class_id);
+            if ($request->class) {
+                $model->setClass($request->class);
             }
-            foreach($request['link'] as $link) {
-                $model->setLink($link['link_type_id'], $link['linked_object_id'], $link['description']);
+            foreach($request['links'] as $link) {
+                $model->setLink($link);
             }
             return response()->json(
                 [

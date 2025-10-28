@@ -140,27 +140,25 @@ export default {
             class_id: props.params.classId || null,
             class_name: props.params.className || null,
             type: props.params.type || 3, // Default to 3 for objects, override for subclasses
-            link_id: null, // Store the link_id for an existing class link
+            link_id: props.object?.class?.link_id || null, // Store the link_id for an existing class link
         });
 
         const linkedObjects = ref([]);
 
         // Initialize linkedObjects and check for existing class link
         onMounted(() => {
-            linkedObjects.value = props.initialLinkedObjects.map((item) => ({
-                currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: item.linkedObjectUUID || '',
-                linkTypeUUID: item.linkTypeUUID || '',
-                comment: item.comment || '',
-                link_id: item.link_id || null, // Include link_id for existing links
-            }));
-            // Check if initialLinkedObjects contains a class link and store its link_id
-            const classLink = props.initialLinkedObjects.find(
-                (item) => item.linkedObjectUUID === formData.value.class_id
-            );
-            if (classLink && isEditMode.value) {
-                formData.value.link_id = classLink.link_id || null;
-            }
+            console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
+            console.log('EditObject.vue - Class link_id:', formData.value.link_id);
+            // Only initialize with non-class links to allow adding new links in edit mode
+            linkedObjects.value = props.initialLinkedObjects
+                .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
+                .map((item) => ({
+                    currentObjectUUID: formData.value.thing_id,
+                    linkedObjectUUID: item.other_thing_id || item.linkedObjectUUID || '',
+                    linkTypeUUID: item.link_type_id || item.linkTypeUUID || '',
+                    comment: item.description || item.comment || '',
+                    link_id: item.link_id || null, // Include link_id for existing links
+                }));
 
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
@@ -215,10 +213,40 @@ export default {
                 await axios.get('/sanctum/csrf-cookie');
                 let response;
 
-                // Filter out empty linked objects and prepare payload
-                const validLinkedObjects = linkedObjects.value.filter(
-                    (item) => item.linkedObjectUUID || item.linkTypeUUID || item.comment
-                );
+                // Prepare existing links from initialLinkedObjects, excluding class link
+                const existingLinks = props.initialLinkedObjects
+                    .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
+                    .map((item) => ({
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: item.link_type_id || item.linkTypeUUID,
+                        other_thing_id: item.other_thing_id || item.linkedObjectUUID,
+                        description: item.description || item.comment || '',
+                        link_id: item.link_id || undefined, // Include link_id if it exists
+                        public: item.public || 0, // Include public field
+                        link_start: item.link_start || null,
+                        link_end: item.link_end || null,
+                        link_start_variety: item.link_start_variety || null,
+                        link_end_variety: item.link_end_variety || null,
+                    }));
+
+                // Filter out empty new linked objects
+                const newLinkedObjects = linkedObjects.value
+                    .filter((item) => item.linkedObjectUUID) // Only include links with a valid linkedObjectUUID
+                    .map((item) => ({
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: item.linkTypeUUID,
+                        other_thing_id: item.linkedObjectUUID,
+                        description: item.comment || '',
+                        link_id: item.link_id || undefined, // Include link_id if it exists
+                        public: 0, // Default for new links
+                        link_start: null,
+                        link_end: null,
+                        link_start_variety: null,
+                        link_end_variety: null,
+                    }));
+
+                // Combine existing and new links
+                const validLinkedObjects = [...existingLinks, ...newLinkedObjects];
 
                 const payload = {
                     thing_id: formData.value.thing_id,
@@ -228,26 +256,23 @@ export default {
                     end_date: formData.value.end,
                     public: formData.value.public,
                     parent_id: formData.value.parent_id,
-                    class_id: formData.value.class_id,
                     type: formData.value.type,
-                    link: validLinkedObjects.map((item) => ({
-                        linked_object_id: item.linkedObjectUUID,
-                        link_type_id: item.linkTypeUUID,
-                        description: item.comment,
-                        link_id: item.link_id || undefined, // Include link_id if it exists
-                    })),
+                    class: formData.value.class_id ? {
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea', // Class link type UUID
+                        other_thing_id: formData.value.class_id,
+                        description: '',
+                        link_id: formData.value.link_id || undefined, // Explicitly include link_id
+                        public: props.object?.class?.public || 1, // Include public field from object.class
+                        link_start: props.object?.class?.link_start || null,
+                        link_end: props.object?.class?.link_end || null,
+                        link_start_variety: props.object?.class?.link_start_variety || null,
+                        link_end_variety: props.object?.class?.link_end_variety || null,
+                    } : null,
+                    links: validLinkedObjects,
                 };
 
-                // Include class link with link_id if it exists
-                if (formData.value.class_id) {
-                    const classLink = {
-                        linked_object_id: formData.value.class_id,
-                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea', // Use the class link type UUID from provided object
-                        description: '',
-                        link_id: formData.value.link_id || undefined, // Include link_id if it exists
-                    };
-                    payload.link.push(classLink);
-                }
+                console.log('EditObject.vue - Payload:', JSON.stringify(payload, null, 2));
 
                 if (isEditMode.value) {
                     console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);
