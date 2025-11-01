@@ -620,7 +620,7 @@ class Anything
                 ->where('link_id', $link['link_id'])
                 ->update([
                     'one_thing_id'   => $this->thing_id,
-                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'link_type_id'   => $link['link_type_id'],
                     'other_thing_id' => $link['other_thing_id'],
                     'translation'    => $link['translation'],
                 ]);

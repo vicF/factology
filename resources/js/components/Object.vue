@@ -106,12 +106,12 @@ import { eventBus } from '../eventBus';
 
 export default {
     name: "Object",
-    components: { ClassTree, EditObject },
+    components: {ClassTree, EditObject},
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
         const route = useRoute();
-        const { t } = useI18n();
+        const {t} = useI18n();
         const authStore = useAuthStore();
 
         const object = ref({});
@@ -168,7 +168,7 @@ export default {
                     console.log('Redirecting to login due to 401 for private object');
                     router.push({
                         path: '/login',
-                        query: { redirect: route.fullPath }
+                        query: {redirect: route.fullPath}
                     });
                 }
             } else {
@@ -185,7 +185,7 @@ export default {
         const openCreateModal = (type) => {
             console.log('Object.vue - Opening create modal for type:', type);
             editObject.value = null;
-            modalParams.value = { classId: object.value.class?.thing_id, type: type === 'Class' ? 2 : 3 };
+            modalParams.value = {classId: object.value.class?.thing_id, type: type === 'Class' ? 2 : 3};
             showEditModal.value = true;
         };
 
@@ -200,16 +200,16 @@ export default {
                 public: object.value.public,
                 class: object.value.class ? {
                     thing_id: object.value.class.thing_id,
-                    link_id:  object.value.class.link_id,
-                    public:   object.value.class.public ?? 1,
+                    link_id: object.value.class.link_id,
+                    public: object.value.class.public ?? 1,
                     link_start: object.value.class.link_start ?? null,
-                    link_end:   object.value.class.link_end ?? null,
+                    link_end: object.value.class.link_end ?? null,
                     link_start_variety: object.value.class.link_start_variety ?? null,
-                    link_end_variety:   object.value.class.link_end_variety ?? null,
+                    link_end_variety: object.value.class.link_end_variety ?? null,
                 } : null,
                 type: object.value.type || 3,
             };
-            modalParams.value = { classId: object.value.class?.thing_id, type: object.value.type || 3 };
+            modalParams.value = {classId: object.value.class?.thing_id, type: object.value.type || 3};
             showEditModal.value = true;
         };
 
@@ -261,7 +261,7 @@ export default {
             console.log('Object.vue - Object created:', newObject);
             showEditModal.value = false;
             showTreeModal.value = false;
-            router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
+            router.push({name: 'object', params: {uid: newObject.data.thing_id}});
         };
 
         const handleObjectUpdated = (updatedObject) => {
@@ -287,21 +287,21 @@ export default {
         const linkRecords = computed(() => {
             if (!Array.isArray(object.value.links)) return [];
             return object.value.links.map(l => ({
-                link_id:            l.link_id,
-                link_type_id:       l.link_type_id,
-                other_thing_id:     l.thing_id,
-                description:        l.description || '',
-                public:             l.public ?? 0,
-                link_start:         l.link_start ?? null,
-                link_end:           l.link_end ?? null,
+                link_id: l.link_id,
+                link_type_id: l.link_type_id,
+                other_thing_id: l.thing_id,
+                description: l.description || '',
+                public: l.public ?? 0,
+                link_start: l.link_start ?? null,
+                link_end: l.link_end ?? null,
                 link_start_variety: l.link_start_variety ?? null,
-                link_end_variety:   l.link_end_variety ?? null,
+                link_end_variety: l.link_end_variety ?? null,
             }));
         });
 
         // Listen for ClassTree events
-        const handleOpenCreateModal = ({ title, params }) => {
-            console.log('Object.vue - Received open-create-modal:', { title, params });
+        const handleOpenCreateModal = ({title, params}) => {
+            console.log('Object.vue - Received open-create-modal:', {title, params});
             treeModalParams.value = params;
             showTreeModal.value = true;
         };
