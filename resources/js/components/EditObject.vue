@@ -145,6 +145,7 @@ export default {
 
         const linkedObjects = ref([]);
         const initialLinkIds = new Set();
+        const originalLinks = new Map();
 
         // === MODAL ===
         const modalId = `editObjectModal-${formData.value.thing_id}`;
@@ -154,11 +155,19 @@ export default {
         onMounted(() => {
             console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
 
-            // Сохраняем ID существующих ссылок
+            // 1. Сохраняем оригинальные значения и ID
             props.initialLinkedObjects.forEach(item => {
-                if (item.link_id) initialLinkIds.add(item.link_id);
+                if (item.link_id) {
+                    initialLinkIds.add(item.link_id);
+                    originalLinks.set(item.link_id, {
+                        linkedObjectUUID: item.other_thing_id || '',
+                        linkTypeUUID: item.link_type_id || '',
+                        comment: item.description || '',
+                    });
+                }
             });
 
+            // 2. Инициализируем редактируемые ссылки
             linkedObjects.value = props.initialLinkedObjects
                 .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
                 .map((item) => ({
@@ -169,10 +178,12 @@ export default {
                     link_id: item.link_id || null,
                 }));
 
+            console.log('EditObject.vue - linkedObjects after init:', linkedObjects.value);
+
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
-                modalInstance.show(); // ВАЖНО: открываем модалку
+                modalInstance.show();
                 modalElement.addEventListener('hidden.bs.modal', () => {
                     console.log('EditObject.vue - Modal hidden → emit close');
                     emit('close');
@@ -187,7 +198,6 @@ export default {
             if (modalElement) {
                 modalElement.removeEventListener('hidden.bs.modal', () => {});
             }
-            // НЕ dispose() — Bootstrap сам почистит
         });
 
         // === LINKS ===
@@ -203,9 +213,14 @@ export default {
             console.log('EditObject.vue - Added new link:', newLink);
         };
 
+        // КРИТИЧНО: сохраняем link_id при обновлении
         const updateItem = ({ index, data }) => {
             console.log('EditObject.vue - Update link at index', index, data);
-            linkedObjects.value[index] = data;
+            linkedObjects.value[index] = {
+                ...linkedObjects.value[index],
+                ...data,
+            };
+            console.log('EditObject.vue - Updated linkedObjects[index]:', linkedObjects.value[index]);
         };
 
         const removeItem = (index) => {
@@ -222,25 +237,59 @@ export default {
             try {
                 await axios.get('/sanctum/csrf-cookie');
 
-                const linksToAdd = linkedObjects.value
-                    .filter(item => item.link_id === null && item.linkedObjectUUID && item.linkedObjectUUID.trim() !== '')
-                    .map(item => ({
-                        one_thing_id: formData.value.thing_id,
-                        link_type_id: item.linkTypeUUID,
-                        other_thing_id: item.linkedObjectUUID,
-                        description: item.comment || '',
-                        public: 0,
-                        link_start: null,
-                        link_end: null,
-                        link_start_variety: null,
-                        link_end_variety: null,
-                    }));
+                const linksToAdd = [];
+                const linksToUpdate = [];
+                const linksToDelete = [];
 
+                console.log('EditObject.vue - SUBMIT linkedObjects:', linkedObjects.value);
+
+                // 1. Новые ссылки
+                linkedObjects.value.forEach(item => {
+                    if (item.link_id === null && item.linkedObjectUUID?.trim()) {
+                        linksToAdd.push({
+                            one_thing_id: formData.value.thing_id,
+                            link_type_id: item.linkTypeUUID,
+                            other_thing_id: item.linkedObjectUUID,
+                            description: item.comment || '',
+                            public: 0,
+                            link_start: null,
+                            link_end: null,
+                            link_start_variety: null,
+                            link_end_variety: null,
+                        });
+                    }
+                });
+
+                // 2. Изменённые ссылки
+                linkedObjects.value.forEach(item => {
+                    if (item.link_id !== null) {
+                        const orig = originalLinks.get(item.link_id);
+                        if (!orig) return;
+
+                        const changed =
+                            item.linkedObjectUUID !== orig.linkedObjectUUID ||
+                            item.linkTypeUUID !== orig.linkTypeUUID ||
+                            item.comment !== orig.comment;
+
+                        if (changed) {
+                            linksToUpdate.push({
+                                link_id: item.link_id,
+                                link_type_id: item.linkTypeUUID,
+                                other_thing_id: item.linkedObjectUUID,
+                                description: item.comment || '',
+                            });
+                            console.log('EditObject.vue - Link to UPDATE:', { link_id: item.link_id, changed });
+                        }
+                    }
+                });
+
+                // 3. Удалённые ссылки
                 const currentLinkIds = new Set(linkedObjects.value.map(i => i.link_id).filter(Boolean));
-                const linksToDelete = Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id));
+                linksToDelete.push(...Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id)));
 
-                const originalClassId = props.object?.class?.thing_id;
-                const classChanged = formData.value.class_id !== originalClassId;
+                console.log('EditObject.vue - Links to ADD:', linksToAdd.length);
+                console.log('EditObject.vue - Links to UPDATE:', linksToUpdate.length);
+                console.log('EditObject.vue - Links to DELETE:', linksToDelete.length);
 
                 const payload = {
                     thing_id: formData.value.thing_id,
@@ -252,6 +301,9 @@ export default {
                     parent_id: formData.value.parent_id,
                     type: formData.value.type,
                 };
+
+                const originalClassId = props.object?.class?.thing_id;
+                const classChanged = formData.value.class_id !== originalClassId;
 
                 if (classChanged && formData.value.class_id) {
                     payload.class = {
@@ -268,13 +320,9 @@ export default {
                     };
                 }
 
-                if (linksToAdd.length > 0) {
-                    payload.links_to_add = linksToAdd;
-                }
-
-                if (linksToDelete.length > 0) {
-                    payload.links_to_delete = linksToDelete;
-                }
+                if (linksToAdd.length > 0) payload.links_to_add = linksToAdd;
+                if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
+                if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
 
                 console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
@@ -288,8 +336,6 @@ export default {
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
                 }
-
-                // НЕ закрываем вручную — Bootstrap сам сделает hide() → hidden.bs.modal → emit('close')
             } catch (error) {
                 console.error('EditObject.vue - Submit error:', error.response?.data || error);
                 alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
@@ -308,7 +354,7 @@ export default {
             removeItem,
             t,
         };
-    },
+    }
 };
 </script>
 
