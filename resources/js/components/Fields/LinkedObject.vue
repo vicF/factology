@@ -40,18 +40,18 @@
 </template>
 
 <script setup>
-import {ref, computed, watch} from 'vue';
-
-import {useObjectCacheStore} from '@/stores/objectCache.js'; //
+import { ref, computed, watch } from 'vue';
+import { useObjectCacheStore } from '@/stores/objectCache.js';
 
 // Props
 const props = defineProps({
-    currentObjectUUID: {type: String, required: true},
-    currentObjectName: {type: String, required: false},
-    linkedObjectUUID: {type: String, default: ''},
-    linkTypeUUID: {type: String, default: ''},
-    comment: {type: String, default: ''},
-    index: {type: Number, required: true},
+    currentObjectUUID: { type: String, required: true },
+    currentObjectName: { type: String, required: false },
+    linkedObjectUUID: { type: String, default: '' },
+    linkTypeUUID: { type: String, default: '' },
+    comment: { type: String, default: '' },
+    link_id: { type: [String, Number, null], default: null }, // Добавлено
+    index: { type: Number, required: true },
 });
 
 // Emits
@@ -100,7 +100,7 @@ watch(
         localCurrentObjectUUID.value = newVal;
         fetchObjectName(newVal);
     },
-    {immediate: true}
+    { immediate: true }
 );
 
 watch(
@@ -109,53 +109,63 @@ watch(
         localLinkTypeUUID.value = newVal;
         fetchObjectName(newVal);
     },
-    {immediate: true} // Added to fetch linkTypeUUID on mount
+    { immediate: true }
 );
 
+// === ЭМИТ UPDATE ПРИ ЛЮБОМ ИЗМЕНЕНИИ ===
+const emitUpdate = () => {
+    console.log('LinkedObject.vue - Emitting update:', {
+        index: props.index,
+        data: {
+            currentObjectUUID: localCurrentObjectUUID.value,
+            linkedObjectUUID: localLinkedObjectUUID.value,
+            linkTypeUUID: localLinkTypeUUID.value,
+            comment: localComment.value,
+            link_id: props.link_id, // ВАЖНО: передаём link_id
+        },
+    });
+
+    emit('update', {
+        index: props.index,
+        data: {
+            currentObjectUUID: localCurrentObjectUUID.value,
+            linkedObjectUUID: localLinkedObjectUUID.value,
+            linkTypeUUID: localLinkTypeUUID.value,
+            comment: localComment.value,
+            link_id: props.link_id,
+        },
+    });
+};
+
+// Watch all local fields and emit update
 watch(
     () => localLinkedObjectUUID.value,
-    (newVal) => {
-        fetchObjectName(newVal);
-        emit('update', {
-            index: props.index,
-            data: {
-                currentObjectUUID: localCurrentObjectUUID.value,
-                linkedObjectUUID: newVal,
-                linkTypeUUID: localLinkTypeUUID.value,
-                comment: localComment.value,
-            },
-        });
+    () => {
+        fetchObjectName(localLinkedObjectUUID.value);
+        emitUpdate();
     }
 );
 
 watch(
     () => localLinkTypeUUID.value,
-    (newVal) => {
-        fetchObjectName(newVal);
-        emit('update', {
-            index: props.index,
-            data: {
-                currentObjectUUID: localCurrentObjectUUID.value,
-                linkedObjectUUID: localLinkedObjectUUID.value,
-                linkTypeUUID: newVal,
-                comment: localComment.value,
-            },
-        });
+    () => {
+        fetchObjectName(localLinkTypeUUID.value);
+        emitUpdate();
     }
 );
 
 watch(
     () => localComment.value,
-    (newVal) => {
-        emit('update', {
-            index: props.index,
-            data: {
-                currentObjectUUID: localCurrentObjectUUID.value,
-                linkedObjectUUID: localLinkedObjectUUID.value,
-                linkTypeUUID: localLinkTypeUUID.value,
-                comment: newVal,
-            },
-        });
+    () => {
+        emitUpdate();
+    }
+);
+
+// Также эмитим при изменении link_id (если он меняется извне)
+watch(
+    () => props.link_id,
+    () => {
+        emitUpdate();
     }
 );
 

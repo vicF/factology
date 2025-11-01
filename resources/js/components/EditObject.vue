@@ -144,10 +144,16 @@ export default {
         });
 
         const linkedObjects = ref([]);
+        const initialLinkIds = new Set();
 
         onMounted(() => {
             console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
             console.log('EditObject.vue - Class link_id:', formData.value.link_id);
+
+            // Сохраняем ID существующих ссылок
+            props.initialLinkedObjects.forEach(item => {
+                if (item.link_id) initialLinkIds.add(item.link_id);
+            });
 
             linkedObjects.value = props.initialLinkedObjects
                 .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
@@ -184,21 +190,29 @@ export default {
         });
 
         const addNewLinkedObject = () => {
-            linkedObjects.value.push({
+            const newLink = {
                 currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: '',
+                linkedObjectUUID: '', // Будет заполнено в LinkedObject
                 linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
                 link_id: null,
-            });
+            };
+            linkedObjects.value.push(newLink);
+            console.log('EditObject.vue - Added new link:', newLink);
         };
 
         const updateItem = ({ index, data }) => {
+            console.log('EditObject.vue - Update link at index', index, data);
             linkedObjects.value[index] = data;
         };
 
         const removeItem = (index) => {
+            const removed = linkedObjects.value[index];
+            if (removed.link_id) {
+                initialLinkIds.delete(removed.link_id);
+            }
             linkedObjects.value.splice(index, 1);
+            console.log('EditObject.vue - Removed link:', removed);
         };
 
         const closeModal = () => {
@@ -208,86 +222,83 @@ export default {
         const submitForm = async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                let response;
 
-                const existingLinks = props.initialLinkedObjects
-                    .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
-                    .map((item) => ({
-                        one_thing_id: formData.value.thing_id,
-                        link_type_id: item.link_type_id,
-                        other_thing_id: item.other_thing_id,
-                        description: item.description || '',
-                        link_id: item.link_id || undefined,
-                        public: item.public || 0,
-                        link_start: item.link_start || null,
-                        link_end: item.link_end || null,
-                        link_start_variety: item.link_start_variety || null,
-                        link_end_variety: item.link_end_variety || null,
-                    }));
+                // === 1. Новые ссылки: link_id === null И linkedObjectUUID заполнен ===
+                const linksToAdd = linkedObjects.value
+                    .filter(item => item.link_id === null && item.linkedObjectUUID && item.linkedObjectUUID.trim() !== '')
+                    .map(item => {
+                        console.log('EditObject.vue - Adding link:', item);
+                        return {
+                            one_thing_id: formData.value.thing_id,
+                            link_type_id: item.linkTypeUUID,
+                            other_thing_id: item.linkedObjectUUID,
+                            description: item.comment || '',
+                            public: 0,
+                            link_start: null,
+                            link_end: null,
+                            link_start_variety: null,
+                            link_end_variety: null,
+                        };
+                    });
 
-                const newLinkedObjects = linkedObjects.value
-                    .filter((item) => item.linkedObjectUUID)
-                    .map((item) => ({
-                        one_thing_id: formData.value.thing_id,
-                        link_type_id: item.linkTypeUUID,
-                        other_thing_id: item.linkedObjectUUID,
-                        description: item.comment || '',
-                        link_id: item.link_id || undefined,
-                        public: 0,
-                        link_start: null,
-                        link_end: null,
-                        link_start_variety: null,
-                        link_end_variety: null,
-                    }));
+                // === 2. Удалённые ссылки ===
+                const currentLinkIds = new Set(linkedObjects.value.map(i => i.link_id).filter(Boolean));
+                const linksToDelete = Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id));
 
-                const validLinkedObjects = [...existingLinks, ...newLinkedObjects];
+                // === 3. Класс: только если изменён ===
+                const originalClassId = props.object?.class?.thing_id;
+                const classChanged = formData.value.class_id !== originalClassId;
 
                 const payload = {
                     thing_id: formData.value.thing_id,
                     name: formData.value.name,
                     description: formData.value.description,
-                    start_date: formData.value.start,
-                    end_date: formData.value.end,
+                    start_date: formData.value.start || null,
+                    end_date: formData.value.end || null,
                     public: formData.value.public,
                     parent_id: formData.value.parent_id,
                     type: formData.value.type,
-                    class: formData.value.class_id ? {
+                };
+
+                if (classChanged && formData.value.class_id) {
+                    payload.class = {
                         one_thing_id: formData.value.thing_id,
                         link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
                         other_thing_id: formData.value.class_id,
                         description: '',
                         link_id: formData.value.link_id || undefined,
-                        public: props.object?.class?.public || 1,
-                        link_start: props.object?.class?.link_start || null,
-                        link_end: props.object?.class?.link_end || null,
-                        link_start_variety: props.object?.class?.link_start_variety || null,
-                        link_end_variety: props.object?.class?.link_end_variety || null,
-                    } : null,
-                    links: validLinkedObjects,
-                };
+                        public: 1,
+                        link_start: null,
+                        link_end: null,
+                        link_start_variety: null,
+                        link_end_variety: null,
+                    };
+                }
 
-                console.log('EditObject.vue - Payload:', JSON.stringify(payload, null, 2));
+                if (linksToAdd.length > 0) {
+                    payload.links_to_add = linksToAdd;
+                }
+
+                if (linksToDelete.length > 0) {
+                    payload.links_to_delete = linksToDelete;
+                }
+
+                console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
                 if (isEditMode.value) {
-                    console.log('EditObject.vue - Sending PUT to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);
-                    response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    const response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object updated:', response.data);
                     emit('object-updated', response.data);
                 } else {
-                    console.log('EditObject.vue - Sending POST to /api/v1/object/' + formData.value.thing_id + ' with body:', payload);
-                    response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    const response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
                 }
 
                 closeModal();
             } catch (error) {
-                console.error('EditObject.vue - Submit error:', {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                    message: error.message,
-                });
-                alert(t('Failed') + ': ' + (error.response?.data?.message || error.response?.data?.error || error.message));
+                console.error('EditObject.vue - Submit error:', error.response?.data || error);
+                alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
             }
         };
 

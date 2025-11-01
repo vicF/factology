@@ -604,7 +604,7 @@ class Anything
 
     }
 
-    public function setLink($link): bool
+    protected function setLinkTranslation(&$link)
     {
         if (empty($link['translation'])) {
             try {
@@ -612,26 +612,51 @@ class Anything
             } catch (\ErrorException $e) {
                 throw new \RuntimeException("Unable to get name for object {$link['other_thing_id']}", 500, $e);
             }
-            $link['translation'] = "{$this->name} is related to $linkedObjectName";
+            switch ($link['link_type_id']) {
+                case UUID::LINK_TO_CLASS:
+                    $link['translation'] = "{$this->name} is of class $linkedObjectName";
+                    break;
+                default:
+                    $link['translation'] = "{$this->name} is related to $linkedObjectName";
+            }
+
         }
+    }
+
+    public function setLink($link): bool
+    {
+        $this->setLinkTranslation($link);
         if ($link['link_id']) {
             // update
-            return DB::table('links')
-                ->where('link_id', $link['link_id'])
-                ->update([
-                    'one_thing_id'   => $this->thing_id,
-                    'link_type_id'   => $link['link_type_id'],
-                    'other_thing_id' => $link['other_thing_id'],
-                    'translation'    => $link['translation'],
-                ]);
+            return $this->updateLink($link);
+
         } else {
-            return DB::table('links')->insert([
-                'one_thing_id'   => $this->id,
-                'link_type_id'   => UUID::LINK_TO_CLASS,
+            return $this->addLink($link);
+        }
+    }
+
+    public function updateLink($link): int
+    {
+        $this->setLinkTranslation($link);
+        return DB::table('links')
+            ->where('link_id', $link['link_id'])
+            ->update([
+                'one_thing_id'   => $this->thing_id,
+                'link_type_id'   => $link['link_type_id'],
                 'other_thing_id' => $link['other_thing_id'],
                 'translation'    => $link['translation'],
             ]);
-        }
+    }
+
+    public function addLink($link): bool
+    {
+        $this->setLinkTranslation($link);
+        return DB::table('links')->insert([
+            'one_thing_id'   => $this->thing_id,
+            'link_type_id'   => $link['link_type_id'],
+            'other_thing_id' => $link['other_thing_id'],
+            'translation'    => $link['translation'],
+        ]);
     }
 
     public function setAsChildOf($parentClass): bool

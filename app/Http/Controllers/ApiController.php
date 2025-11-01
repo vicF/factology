@@ -48,8 +48,20 @@ class ApiController extends BaseController
             if ($request->class) {
                 $model->setClass($request->class);
             }
-            foreach($request['links'] as $link) {
-                $model->setLink($link);
+            if (!empty($request['links'])) {
+                foreach ($request['links'] as $link) {
+                    $model->setLink($link);
+                }
+            }
+            if (!empty($request['links_to_add'])) {
+                foreach ($request['links_to_add'] as $link) {
+                    $model->addLink($link);
+                }
+            }
+            if (!empty($request['links_to_update'])) {
+                foreach ($request['links_to_update'] as $link) {
+                    $model->updateLink($link);
+                }
             }
             return response()->json(
                 [
