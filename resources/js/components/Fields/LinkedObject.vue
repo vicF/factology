@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 
 // Props
@@ -50,7 +50,7 @@ const props = defineProps({
     linkedObjectUUID: { type: String, default: '' },
     linkTypeUUID: { type: String, default: '' },
     comment: { type: String, default: '' },
-    link_id: { type: [String, Number, null], default: null }, // Добавлено
+    link_id: { type: [String, Number, null], default: null },
     index: { type: Number, required: true },
 });
 
@@ -73,44 +73,25 @@ const currentObjectName = computed(() => {
 });
 
 const linkedObjectName = computed(() => {
-    const obj = store.cache.get(props.linkedObjectUUID);
-    return obj?.data?.name || 'Not set';
+    const obj = store.cache.get(localLinkedObjectUUID.value);
+    return obj?.data?.name || props.linkedObjectName || 'Not set';
 });
 
 const linkTypeName = computed(() => {
-    const obj = store.cache.get(props.linkTypeUUID);
+    const obj = store.cache.get(localLinkTypeUUID.value);
     return obj?.data?.name || 'Not set';
 });
 
-// Fetch names for UUIDs when they change
+// Fetch names for UUIDs
 async function fetchObjectName(uuid) {
-    if (uuid) {
-        try {
-            await store.getObject(uuid);
-        } catch (error) {
-            console.error(`Failed to fetch object for UUID ${uuid}:`, error);
-        }
+    if (!uuid || uuid.trim() === '') return;
+    try {
+        await store.getObject(uuid);
+        console.log(`Fetched name for ${uuid}`);
+    } catch (error) {
+        console.error(`Failed to fetch object for UUID ${uuid}:`, error);
     }
 }
-
-// Watch for UUID changes and fetch names
-watch(
-    () => props.currentObjectUUID,
-    (newVal) => {
-        localCurrentObjectUUID.value = newVal;
-        fetchObjectName(newVal);
-    },
-    { immediate: true }
-);
-
-watch(
-    () => props.linkTypeUUID,
-    (newVal) => {
-        localLinkTypeUUID.value = newVal;
-        fetchObjectName(newVal);
-    },
-    { immediate: true }
-);
 
 // === ЭМИТ UPDATE ПРИ ЛЮБОМ ИЗМЕНЕНИИ ===
 const emitUpdate = () => {
@@ -121,7 +102,7 @@ const emitUpdate = () => {
             linkedObjectUUID: localLinkedObjectUUID.value,
             linkTypeUUID: localLinkTypeUUID.value,
             comment: localComment.value,
-            link_id: props.link_id, // ВАЖНО: передаём link_id
+            link_id: props.link_id,
         },
     });
 
@@ -137,19 +118,46 @@ const emitUpdate = () => {
     });
 };
 
-// Watch all local fields and emit update
+// === WATCHERS ===
+watch(
+    () => props.currentObjectUUID,
+    (newVal) => {
+        localCurrentObjectUUID.value = newVal;
+        fetchObjectName(newVal);
+    },
+    {immediate: true}
+);
+
+watch(
+    () => props.linkTypeUUID,
+    (newVal) => {
+        localLinkTypeUUID.value = newVal;
+        fetchObjectName(newVal);
+    },
+    {immediate: true}
+);
+
+watch(
+    () => props.linkedObjectUUID,
+    (newVal) => {
+        localLinkedObjectUUID.value = newVal;
+        fetchObjectName(newVal);
+    },
+    {immediate: true}
+);
+
 watch(
     () => localLinkedObjectUUID.value,
-    () => {
-        fetchObjectName(localLinkedObjectUUID.value);
+    (newVal) => {
+        fetchObjectName(newVal);
         emitUpdate();
     }
 );
 
 watch(
     () => localLinkTypeUUID.value,
-    () => {
-        fetchObjectName(localLinkTypeUUID.value);
+    (newVal) => {
+        fetchObjectName(newVal);
         emitUpdate();
     }
 );
@@ -161,13 +169,19 @@ watch(
     }
 );
 
-// Также эмитим при изменении link_id (если он меняется извне)
 watch(
     () => props.link_id,
     () => {
         emitUpdate();
     }
 );
+
+// === ON MOUNTED: Загружаем имена при открытии ===
+onMounted(() => {
+    fetchObjectName(localLinkedObjectUUID.value);
+    fetchObjectName(localLinkTypeUUID.value);
+    fetchObjectName(props.currentObjectUUID);
+});
 
 // Methods
 function removeSelf() {
