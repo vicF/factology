@@ -4,7 +4,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" :id="modalLabelId">{{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @click="closeModal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
@@ -86,7 +86,7 @@
                             />
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="closeModal">{{ $t('Close') }}</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ $t('Close') }}</button>
                             <button type="submit" class="btn btn-primary">{{ isEditMode ? $t('Update') : $t('Save') }}</button>
                         </div>
                     </form>
@@ -146,9 +146,13 @@ export default {
         const linkedObjects = ref([]);
         const initialLinkIds = new Set();
 
+        // === MODAL ===
+        const modalId = `editObjectModal-${formData.value.thing_id}`;
+        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
+        let modalInstance = null;
+
         onMounted(() => {
             console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
-            console.log('EditObject.vue - Class link_id:', formData.value.link_id);
 
             // Сохраняем ID существующих ссылок
             props.initialLinkedObjects.forEach(item => {
@@ -168,31 +172,29 @@ export default {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
-                modalInstance.show();
-                modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
+                modalInstance.show(); // ВАЖНО: открываем модалку
+                modalElement.addEventListener('hidden.bs.modal', () => {
+                    console.log('EditObject.vue - Modal hidden → emit close');
+                    emit('close');
+                });
             } else {
                 console.error('EditObject.vue - Modal element not found:', modalId);
             }
         });
-
-        const modalId = `editObjectModal-${formData.value.thing_id}`;
-        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
-        let modalInstance = null;
 
         onUnmounted(() => {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalElement.removeEventListener('hidden.bs.modal', () => {});
             }
-            if (modalInstance) {
-                modalInstance.dispose();
-            }
+            // НЕ dispose() — Bootstrap сам почистит
         });
 
+        // === LINKS ===
         const addNewLinkedObject = () => {
             const newLink = {
                 currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: '', // Будет заполнено в LinkedObject
+                linkedObjectUUID: '',
                 linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
                 link_id: null,
@@ -215,37 +217,28 @@ export default {
             console.log('EditObject.vue - Removed link:', removed);
         };
 
-        const closeModal = () => {
-            if (modalInstance) modalInstance.hide();
-        };
-
+        // === SUBMIT ===
         const submitForm = async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
 
-                // === 1. Новые ссылки: link_id === null И linkedObjectUUID заполнен ===
                 const linksToAdd = linkedObjects.value
                     .filter(item => item.link_id === null && item.linkedObjectUUID && item.linkedObjectUUID.trim() !== '')
-                    .map(item => {
-                        console.log('EditObject.vue - Adding link:', item);
-                        return {
-                            one_thing_id: formData.value.thing_id,
-                            link_type_id: item.linkTypeUUID,
-                            other_thing_id: item.linkedObjectUUID,
-                            description: item.comment || '',
-                            public: 0,
-                            link_start: null,
-                            link_end: null,
-                            link_start_variety: null,
-                            link_end_variety: null,
-                        };
-                    });
+                    .map(item => ({
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: item.linkTypeUUID,
+                        other_thing_id: item.linkedObjectUUID,
+                        description: item.comment || '',
+                        public: 0,
+                        link_start: null,
+                        link_end: null,
+                        link_start_variety: null,
+                        link_end_variety: null,
+                    }));
 
-                // === 2. Удалённые ссылки ===
                 const currentLinkIds = new Set(linkedObjects.value.map(i => i.link_id).filter(Boolean));
                 const linksToDelete = Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id));
 
-                // === 3. Класс: только если изменён ===
                 const originalClassId = props.object?.class?.thing_id;
                 const classChanged = formData.value.class_id !== originalClassId;
 
@@ -285,17 +278,18 @@ export default {
 
                 console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
+                let response;
                 if (isEditMode.value) {
-                    const response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object updated:', response.data);
                     emit('object-updated', response.data);
                 } else {
-                    const response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
                 }
 
-                closeModal();
+                // НЕ закрываем вручную — Bootstrap сам сделает hide() → hidden.bs.modal → emit('close')
             } catch (error) {
                 console.error('EditObject.vue - Submit error:', error.response?.data || error);
                 alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
@@ -307,7 +301,6 @@ export default {
             linkedObjects,
             modalId,
             modalLabelId,
-            closeModal,
             submitForm,
             isEditMode,
             addNewLinkedObject,
