@@ -4,7 +4,7 @@
             <label>UUID текущего объекта:</label>
             <input
                 type="text"
-                v-model="localCurrentObjectUUID"
+                v-model="localCurrentObjectUuid"
                 readonly
                 class="form-control"
             />{{ currentObjectName }}
@@ -13,7 +13,7 @@
             <label>UUID связанного объекта</label>
             <input
                 type="text"
-                v-model="localLinkedObjectUUID"
+                v-model="localLinkedObjectUuid"
                 class="form-control"
                 placeholder="Введите UUID связанного объекта"
             />{{ linkedObjectName }}
@@ -22,7 +22,7 @@
             <label>UUID типа связи</label>
             <input
                 type="text"
-                v-model="localLinkTypeUUID"
+                v-model="localLinkTypeUuid"
                 class="form-control"
                 placeholder="Введите UUID типа связи"
             />{{ linkTypeName }}
@@ -43,14 +43,14 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 
-// Props
+// Props — camelCase
 const props = defineProps({
-    currentObjectUUID: { type: String, required: true },
+    currentObjectUuid: { type: String, required: true },
     currentObjectName: { type: String, required: false },
-    linkedObjectUUID: { type: String, default: '' },
-    linkTypeUUID: { type: String, default: '' },
+    linkedObjectUuid: { type: String, default: '' },
+    linkTypeUuid: { type: String, default: '' },
     comment: { type: String, default: '' },
-    link_id: { type: [String, Number, null], default: null },
+    linkId: { type: [String, Number, null], default: null },
     index: { type: Number, required: true },
 });
 
@@ -58,9 +58,9 @@ const props = defineProps({
 const emit = defineEmits(['update', 'remove']);
 
 // Local reactive state
-const localCurrentObjectUUID = ref(props.currentObjectUUID);
-const localLinkedObjectUUID = ref(props.linkedObjectUUID);
-const localLinkTypeUUID = ref(props.linkTypeUUID);
+const localCurrentObjectUuid = ref(props.currentObjectUuid);
+const localLinkedObjectUuid = ref(props.linkedObjectUuid);
+const localLinkTypeUuid = ref(props.linkTypeUuid);
 const localComment = ref(props.comment);
 
 // Pinia store
@@ -68,17 +68,17 @@ const store = useObjectCacheStore();
 
 // Computed properties for object names
 const currentObjectName = computed(() => {
-    const obj = store.cache.get(props.currentObjectUUID);
+    const obj = store.cache.get(props.currentObjectUuid);
     return obj?.name || props.currentObjectName || 'Loading...';
 });
 
 const linkedObjectName = computed(() => {
-    const obj = store.cache.get(localLinkedObjectUUID.value);
+    const obj = store.cache.get(localLinkedObjectUuid.value);
     return obj?.data?.name || props.linkedObjectName || 'Not set';
 });
 
 const linkTypeName = computed(() => {
-    const obj = store.cache.get(localLinkTypeUUID.value);
+    const obj = store.cache.get(localLinkTypeUuid.value);
     return obj?.data?.name || 'Not set';
 });
 
@@ -98,56 +98,56 @@ const emitUpdate = () => {
     console.log('LinkedObject.vue - Emitting update:', {
         index: props.index,
         data: {
-            currentObjectUUID: localCurrentObjectUUID.value,
-            linkedObjectUUID: localLinkedObjectUUID.value,
-            linkTypeUUID: localLinkTypeUUID.value,
+            currentObjectUuid: localCurrentObjectUuid.value,
+            linkedObjectUuid: localLinkedObjectUuid.value,
+            linkTypeUuid: localLinkTypeUuid.value,
             comment: localComment.value,
-            link_id: props.link_id,
+            linkId: props.linkId,
         },
     });
 
     emit('update', {
         index: props.index,
         data: {
-            currentObjectUUID: localCurrentObjectUUID.value,
-            linkedObjectUUID: localLinkedObjectUUID.value,
-            linkTypeUUID: localLinkTypeUUID.value,
+            currentObjectUuid: localCurrentObjectUuid.value,
+            linkedObjectUuid: localLinkedObjectUuid.value,
+            linkTypeUuid: localLinkTypeUuid.value,
             comment: localComment.value,
-            link_id: props.link_id,
+            linkId: props.linkId,
         },
     });
 };
 
 // === WATCHERS ===
 watch(
-    () => props.currentObjectUUID,
+    () => props.currentObjectUuid,
     (newVal) => {
-        localCurrentObjectUUID.value = newVal;
+        localCurrentObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
     {immediate: true}
 );
 
 watch(
-    () => props.linkTypeUUID,
+    () => props.linkTypeUuid,
     (newVal) => {
-        localLinkTypeUUID.value = newVal;
+        localLinkTypeUuid.value = newVal;
         fetchObjectName(newVal);
     },
     {immediate: true}
 );
 
 watch(
-    () => props.linkedObjectUUID,
+    () => props.linkedObjectUuid,
     (newVal) => {
-        localLinkedObjectUUID.value = newVal;
+        localLinkedObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
     {immediate: true}
 );
 
 watch(
-    () => localLinkedObjectUUID.value,
+    () => localLinkedObjectUuid.value,
     (newVal) => {
         fetchObjectName(newVal);
         emitUpdate();
@@ -155,7 +155,7 @@ watch(
 );
 
 watch(
-    () => localLinkTypeUUID.value,
+    () => localLinkTypeUuid.value,
     (newVal) => {
         fetchObjectName(newVal);
         emitUpdate();
@@ -170,7 +170,7 @@ watch(
 );
 
 watch(
-    () => props.link_id,
+    () => props.linkId,
     () => {
         emitUpdate();
     }
@@ -178,9 +178,9 @@ watch(
 
 // === ON MOUNTED: Загружаем имена при открытии ===
 onMounted(() => {
-    fetchObjectName(localLinkedObjectUUID.value);
-    fetchObjectName(localLinkTypeUUID.value);
-    fetchObjectName(props.currentObjectUUID);
+    fetchObjectName(localLinkedObjectUuid.value);
+    fetchObjectName(localLinkTypeUuid.value);
+    fetchObjectName(props.currentObjectUuid);
 });
 
 // Methods

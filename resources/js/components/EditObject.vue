@@ -76,10 +76,10 @@
                             <LinkedObject
                                 :current-object-u-u-i-d="formData.thing_id"
                                 :current-object-name="formData.name"
-                                :linked-object-u-u-i-d="item.linkedObjectUUID"
-                                :link-type-u-u-i-d="item.linkTypeUUID"
+                                :linked-object-u-u-i-d="item.linkedObjectUuid"
+                                :link-type-u-u-i-d="item.linkTypeUuid"
                                 :comment="item.comment"
-                                :link-id="item.link_id"
+                                :link-id="item.linkId"
                                 :index="index"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -160,8 +160,8 @@ export default {
                 if (item.link_id) {
                     initialLinkIds.add(item.link_id);
                     originalLinks.set(item.link_id, {
-                        linkedObjectUUID: item.other_thing_id || '',
-                        linkTypeUUID: item.link_type_id || '',
+                        linkedObjectUuid: item.other_thing_id || '',
+                        linkTypeUuid: item.link_type_id || '',
                         comment: item.description || '',
                     });
                 }
@@ -171,11 +171,11 @@ export default {
             linkedObjects.value = props.initialLinkedObjects
                 .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
                 .map((item) => ({
-                    currentObjectUUID: formData.value.thing_id,
-                    linkedObjectUUID: item.other_thing_id || '',
-                    linkTypeUUID: item.link_type_id || '',
+                    currentObjectUuid: formData.value.thing_id,
+                    linkedObjectUuid: item.other_thing_id || '',
+                    linkTypeUuid: item.link_type_id || '',
                     comment: item.description || '',
-                    link_id: item.link_id || null,
+                    linkId: item.link_id || null,
                 }));
 
             console.log('EditObject.vue - linkedObjects after init:', linkedObjects.value);
@@ -203,17 +203,16 @@ export default {
         // === LINKS ===
         const addNewLinkedObject = () => {
             const newLink = {
-                currentObjectUUID: formData.value.thing_id,
-                linkedObjectUUID: '',
-                linkTypeUUID: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+                currentObjectUuid: formData.value.thing_id,
+                linkedObjectUuid: '',
+                linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
-                link_id: null,
+                linkId: null,
             };
             linkedObjects.value.push(newLink);
             console.log('EditObject.vue - Added new link:', newLink);
         };
 
-        // КРИТИЧНО: сохраняем link_id при обновлении
         const updateItem = ({ index, data }) => {
             console.log('EditObject.vue - Update link at index', index, data);
             linkedObjects.value[index] = {
@@ -225,8 +224,8 @@ export default {
 
         const removeItem = (index) => {
             const removed = linkedObjects.value[index];
-            if (removed.link_id) {
-                initialLinkIds.delete(removed.link_id);
+            if (removed.linkId) {
+                initialLinkIds.delete(removed.linkId);
             }
             linkedObjects.value.splice(index, 1);
             console.log('EditObject.vue - Removed link:', removed);
@@ -245,11 +244,11 @@ export default {
 
                 // 1. Новые ссылки
                 linkedObjects.value.forEach(item => {
-                    if (item.link_id === null && item.linkedObjectUUID?.trim()) {
+                    if (item.linkId === null && item.linkedObjectUuid?.trim()) {
                         linksToAdd.push({
                             one_thing_id: formData.value.thing_id,
-                            link_type_id: item.linkTypeUUID,
-                            other_thing_id: item.linkedObjectUUID,
+                            link_type_id: item.linkTypeUuid,
+                            other_thing_id: item.linkedObjectUuid,
                             description: item.comment || '',
                             public: 0,
                             link_start: null,
@@ -262,29 +261,29 @@ export default {
 
                 // 2. Изменённые ссылки
                 linkedObjects.value.forEach(item => {
-                    if (item.link_id !== null) {
-                        const orig = originalLinks.get(item.link_id);
+                    if (item.linkId !== null) {
+                        const orig = originalLinks.get(item.linkId);
                         if (!orig) return;
 
                         const changed =
-                            item.linkedObjectUUID !== orig.linkedObjectUUID ||
-                            item.linkTypeUUID !== orig.linkTypeUUID ||
+                            item.linkedObjectUuid !== orig.linkedObjectUuid ||
+                            item.linkTypeUuid !== orig.linkTypeUuid ||
                             item.comment !== orig.comment;
 
                         if (changed) {
                             linksToUpdate.push({
-                                link_id: item.link_id,
-                                link_type_id: item.linkTypeUUID,
-                                other_thing_id: item.linkedObjectUUID,
+                                link_id: item.linkId,
+                                link_type_id: item.linkTypeUuid,
+                                other_thing_id: item.linkedObjectUuid,
                                 description: item.comment || '',
                             });
-                            console.log('EditObject.vue - Link to UPDATE:', { link_id: item.link_id, changed });
+                            console.log('EditObject.vue - Link to UPDATE:', { link_id: item.linkId, changed });
                         }
                     }
                 });
 
                 // 3. Удалённые ссылки
-                const currentLinkIds = new Set(linkedObjects.value.map(i => i.link_id).filter(Boolean));
+                const currentLinkIds = new Set(linkedObjects.value.map(i => i.linkId).filter(Boolean));
                 linksToDelete.push(...Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id)));
 
                 console.log('EditObject.vue - Links to ADD:', linksToAdd.length);
