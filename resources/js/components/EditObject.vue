@@ -74,10 +74,10 @@
                         </button>
                         <div v-for="(item, index) in linkedObjects" :key="index">
                             <LinkedObject
-                                :current-object-u-u-i-d="formData.thing_id"
+                                :current-object-uuid="formData.thing_id"
                                 :current-object-name="formData.name"
-                                :linked-object-u-u-i-d="item.linkedObjectUuid"
-                                :link-type-u-u-i-d="item.linkTypeUuid"
+                                :linked-object-uuid="item.linkedObjectUuid"
+                                :link-type-uuid="item.linkTypeUuid"
                                 :comment="item.comment"
                                 :link-id="item.linkId"
                                 :index="index"
@@ -147,7 +147,6 @@ export default {
         const initialLinkIds = new Set();
         const originalLinks = new Map();
 
-        // === MODAL ===
         const modalId = `editObjectModal-${formData.value.thing_id}`;
         const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
         let modalInstance = null;
@@ -155,7 +154,6 @@ export default {
         onMounted(() => {
             console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
 
-            // 1. Сохраняем оригинальные значения и ID
             props.initialLinkedObjects.forEach(item => {
                 if (item.link_id) {
                     initialLinkIds.add(item.link_id);
@@ -167,7 +165,6 @@ export default {
                 }
             });
 
-            // 2. Инициализируем редактируемые ссылки
             linkedObjects.value = props.initialLinkedObjects
                 .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
                 .map((item) => ({
@@ -200,7 +197,6 @@ export default {
             }
         });
 
-        // === LINKS ===
         const addNewLinkedObject = () => {
             const newLink = {
                 currentObjectUuid: formData.value.thing_id,
@@ -231,7 +227,6 @@ export default {
             console.log('EditObject.vue - Removed link:', removed);
         };
 
-        // === SUBMIT ===
         const submitForm = async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
@@ -242,7 +237,6 @@ export default {
 
                 console.log('EditObject.vue - SUBMIT linkedObjects:', linkedObjects.value);
 
-                // 1. Новые ссылки
                 linkedObjects.value.forEach(item => {
                     if (item.linkId === null && item.linkedObjectUuid?.trim()) {
                         linksToAdd.push({
@@ -259,7 +253,6 @@ export default {
                     }
                 });
 
-                // 2. Изменённые ссылки
                 linkedObjects.value.forEach(item => {
                     if (item.linkId !== null) {
                         const orig = originalLinks.get(item.linkId);
@@ -277,12 +270,10 @@ export default {
                                 other_thing_id: item.linkedObjectUuid,
                                 description: item.comment || '',
                             });
-                            console.log('EditObject.vue - Link to UPDATE:', { link_id: item.linkId, changed });
                         }
                     }
                 });
 
-                // 3. Удалённые ссылки
                 const currentLinkIds = new Set(linkedObjects.value.map(i => i.linkId).filter(Boolean));
                 linksToDelete.push(...Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id)));
 

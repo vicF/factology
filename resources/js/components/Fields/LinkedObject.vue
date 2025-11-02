@@ -43,7 +43,6 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 
-// Props — camelCase
 const props = defineProps({
     currentObjectUuid: { type: String, required: true },
     currentObjectName: { type: String, required: false },
@@ -54,19 +53,15 @@ const props = defineProps({
     index: { type: Number, required: true },
 });
 
-// Emits
 const emit = defineEmits(['update', 'remove']);
 
-// Local reactive state
 const localCurrentObjectUuid = ref(props.currentObjectUuid);
 const localLinkedObjectUuid = ref(props.linkedObjectUuid);
 const localLinkTypeUuid = ref(props.linkTypeUuid);
 const localComment = ref(props.comment);
 
-// Pinia store
 const store = useObjectCacheStore();
 
-// Computed properties for object names
 const currentObjectName = computed(() => {
     const obj = store.cache.get(props.currentObjectUuid);
     return obj?.name || props.currentObjectName || 'Loading...';
@@ -82,7 +77,6 @@ const linkTypeName = computed(() => {
     return obj?.data?.name || 'Not set';
 });
 
-// Fetch names for UUIDs
 async function fetchObjectName(uuid) {
     if (!uuid || uuid.trim() === '') return;
     try {
@@ -93,7 +87,6 @@ async function fetchObjectName(uuid) {
     }
 }
 
-// === ЭМИТ UPDATE ПРИ ЛЮБОМ ИЗМЕНЕНИИ ===
 const emitUpdate = () => {
     console.log('LinkedObject.vue - Emitting update:', {
         index: props.index,
@@ -118,14 +111,13 @@ const emitUpdate = () => {
     });
 };
 
-// === WATCHERS ===
 watch(
     () => props.currentObjectUuid,
     (newVal) => {
         localCurrentObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    {immediate: true}
+    { immediate: true }
 );
 
 watch(
@@ -134,7 +126,7 @@ watch(
         localLinkTypeUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    {immediate: true}
+    { immediate: true }
 );
 
 watch(
@@ -143,7 +135,7 @@ watch(
         localLinkedObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    {immediate: true}
+    { immediate: true }
 );
 
 watch(
@@ -176,14 +168,12 @@ watch(
     }
 );
 
-// === ON MOUNTED: Загружаем имена при открытии ===
 onMounted(() => {
     fetchObjectName(localLinkedObjectUuid.value);
     fetchObjectName(localLinkTypeUuid.value);
     fetchObjectName(props.currentObjectUuid);
 });
 
-// Methods
 function removeSelf() {
     emit('remove', props.index);
 }
