@@ -1,4 +1,5 @@
 function dateFromDb(number, timeZone = 'UTC', format = 'yyyy-MM-dd HH:mm:ss') {
+    return number; // @TODO temporary
     if (number === null) {
         return null;
     }
