@@ -71,7 +71,7 @@ class Anything
     public string $template = 'partials.object.view.main.properties';
     public string $additional_template = ''; //'partials.object.view.additional.properties';
 
-    protected $_data;
+    protected array $_data = [];
     protected $_eloquentModel;
     protected $_classes;
     protected $_tableFields = [
@@ -433,6 +433,7 @@ class Anything
             // set dependant fields
             switch ($key) {
                 // Object has dates  in both user format and database format. Setting one initiates another.
+                // @TODO may be this is not needed anymore. Expect to send dates in database format to the client and receive the same FACT-1
                 case 'start':
                     Log::debug('start: ' . $value);
                     $this->_data['start_date'] = self::dateFromDb($value);
