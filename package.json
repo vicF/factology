@@ -6,8 +6,8 @@
         "build": "vite build",
         "test": "npm run test:php && npm run test:js",
         "test:php": "vendor/bin/phpunit",
-        "test:js": "node --experimental-vm-modules node_modules/jest/bin/jest.js --colors",
-        "test:js:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
+        "test:js": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --colors",
+        "test:js:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --watch"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
