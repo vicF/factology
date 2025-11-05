@@ -33,7 +33,7 @@ const dateProvider = [
     ['201809231344', 'UTC', 'yyyy-MM-dd HH:mm:ss', '2018-09-23 13:44:00'],
     ['20180923', 'UTC', 'yyyy-MM-dd HH:mm:ss', '2018-09-23 00:00:00'],
 
-    // Moscow offset (dynamic – we compute it at test runtime)
+    // Moscow offset (dynamic – computed at test runtime)
     (() => {
         const moscowOffset = DateTime.now().setZone('Europe/Moscow').offset / 60; // hours
         const padded = moscowOffset.toString().padStart(2, '0');
@@ -67,9 +67,8 @@ const dateProvider = [
 
     // BC dates – hours/minutes/seconds are inverted
     ['-99999999990101235959', 'UTC', 'yyyy-MM-dd HH:mm:ss', '-9999999999-01-01 00:00:00'],
-    ['-99999999990101235959', 'UTC', 'yyyy-MM-dd HH:mm:ss', '-9999999999-01-01 00:00:00'], // same as above (short form)
 
-    // Max millenniums (15 digits)
+    // Max millenniums (15+ digits)
     ['9999999999999990101000000', 'UTC', 'yyyy-MM-dd HH:mm:ss', '999999999999999-01-01 00:00:00'],
     ['99999999999999901010000', 'UTC', 'yyyy-MM-dd HH:mm:ss', '999999999999999-01-01 00:00:00'],
     ['9999999999999990101', 'UTC', 'yyyy-MM-dd HH:mm:ss', '999999999999999-01-01 00:00:00'],
