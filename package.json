@@ -6,8 +6,8 @@
         "build": "vite build",
         "test": "npm run test:php && npm run test:js",
         "test:php": "vendor/bin/phpunit",
-        "test:js": "jest --colors",
-        "test:js:watch": "jest --watch"
+        "test:js": "node --experimental-vm-modules node_modules/jest/bin/jest.js --colors",
+        "test:js:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
@@ -38,7 +38,6 @@
             "<rootDir>/resources/js/__tests__/**/*.test.js"
         ],
         "verbose": true,
-        "extensionsToTreatAsEsm": [],
         "transform": {},
         "moduleNameMapper": {
             "^(\\.{1,2}/.*)\\.js$": "$1"
