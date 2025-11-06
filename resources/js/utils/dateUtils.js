@@ -27,9 +27,13 @@ const TIME_FORMAT          = 'yyyy-MM-dd HH:mm:ss';
 function _correctBeforeBC(number) {
     // number is a 14‑digit string without the leading '-'
     const last13 = number.substring(number.length - 13);
-    const hhmmss = last13.substring(7);                 // last 6 chars
-    const inverted = (999999 - parseInt(hhmmss, 10)).toString().padStart(6, '0');
-    return number.substring(0, number.length - 13) + last13.substring(0, 7) + inverted;
+    const HH = parseInt(last13.substring(7,9), 10);
+    const mm = parseInt(last13.substring(9,11), 10);
+    const ss = parseInt(last13.substring(11,13), 10);
+    const invertedHH = (23 - HH).toString().padStart(2, '0');
+    const invertedmm = (59 - mm).toString().padStart(2, '0');
+    const invertedss = (59 - ss).toString().padStart(2, '0');
+    return number.substring(0, number.length - 13) + last13.substring(0,7) + invertedHH + invertedmm + invertedss;
 }
 
 /**
@@ -57,14 +61,34 @@ function dateFromDb(number, timeZone = 'UTC', format = TIME_FORMAT) {
     let bc = input[0] === '-';
     let work = bc ? input.substring(1) : input;
 
-    // Pad to at least 14 digits (PHP str_pad(...,14,'0',STR_PAD_LEFT))
-    work = work.padStart(14, '0');
+    // Remove any non‑digit characters (microseconds, dots, etc.) – PHP ignores them
+    work = work.replace(/[^\d]/g, '');
+
+    const length = work.length;
+
+    if (length < 4) {
+        throw new Error(`Invalid date format: ${input}`);
+    }
+
+    // Pad on the right with defaults for short inputs (@TODO in PHP)
+    let pad = '';
+    switch (14 - length) {
+        case 10: pad = '0101000000'; break; // add MM dd HH mm ss
+        case 8: pad = '01000000'; break; // add dd HH mm ss
+        case 6: pad = '000000'; break; // add HH mm ss
+        case 4: pad = '0000'; break; // add mm ss
+        case 2: pad = '00'; break; // add ss
+        case 0: break;
+        default: if (length > 14) break; else throw new Error(`Invalid date format: ${input}`);
+    }
+    work += pad;
 
     if (bc) {
         work = _correctBeforeBC(work);
     }
 
-    const milleniums = parseInt(work.substring(0, work.length - 13), 10) || 0;
+    // Milleniums are the prefix (as string for large numbers)
+    const milleniums = work.substring(0, work.length - 13) || '0';
     const smallNumber = '1' + work.substring(work.length - 13);
 
     d = DateTime.fromFormat(smallNumber, DATABASE_TIME_FORMAT, { zone: 'UTC' });
