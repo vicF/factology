@@ -48,7 +48,7 @@ class ApiController extends BaseController
             if ($request->class) {
                 $model->setClass($request->class);
             }
-            if (!empty($request['links'])) {
+            if (!empty($request['links'])) { // @TODO likely will not be used
                 foreach ($request['links'] as $link) {
                     $model->setLink($link);
                 }

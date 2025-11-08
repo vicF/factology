@@ -328,6 +328,11 @@ export default {
                     console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
                 }
+
+                // ЗАКРЫВАЕМ МОДАЛКУ ПОСЛЕ УСПЕХА
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
             } catch (error) {
                 console.error('EditObject.vue - Submit error:', error.response?.data || error);
                 alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
