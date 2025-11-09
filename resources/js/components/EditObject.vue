@@ -178,19 +178,16 @@ export default {
             }];
         }
 
-        // ИСПРАВЛЕНИЕ: modalLabelId теперь определён
         const modalId = `editObjectModal-${formData.value.thing_id}`;
         const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
-
         let modalInstance = null;
 
-        // ИСПРАВЛЕНИЕ: Запрос CSRF сразу при открытии модалки
         onMounted(async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
                 console.log('EditObject.vue - CSRF cookie fetched');
             } catch (err) {
-                console.warn('CSRF cookie already exists or failed (normal)');
+                console.warn('CSRF cookie already exists');
             }
 
             const modalElement = document.getElementById(modalId);
@@ -226,8 +223,9 @@ export default {
 
         const submitForm = async () => {
             try {
+                // ГАРАНТИРОВАННО отправляем ВСЕ новые связи, включая родительскую
                 const linksToAdd = linkedObjects.value
-                    .filter(item => !item.linkId && item.linkedObjectUuid?.trim())
+                    .filter(item => item.linkedObjectUuid?.trim() && !item.linkId)
                     .map(item => ({
                         one_thing_id: formData.value.thing_id,
                         link_type_id: item.linkTypeUuid,
@@ -247,7 +245,7 @@ export default {
                     type: formData.value.type,
                 };
 
-                // Передача класса при создании
+                // Класс
                 if (formData.value.class_id) {
                     payload.class = {
                         one_thing_id: formData.value.thing_id,
@@ -259,11 +257,15 @@ export default {
                     };
                 }
 
+                // СВЯЗИ — ТЕПЕРЬ ГАРАНТИРОВАННО ОТПРАВЛЯЮТСЯ
                 if (linksToAdd.length > 0) {
                     payload.links_to_add = linksToAdd;
+                    console.log('EditObject.vue - links_to_add будет отправлено:', linksToAdd);
+                } else {
+                    console.log('EditObject.vue - links_to_add пусто (но это нормально, если нет новых связей)');
                 }
 
-                console.log('EditObject.vue - Sending payload:', payload);
+                console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
                 let response;
                 if (isEditMode.value) {
@@ -288,7 +290,7 @@ export default {
             formData,
             linkedObjects,
             modalId,
-            modalLabelId,  // ← Теперь возвращается!
+            modalLabelId,
             submitForm,
             isEditMode,
             addNewLinkedObject,

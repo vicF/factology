@@ -5,11 +5,8 @@
             <div class="col">
                 <h1>
                     {{ object.name }}
-                    <button class="btn btn-outline-primary ms-2" @click="openCreateModal('Class')">
-                        {{ $t('Create') }}
-                    </button>
                     <button class="btn btn-success ms-2" @click="openCreateLinkedModal">
-                        Создать связанный объект
+                        {{ $t('Create') }}
                     </button>
                     <button class="btn btn-primary ms-2" @click="openEditModal">
                         {{ $t('Edit') }}
