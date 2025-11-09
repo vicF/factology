@@ -3,7 +3,9 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" :id="modalLabelId">{{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}</h5>
+                    <h5 class="modal-title" :id="modalLabelId">
+                        {{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -69,10 +71,14 @@
                                 :label="$t('Access')"
                             />
                         </div>
-                        <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+
+                        <!-- КНОПКА "Добавить связь" -->
+                        <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
                             {{ $t('Add Link') }}
                         </button>
-                        <div v-for="(item, index) in linkedObjects" :key="index">
+
+                        <!-- ССЫЛКИ — ВСЕГДА ОТОБРАЖАЮТСЯ -->
+                        <div v-for="item in linkedObjects" :key="item.id">
                             <LinkedObject
                                 :current-object-uuid="formData.thing_id"
                                 :current-object-name="formData.name"
@@ -80,14 +86,19 @@
                                 :link-type-uuid="item.linkTypeUuid"
                                 :comment="item.comment"
                                 :link-id="item.linkId"
-                                :index="index"
+                                :index="linkedObjects.indexOf(item)"
                                 @update="updateItem"
                                 @remove="removeItem"
                             />
                         </div>
+
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ $t('Close') }}</button>
-                            <button type="submit" class="btn btn-primary">{{ isEditMode ? $t('Update') : $t('Save') }}</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                {{ $t('Close') }}
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                {{ isEditMode ? $t('Update') : $t('Save') }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -98,7 +109,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
 import { v4 as uuidv4 } from 'uuid';
@@ -113,24 +124,27 @@ export default {
     name: 'EditObject',
     components: { LinkedObject, ObjectField, TextField, DateField, RadioGroupField },
     props: {
-        object: { type: Object, default: null },
-        params: { type: Object, default: () => ({}) },
-        title: { type: String, default: '' },
-        initialLinkedObjects: {
-            type: Array,
-            default: () => [],
-        },
+        object: {type: Object, default: null},
+        params: {type: Object, default: () => ({})},
+        title: {type: String, default: ''},
+        initialLinkedObjects: {type: Array, default: () => []},
+        parentObjectId: {type: String, default: null},
+        parentLinkType: {type: String, default: '2da45f14-69c6-4d56-9f2f-809fda14abf5'},
     },
     emits: ['close', 'object-created', 'object-updated'],
-    setup(props, { emit }) {
-        const { t } = useI18n();
-        const route = useRoute();
+    setup(props, {emit}) {
+        const {t} = useI18n();
+        const router = useRouter();
         const isEditMode = computed(() => !!props.object);
 
-        console.log('EditObject.vue - Props:', { object: props.object, params: props.params, title: props.title });
+        console.log('EditObject.vue - Режим:', isEditMode.value ? 'EDIT' : 'CREATE');
+        console.log('EditObject.vue - parentObjectId:', props.parentObjectId);
+        console.log('EditObject.vue - initialLinkedObjects (должны быть пустыми при создании):', props.initialLinkedObjects);
 
         const formData = ref({
-            thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
+            thing_id: isEditMode.value
+                ? (props.object.thing_id || props.object.id || uuidv4())
+                : uuidv4(),
             name: isEditMode.value ? props.object.name || '' : '',
             description: isEditMode.value ? props.object.description || '' : '',
             start: isEditMode.value ? props.object.start || '' : '',
@@ -143,198 +157,112 @@ export default {
             link_id: props.object?.class?.link_id || null,
         });
 
+        // ГЛАВНОЕ: linkedObjects формируется ТОЛЬКО по логике
         const linkedObjects = ref([]);
-        const initialLinkIds = new Set();
-        const originalLinks = new Map();
 
-        const modalId = `editObjectModal-${formData.value.thing_id}`;
-        const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
-        let modalInstance = null;
-
-        onMounted(() => {
-            console.log('EditObject.vue - Initial Linked Objects:', props.initialLinkedObjects);
-
-            props.initialLinkedObjects.forEach(item => {
-                if (item.link_id) {
-                    initialLinkIds.add(item.link_id);
-                    originalLinks.set(item.link_id, {
-                        linkedObjectUuid: item.other_thing_id || '',
-                        linkTypeUuid: item.link_type_id || '',
-                        comment: item.description || '',
-                    });
-                }
-            });
-
+        if (isEditMode.value) {
+            // РЕДАКТИРОВАНИЕ — берём только свои ссылки
             linkedObjects.value = props.initialLinkedObjects
-                .filter((item) => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
-                .map((item) => ({
+                .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
+                .map(item => ({
+                    id: uuidv4(),
                     currentObjectUuid: formData.value.thing_id,
                     linkedObjectUuid: item.other_thing_id || '',
                     linkTypeUuid: item.link_type_id || '',
                     comment: item.description || '',
                     linkId: item.link_id || null,
                 }));
+        } else if (props.parentObjectId) {
+            // СОЗДАНИЕ — ТОЛЬКО ОДНА СВЯЗЬ С РОДИТЕЛЕМ
+            linkedObjects.value = [{
+                id: uuidv4(),
+                currentObjectUuid: formData.value.thing_id,
+                linkedObjectUuid: props.parentObjectId,
+                linkTypeUuid: props.parentLinkType,
+                comment: '',
+                linkId: null,
+            }];
+        }
+        // Если нет parentObjectId — пусто
 
-            console.log('EditObject.vue - linkedObjects after init:', linkedObjects.value);
+        console.log('EditObject.vue - linkedObjects после инициализации:', linkedObjects.value);
 
+        const modalId = `editObjectModal-${formData.value.thing_id}`;
+        let modalInstance = null;
+
+        onMounted(() => {
             const modalElement = document.getElementById(modalId);
             if (modalElement) {
                 modalInstance = new Modal(modalElement);
                 modalInstance.show();
-                modalElement.addEventListener('hidden.bs.modal', () => {
-                    console.log('EditObject.vue - Modal hidden → emit close');
-                    emit('close');
-                });
-            } else {
-                console.error('EditObject.vue - Modal element not found:', modalId);
+                modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
             }
         });
 
         onUnmounted(() => {
-            const modalElement = document.getElementById(modalId);
-            if (modalElement) {
-                modalElement.removeEventListener('hidden.bs.modal', () => {});
-            }
+            if (modalInstance) modalInstance.dispose();
         });
 
         const addNewLinkedObject = () => {
-            const newLink = {
+            linkedObjects.value.push({
+                id: uuidv4(),
                 currentObjectUuid: formData.value.thing_id,
                 linkedObjectUuid: '',
                 linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
                 comment: '',
                 linkId: null,
-            };
-            linkedObjects.value.push(newLink);
-            console.log('EditObject.vue - Added new link:', newLink);
+            });
         };
 
-        const updateItem = ({ index, data }) => {
-            console.log('EditObject.vue - Update link at index', index, data);
-            linkedObjects.value[index] = {
-                ...linkedObjects.value[index],
-                ...data,
-            };
-            console.log('EditObject.vue - Updated linkedObjects[index]:', linkedObjects.value[index]);
+        const updateItem = ({index, data}) => {
+            linkedObjects.value[index] = {...linkedObjects.value[index], ...data};
         };
 
         const removeItem = (index) => {
-            const removed = linkedObjects.value[index];
-            if (removed.linkId) {
-                initialLinkIds.delete(removed.linkId);
-            }
             linkedObjects.value.splice(index, 1);
-            console.log('EditObject.vue - Removed link:', removed);
         };
 
         const submitForm = async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
 
-                const linksToAdd = [];
-                const linksToUpdate = [];
-                const linksToDelete = [];
-
-                console.log('EditObject.vue - SUBMIT linkedObjects:', linkedObjects.value);
-
-                linkedObjects.value.forEach(item => {
-                    if (item.linkId === null && item.linkedObjectUuid?.trim()) {
-                        linksToAdd.push({
-                            one_thing_id: formData.value.thing_id,
-                            link_type_id: item.linkTypeUuid,
-                            other_thing_id: item.linkedObjectUuid,
-                            description: item.comment || '',
-                            public: 0,
-                            link_start: null,
-                            link_end: null,
-                            link_start_variety: null,
-                            link_end_variety: null,
-                        });
-                    }
-                });
-
-                linkedObjects.value.forEach(item => {
-                    if (item.linkId !== null) {
-                        const orig = originalLinks.get(item.linkId);
-                        if (!orig) return;
-
-                        const changed =
-                            item.linkedObjectUuid !== orig.linkedObjectUuid ||
-                            item.linkTypeUuid !== orig.linkTypeUuid ||
-                            item.comment !== orig.comment;
-
-                        if (changed) {
-                            linksToUpdate.push({
-                                link_id: item.linkId,
-                                link_type_id: item.linkTypeUuid,
-                                other_thing_id: item.linkedObjectUuid,
-                                description: item.comment || '',
-                            });
-                        }
-                    }
-                });
-
-                const currentLinkIds = new Set(linkedObjects.value.map(i => i.linkId).filter(Boolean));
-                linksToDelete.push(...Array.from(initialLinkIds).filter(id => !currentLinkIds.has(id)));
-
-                console.log('EditObject.vue - Links to ADD:', linksToAdd.length);
-                console.log('EditObject.vue - Links to UPDATE:', linksToUpdate.length);
-                console.log('EditObject.vue - Links to DELETE:', linksToDelete.length);
+                const linksToAdd = linkedObjects.value
+                    .filter(item => !item.linkId && item.linkedObjectUuid?.trim())
+                    .map(item => ({
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: item.linkTypeUuid,
+                        other_thing_id: item.linkedObjectUuid,
+                        description: item.comment || '',
+                        public: 0,
+                    }));
 
                 const payload = {
                     thing_id: formData.value.thing_id,
                     name: formData.value.name,
                     description: formData.value.description,
-                    start_date: formData.value.start_date || null,
-                    end_date: formData.value.end_date || null,
                     start: formData.value.start || null,
                     end: formData.value.end || null,
                     public: formData.value.public,
                     parent_id: formData.value.parent_id,
                     type: formData.value.type,
+                    ...(linksToAdd.length > 0 && {links_to_add: linksToAdd}),
                 };
-
-                const originalClassId = props.object?.class?.thing_id;
-                const classChanged = formData.value.class_id !== originalClassId;
-
-                if (classChanged && formData.value.class_id) {
-                    payload.class = {
-                        one_thing_id: formData.value.thing_id,
-                        link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                        other_thing_id: formData.value.class_id,
-                        description: '',
-                        link_id: formData.value.link_id || undefined,
-                        public: 1,
-                        link_start: null,
-                        link_end: null,
-                        link_start_variety: null,
-                        link_end_variety: null,
-                    };
-                }
-
-                if (linksToAdd.length > 0) payload.links_to_add = linksToAdd;
-                if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
-                if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
-
-                console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
                 let response;
                 if (isEditMode.value) {
                     response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
-                    console.log('EditObject.vue - Object updated:', response.data);
                     emit('object-updated', response.data);
                 } else {
                     response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
-                    console.log('EditObject.vue - Object created:', response.data);
                     emit('object-created', response.data);
+                    if (props.parentObjectId) {
+                        router.push({name: 'object', params: {id: props.parentObjectId}});
+                    }
                 }
 
-                // ЗАКРЫВАЕМ МОДАЛКУ ПОСЛЕ УСПЕХА
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
+                modalInstance?.hide();
             } catch (error) {
-                console.error('EditObject.vue - Submit error:', error.response?.data || error);
+                console.error('Submit error:', error);
                 alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
             }
         };
@@ -343,7 +271,6 @@ export default {
             formData,
             linkedObjects,
             modalId,
-            modalLabelId,
             submitForm,
             isEditMode,
             addNewLinkedObject,

@@ -5,10 +5,20 @@
             <div class="col">
                 <h1>
                     {{ object.name }}
-                    <button class="btn btn-outline-primary ms-2" @click="openCreateModal('Class')">{{ $t('Create') }}</button>
-                    <button class="btn btn-primary ms-2" @click="openEditModal">{{ $t('Edit') }}</button>
-                    <button class="btn btn-danger ms-2" @click="deleteObject">{{ $t('Delete') }}</button>
+                    <button class="btn btn-outline-primary ms-2" @click="openCreateModal('Class')">
+                        {{ $t('Create') }}
+                    </button>
+                    <button class="btn btn-success ms-2" @click="openCreateLinkedModal">
+                        Создать связанный объект
+                    </button>
+                    <button class="btn btn-primary ms-2" @click="openEditModal">
+                        {{ $t('Edit') }}
+                    </button>
+                    <button class="btn btn-danger ms-2" @click="deleteObject">
+                        {{ $t('Delete') }}
+                    </button>
                 </h1>
+
                 <div class="col-md-10 col-md-offset-1">
                     <div class="row rounded border p-3 rounded-4">
                         <div class="col-md-2" style="font-size: x-small">
@@ -25,6 +35,7 @@
                             <div>{{ $t('Access') }}: {{ object.public ? $t('Public') : $t('Private') }}</div>
                         </div>
                     </div>
+
                     <!-- class -->
                     <div class="row p-3">
                         <div class="col-md-2">
@@ -37,14 +48,19 @@
                         </div>
                         <div class="col-md-10">
                             <div v-if="object.class.name">
-                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">{{ object.class.name }}</RouterLink>
+                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
+                                    {{ object.class.name }}
+                                </RouterLink>
                             </div>
-                            <div v-if="object.class.description">{{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}</div>
+                            <div v-if="object.class.description">
+                                {{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}
+                            </div>
                             <div v-if="object.class.translation">{{ object.class.translation }}</div>
                         </div>
                     </div>
+
                     <!-- Going through links -->
-                    <div v-for="link in object.links" :key="link.link_type_id" class="row p-3">
+                    <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
                         <div class="col-md-2">
                             <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
                                 <img :src="getThumbUrl(link.thing_id)" width="50"/>
@@ -55,71 +71,89 @@
                         </div>
                         <div class="col-md-10">
                             <div v-if="link.name">
-                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">{{ link.name }}</RouterLink>
+                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                    {{ link.name }}
+                                </RouterLink>
                             </div>
                             <div v-if="link.start">{{ $t('Start') }}: {{ $dateFromDb(link.start) }}</div>
                             <div v-if="link.end">{{ $t('End') }}: {{ $dateFromDb(link.end) }}</div>
                             <div v-if="link.link_start">{{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}</div>
                             <div v-if="link.link_end">{{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}</div>
-                            <div v-if="link.description">{{ $t('Description') }}: {{ $truncateText(link.description, 300) }}</div>
+                            <div v-if="link.description">
+                                {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
+                            </div>
                             <div v-if="link.translation">{{ link.translation }}</div>
                             <div>
-                                <button class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
+                                <button class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">
+                                    {{ $t('Delete') }}
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <!-- Dynamically render EditObject modal -->
+
+        <!-- === РЕДАКТИРОВАНИЕ ТЕКУЩЕГО ОБЪЕКТА === -->
         <EditObject
             v-if="showEditModal"
             :object="editObject"
             :params="modalParams"
             :initialLinkedObjects="linkRecords"
-            @object-created="handleObjectCreated"
             @object-updated="handleObjectUpdated"
             @close="showEditModal = false"
         />
-        <!-- Modal for ClassTree events -->
+
+        <!-- === СОЗДАНИЕ НОВОГО ОБЪЕКТА (ClassTree) === -->
         <EditObject
             v-if="showTreeModal"
             :object="null"
             :params="treeModalParams"
             :initialLinkedObjects="[]"
             @object-created="handleObjectCreated"
-            @object-updated="handleObjectUpdated"
             @close="showTreeModal = false"
+        />
+
+        <!-- === СОЗДАНИЕ СВЯЗАННОГО ОБЪЕКТА (с автосвязью) === -->
+        <EditObject
+            v-if="showCreateLinkedModal"
+            :object="null"
+            :parentObjectId="object.thing_id"
+            :initialLinkedObjects="[]"
+            @object-created="handleLinkedObjectCreated"
+            @close="showCreateLinkedModal = false"
         />
     </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
-import ClassTree from "./ClassTree.vue";
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import { useAuthStore } from '../stores/auth';
-import { eventBus } from '../eventBus';
 
 export default {
     name: "Object",
-    components: {ClassTree, EditObject},
+    components: { EditObject },
     props: ["searchText", "typeThing", "typeClass"],
     setup(props) {
         const router = useRouter();
         const route = useRoute();
-        const {t} = useI18n();
+        const { t } = useI18n();
         const authStore = useAuthStore();
 
         const object = ref({});
         const loaded = ref(false);
+
+        // Модалки
         const showEditModal = ref(false);
+        const showTreeModal = ref(false);
+        const showCreateLinkedModal = ref(false);
+
         const editObject = ref(null);
         const modalParams = ref({});
-        const showTreeModal = ref(false);
         const treeModalParams = ref({});
 
         const getThumbUrl = (thing_id) => {
@@ -134,156 +168,96 @@ export default {
                 console.log('Object.vue - Fetched object:', object.value);
                 loaded.value = true;
             } catch (error) {
-                console.error('Get object error:', {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                    message: error.message,
-                    config: error.config
-                });
+                console.error('Get object error:', error);
                 handleApiError(error);
             }
         };
 
         const handleApiError = (error) => {
-            console.log('handleApiError - Current route:', route.path, 'Query:', route.query);
-            if (!router) {
-                console.error('Router is undefined in handleApiError');
-                window.location.href = '/login';
-                return;
-            }
-
             const status = error.response?.status;
-            const data = error.response?.data;
-
             if (status === 401) {
+                const data = error.response?.data;
                 if (data?.data?.public === 1) {
                     object.value = data.data;
                     loaded.value = true;
                 } else {
                     localStorage.removeItem('authenticated');
-                    if (route.path === '/login') {
-                        console.log('Already on login page, skipping redirect');
-                        return;
-                    }
-                    console.log('Redirecting to login due to 401 for private object');
-                    router.push({
-                        path: '/login',
-                        query: {redirect: route.fullPath}
-                    });
+                    router.push({ path: '/login', query: { redirect: route.fullPath } });
                 }
             } else {
-                console.error('Unhandled error in handleApiError:', {
-                    status,
-                    data,
-                    message: error.message
-                });
-                alert(data?.message || t('Error loading object'));
+                alert(t('Error loading object'));
                 loaded.value = true;
             }
         };
 
+        // Открыть создание в дереве классов
         const openCreateModal = (type) => {
-            console.log('Object.vue - Opening create modal for type:', type);
-            editObject.value = null;
-            modalParams.value = {classId: object.value.class?.thing_id, type: type === 'Class' ? 2 : 3};
+            modalParams.value = {
+                classId: object.value.class?.thing_id,
+                type: type === 'Class' ? 2 : 3
+            };
+            showTreeModal.value = true;
+        };
+
+        // Открыть редактирование текущего объекта
+        const openEditModal = () => {
+            editObject.value = { ...object.value };
+            modalParams.value = {
+                classId: object.value.class?.thing_id,
+                type: object.value.type || 3
+            };
             showEditModal.value = true;
         };
 
-        const openEditModal = () => {
-            console.log('Object.vue - Opening edit modal for object:', object.value);
-            editObject.value = {
-                thing_id: object.value.thing_id,
-                name: object.value.name,
-                description: object.value.description,
-                start: object.value.start,
-                end: object.value.end,
-                public: object.value.public,
-                class: object.value.class ? {
-                    thing_id: object.value.class.thing_id,
-                    link_id: object.value.class.link_id,
-                    public: object.value.class.public ?? 1,
-                    link_start: object.value.class.link_start ?? null,
-                    link_end: object.value.class.link_end ?? null,
-                    link_start_variety: object.value.class.link_start_variety ?? null,
-                    link_end_variety: object.value.class.link_end_variety ?? null,
-                } : null,
-                type: object.value.type || 3,
-            };
-            modalParams.value = {classId: object.value.class?.thing_id, type: object.value.type || 3};
-            showEditModal.value = true;
+        // === НОВАЯ КНОПКА: Создать связанный объект ===
+        const openCreateLinkedModal = () => {
+            showCreateLinkedModal.value = true;
         };
 
         const deleteObject = async () => {
-            if (!window.confirm(t('Are you sure you want to delete this object?'))) {
-                return;
-            }
-
+            if (!confirm(t('Are you sure you want to delete this object?'))) return;
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                console.log('Object.vue - Sending DELETE to /api/v1/object/' + object.value.thing_id);
                 await axios.delete(`/api/v1/object/${object.value.thing_id}`);
-                console.log('Object.vue - Object deleted:', object.value.thing_id);
-
-                // Redirect to a default route or parent object
-                router.push('/'); // Adjust to your route name
+                router.push('/');
             } catch (error) {
-                console.error('Object.vue - Delete error:', {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                    message: error.message,
-                });
-                alert(t('Failed to delete object') + ': ' + (error.response?.data?.message || error.response?.data?.error || error.message));
+                alert(t('Failed to delete object'));
             }
         };
 
         const deleteLink = async (link_id) => {
-            if (!window.confirm(t('Are you sure you want to delete this link?'))) {
-                return;
-            }
-
+            if (!confirm(t('Are you sure you want to delete this link?'))) return;
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                console.log('Object.vue - Sending DELETE to /api/v1/link/' + link_id);
                 await axios.delete(`/api/v1/link/${link_id}`);
-                console.log('Object.vue - Link deleted:', link_id);
-                await getObject(); // Refresh object data to update links
+                await getObject();
             } catch (error) {
-                console.error('Object.vue - Delete link error:', {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                    message: error.message,
-                });
-                alert(t('Failed to delete link') + ': ' + (error.response?.data?.message || error.response?.data?.error || error.message));
+                alert(t('Failed to delete link'));
             }
         };
 
+        // Создание через ClassTree
         const handleObjectCreated = (newObject) => {
-            console.log('Object.vue - Object created:', newObject);
-            showEditModal.value = false;
+            console.log('Object.vue - Created via tree:', newObject);
             showTreeModal.value = false;
-            router.push({name: 'object', params: {uid: newObject.data.thing_id}});
+            router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
         };
 
+        // Обновление текущего объекта
         const handleObjectUpdated = (updatedObject) => {
             console.log('Object.vue - Object updated:', updatedObject);
-            const payload = updatedObject.data;
-
-            object.value = {
-                ...object.value,
-                ...payload,
-                class: payload.class ? {
-                    ...payload.class,
-                    thing_id: payload.class.other_thing_id,
-                } : object.value.class,
-                links: payload.links ?? object.value.links ?? [],
-            };
-
+            object.value = { ...object.value, ...updatedObject.data };
             showEditModal.value = false;
-            showTreeModal.value = false;
         };
 
-        // ------------------------------------------------
-        // Build an array of *link records* that EditObject expects
+        // === СОЗДАНИЕ СВЯЗАННОГО ОБЪЕКТА (главное!) ===
+        const handleLinkedObjectCreated = async () => {
+            console.log('Object.vue - Linked object created → refreshing current object');
+            showCreateLinkedModal.value = false;
+            await getObject(); // ← Обновляем текущий объект → новая связь появится
+        };
+
+        // Формируем linkRecords только для редактирования
         const linkRecords = computed(() => {
             if (!Array.isArray(object.value.links)) return [];
             return object.value.links.map(l => ({
@@ -292,59 +266,49 @@ export default {
                 other_thing_id: l.thing_id,
                 description: l.description || '',
                 public: l.public ?? 0,
-                link_start: l.link_start ?? null,
-                link_end: l.link_end ?? null,
-                link_start_variety: l.link_start_variety ?? null,
-                link_end_variety: l.link_end_variety ?? null,
             }));
         });
 
-        // Listen for ClassTree events
-        const handleOpenCreateModal = ({title, params}) => {
-            console.log('Object.vue - Received open-create-modal:', {title, params});
-            treeModalParams.value = params;
-            showTreeModal.value = true;
-        };
-
         onMounted(() => {
-            console.log('Object.vue mounted - Calling getObject');
             getObject();
         });
 
-        watch(() => route.params.uid, (newParam, oldParam) => {
-            if (newParam !== oldParam) {
-                console.log('Object.vue watch - UID changed:', newParam);
-                getObject();
-            }
+        watch(() => route.params.uid, (newUid) => {
+            if (newUid) getObject();
         });
 
         return {
             object,
             loaded,
             showEditModal,
+            showTreeModal,
+            showCreateLinkedModal,
             editObject,
             modalParams,
-            showTreeModal,
             treeModalParams,
             getThumbUrl,
             openCreateModal,
             openEditModal,
+            openCreateLinkedModal,
             deleteObject,
             deleteLink,
             handleObjectCreated,
             handleObjectUpdated,
-            t,
+            handleLinkedObjectCreated,
             linkRecords,
+            t,
         };
     },
 };
 </script>
 
 <style scoped>
-.card {
-    margin-top: 2rem;
+.border-top { border-top: 1px solid #dee2e6; }
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
 }
-.alert {
-    margin-bottom: 1rem;
+.btn-success:hover {
+    background-color: #218838;
 }
 </style>
