@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Eloquent\Link;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -46,10 +45,24 @@ class ApiController extends BaseController
             if ($request->parent_id) {
                 $model->setLink(UUID::PARENT, $request->parent_id, 'Child of');
             }
-            if ($request->class_id) {
-                $model->setLink(UUID::LINK_TO_CLASS, $request->class_id, 'Class of');
+            if ($request->class) {
+                $model->setClass($request->class);
             }
-            //$model->saveLinks($request->toArray());
+            if (!empty($request['links'])) { // @TODO likely will not be used
+                foreach ($request['links'] as $link) {
+                    $model->setLink($link);
+                }
+            }
+            if (!empty($request['links_to_add'])) {
+                foreach ($request['links_to_add'] as $link) {
+                    $model->addLink($link);
+                }
+            }
+            if (!empty($request['links_to_update'])) {
+                foreach ($request['links_to_update'] as $link) {
+                    $model->updateLink($link);
+                }
+            }
             return response()->json(
                 [
                     'data'    => $model->toArray(),
@@ -111,6 +124,23 @@ class ApiController extends BaseController
     {
         Anything::deleteById($id);
         return response()->json(['success' => true]);
+    }
+
+    public function deleteLink(Request $request, $id)
+    {
+        try {
+            $deleted = DB::table('links')
+                ->where('link_id', $id)
+                ->update(['deleted' => 1]);
+
+            if ($deleted) {
+                return response()->json(['message' => 'Link deleted successfully'], 200);
+            }
+
+            return response()->json(['message' => 'Link not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to delete link', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function photos(Request $request)
@@ -176,6 +206,7 @@ class ApiController extends BaseController
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
+                $join->where('links.deleted', '=', 0);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
         }
@@ -207,7 +238,10 @@ class ApiController extends BaseController
             ->select('links.*', 'things.name')
             ->whereIn('links.one_thing_id', $ids)
             ->orWhere('other_thing_id', $ids)
-            ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
+            ->leftJoin('things', function ($join) {
+                $join->on('links.other_thing_id', '=', 'things.thing_id');
+                $join->where('links.deleted', '=', 0);
+            })
             ->get()->toArray();
 
         return response()->json(json_encode([

@@ -15,7 +15,7 @@ use App\Http\Controllers\Auth\LoginController;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-use Illuminate\Support\Facades\Auth;
+
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->post('/v1/object/{id}', [ApiController::class
 // Save existing object
 Route::middleware('auth:sanctum')->put('/v1/object/{id}', [ApiController::class, 'store']);
 Route::middleware('auth:sanctum')->delete('/v1/object/{id}', [ApiController::class, 'delete']);
+Route::middleware('auth:sanctum')->delete('/v1/link/{id}', [ApiController::class, 'deleteLink']);
 Route::middleware('auth:sanctum')->post('/v1/photos', [ApiController::class, 'photos']);
 Route::middleware('auth:sanctum')->post('/v1/check_photos', [ApiController::class, 'checkPhotos']);
 Route::middleware('auth:sanctum')->post('/v1/photos/thumbs_upload', [ApiController::class, 'upload']);

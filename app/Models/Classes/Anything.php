@@ -70,9 +70,8 @@ class Anything
 
     public string $template = 'partials.object.view.main.properties';
     public string $additional_template = ''; //'partials.object.view.additional.properties';
-    public \stdClass $class; // @TODO seems to be not really used
 
-    protected $_data;
+    protected array $_data = [];
     protected $_eloquentModel;
     protected $_classes;
     protected $_tableFields = [
@@ -168,7 +167,7 @@ class Anything
     public function setData(array $data): array
     {
         if (array_key_exists('class', $data) && is_string($data['class'])) {
-            $data['class'] = $this->getClassByClassId($data['class']);
+            $data['class'] = $this->getObjectNameByUid($data['class']);
         }
         foreach ((array)$data as $key => $value) {
             $this->$key = $value;
@@ -319,6 +318,7 @@ class Anything
         $thing['class'] = $class;
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
+            ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
             ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
             ->limit(50);
 
@@ -432,6 +432,8 @@ class Anything
             $this->_data[$key] = $value;
             // set dependant fields
             switch ($key) {
+                // Object has dates  in both user format and database format. Setting one initiates another.
+                // @TODO may be this is not needed anymore. Expect to send dates in database format to the client and receive the same FACT-1
                 case 'start':
                     Log::debug('start: ' . $value);
                     $this->_data['start_date'] = self::dateFromDb($value);
@@ -526,14 +528,13 @@ class Anything
             //DB::table('things')->where('thing_id', $this->thing_id)->update($data);
             // Prepare data for upsert
             $upsertData = [
-                'thing_id' => $data['thing_id'],
-                'name' => $data['name'] ?? null,
-                'description' => $data['description'] ?? null,
-                'public' => $data['public'] ?? 0,
-                'start' => $data['start'] ?? null,
-                'end' => $data['end'] ?? null,
-                'type' => $data['type'],
-                'record_created' => now(),
+                'thing_id'       => $data['thing_id'],
+                'name'           => $data['name'] ?? null,
+                'description'    => $data['description'] ?? null,
+                'public'         => $data['public'] ?? 0,
+                'start'          => $data['start'] ?? null,
+                'end'            => $data['end'] ?? null,
+                'type'           => $data['type'],
                 'record_updated' => now(),
             ];
 
@@ -590,14 +591,72 @@ class Anything
         return Thing::where('thing_id', $id)->delete();
     }
 
-    public function setLink($type, $target, $translation): bool
+    public function setClass(array $classLink): bool
     {
-        $link = new Link();
-        $link->one_thing_id = $this->thing_id;
-        $link->link_type_id = $type;
-        $link->other_thing_id = $target;
-        $link->translation = $translation;
-        return $link->save();
+        if (empty($classLink['translation'])) {
+            try {
+                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
+            } catch (\ErrorException $e) {
+                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
+            }
+            $classLink['translation'] = "{$this->name} is of class $className";
+        }
+        return $this->setLink($classLink);
+
+    }
+
+    protected function setLinkTranslation(&$link)
+    {
+        if (empty($link['translation'])) {
+            try {
+                $linkedObjectName = $this->getObjectNameByUid($link['other_thing_id'])->name;
+            } catch (\ErrorException $e) {
+                throw new \RuntimeException("Unable to get name for object {$link['other_thing_id']}", 500, $e);
+            }
+            switch ($link['link_type_id']) {
+                case UUID::LINK_TO_CLASS:
+                    $link['translation'] = "{$this->name} is of class $linkedObjectName";
+                    break;
+                default:
+                    $link['translation'] = "{$this->name} is related to $linkedObjectName";
+            }
+
+        }
+    }
+
+    public function setLink($link): bool
+    {
+        $this->setLinkTranslation($link);
+        if (@$link['link_id']) {
+            // update
+            return $this->updateLink($link);
+        } else {
+            return $this->addLink($link);
+        }
+    }
+
+    public function updateLink($link): int
+    {
+        $this->setLinkTranslation($link);
+        return DB::table('links')
+            ->where('link_id', $link['link_id'])
+            ->update([
+                'one_thing_id'   => $this->thing_id,
+                'link_type_id'   => $link['link_type_id'],
+                'other_thing_id' => $link['other_thing_id'],
+                'translation'    => $link['translation'],
+            ]);
+    }
+
+    public function addLink($link): bool
+    {
+        $this->setLinkTranslation($link);
+        return DB::table('links')->insert([
+            'one_thing_id'   => $this->thing_id,
+            'link_type_id'   => $link['link_type_id'],
+            'other_thing_id' => $link['other_thing_id'],
+            'translation'    => $link['translation'],
+        ]);
     }
 
     public function setAsChildOf($parentClass): bool
@@ -606,21 +665,12 @@ class Anything
         return $this->setLink(UUID::PARENT, $parentClass, "\"{$this->name}\" is child of \"{$parentName}\"");
     }
 
-    public function setClass($class): bool
-    {
-        try {
-            $className = $this->getClassByClassId($class)->name;
-        } catch (\ErrorException $e) {
-            throw new \RuntimeException("Unable to get name for class $class", 500, $e);
-        }
-        return $this->setLink(UUID::LINK_TO_CLASS, $class, "{$this->name} is of class \"{$className}\"");
-    }
 
-    public function getClassByClassId($classId)
+    public function getObjectNameByUid($uid)
     {
         return DB::table('things')
             ->select('thing_id', 'name')
-            ->where('thing_id', $classId)
+            ->where('thing_id', $uid)
             ->first();
     }
 

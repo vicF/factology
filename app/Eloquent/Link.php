@@ -28,6 +28,13 @@ class Link extends Model
     protected $keyType = 'string';
     protected $primaryKey = self::LINK_ID;
 
+    protected $fillable = [
+        'one_thing_id',
+        'link_type_id',
+        'other_thing_id',
+        'translation',
+    ];
+
     public function scopeOfClass($query, $class)
     {
         return $query
