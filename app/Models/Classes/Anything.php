@@ -627,10 +627,9 @@ class Anything
     public function setLink($link): bool
     {
         $this->setLinkTranslation($link);
-        if ($link['link_id']) {
+        if (@$link['link_id']) {
             // update
             return $this->updateLink($link);
-
         } else {
             return $this->addLink($link);
         }
