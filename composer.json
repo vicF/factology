@@ -21,7 +21,7 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.9",
-        "codeception/codeception": "^5.2",
+        "codeception/codeception": "^5.3",
         "codeception/module-asserts": "*",
         "codeception/module-phpbrowser": "*",
         "codeception/module-webdriver": "^4.0",

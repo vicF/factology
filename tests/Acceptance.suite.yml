@@ -6,8 +6,9 @@
 actor: AcceptanceTester
 modules:
     enabled:
+      - Asserts
       - WebDriver:
-          url: "%TESTED_URL%"
+          url: "%TESTED_HOST%"
           window_size: 1280x1024
           port: 9515   # 9515 for chromedriver
           path: '/wd/hub'  # this value may differ between servers. Some work without it
@@ -19,7 +20,7 @@ modules:
             acceptInsecureCerts: true
             timeouts:
               pageLoad: 500000
-            chromeOptions:
+            goog:chromeOptions:
               args: [
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
@@ -43,8 +44,8 @@ modules:
                 download.default_directory: "tmp"
             moz:firefoxOptions:
               args: [ "%FIREFOX_ARGS%" ]
-# Add Codeception\Step\Retry trait to AcceptanceTester to enable retries
-step_decorators:
-    - Codeception\Step\ConditionalAssertion
-    - Codeception\Step\TryTo
-    - Codeception\Step\Retry
+    step_decorators:
+      - \Codeception\Step\Retry
+    extensions:
+      enabled:
+        - Codeception\Extension\PauseOnFail
