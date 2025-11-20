@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use Codeception\Lib\Actor\Shared\Retry;
+
 /**
  * Inherited Methods
  * @method void wantTo($text)
@@ -22,6 +24,7 @@ namespace Tests\Support;
 class AcceptanceTester extends \Codeception\Actor
 {
     use _generated\AcceptanceTesterActions;
+    use Retry;
 
     /**
      * Define custom actions here

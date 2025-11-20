@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b90513b556d6c708b69041f986b3713e",
+    "content-hash": "aa13052543283da9601ad8cc3fcf83f1",
     "packages": [
         {
             "name": "brick/math",
@@ -7049,6 +7049,54 @@
                 "source": "https://github.com/hamcrest/hamcrest-php/tree/v2.1.1"
             },
             "time": "2025-04-30T06:54:44+00:00"
+        },
+        {
+            "name": "ipeevski/pauseonfail",
+            "version": "1.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ipeevski/PauseOnFail.git",
+                "reference": "34f261699332ca81334586d98e7d9b280ce886d2"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ipeevski/PauseOnFail/zipball/34f261699332ca81334586d98e7d9b280ce886d2",
+                "reference": "34f261699332ca81334586d98e7d9b280ce886d2",
+                "shasum": ""
+            },
+            "require-dev": {
+                "codeception/codeception": "@dev"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-0": {
+                    "Codeception": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ivan Peevski",
+                    "email": "ipeevski@gmail.com"
+                }
+            ],
+            "description": "Extension for Codeception to Pause on Fail",
+            "homepage": "http://codeception.com/",
+            "keywords": [
+                "TDD",
+                "acceptance testing",
+                "functional testing",
+                "notification",
+                "unit testing"
+            ],
+            "support": {
+                "issues": "https://github.com/ipeevski/PauseOnFail/issues",
+                "source": "https://github.com/ipeevski/PauseOnFail/tree/v1.1.1"
+            },
+            "time": "2020-08-20T05:36:08+00:00"
         },
         {
             "name": "laravel/pint",
