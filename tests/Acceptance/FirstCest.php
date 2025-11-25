@@ -19,7 +19,7 @@ final class FirstCest
         });*/
 
         // Если захотите retry — раскомментируйте трейт в AcceptanceTester и используйте так:
-        // $I->retry(3, 500);
+        $I->retry(5, 500);
     }
 
     public function tryToTest(AcceptanceTester $I, Scenario $scenario = null): void
@@ -34,6 +34,7 @@ final class FirstCest
         $I->fillField('email', 'tester@mail.ru');
         $I->fillField('password', 'qqqqqqq');
         $I->click('button[type="submit"]');
+        $I->click(['xpath' => "/html/body/div[1]/div/div/main/div/div/div[2]/div/div/div/div/form/div[3]/button[1]"]);
 
         // Ждём, пока исчезнет блок логина и появится имя пользователя
         $I->waitForText('tester', 10);
