@@ -44,8 +44,8 @@ modules:
                 download.default_directory: "tmp"
             moz:firefoxOptions:
               args: [ "%FIREFOX_ARGS%" ]
-    step_decorators:
-      - \Codeception\Step\Retry
-    extensions:
-      enabled:
-        - Codeception\Extension\PauseOnFail
+step_decorators:
+  - \Codeception\Step\Retry
+extensions:
+    enabled:
+    - Codeception\Extension\PauseOnFail
