@@ -16,10 +16,10 @@
                                 class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-        <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
-            <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-            <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
-        </form>
+                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
+                        <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
+                    </form>
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
@@ -63,8 +63,8 @@
                         <class-tree></class-tree>
                     </div>
                     <div class="col-9">
-        <router-view></router-view>
-    </div>
+                        <router-view></router-view>
+                    </div>
                 </div>
             </div>
         </main>
@@ -96,7 +96,7 @@ export default {
         const checkAuth = async () => {
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                const response = await axios.get('/api/user');
+                const response = await axios.get('/api/user', { noAuthRedirect: true }); // Add flag to skip redirect on 401
                 if (response.data && !authStore.authenticated) {
                     authStore.login(response.data);
                 }
@@ -108,9 +108,9 @@ export default {
                 } else {
                     console.error('Auth check failed:', error.response?.status);
                 }
-                if (authStore.authenticated) {
-                    authStore.logout(); // Clear stale state
-                }
+                // if (authStore.authenticated) {
+                //     authStore.logout(); // Clear stale state
+                // }
             }
         };
         // Use computed to create a two-way binding with searchStore.searchQuery
@@ -155,7 +155,7 @@ export default {
             selectedType,
             showModal,
             submitSearch,
-            };
+        };
     },
     computed: {
         eventBus() {

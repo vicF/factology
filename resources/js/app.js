@@ -64,15 +64,16 @@ axios.interceptors.response.use(
         const status = error.response?.status;
         if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')  && !router.currentRoute.value.fullPath.includes('/register')) {
             const authStore = useAuthStore();
-            if (!authStore.authenticated) {
-                // Redirect to login with current route as redirect query
+            if (authStore.authenticated) {
+                authStore.logout();
+            }
+            // Redirect to login with current route as redirect query
+            // Skip redirect if request config has noAuthRedirect flag (e.g., for auth checks or public fetches)
+            if (!error.config || !error.config.noAuthRedirect) {
                 router.push({
                     name: 'login',
                     query: { redirect: router.currentRoute.value.fullPath }
                 });
-            } else {
-                // Authenticated but unauthorized
-                //router.push({ name: '/' });
             }
         } else if (status === 400 && error.message.includes('header')) {
             const authStore = useAuthStore();
