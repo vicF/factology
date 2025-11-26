@@ -34,7 +34,7 @@
                     </div>
 
                     <!-- class -->
-                    <div class="row p-3">
+                    <div class="row p-3" v-if="object.class">
                         <div class="col-md-2">
                             <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
                                 <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
