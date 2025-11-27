@@ -5,13 +5,13 @@
             <div class="col">
                 <h1>
                     {{ object.name }}
-                    <button class="btn btn-success ms-2" @click="openCreateLinkedModal">
+                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkedModal">
                         {{ $t('Create') }}
                     </button>
-                    <button class="btn btn-primary ms-2" @click="openEditModal">
+                    <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal">
                         {{ $t('Edit') }}
                     </button>
-                    <button class="btn btn-danger ms-2" @click="deleteObject">
+                    <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject">
                         {{ $t('Delete') }}
                     </button>
                 </h1>
@@ -81,7 +81,7 @@
                             </div>
                             <div v-if="link.translation">{{ link.translation }}</div>
                             <div>
-                                <button class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">
+                                <button v-if="authenticated" class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">
                                     {{ $t('Delete') }}
                                 </button>
                             </div>
