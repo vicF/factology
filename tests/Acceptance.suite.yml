@@ -20,6 +20,10 @@ modules:
             acceptInsecureCerts: true
             timeouts:
               pageLoad: 500000
+            goog:loggingPrefs:
+              browser: ALL      # logs console.log, errors, etc.
+              performance: ALL  # network, page events
+            log_js_errors: true   # fails test on JS errors
             goog:chromeOptions:
               args: [
                 "--disable-dev-shm-usage",
@@ -44,6 +48,10 @@ modules:
                 download.default_directory: "tmp"
             moz:firefoxOptions:
               args: [ "%FIREFOX_ARGS%" ]
+      - \Tests\Support\Helper\Acceptance
+    config:
+      \Codeception\Module\WebDriver:
+        reporter: verbose     # <-- THIS IS KEY
 step_decorators:
   - \Codeception\Step\Retry
 extensions:
