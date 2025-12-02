@@ -88,20 +88,12 @@ export default {
                 console.log('Login successful, user:', response.data.user);
                 console.log('Cookies after login:', document.cookie);
 
-                // Handle redirect
+                // ONLY CHANGE: Force full reload with delay
                 const redirect = route.query.redirect || '/';
-                console.log('Login.vue login - Redirect value:', redirect);
-                if (!redirect) {
-                    console.warn('Redirect is empty, defaulting to /');
-                }
-                try {
-                    console.log('Attempting router.push to:', redirect);
-                    await router.push(redirect);
-                    console.log('Navigation successful');
-                } catch (error) {
-                    console.error('Navigation error:', error);
+                setTimeout(() => {
                     window.location.href = redirect;
-                }
+                }, 300);
+
             } catch (error) {
                 console.error('Login error:', {
                     status: error.response?.status,

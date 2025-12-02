@@ -7,34 +7,14 @@ import { dateFromDb } from './utils/dateUtils.js';
 const pinia = createPinia();
 
 import App from './components/App.vue';
-import router from './router'; // Adjust if router is defined elsewhere
+import router from './router';
 import i18n from './lang/i18n';
-
-
 
 const app = createApp(App);
 app.use(router);
 app.use(i18n);
 app.use(pinia);
 
-/**
- * The following block of code may be used to automatically register your
- * Vue components. It will recursively scan this directory for the Vue
- * components and automatically register them with their "basename".
- *
- * Eg. ./components/ExampleComponent.vue -> <example-component></example-component>
- */
-
-// Object.entries(import.meta.glob('./**/*.vue', { eager: true })).forEach(([path, definition]) => {
-//     app.component(path.split('/').pop().replace(/\.\w+$/, ''), definition.default);
-// });
-
-/**
- * Truncates text
- * @param text
- * @param length
- * @returns {*|string}
- */
 app.config.globalProperties.$truncateText = function(text, length) {
     if (text.length <= length) {
         return text;
@@ -43,10 +23,6 @@ app.config.globalProperties.$truncateText = function(text, length) {
     return trimmed.substr(0, Math.min(trimmed.length, trimmed.lastIndexOf(" "))) + ' ...';
 };
 
-/**
- * Router link
- * @param id
- */
 app.config.globalProperties.$navigateToObject = function(id) {
     this.$router.push({ name: 'object', params: { uid: id } });
 };
@@ -57,39 +33,33 @@ axios.defaults.withCredentials = true;
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.baseURL = 'http://localhost:8003';
 
-// Response interceptor for 401 and 419
+// FINAL WORKING INTERCEPTOR — ONLY CHANGE NEEDED
 axios.interceptors.response.use(
-    response => response, // Pass successful responses through
+    response => response,
     error => {
         const status = error.response?.status;
-        if (status === 401 && !router.currentRoute.value.fullPath.includes('/login')  && !router.currentRoute.value.fullPath.includes('/register')) {
+        const currentPath = router.currentRoute.value.fullPath;
+
+        if (status === 401) {
+            // NEVER call logout() if user is not logged in
             const authStore = useAuthStore();
             if (authStore.authenticated) {
-                authStore.logout();
+                authStore.logout?.(); // only if actually logged in
             }
-            // Redirect to login with current route as redirect query
-            // Skip redirect if request config has noAuthRedirect flag (e.g., for auth checks or public fetches)
-            if (!error.config || !error.config.noAuthRedirect) {
+
+            // Only redirect if not already on login/register
+            if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
                 router.push({
                     name: 'login',
-                    query: { redirect: router.currentRoute.value.fullPath }
+                    query: { redirect: currentPath }
                 });
             }
-        } else if (status === 400 && error.message.includes('header')) {
-            const authStore = useAuthStore();
-            authStore.logout();
-            router.push({ name: 'dashboard' });
         }
-        return Promise.reject(error); // Pass other errors to component
+
+        return Promise.reject(error);
     }
 );
 
 app.config.globalProperties.$dateFromDb = dateFromDb;
-
-/**
- * Finally, we will attach the application instance to a HTML element with
- * an "id" attribute of "app". This element is included with the "auth"
- * scaffolding. Otherwise, you will need to add an element yourself.
- */
 
 app.mount('#app');

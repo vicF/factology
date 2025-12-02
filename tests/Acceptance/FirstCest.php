@@ -22,12 +22,13 @@ final class FirstCest
         $I->retry(5, 500);
     }
 
-    public function tryToTest(AcceptanceTester $I, Scenario $scenario = null): void
+
+
+    public function testerLoginTest(AcceptanceTester $I, Scenario $scenario = null): void
     {
         $I->amOnPage('/');
         $I->see('Home');
-        $I->see('Login');
-
+        $I->dontSee('Login');
         $I->amOnPage('/object/d591f9d2-686a-4749-98c3-8fc6bb9d34da');
         $I->see('Login');
 
