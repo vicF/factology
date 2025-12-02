@@ -51,8 +51,8 @@
             </div>
         </nav>
 
-        <!-- Quick create buttons -->
-        <nav class="navbar navbar-light bg-light">
+        <!-- Quick create buttons – shown only to logged-in users -->
+        <nav class="navbar navbar-light bg-light" v-if="authenticated">
             <div class="container-fluid">
                 <div class="d-flex gap-2">
                     <button class="btn btn-outline-primary" @click="openCreateModal('Class')">Class</button>
@@ -80,50 +80,45 @@
 </template>
 
 <script>
-// Vue 3 Composition API imports
-import { computed, watch, onMounted, ref } from 'vue';
+import {computed, watch, onMounted} from 'vue';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "../ClassTree.vue";
-import { useRouter, useRoute } from 'vue-router';
-import { eventBus } from '../../eventBus.js';
-import { useAuthStore } from '../../stores/auth';
+import {useRouter, useRoute} from 'vue-router';
+import {eventBus} from '../../eventBus.js';
+import {useAuthStore} from '../../stores/auth';
 import axios from 'axios';
-import { useSearchStore } from '../../stores/search';
+import {useSearchStore} from '../../stores/search';
 
 export default {
     name: "default-layout",
-    components: { LanguageSwitcher, ClassTree },
+    components: {LanguageSwitcher, ClassTree},
 
     setup() {
         const router = useRouter();
-        const route  = useRoute();
+        const route = useRoute();
         const authStore = useAuthStore();
         const searchStore = useSearchStore();
 
-        /**
-         * Verify authentication status.
-         * The request uses { noAuthRedirect: true } so a 401 does NOT trigger the global redirect.
-         */
+        // ──────────────────────────────────────────────────────────────
+        //  Silent auth check – never triggers redirect on 401
+        // ──────────────────────────────────────────────────────────────
         const checkAuth = async () => {
-            // Already authenticated → nothing to do
-            if (authStore.authenticated) return;
+            if (authStore.authenticated) return; // already logged in
 
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                const { data } = await axios.get('/api/user', { noAuthRedirect: true });
+                const {data} = await axios.get('/api/user', {noAuthRedirect: true});
 
-                if (data) {
-                    authStore.login(data);
-                }
+                if (data) authStore.login(data);
             } catch (error) {
-                // 401 = guest → expected, stay silent
+                // 401 = guest → totally fine, do nothing
                 if (error.response?.status !== 401) {
-                    console.error('Auth check error', error);
+                    console.error('Unexpected auth check error', error);
                 }
             }
         };
 
-        // Two-way binding for the global search query
+        // Two-way bound search input
         const searchQuery = computed({
             get: () => searchStore.searchQuery,
             set: (val) => searchStore.setSearchQuery(val)
@@ -131,32 +126,23 @@ export default {
 
         const submitSearch = () => eventBus.emit('trigger-search');
 
-        // --------------------------------------------------------------
-        // 1. Run on first load
-        // --------------------------------------------------------------
+        // Run on mount and on every route change
         onMounted(checkAuth);
-
-        // --------------------------------------------------------------
-        // 2. Re-check whenever the route changes (including query changes)
-        // --------------------------------------------------------------
         watch(() => route.fullPath, checkAuth);
 
-        // --------------------------------------------------------------
-        // 3. AFTER login we land on /login?redirect=...
-        //     When the user becomes authenticated while we are still on the login page → redirect!
-        // --------------------------------------------------------------
+        // After login → redirect away from /login page
         watch(
             () => authStore.authenticated,
             (isAuth) => {
                 if (isAuth && route.name === 'login') {
                     const redirect = route.query.redirect || '/';
-                    router.replace(redirect);   // replace so the login page is removed from history
+                    router.replace(redirect);
                 }
             },
-            { immediate: true }   // also run once on mount in case the user refreshed the page already logged in
+            {immediate: true}
         );
 
-        // Keep search input in sync with URL query param
+        // Sync URL ?q= parameter with search field
         watch(() => route.query.q, (q) => {
             searchQuery.value = q || '';
         });
@@ -171,9 +157,15 @@ export default {
     },
 
     computed: {
-        eventBus() { return eventBus; },
-        user() { return this.authStore.user || null; },
-        authenticated() { return this.authStore.authenticated; },
+        eventBus() {
+            return eventBus;
+        },
+        user() {
+            return this.authStore.user || null;
+        },
+        authenticated() {
+            return this.authStore.authenticated;
+        },
     },
 
     methods: {
@@ -181,25 +173,30 @@ export default {
             try {
                 await axios.post('/logout');
                 this.authStore.logout();
-                this.$router.push({ name: "dashboard" });
+                this.$router.push({name: "dashboard"});
             } catch (e) {
                 console.error('Logout failed', e);
             }
         },
 
         openCreateModal(type) {
-            // your existing modal logic
+            // your existing modal opening logic
         },
 
         handleObjectCreated(object) {
             console.log('Object created:', object);
-            this.$router.push({ path: '/', query: { q: this.searchQuery } });
+            this.$router.push({path: '/', query: {q: this.searchQuery}});
         }
     }
 };
 </script>
 
 <style scoped>
-.navbar-light .btn { margin-right: 0.5rem; }
-.container { max-width: 100%; }
+.navbar-light .btn {
+    margin-right: 0.5rem;
+}
+
+.container {
+    max-width: 100%;
+}
 </style>

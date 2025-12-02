@@ -4,10 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Support\Helper;
 
+use Codeception\TestInterface;
+
 class Acceptance extends \Codeception\Module
 {
     public function _afterStep(\Codeception\Step $step)
     {
+        parent::_afterStep($step);
+        $this->dumpBrowserConsole();
+    }
+
+    public function _failed(TestInterface $test, \Exception $fail)
+    {
+        parent::_failed($test, $fail);
         $this->dumpBrowserConsole();
     }
 

@@ -1,3 +1,5 @@
+// resources/js/app.js
+
 import './bootstrap';
 import '../sass/app.scss';
 import { createApp } from 'vue';
@@ -16,9 +18,7 @@ app.use(i18n);
 app.use(pinia);
 
 app.config.globalProperties.$truncateText = function(text, length) {
-    if (text.length <= length) {
-        return text;
-    }
+    if (text.length <= length) return text;
     let trimmed = text.substr(0, length);
     return trimmed.substr(0, Math.min(trimmed.length, trimmed.lastIndexOf(" "))) + ' ...';
 };
@@ -33,25 +33,30 @@ axios.defaults.withCredentials = true;
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.baseURL = 'http://localhost:8003';
 
-// FINAL WORKING INTERCEPTOR — ONLY CHANGE NEEDED
+// ──────────────────────────────────────────────────────────────
+//  FIXED 401 INTERCEPTOR – this is the only part that matters now
+// ──────────────────────────────────────────────────────────────
 axios.interceptors.response.use(
     response => response,
     error => {
         const status = error.response?.status;
-        const currentPath = router.currentRoute.value.fullPath;
 
+        // 401 → redirect to login ONLY if the request was NOT marked as safe
         if (status === 401) {
-            // NEVER call logout() if user is not logged in
-            const authStore = useAuthStore();
-            if (authStore.authenticated) {
-                authStore.logout?.(); // only if actually logged in
+            // Do NOT redirect when we are just checked who the user is
+            if (error.config?.noAuthRedirect) {
+                return Promise.reject(error); // just continue, no redirect
             }
 
-            // Only redirect if not already on login/register
-            if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+            // All other 401s → force login
+            if (!router.currentRoute.value.fullPath.includes('/login') &&
+                !router.currentRoute.value.fullPath.includes('/register')) {
+                const authStore = useAuthStore();
+                if (authStore.authenticated) authStore.logout();
+
                 router.push({
                     name: 'login',
-                    query: { redirect: currentPath }
+                    query: { redirect: router.currentRoute.value.fullPath || '/' }
                 });
             }
         }

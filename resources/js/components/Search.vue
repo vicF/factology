@@ -1,5 +1,5 @@
 <template>
-    <div id="search" v-cloak>
+    <div id="search" v-cloak> <!-- Added id="search" here — this is the reliable container for acceptance tests -->
         <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
             <div class="col">
@@ -48,89 +48,89 @@
 </template>
 
 <script>
-import TreeMenu from './TreeMenu.vue';
-import { useSearchStore } from '../stores/search';
-import { ref, onMounted, watch } from 'vue';
-import axios from 'axios';
-import { useRoute } from 'vue-router';
-import {eventBus} from "../eventBus";
+    import TreeMenu from './TreeMenu.vue';
+    import { useSearchStore } from '../stores/search';
+    import { ref, onMounted, watch } from 'vue';
+    import axios from 'axios';
+    import { useRoute } from 'vue-router';
+    import {eventBus} from "../eventBus";
 
-export default {
-    name: "Search",
-    components: { TreeMenu },
-    props: ['searchText', 'typeThing', 'typeClass'],
-    setup(props) {
-        const objects = ref([]);
-        const loaded = ref(false);
-        const validationErrors = ref({});
-        const processing = ref(false);
-        const route = useRoute();
-        const searchStore = useSearchStore();
+    export default {
+        name: "Search",
+        components: { TreeMenu },
+        props: ['searchText', 'typeThing', 'typeClass'],
+        setup(props) {
+            const objects = ref([]);
+            const loaded = ref(false);
+            const validationErrors = ref({});
+            const processing = ref(false);
+            const route = useRoute();
+            const searchStore = useSearchStore();
 
-        // Sync props with store
-        if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
-        if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
+            // Sync props with store
+            if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
+            if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
 
-        const getThumbUrl = (thing_id) => {
-            return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
-        };
+            const getThumbUrl = (thing_id) => {
+                return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
+            };
 
-        const getObjects = async () => {
-            let type = [];
-            if (searchStore.typeThing) type.push(3);
-            if (searchStore.typeClass) type.push(2);
+            const getObjects = async () => {
+                let type = [];
+                if (searchStore.typeThing) type.push(3);
+                if (searchStore.typeClass) type.push(2);
 
-            processing.value = true;
-            try {
-                 const response = await axios.post('/api/v1/object', JSON.stringify({
-                    "search": searchStore.searchQuery || props.searchText || route.query.q || '',
-                    "type": type,
-                    classes: searchStore.checkedItems,
-                }));
-                validationErrors.value = {};
-                let data = JSON.parse(response.data);
-                objects.value = data.things;
-                console.log('Links:', data.links);
-            } catch (error) {
-                console.error(error);
-                if (error.response && error.response.status === 422) {
-                    validationErrors.value = error.response.data.errors;
-                } else {
+                processing.value = true;
+                try {
+                    const response = await axios.post('/api/v1/object', JSON.stringify({
+                        "search": searchStore.searchQuery || props.searchText || route.query.q || '',
+                        "type": type,
+                        classes: searchStore.checkedItems,
+                    }));
                     validationErrors.value = {};
-                alert(error.response ? error.response.data.message : error.message);
+                    let data = JSON.parse(response.data);
+                    objects.value = data.things;
+                    console.log('Links:', data.links);
+                } catch (error) {
+                    console.error(error);
+                    if (error.response && error.response.status === 422) {
+                        validationErrors.value = error.response.data.errors;
+                    } else {
+                        validationErrors.value = {};
+                        alert(error.response ? error.response.data.message : error.message);
+                    }
+                } finally {
+                    processing.value = false;
+                    loaded.value = true;
                 }
-            } finally {
-                processing.value = false;
-                loaded.value = true;
-            }
-        };
+            };
 
-        watch(() => route.query.q, (newQuery, oldQuery) => {
-            if (newQuery !== oldQuery) {
-                console.log('Search.vue - Query param changed:', newQuery);
-                searchStore.setSearchQuery(newQuery || '');
-                getObjects();
-            }
-        });
+            watch(() => route.query.q, (newQuery, oldQuery) => {
+                if (newQuery !== oldQuery) {
+                    console.log('Search.vue - Query param changed:', newQuery);
+                    searchStore.setSearchQuery(newQuery || '');
+                    getObjects();
+                }
+            });
 
-        onMounted(() => {
-            eventBus.on('trigger-search', () => {
-                console.log('Search.vue - trigger-search received, searchQuery:', searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
+            onMounted(() => {
+                eventBus.on('trigger-search', () => {
+                    console.log('Search.vue - trigger-search received, searchQuery:', searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
+                    getObjects();
+                });
                 getObjects();
             });
-            getObjects();
-        });
 
-        return {
-            objects,
-            loaded,
-            getThumbUrl,
-            getObjects,
-            validationErrors,
-            processing
-        };
-    }
-};
+            return {
+                objects,
+                loaded,
+                getThumbUrl,
+                getObjects,
+                validationErrors,
+                processing
+            };
+        }
+    };
 </script>
 
 <style scoped>
