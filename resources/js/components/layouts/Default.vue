@@ -12,20 +12,14 @@
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">
-                                Home <span class="sr-only">(current)</span>
-                            </router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span
+                                class="sr-only">(current)</span></router-link>
                         </li>
                     </ul>
-
-                    <!-- Search form -->
                     <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
-                        <input class="form-control me-2" type="search" placeholder="Search"
-                               v-model="searchQuery" aria-label="Search">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
-
-                    <!-- Right side – language switcher & user menu -->
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
@@ -35,7 +29,8 @@
                                    aria-expanded="false">
                                     {{ authenticated && user ? user.name : 'User' }}
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                                <div class="dropdown-menu dropdown-menu-end"
+                                     aria-labelledby="navbarDropdownMenuLink">
                                     <template v-if="authenticated">
                                         <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
                                     </template>
@@ -50,9 +45,7 @@
                 </div>
             </div>
         </nav>
-
-        <!-- Quick create buttons – shown only to logged-in users -->
-        <nav class="navbar navbar-light bg-light" v-if="authenticated">
+        <nav class="navbar navbar-light bg-light">
             <div class="container-fluid">
                 <div class="d-flex gap-2">
                     <button class="btn btn-outline-primary" @click="openCreateModal('Class')">Class</button>
@@ -80,61 +73,80 @@
 </template>
 
 <script>
-import {computed, watch, onMounted} from 'vue';
+import { computed } from 'vue';
 import LanguageSwitcher from "../LanguageSwitcher.vue";
 import ClassTree from "../ClassTree.vue";
-import {useRouter, useRoute} from 'vue-router';
-import {eventBus} from '../../eventBus.js';
-import {useAuthStore} from '../../stores/auth';
+import { useRouter, useRoute } from 'vue-router';
+import { ref, watch, onMounted } from 'vue';
+import { eventBus } from '../../eventBus.js';
+import { useAuthStore } from '../../stores/auth';
 import axios from 'axios';
-import {useSearchStore} from '../../stores/search';
+import { useSearchStore } from '../../stores/search';
 
 export default {
     name: "default-layout",
     components: {LanguageSwitcher, ClassTree},
-
     setup() {
         const router = useRouter();
         const route = useRoute();
         const authStore = useAuthStore();
+        const showModal = ref(false);
+        const selectedType = ref('');
         const searchStore = useSearchStore();
 
-        // ──────────────────────────────────────────────────────────────
-        //  Silent auth check – never triggers redirect on 401
-        // ──────────────────────────────────────────────────────────────
         const checkAuth = async () => {
-            if (authStore.authenticated) return; // already logged in
-
             try {
                 await axios.get('/sanctum/csrf-cookie');
-                const {data} = await axios.get('/api/user', {noAuthRedirect: true});
-
-                if (data) authStore.login(data);
+                const response = await axios.get('/api/user', {noAuthRedirect: true});
+                if (response.data && !authStore.authenticated) {
+                    authStore.login(response.data);
+                }
+                console.log('Authenticated:', authStore.authenticated);
+                console.log('User:', authStore.user);
             } catch (error) {
-                // 401 = guest → totally fine, do nothing
-                if (error.response?.status !== 401) {
-                    console.error('Unexpected auth check error', error);
+                if (error.response?.status === 401) {
+                    console.log('Not authenticated yet (401)');
+                } else {
+                    console.error('Auth check failed:', error.response?.status);
+                }
+                if (authStore.authenticated) {
+                    authStore.logout();
                 }
             }
         };
 
-        // Two-way bound search input
         const searchQuery = computed({
-            get: () => searchStore.searchQuery,
-            set: (val) => searchStore.setSearchQuery(val)
+            get() {
+                return searchStore.searchQuery;
+            },
+            set(value) {
+                console.log('default.vue - Updating searchQuery:', value);
+                searchStore.setSearchQuery(value);
+            }
         });
 
-        const submitSearch = () => eventBus.emit('trigger-search');
+        const submitSearch = () => {
+            console.log('default.vue - Emitting trigger-search');
+            eventBus.emit('trigger-search');
+        };
 
-        // Run on mount and on every route change
-        onMounted(checkAuth);
-        watch(() => route.fullPath, checkAuth);
+        onMounted(() => {
+            checkAuth();
+        });
 
-        // After login → redirect away from /login page
+        watch(() => route.path, () => {
+            checkAuth();
+        });
+
+        watch(() => route.query.q, (newQuery) => {
+            searchQuery.value = newQuery || '';
+        });
+
+        // ONLY THIS BLOCK WAS ADDED — redirect after successful login
         watch(
             () => authStore.authenticated,
             (isAuth) => {
-                if (isAuth && route.name === 'login') {
+                if (isAuth && route.path === '/login') {
                     const redirect = route.query.redirect || '/';
                     router.replace(redirect);
                 }
@@ -142,23 +154,20 @@ export default {
             {immediate: true}
         );
 
-        // Sync URL ?q= parameter with search field
-        watch(() => route.query.q, (q) => {
-            searchQuery.value = q || '';
-        });
-
         return {
             authStore,
+            checkAuth,
             route,
             router,
             searchQuery,
+            selectedType,
+            showModal,
             submitSearch,
         };
     },
-
     computed: {
         eventBus() {
-            return eventBus;
+            return eventBus
         },
         user() {
             return this.authStore.user || null;
@@ -167,27 +176,28 @@ export default {
             return this.authStore.authenticated;
         },
     },
-
     methods: {
         async logout() {
-            try {
-                await axios.post('/logout');
+            await axios.post('/logout').then(() => {
                 this.authStore.logout();
                 this.$router.push({name: "dashboard"});
-            } catch (e) {
-                console.error('Logout failed', e);
-            }
+            }).catch(error => {
+                console.error('Logout failed:', error);
+            });
         },
-
         openCreateModal(type) {
-            // your existing modal opening logic
+            this.selectedType = type;
+            this.showModal = true;
         },
-
+        closeModal() {
+            this.showModal = false;
+            this.selectedType = '';
+        },
         handleObjectCreated(object) {
             console.log('Object created:', object);
             this.$router.push({path: '/', query: {q: this.searchQuery}});
-        }
-    }
+        },
+    },
 };
 </script>
 

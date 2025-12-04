@@ -281,5 +281,10 @@ class AcceptanceTester extends \Codeception\Actor
         return $uri;
     }
 
+    public function clickLoginButton(): void
+    {
+        $this->click(['xpath' => "/html/body/div[1]/div/div/main/div/div/div[2]/div/div/div/div/form/div[3]/button[1]"]);
+    }
+
 
 }

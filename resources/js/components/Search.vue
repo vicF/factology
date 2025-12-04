@@ -1,5 +1,5 @@
 <template>
-    <div id="search" v-cloak> <!-- Added id="search" here — this is the reliable container for acceptance tests -->
+    <div id="search">  <!-- v-cloak removed – only change -->
         <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
             <div class="col">
@@ -28,11 +28,11 @@
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                        <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
+                                            <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
                                     </RouterLink>
-                                    {{ link.translation }}
+                                        {{ link.translation }}
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                        {{ link.name }}
+                                            {{ link.name }}
                                     </RouterLink>
                                 </div>
                             </div>

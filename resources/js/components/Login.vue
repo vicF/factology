@@ -1,4 +1,3 @@
-<!-- factology/resources/js/components/Login.vue -->
 <template>
     <div class="container d-flex justify-content-center align-items-start min-vh-100 py-4">
         <div class="col-12 col-md-6">
@@ -6,6 +5,7 @@
                 <div class="card-body">
                     <h1 class="text-center">{{ $t('Login') }}</h1>
                     <hr/>
+
                     <form @submit.prevent="login" class="row">
                         <div class="col-12" v-if="Object.keys(validationErrors).length > 0">
                             <div class="alert alert-danger">
@@ -14,20 +14,24 @@
                                 </ul>
                             </div>
                         </div>
+
                         <div class="form-group col-12">
                             <label for="email" class="font-weight-bold">{{ $t('Email') }}</label>
-                            <input type="email" v-model="auth.email" name="email" id="email" class="form-control" required>
+                            <input type="email" v-model="auth.email" name="email" id="email" class="form-control" required autocomplete="email">
                         </div>
+
                         <div class="form-group col-12 my-2">
                             <label for="password" class="font-weight-bold">{{ $t('Password') }}</label>
-                            <input type="password" v-model="auth.password" name="password" id="password" class="form-control" required>
+                            <input type="password" v-model="auth.password" name="password" id="password" class="form-control" required autocomplete="current-password">
                         </div>
+
                         <div class="col-12 mb-2 d-flex gap-2">
                             <button type="submit" :disabled="processing" class="btn btn-primary flex-fill">
                                 {{ processing ? $t('Please wait') : $t('Login') }}
                             </button>
                             <button type="button" class="btn btn-secondary flex-fill" @click="cancel">{{ $t('Cancel') }}</button>
                         </div>
+
                         <div class="col-12 text-center">
                             <label>{{ $t('Don\'t have an account?') }} <router-link :to="{name:'register'}">{{ $t('Register Now!') }}</router-link></label>
                         </div>
@@ -52,60 +56,33 @@ export default {
         const route = useRoute();
         const { t } = useI18n();
         const authStore = useAuthStore();
+
         const auth = reactive({
             email: "",
             password: ""
         });
+
         const validationErrors = ref({});
         const processing = ref(false);
 
-        // Debug route and query
-        console.log('Login.vue setup - Route:', route);
-        console.log('Login.vue setup - Query:', route.query);
-        console.log('Login.vue setup - Redirect:', route.query.redirect);
-
         const login = async () => {
             processing.value = true;
-            try {
-                console.log('Fetching CSRF cookie...');
-                const csrfResponse = await axios.get('/sanctum/csrf-cookie');
-                console.log('CSRF response:', csrfResponse);
-                console.log('CSRF cookie fetched, sending login request...');
-                const response = await axios.post('/login', auth, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN')
-                    }
-                });
-                console.log('Login response:', response);
-                if (!response.data.user) {
-                    throw new Error('User data missing in response');
-                }
-                if (typeof authStore.login !== 'function') {
-                    throw new Error('authStore.login is not a function');
-                }
-                authStore.login(response.data.user);
-                console.log('Login successful, user:', response.data.user);
-                console.log('Cookies after login:', document.cookie);
+            validationErrors.value = {};
 
-                // ONLY CHANGE: Force full reload with delay
-                const redirect = route.query.redirect || '/';
-                setTimeout(() => {
-                    window.location.href = redirect;
-                }, 300);
+            try {
+                await axios.get('/sanctum/csrf-cookie');
+                const response = await axios.post('/login', auth);
+
+                authStore.login(response.data.user);
+
+                const redirectTo = route.query.redirect || '/';
+                await router.push(redirectTo);
 
             } catch (error) {
-                console.error('Login error:', {
-                    status: error.response?.status,
-                    data: error.response?.data,
-                    message: error.message,
-                    headers: error.response?.headers
-                });
                 if (error.response?.status === 422) {
                     validationErrors.value = error.response.data.errors;
                 } else {
-                    validationErrors.value = {};
-                    alert(error.message || error.response?.data?.message || t('Login failed'));
+                    alert(t('Login failed'));
                 }
             } finally {
                 processing.value = false;
@@ -113,14 +90,7 @@ export default {
         };
 
         const cancel = () => {
-            router.push({ name: 'dashboard' });
-        };
-
-        const getCookie = (name) => {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return null;
+            router.push({name: 'dashboard'});
         };
 
         return {
@@ -139,14 +109,17 @@ export default {
 .min-vh-100 {
     min-height: 100vh;
 }
+
 .card {
     max-width: 400px;
     width: 100%;
 }
+
 @media (max-height: 600px) {
     .align-items-start {
         align-items: flex-start !important;
     }
+
     .py-4 {
         padding-top: 1rem !important;
     }
