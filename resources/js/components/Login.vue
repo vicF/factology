@@ -76,6 +76,7 @@ export default {
                 authStore.login(response.data.user);
 
                 const redirectTo = route.query.redirect || '/';
+                console.debug('await router.push(redirectTo);');
                 await router.push(redirectTo);
 
             } catch (error) {

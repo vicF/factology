@@ -1,5 +1,5 @@
-import loadash from 'lodash'
-window._ = loadash
+import lodash from 'lodash'
+window._ = lodash
 
 import * as Popper from '@popperjs/core'
 window.Popper = Popper

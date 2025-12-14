@@ -1,7 +1,14 @@
 <template>
     <div class="container" id="search">
-        <div v-if="!loaded" class="row">{{ $t('Loading...') }}</div>
-        <div v-else class="row">
+        <!-- Loading state -->
+        <div v-if="!loaded" class="row text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">{{ $t('Loading...') }}</span>
+            </div>
+        </div>
+
+        <!-- Object loaded successfully -->
+        <div v-else-if="object" class="row">
             <div class="col">
                 <h1>
                     {{ object.name }}
@@ -91,6 +98,24 @@
             </div>
         </div>
 
+        <!-- Object not accessible or doesn't exist -->
+        <div v-else class="row">
+            <div class="col text-center py-5">
+                <div class="alert" :class="authenticated ? 'alert-warning' : 'alert-info'">
+                    <h4>{{ $t('Not Found') }}</h4>
+                    <p>
+                        {{ authenticated
+                        ? $t('This object is private or does not exist.')
+                        : $t('This object is private or does not exist. You may need to log in to view it.')
+                        }}
+                    </p>
+                    <router-link v-if="!authenticated" to="/login" class="btn btn-primary mt-3">
+                        {{ $t('Log in to see more') }}
+                    </router-link>
+                </div>
+            </div>
+        </div>
+
         <!-- === РЕДАКТИРОВАНИЕ ТЕКУЩЕГО ОБЪЕКТА === -->
         <EditObject
             v-if="showEditModal"
@@ -115,7 +140,7 @@
         <EditObject
             v-if="showCreateLinkedModal"
             :object="null"
-            :parentObjectId="object.thing_id"
+            :parentObjectId="object?.thing_id"
             :initialLinkedObjects="[]"
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
@@ -141,7 +166,7 @@ export default {
         const { t } = useI18n();
         const authStore = useAuthStore();
 
-        const object = ref({});
+        const object = ref(null);
         const loaded = ref(false);
 
         // Модалки
@@ -153,6 +178,8 @@ export default {
         const modalParams = ref({});
         const treeModalParams = ref({});
 
+        const authenticated = computed(() => authStore.authenticated);
+
         const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
         };
@@ -162,11 +189,17 @@ export default {
                 loaded.value = false;
                 const response = await axios.get(`/api/v1/object/${route.params.uid}`);
                 object.value = response.data.data;
-                console.log('Object.vue - Fetched object:', object.value);
-                loaded.value = true;
             } catch (error) {
-                console.error('Get object error:', error);
-                handleApiError(error);
+                // 401 or 404 → treat as "not accessible"
+                if (error.response?.status === 401 || error.response?.status === 404) {
+                    console.log('Object not accessible for current user');
+                    object.value = null;
+                } else {
+                    console.error('Get object error:', error);
+                    //alert(t('Error loading object'));
+                }
+            } finally {
+                loaded.value = true;
             }
         };
 
@@ -182,7 +215,7 @@ export default {
                     router.push({ path: '/login', query: { redirect: route.fullPath } });
                 }
             } else {
-                alert(t('Error loading object'));
+                //alert(t('Error loading object'));
                 loaded.value = true;
             }
         };
@@ -251,12 +284,12 @@ export default {
         const handleLinkedObjectCreated = async () => {
             console.log('Object.vue - Linked object created → refreshing current object');
             showCreateLinkedModal.value = false;
-            await getObject(); // ← Обновляем текущий объект → новая связь появится
+            await getObject();
         };
 
         // Формируем linkRecords только для редактирования
         const linkRecords = computed(() => {
-            if (!Array.isArray(object.value.links)) return [];
+            if (!Array.isArray(object.value?.links)) return [];
             return object.value.links.map(l => ({
                 link_id: l.link_id,
                 link_type_id: l.link_type_id,
@@ -294,6 +327,7 @@ export default {
             handleLinkedObjectCreated,
             linkRecords,
             t,
+            authenticated,
         };
     },
 };

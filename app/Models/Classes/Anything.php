@@ -313,7 +313,7 @@ class Anything
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
-            abort(401, 'Authorization required to access this resource');
+            abort(404, 'Authorization required to access this resource');
         }
         $thing['class'] = $class;
         $first = DB::table('links') // One way links

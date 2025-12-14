@@ -142,12 +142,12 @@ export default {
             searchQuery.value = newQuery || '';
         });
 
-        // ONLY THIS BLOCK WAS ADDED — redirect after successful login
         watch(
             () => authStore.authenticated,
-            (isAuth) => {
-                if (isAuth && route.path === '/login') {
+            (isAuthenticated) => {
+                if (isAuthenticated && route.matched.some(r => r.components?.default?.name === 'login')) {
                     const redirect = route.query.redirect || '/';
+                    console.debug('router.replace(' + redirect + ')');
                     router.replace(redirect);
                 }
             },
