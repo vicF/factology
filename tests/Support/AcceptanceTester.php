@@ -286,5 +286,16 @@ class AcceptanceTester extends \Codeception\Actor
         $this->click(['xpath' => "/html/body/div[1]/div/div/main/div/div/div[2]/div/div/div/div/form/div[3]/button[1]"]);
     }
 
+    /**
+     * @param AcceptanceTester $I
+     */
+    public function _failed(AcceptanceTester $I): void
+    {
+        if (getenv('PAUSE_ON_FAIL') === '1') {
+            $this->debug('Paused on fail');
+            $this->pause();
+        }
+    }
+
 
 }
