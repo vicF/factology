@@ -51,7 +51,7 @@ modules:
       - \Tests\Support\Helper\Acceptance
     config:
       \Codeception\Module\WebDriver:
-        reporter: verbose     # <-- THIS IS KEY
+        reporter: verbose
 step_decorators:
   - \Codeception\Step\Retry
 extensions:

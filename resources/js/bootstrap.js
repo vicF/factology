@@ -38,3 +38,17 @@ axios.defaults.withCredentials = true;
 //     forceTLS: (import.meta.env.VITE_PUSHER_SCHEME ?? 'https') === 'https',
 //     enabledTransports: ['ws', 'wss'],
 // });
+
+
+// Helper to make Bootstrap dropdowns more reliable in Codeception/WebDriver tests
+// Usage in test: $I->executeJS('triggerDropdown("#navbarDropdownMenuLink")');
+window.triggerDropdown = function(selector) {
+    const el = document.querySelector(selector);
+    if (el) {
+        el.scrollIntoView({ block: 'center' });
+        el.click();
+        // Force Bootstrap to show the dropdown (fallback if click doesn't work)
+        const dropdown = bootstrap.Dropdown.getInstance(el) || new bootstrap.Dropdown(el);
+        dropdown.show();
+    }
+};
