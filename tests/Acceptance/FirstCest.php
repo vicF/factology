@@ -66,20 +66,16 @@ final class FirstCest
         $I->see('Home');
         $I->waitForElement('#search', 10);
 
-        // Open dropdown using direct Bootstrap JS (more reliable than custom function, avoids "not defined" errors)
-        $I->executeJS("
-            const toggle = document.querySelector('#navbarDropdownMenuLink');
-            if (toggle) {
-                toggle.scrollIntoView({ block: 'center' });
-                const dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle);
-                dropdown.show();
-            }
-        ");
+        // More reliable way: scroll into view and perform a normal click on the toggle
+        // This triggers Bootstrap's data-api properly (data-bs-toggle="dropdown")
+        $I->scrollTo('#navbarDropdownMenuLink');
+        $I->wait(1); // small delay after scroll
+        $I->click('#navbarDropdownMenuLink');
 
-        // Wait for the dropdown menu to be visible
+        // Wait for the dropdown menu to become visible
         $I->waitForElementVisible('.dropdown-menu.show', 10);
 
-        // Click the Register item
+        // Click the Register item inside the dropdown
         $I->click('Register', '.dropdown-menu');
 
         // Wait for register page and fill registration form
@@ -111,13 +107,9 @@ final class FirstCest
         // TODO: Delete created objects (when implemented)
 
         // Test logout
-        $I->executeJS("
-            const toggle = document.querySelector('#navbarDropdownMenuLink');
-            if (toggle) {
-                const dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle);
-                dropdown.show();
-            }
-        ");
+        $I->scrollTo('#navbarDropdownMenuLink');
+        $I->wait(1);
+        $I->click('#navbarDropdownMenuLink');
         $I->waitForElementVisible('.dropdown-menu.show', 10);
         $I->click('Logout', '.dropdown-menu');
         $I->waitForText('Home', 10);
@@ -142,13 +134,9 @@ final class FirstCest
         // $I->see('Account deleted');
 
         // Final logout (if delete not implemented yet)
-        $I->executeJS("
-            const toggle = document.querySelector('#navbarDropdownMenuLink');
-            if (toggle) {
-                const dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle);
-                dropdown.show();
-            }
-        ");
+        $I->scrollTo('#navbarDropdownMenuLink');
+        $I->wait(1);
+        $I->click('#navbarDropdownMenuLink');
         $I->waitForElementVisible('.dropdown-menu.show', 10);
         $I->click('Logout', '.dropdown-menu');
         $I->wait(1); // small pause for cleanup
