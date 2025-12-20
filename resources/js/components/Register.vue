@@ -1,11 +1,11 @@
 <template>
-    <div class="container h-100">
-        <div class="row h-100 align-items-center">
-            <div class="col-12 col-md-6 offset-md-3">
-                <div class="card shadow sm">
-                    <div class="card-body">
-                        <h1 class="text-center">Register</h1>
-                        <hr/>
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4 p-md-5">
+                        <h1 class="text-center mb-4">Register</h1>
+                        <hr class="mb-4"/>
                         <form action="javascript:void(0)" @submit="register" class="row" method="post">
                             <div class="col-12" v-if="Object.keys(validationErrors).length > 0">
                                 <div class="alert alert-danger">
@@ -14,24 +14,24 @@
                                     </ul>
                                 </div>
                             </div>
-                            <div class="form-group col-12">
+                            <div class="form-group col-12 mb-3">
                                 <label for="name" class="font-weight-bold">Name</label>
                                 <input type="text" name="name" v-model="user.name" id="name" placeholder="Enter name" class="form-control">
                             </div>
-                            <div class="form-group col-12 my-2">
+                            <div class="form-group col-12 mb-3">
                                 <label for="email" class="font-weight-bold">Email</label>
                                 <input type="text" name="email" v-model="user.email" id="email" placeholder="Enter Email" class="form-control">
                             </div>
-                            <div class="form-group col-12">
+                            <div class="form-group col-12 mb-3">
                                 <label for="password" class="font-weight-bold">Password</label>
                                 <input type="password" name="password" v-model="user.password" id="password" placeholder="Enter Password" class="form-control">
                             </div>
-                            <div class="form-group col-12 my-2">
+                            <div class="form-group col-12 mb-4">
                                 <label for="password_confirmation" class="font-weight-bold">Confirm Password</label>
                                 <input type="password" name="password_confirmation" v-model="user.password_confirmation" id="password_confirmation" placeholder="Enter Password" class="form-control">
                             </div>
-                            <div class="col-12 mb-2">
-                                <button type="submit" :disabled="processing" class="btn btn-primary btn-block">
+                            <div class="col-12 mb-3">
+                                <button type="submit" :disabled="processing" class="btn btn-primary btn-block w-100">
                                     {{ processing ? "Please wait" : "Register" }}
                                 </button>
                             </div>
