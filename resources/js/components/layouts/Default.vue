@@ -45,16 +45,6 @@
                 </div>
             </div>
         </nav>
-        <nav class="navbar navbar-light bg-light">
-            <div class="container-fluid">
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" @click="openCreateModal('Class')">Class</button>
-                    <button class="btn btn-outline-primary" @click="openCreateModal('Person')">Person</button>
-                    <button class="btn btn-outline-primary" @click="openCreateModal('Event')">Event</button>
-                    <button class="btn btn-outline-primary" @click="openCreateModal('Something')">Something</button>
-                </div>
-            </div>
-        </nav>
 
         <!-- Main content area -->
         <main class="mt-3">
