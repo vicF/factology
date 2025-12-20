@@ -66,33 +66,40 @@ final class FirstCest
         $I->see('Home');
         $I->waitForElement('#search', 10);
 
-        // More reliable way: scroll into view and perform a normal click on the toggle
-        // This triggers Bootstrap's data-api properly (data-bs-toggle="dropdown")
+        // Open dropdown
         $I->scrollTo('#navbarDropdownMenuLink');
-        $I->wait(1); // small delay after scroll
+        $I->wait(1);
         $I->click('#navbarDropdownMenuLink');
-
-        // Wait for the dropdown menu to become visible
         $I->waitForElementVisible('.dropdown-menu.show', 10);
 
-        // Click the Register item inside the dropdown
+        // Click Register in dropdown
         $I->click('Register', '.dropdown-menu');
 
-        // Wait for register page and fill registration form
+        // Wait for register page
         $I->waitForText('Register', 10);
+
+        // Ensure the entire form is visible and interactable
+        $I->scrollTo('.card.shadow-sm');
+        $I->wait(1);
+
+        // Fill form fields using precise IDs (most reliable for Vue inputs)
         $I->fillField('name', $tempName);
         $I->fillField('email', $tempEmail);
         $I->fillField('password', $tempPassword);
         $I->fillField('password_confirmation', $tempPassword);
-        $I->click('Register'); // assuming button text is "Register"
 
-        // After registration – should be logged in and redirected (usually to home)
-        $I->waitForText($tempName, 15); // wait for username in navbar
+        // Scroll to and click the submit button using a reliable CSS selector
+        $I->scrollTo('button[type="submit"].btn-primary');
+        $I->wait(1);
+        $I->click('button[type="submit"].btn-primary');
+
+        // Wait for successful registration – username appears in navbar
+        $I->waitForText($tempName, 15);
         $I->see($tempName);
         $I->dontSee('Register');
         $I->dontSee('Login');
 
-        // Browse some pages as logged-in user (example: assume a protected page or just home)
+        // Browse home as logged-in user
         $I->amOnPage('/');
         $I->see('Home');
         $I->waitForElement('#search', 10);
@@ -122,26 +129,21 @@ final class FirstCest
         $I->waitForText('Login', 10);
         $I->fillField('email', $tempEmail);
         $I->fillField('password', $tempPassword);
-        $I->clickLoginButton(); // reuse existing helper if available
+        $I->clickLoginButton();
         $I->waitForText($tempName, 15);
         $I->see($tempName);
 
         // TODO: Delete account (will be added when feature is implemented)
-        // Example placeholder:
-        // $I->executeJS('triggerDropdown("#navbarDropdownMenuLink")');
-        // $I->click('Delete Account');
-        // $I->acceptPopup();
-        // $I->see('Account deleted');
 
-        // Final logout (if delete not implemented yet)
+        // Final logout
         $I->scrollTo('#navbarDropdownMenuLink');
         $I->wait(1);
         $I->click('#navbarDropdownMenuLink');
         $I->waitForElementVisible('.dropdown-menu.show', 10);
         $I->click('Logout', '.dropdown-menu');
-        $I->wait(1); // small pause for cleanup
+        $I->wait(1);
 
-        // Optional: pause for manual inspection during development
+        // Optional: pause for manual inspection
         // $I->pause();
     }
 }
