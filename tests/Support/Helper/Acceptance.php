@@ -16,9 +16,11 @@ class Acceptance extends \Codeception\Module
         // Determine project root directory reliably in Codeception context
         $projectRoot = dirname(__DIR__, 3); // tests/_support/Helper -> tests/_support -> tests -> project root
 
-        $logFile = $projectRoot . '/storage/logs/laravel-' . date('Y-m-d') . '.log';
+        $logFile = $projectRoot . '/storage/logs/laravel.log';
 
         if (file_exists($logFile)) {
+            // Start monitoring from the current end of the file
+            // This ensures we only capture new entries written during this test run
             self::$lastLogPosition = filesize($logFile);
         } else {
             self::$lastLogPosition = 0;
@@ -35,6 +37,12 @@ class Acceptance extends \Codeception\Module
     {
         parent::_failed($test, $fail);
         $this->dumpBrowserConsole();
+        $this->dumpNewLaravelErrors();
+    }
+
+    public function _after(TestInterface $test)
+    {
+        // Show Laravel errors at the end of every test (passed or failed)
         $this->dumpNewLaravelErrors();
     }
 
@@ -89,7 +97,7 @@ class Acceptance extends \Codeception\Module
 
     /**
      * Dump only new Laravel log entries with ERROR, CRITICAL, ALERT or EMERGENCY level
-     * that appeared since the last failure or suite start.
+     * that were appended to laravel.log since the last check (or suite start).
      */
     private function dumpNewLaravelErrors(): void
     {
@@ -99,17 +107,19 @@ class Acceptance extends \Codeception\Module
         $logFile = $projectRoot . '/storage/logs/laravel.log';
 
         if (!file_exists($logFile)) {
+            $this->debug("\033[33mLaravel log file not found: $logFile\033[0m");
             return;
         }
 
         $currentSize = filesize($logFile);
 
         if ($currentSize <= self::$lastLogPosition) {
-            return; // no new content
+            return; // no new content since last check
         }
 
         $handle = fopen($logFile, 'r');
         if ($handle === false) {
+            $this->debug("\033[33mCould not open Laravel log file: $logFile\033[0m");
             return;
         }
 
@@ -139,7 +149,7 @@ class Acceptance extends \Codeception\Module
             return;
         }
 
-        $this->debug("\n\033[1;31m=== New Laravel ERROR-level Log Entries (since last failure) ===\033[0m");
+        $this->debug("\n\033[1;31m=== New Laravel ERROR-level Log Entries ===\033[0m");
         foreach ($errorLines as $line) {
             $this->debug($line);
         }
