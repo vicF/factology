@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class RegisterController extends Controller
 {
@@ -63,12 +64,36 @@ class RegisterController extends Controller
      * @param  array  $data
      * @return \App\Models\User
      */
-    protected function create(Request $data)
+    protected function create(array $data)
     {
         return User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
         ]);
+    }
+
+    /**
+     * The user has been registered.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed  $user
+     * @return mixed
+     */
+    protected function registered(Request $request, $user)
+    {
+        // Log the newly registered user in immediately
+        Auth::guard('web')->login($user);
+
+        // For SPA/API requests (JSON), return JSON response with user data
+        if ($request->wantsJson() || $request->expectsJson()) {
+            return response()->json([
+                'user' => $user,
+                'message' => 'Registration successful',
+            ]);
+        }
+
+        // For traditional form submissions, proceed with default redirect
+        return redirect($this->redirectPath());
     }
 }

@@ -5,10 +5,27 @@ declare(strict_types=1);
 namespace Tests\Support\Helper;
 
 use Codeception\TestInterface;
+use Codeception\Step;
 
 class Acceptance extends \Codeception\Module
 {
-    public function _afterStep(\Codeception\Step $step)
+    private static int $lastLogPosition = 0;
+
+    public function _beforeSuite($settings = [])
+    {
+        // Determine project root directory reliably in Codeception context
+        $projectRoot = dirname(__DIR__, 3); // tests/_support/Helper -> tests/_support -> tests -> project root
+
+        $logFile = $projectRoot . '/storage/logs/laravel-' . date('Y-m-d') . '.log';
+
+        if (file_exists($logFile)) {
+            self::$lastLogPosition = filesize($logFile);
+        } else {
+            self::$lastLogPosition = 0;
+        }
+    }
+
+    public function _afterStep(Step $step)
     {
         parent::_afterStep($step);
         $this->dumpBrowserConsole();
@@ -18,6 +35,7 @@ class Acceptance extends \Codeception\Module
     {
         parent::_failed($test, $fail);
         $this->dumpBrowserConsole();
+        $this->dumpNewLaravelErrors();
     }
 
     public function dumpBrowserConsole()
@@ -67,5 +85,64 @@ class Acceptance extends \Codeception\Module
         } catch (\Throwable $e) {
             $this->debug("\033[90mConsole logging failed: {$e->getMessage()}\033[0m");
         }
+    }
+
+    /**
+     * Dump only new Laravel log entries with ERROR, CRITICAL, ALERT or EMERGENCY level
+     * that appeared since the last failure or suite start.
+     */
+    private function dumpNewLaravelErrors(): void
+    {
+        // Determine project root directory reliably in Codeception context
+        $projectRoot = dirname(__DIR__, 3); // tests/_support/Helper -> tests/_support -> tests -> project root
+
+        $logFile = $projectRoot . '/storage/logs/laravel.log';
+
+        if (!file_exists($logFile)) {
+            return;
+        }
+
+        $currentSize = filesize($logFile);
+
+        if ($currentSize <= self::$lastLogPosition) {
+            return; // no new content
+        }
+
+        $handle = fopen($logFile, 'r');
+        if ($handle === false) {
+            return;
+        }
+
+        fseek($handle, self::$lastLogPosition);
+        $newContent = '';
+        while (!feof($handle)) {
+            $newContent .= fread($handle, 8192);
+        }
+        fclose($handle);
+
+        // Update position for next call
+        self::$lastLogPosition = $currentSize;
+
+        if (trim($newContent) === '') {
+            return;
+        }
+
+        $lines = explode("\n", $newContent);
+        $errorLines = [];
+        foreach ($lines as $line) {
+            if (preg_match('/\.(ERROR|CRITICAL|ALERT|EMERGENCY):/', $line)) {
+                $errorLines[] = $line;
+            }
+        }
+
+        if (empty($errorLines)) {
+            return;
+        }
+
+        $this->debug("\n\033[1;31m=== New Laravel ERROR-level Log Entries (since last failure) ===\033[0m");
+        foreach ($errorLines as $line) {
+            $this->debug($line);
+        }
+        $this->debug("\033[1;31m=== End of New ERROR Logs ===\033[0m\n");
     }
 }

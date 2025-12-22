@@ -6,7 +6,7 @@
                     <div class="card-body p-4 p-md-5">
                         <h1 class="text-center mb-4">Register</h1>
                         <hr class="mb-4"/>
-                        <form action="javascript:void(0)" @submit="register" class="row" method="post">
+                        <form action="javascript:void(0)" @submit.prevent="register" class="row" method="post">
                             <div class="col-12" v-if="Object.keys(validationErrors).length > 0">
                                 <div class="alert alert-danger">
                                     <ul class="mb-0">
@@ -16,19 +16,19 @@
                             </div>
                             <div class="form-group col-12 mb-3">
                                 <label for="name" class="font-weight-bold">Name</label>
-                                <input type="text" name="name" v-model="user.name" id="name" placeholder="Enter name" class="form-control">
+                                <input type="text" name="name" v-model="user.name" id="name" placeholder="Enter name" class="form-control" autocomplete="name">
                             </div>
                             <div class="form-group col-12 mb-3">
                                 <label for="email" class="font-weight-bold">Email</label>
-                                <input type="text" name="email" v-model="user.email" id="email" placeholder="Enter Email" class="form-control">
+                                <input type="email" name="email" v-model="user.email" id="email" placeholder="Enter Email" class="form-control" autocomplete="email">
                             </div>
                             <div class="form-group col-12 mb-3">
                                 <label for="password" class="font-weight-bold">Password</label>
-                                <input type="password" name="password" v-model="user.password" id="password" placeholder="Enter Password" class="form-control">
+                                <input type="password" name="password" v-model="user.password" id="password" placeholder="Enter Password" class="form-control" autocomplete="new-password">
                             </div>
                             <div class="form-group col-12 mb-4">
                                 <label for="password_confirmation" class="font-weight-bold">Confirm Password</label>
-                                <input type="password" name="password_confirmation" v-model="user.password_confirmation" id="password_confirmation" placeholder="Enter Password" class="form-control">
+                                <input type="password" name="password_confirmation" v-model="user.password_confirmation" id="password_confirmation" placeholder="Enter Password" class="form-control" autocomplete="new-password">
                             </div>
                             <div class="col-12 mb-3">
                                 <button type="submit" :disabled="processing" class="btn btn-primary btn-block w-100">
@@ -71,18 +71,30 @@ export default {
 
         const register = async () => {
             state.processing = true;
+            state.validationErrors = {};
+
             try {
+                // Get CSRF cookie
                 await axios.get('/sanctum/csrf-cookie');
+
+                // Register the user
                 const response = await axios.post('/register', state.user);
-                state.validationErrors = {};
-                authStore.login(response.data.user || {name: state.user.name, email: state.user.email});
-                router.push({name: 'dashboard'});
-            } catch ({response}) {
-                if (response && response.status === 422) {
-                    state.validationErrors = response.data.errors;
+
+                // Extract authenticated user from Laravel response
+                const authenticatedUser = response.data.user || response.data || { name: state.user.name, email: state.user.email };
+
+                // Update Pinia auth store
+                authStore.login(authenticatedUser);
+
+                // Redirect to root (home page) using path instead of named route to avoid "No match" error
+                router.push('/');
+            } catch (error) {
+                console.error('Registration failed:', error);
+
+                if (error.response?.status === 422) {
+                    state.validationErrors = error.response.data.errors || {};
                 } else {
-                    state.validationErrors = {};
-                    alert(response ? response.data.message : 'Error during registration');
+                    alert(error.response?.data?.message || 'An error occurred during registration.');
                 }
             } finally {
                 state.processing = false;
