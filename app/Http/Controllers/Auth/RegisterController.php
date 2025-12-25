@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Auth\Events\Registered;
 
 class RegisterController extends Controller
 {
@@ -61,11 +62,13 @@ class RegisterController extends Controller
     /**
      * Create a new user instance after a valid registration.
      *
-     * @param  array  $data
      * @return \App\Models\User
      */
-    protected function create(array $data)
+    protected function create()
     {
+        // Use request data directly since trait calls create() without arguments
+        $data = request()->all();
+
         return User::create([
             'name' => $data['name'],
             'email' => $data['email'],
@@ -74,18 +77,19 @@ class RegisterController extends Controller
     }
 
     /**
-     * The user has been registered.
+     * Handle a registration request for the application.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  mixed  $user
-     * @return mixed
+     * @return \Illuminate\Http\Response
      */
-    protected function registered(Request $request, $user)
+    public function register(Request $request)
     {
-        // Log the newly registered user in immediately
-        Auth::guard('web')->login($user);
+        $this->validator($request->all())->validate();
 
-        // For SPA/API requests (JSON), return JSON response with user data
+        event(new Registered($user = $this->create()));
+
+        $this->guard()->login($user);
+
         if ($request->wantsJson() || $request->expectsJson()) {
             return response()->json([
                 'user' => $user,
@@ -93,7 +97,7 @@ class RegisterController extends Controller
             ]);
         }
 
-        // For traditional form submissions, proceed with default redirect
-        return redirect($this->redirectPath());
+        return $this->registered($request, $user)
+            ?: redirect($this->redirectPath());
     }
 }
