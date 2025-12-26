@@ -1,3 +1,4 @@
+<!-- resources/js/components/Register.vue -->
 <template>
     <div class="container my-5">
         <div class="row justify-content-center">
@@ -86,8 +87,11 @@ export default {
                 // Update Pinia auth store
                 authStore.login(authenticatedUser);
 
-                // Redirect to root (home page) using path instead of named route to avoid "No match" error
-                router.push('/');
+                // Redirect to root (home page)
+                await router.push('/');
+
+                // Force re-check auth state after redirect
+                await authStore.checkAuth();
             } catch (error) {
                 console.error('Registration failed:', error);
 

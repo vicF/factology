@@ -1,3 +1,4 @@
+// resources/js/stores/auth.js
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import axios from 'axios';
@@ -60,5 +61,25 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { authenticated, user, login, logout };
+    // Sync auth state with server (called on app mount or after redirect)
+    async function checkAuth() {
+        try {
+            const response = await axios.get('/api/user');
+            if (response.data && response.data.id) {
+                login(response.data);
+            } else {
+                logout();
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            if (error.response?.status === 401 || error.response?.status === 419) {
+                authenticated.value = false;
+                user.value = null;
+                localStorage.removeItem('authenticated');
+                localStorage.removeItem('user');
+            }
+        }
+    }
+
+    return { authenticated, user, login, logout, checkAuth };
 });
