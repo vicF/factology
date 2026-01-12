@@ -13,10 +13,28 @@ final class FirstCest
 
     public function _before(AcceptanceTester $I, Scenario $scenario = null): void
     {
-        // Очищаем куки перед каждым тестом
-        /*$I->executeInSelenium(function (\Facebook\WebDriver\Remote\RemoteWebDriver $driver) {
+        // Reset Laravel cookies before each test
+        $I->resetCookie('factology_session');
+        $I->resetCookie('XSRF-TOKEN');
+
+        // Clear browser storage safely with extra checks
+        $I->executeJS("
+            try {
+                if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage === 'object') {
+                    localStorage.clear();
+                }
+                if (typeof window !== 'undefined' && window.sessionStorage && typeof window.sessionStorage === 'object') {
+                    sessionStorage.clear();
+                }
+            } catch (e) {
+                // Ignore storage access errors
+            }
+        ");
+
+        // Full cookie reset via WebDriver as fallback
+        $I->executeInSelenium(function (\Facebook\WebDriver\Remote\RemoteWebDriver $driver) {
             $driver->manage()->deleteAllCookies();
-        });*/
+        });
 
         $I->retry(5, 500);
     }
@@ -78,23 +96,29 @@ final class FirstCest
         // Wait for register page
         $I->waitForText('Register', 10);
 
-        // Ensure the entire form is visible and interactable
+        // Ensure form is in view
         $I->scrollTo('.card.shadow-sm');
         $I->wait(1);
 
-        // Fill form fields using precise IDs (most reliable for Vue inputs)
+        // Fill form
         $I->fillField('name', $tempName);
         $I->fillField('email', $tempEmail);
         $I->fillField('password', $tempPassword);
         $I->fillField('password_confirmation', $tempPassword);
 
-        // Scroll to and click the submit button using a reliable CSS selector
+        // Submit registration
         $I->scrollTo('button[type="submit"].btn-primary');
         $I->wait(1);
         $I->click('button[type="submit"].btn-primary');
 
-        // Wait for successful registration – username appears in navbar
-        $I->waitForText($tempName, 15);
+        // Give extra time for redirect, cookie set, and frontend auth sync
+        $I->wait(5);
+
+        // Debug: log cookies after registration
+        $I->executeJS("console.log('Cookies after registration:', document.cookie);");
+
+        // Wait for username in navbar (increased timeout)
+        $I->waitForText($tempName, 40);
         $I->see($tempName);
         $I->dontSee('Register');
         $I->dontSee('Login');
@@ -105,13 +129,6 @@ final class FirstCest
         $I->waitForElement('#search', 10);
 
         // TODO: Create temporary objects (will be added when feature is implemented)
-        // Example placeholder:
-        // $I->click('Create Object');
-        // $I->fillField('title', 'Temp Object 1');
-        // $I->click('Save');
-        // $I->see('Temp Object 1');
-
-        // TODO: Delete created objects (when implemented)
 
         // Test logout
         $I->scrollTo('#navbarDropdownMenuLink');

@@ -63,22 +63,28 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Sync auth state with server (called on app mount or after redirect)
     async function checkAuth() {
+        console.log('Starting initial auth check...');
         try {
             const response = await axios.get('/api/user', {
-                withCredentials: true // Force send cookies
+                withCredentials: true
             });
+            console.log('Auth check response:', response.data);
             if (response.data && response.data.id) {
                 login(response.data);
+                console.log('User logged in from server:', response.data.name);
             } else {
-                logout();
+                // For guest, just set unauthenticated - no logout/redirect
+                authenticated.value = false;
+                user.value = null;
+                console.log('No user found - guest state');
             }
         } catch (error) {
-            console.error('Auth check failed:', error);
+            console.error('Auth check failed:', error.response?.status, error.message);
             if (error.response?.status === 401 || error.response?.status === 419) {
                 authenticated.value = false;
                 user.value = null;
-                localStorage.removeItem('authenticated');
-                localStorage.removeItem('user');
+                // Do NOT clear localStorage or redirect on initial check
+                console.log('Guest auth check - no action taken');
             }
         }
     }

@@ -75,13 +75,19 @@ export default {
             state.validationErrors = {};
 
             try {
+                console.log('Starting registration process');
+
                 // Get CSRF cookie
                 await axios.get('/sanctum/csrf-cookie');
+
+                console.log('CSRF cookie fetched');
 
                 // Register the user
                 const response = await axios.post('/register', state.user, {
                     withCredentials: true
                 });
+
+                console.log('Registration response:', response.data);
 
                 // Extract authenticated user from Laravel response
                 const authenticatedUser = response.data.user || response.data || { name: state.user.name, email: state.user.email };
@@ -89,11 +95,22 @@ export default {
                 // Update Pinia auth store
                 authStore.login(authenticatedUser);
 
+                console.log('User logged in locally:', authenticatedUser.name);
+
+                // Small delay for cookie to settle
+                await new Promise(resolve => setTimeout(resolve, 500));
+
                 // Redirect to root (home page)
+                console.log('Redirecting to home');
                 await router.push('/');
 
-                // Force re-check auth state after redirect
+                // Extra delay after redirect to allow app re-mount and route guards
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                console.log('Post-redirect auth check starting');
                 await authStore.checkAuth();
+
+                console.log('Post-redirect auth check completed');
             } catch (error) {
                 console.error('Registration failed:', error);
 

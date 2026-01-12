@@ -62,4 +62,7 @@ axios.interceptors.response.use(
 
 app.config.globalProperties.$dateFromDb = dateFromDb;
 
+const authStore = useAuthStore();
+await authStore.checkAuth();
+
 app.mount('#app');
