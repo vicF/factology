@@ -64,7 +64,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Sync auth state with server (called on app mount or after redirect)
     async function checkAuth() {
         try {
-            const response = await axios.get('/api/user');
+            const response = await axios.get('/api/user', {
+                withCredentials: true // Force send cookies
+            });
             if (response.data && response.data.id) {
                 login(response.data);
             } else {

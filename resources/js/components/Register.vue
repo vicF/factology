@@ -79,7 +79,9 @@ export default {
                 await axios.get('/sanctum/csrf-cookie');
 
                 // Register the user
-                const response = await axios.post('/register', state.user);
+                const response = await axios.post('/register', state.user, {
+                    withCredentials: true
+                });
 
                 // Extract authenticated user from Laravel response
                 const authenticatedUser = response.data.user || response.data || { name: state.user.name, email: state.user.email };
