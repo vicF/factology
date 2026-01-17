@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Auth\Events\Registered;
@@ -69,11 +70,13 @@ class RegisterController extends Controller
         // Use request data directly since trait calls create() without arguments
         $data = request()->all();
 
-        return User::create([
+        $user =  User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
         ]);
+        $this->guard()->login($user);
+        return $user;
     }
 
     /**
@@ -84,6 +87,7 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
+        Log::debug('Register  ...');
         $this->validator($request->all())->validate();
 
         event(new Registered($user = $this->create()));
