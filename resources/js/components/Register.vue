@@ -77,11 +77,6 @@ export default {
             try {
                 console.log('Starting registration process');
 
-                // Get CSRF cookie
-                await axios.get('/sanctum/csrf-cookie');
-
-                console.log('CSRF cookie fetched');
-
                 // Register the user
                 const response = await axios.post('/register', state.user, {
                     withCredentials: true

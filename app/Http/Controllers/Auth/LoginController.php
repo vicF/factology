@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\TransientToken;
 
 class LoginController extends Controller
 {
@@ -39,11 +40,22 @@ class LoginController extends Controller
         ]);
 
         if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
             $user = Auth::user();
-            \Log::info('Login successful', ['user_id' => $user->id]);
+
+            $token = $user->createToken(
+                name: 'spa-token',
+                abilities: ['*'],
+                expiresAt: null
+            )->plainTextToken;
+
+            \Log::info('Login successful - token issued', [
+                'user_id' => $user->id,
+                'token_id' => explode('|', $token)[0] ?? null
+            ]);
+
             return response()->json([
                 'user' => $user,
+                'token' => $token,
                 'message' => 'Login successful'
             ], 200);
         }
@@ -63,10 +75,25 @@ class LoginController extends Controller
     public function logout(Request $request)
     {
         try {
+            $user = $request->user();
+
+            if ($user) {
+                $currentToken = $user->currentAccessToken();
+
+                // Only delete if it's a real database token (not TransientToken)
+                if ($currentToken && !$currentToken instanceof TransientToken) {
+                    $currentToken->delete();
+                    \Log::info('Token revoked on logout', ['user_id' => $user->id]);
+                } else {
+                    \Log::info('No revocable token found (transient or none) - logout proceeded', ['user_id' => $user->id]);
+                }
+            }
+
+            // Optional: keep for compatibility if any session is somehow active
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            \Log::info('Logout successful');
+
             return response()->json(['message' => 'Logged out'], 200);
         } catch (\Exception $e) {
             \Log::error('Logout error: ' . $e->getMessage());

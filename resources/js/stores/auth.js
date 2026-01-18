@@ -6,47 +6,70 @@ import { useRouter } from 'vue-router';
 
 export const useAuthStore = defineStore('auth', () => {
     let initialUser = null;
+    let initialToken = null;
+
     try {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             initialUser = JSON.parse(storedUser);
         }
+
+        const storedToken = localStorage.getItem('auth_token');
+        if (storedToken) {
+            initialToken = storedToken;
+        }
     } catch (error) {
-        console.error('Failed to parse user from localStorage:', error);
-        localStorage.removeItem('user'); // Clear invalid data
+        console.error('Failed to parse stored auth data:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('auth_token');
     }
 
-    const authenticated = ref(localStorage.getItem('authenticated') === 'true');
+    const authenticated = ref(!!initialToken);
     const user = ref(initialUser);
+    const token = ref(initialToken);
     const router = useRouter();
 
-    function login(userData) {
+    // Helper to set auth state after successful login
+    function setAuth(userData, authToken) {
         authenticated.value = true;
         user.value = userData;
+        token.value = authToken;
+
         localStorage.setItem('authenticated', 'true');
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('auth_token', authToken);
+    }
+
+    function login(userData, authToken) {
+        setAuth(userData, authToken);
     }
 
     async function logout() {
         console.log('AuthStore logout - Starting logout process');
         try {
+            // Optional: revoke token on backend
+            if (token.value) {
+                console.log('AuthStore logout - Sending /logout request with token');
+                await axios.post('/logout', {}, {
+                    headers: {
+                        Authorization: `Bearer ${token.value}`
+                    }
+                });
+                console.log('AuthStore logout - /logout request successful');
+            }
+
+            // Clear local state
             authenticated.value = false;
             user.value = null;
+            token.value = null;
+
             localStorage.removeItem('authenticated');
             localStorage.removeItem('user');
+            localStorage.removeItem('auth_token');
 
-            console.log('AuthStore logout - Sending /logout request');
-            await axios.post('/logout');
-            console.log('AuthStore logout - /logout request successful');
+            console.log('AuthStore logout - Local storage cleared');
 
-            // Clear cookies
-            document.cookie.split(';').forEach(cookie => {
-                const name = cookie.split('=')[0].trim();
-                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-            });
-            console.log('AuthStore logout - Cookies cleared');
-
-            // Navigate to /login without redirect query
+            // Navigate to /login
             console.log('AuthStore logout - Navigating to /login');
             await router.push('/login');
             console.log('AuthStore logout - Navigation to /login successful');
@@ -56,38 +79,57 @@ export const useAuthStore = defineStore('auth', () => {
                 data: error.response?.data,
                 message: error.message
             });
-            // Fallback navigation
+            // Fallback: clear everything and redirect anyway
+            authenticated.value = false;
+            user.value = null;
+            token.value = null;
+            localStorage.removeItem('authenticated');
+            localStorage.removeItem('user');
+            localStorage.removeItem('auth_token');
             window.location.href = '/login';
         }
     }
 
-    // Sync auth state with server (called on app mount or after redirect)
+    // Sync auth state with server (called on app mount)
     async function checkAuth() {
         console.log('Starting initial auth check...');
+
+        if (!token.value) {
+            console.log('No token found - treating as guest');
+            authenticated.value = false;
+            user.value = null;
+            return;
+        }
+
         try {
             const response = await axios.get('/api/user', {
-                withCredentials: true
+                headers: {
+                    Authorization: `Bearer ${token.value}`
+                }
             });
+
             console.log('Auth check response:', response.data);
+
             if (response.data && response.data.id) {
-                login(response.data);
-                console.log('User logged in from server:', response.data.name);
+                // Update user data (token remains the same)
+                setAuth(response.data, token.value);
+                console.log('User authenticated from server:', response.data.name);
             } else {
-                // For guest, just set unauthenticated - no logout/redirect
-                authenticated.value = false;
-                user.value = null;
-                console.log('No user found - guest state');
+                console.log('Invalid user data - logging out');
+                await logout();
             }
         } catch (error) {
             console.error('Auth check failed:', error.response?.status, error.message);
-            if (error.response?.status === 401 || error.response?.status === 419) {
-                authenticated.value = false;
-                user.value = null;
-                // Do NOT clear localStorage or redirect on initial check
-                console.log('Guest auth check - no action taken');
+
+            if (error.response?.status === 401) {
+                console.log('Token invalid or expired - logging out');
+                await logout();
+            } else {
+                // Other errors → keep local state for now (optimistic)
+                console.log('Non-auth error during check - keeping local state');
             }
         }
     }
 
-    return { authenticated, user, login, logout, checkAuth };
+    return { authenticated, user, token, login, logout, checkAuth };
 });

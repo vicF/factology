@@ -183,12 +183,12 @@ export default {
         let modalInstance = null;
 
         onMounted(async () => {
-            try {
+            /*try {
                 await axios.get('/sanctum/csrf-cookie');
                 console.log('EditObject.vue - CSRF cookie fetched');
             } catch (err) {
                 console.warn('CSRF cookie already exists');
-            }
+            }*/
 
             const modalElement = document.getElementById(modalId);
             if (modalElement) {

@@ -29,13 +29,18 @@ app.config.globalProperties.$navigateToObject = function(id) {
 
 import axios from 'axios';
 
-axios.defaults.withCredentials = true;
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.baseURL = 'http://localhost:8003';
-
-axios.defaults.headers.common['X-XSRF-TOKEN'] = document.cookie
-    .match(/XSRF-TOKEN=([^;]*)/)?.[1] || '';
 axios.defaults.headers.common['Accept'] = 'application/json';
+
+// Automatically add Authorization header with Bearer token when available
+axios.interceptors.request.use(config => {
+    const authStore = useAuthStore(pinia);  // pass pinia instance to access store outside setup()
+    if (authStore.token) {
+        config.headers.Authorization = `Bearer ${authStore.token}`;
+    }
+    return config;
+});
 
 axios.interceptors.response.use(
     response => response,

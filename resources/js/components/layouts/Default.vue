@@ -86,7 +86,6 @@ export default {
 
         const checkAuth = async () => {
             try {
-                await axios.get('/sanctum/csrf-cookie');
                 const response = await axios.get('/api/user', {noAuthRedirect: true});
                 if (response.data && !authStore.authenticated) {
                     authStore.login(response.data);

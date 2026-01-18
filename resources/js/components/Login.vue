@@ -70,10 +70,10 @@ export default {
             validationErrors.value = {};
 
             try {
-                await axios.get('/sanctum/csrf-cookie');
                 const response = await axios.post('/login', auth);
 
-                authStore.login(response.data.user);
+                // Changed: pass both user and token to the store
+                authStore.login(response.data.user, response.data.token);
 
                 const redirectTo = route.query.redirect || '/';
                 console.debug('await router.push(redirectTo);');

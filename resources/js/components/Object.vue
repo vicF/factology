@@ -247,7 +247,6 @@ export default {
         const deleteObject = async () => {
             if (!confirm(t('Are you sure you want to delete this object?'))) return;
             try {
-                await axios.get('/sanctum/csrf-cookie');
                 await axios.delete(`/api/v1/object/${object.value.thing_id}`);
                 router.push('/');
             } catch (error) {
@@ -258,7 +257,6 @@ export default {
         const deleteLink = async (link_id) => {
             if (!confirm(t('Are you sure you want to delete this link?'))) return;
             try {
-                await axios.get('/sanctum/csrf-cookie');
                 await axios.delete(`/api/v1/link/${link_id}`);
                 await getObject();
             } catch (error) {
