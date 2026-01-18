@@ -3,38 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Providers\RouteServiceProvider;
 use App\Models\User;
-use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Auth\Events\Registered;
 
 class RegisterController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Register Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller handles the registration of new users as well as their
-    | validation and creation. By default this controller uses a trait to
-    | provide this functionality without requiring any additional code.
-    |
-    */
-
-    use RegistersUsers;
-
-    /**
-     * Where to redirect users after registration.
-     *
-     * @var string
-     */
-    protected $redirectTo = RouteServiceProvider::HOME;
-
     /**
      * Create a new controller instance.
      *
@@ -42,66 +18,51 @@ class RegisterController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('guest');
-    }
-
-    /**
-     * Get a validator for an incoming registration request.
-     *
-     * @param  array  $data
-     * @return \Illuminate\Contracts\Validation\Validator
-     */
-    protected function validator(array $data)
-    {
-        return Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-    }
-
-    /**
-     * Create a new user instance after a valid registration.
-     *
-     * @return \App\Models\User
-     */
-    protected function create()
-    {
-        // Use request data directly since trait calls create() without arguments
-        $data = request()->all();
-
-        $user =  User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
-        $this->guard()->login($user);
-        return $user;
+        // Allow only guests to register
+        $this->middleware('guest')->only('register');
     }
 
     /**
      * Handle a registration request for the application.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Illuminate\Validation\ValidationException
      */
     public function register(Request $request)
     {
-        Log::debug('Register  ...');
-        $this->validator($request->all())->validate();
+        Log::debug('Register ...');
 
-        event(new Registered($user = $this->create()));
+        $validated = $request->validate([
+            'name'                  => ['required', 'string', 'max:255'],
+            'email'                 => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password'              => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
 
-        $this->guard()->login($user);
+        $user = User::create([
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
 
-        if ($request->wantsJson() || $request->expectsJson()) {
-            return response()->json([
-                'user' => $user,
-                'message' => 'Registration successful',
-            ]);
-        }
+        event(new Registered($user));
 
-        return $this->registered($request, $user)
-            ?: redirect($this->redirectPath());
+        // Create Sanctum token (consistent with LoginController)
+        $token = $user->createToken(
+            name: 'spa-token',
+            abilities: ['*'],
+            expiresAt: null
+        )->plainTextToken;
+
+        Log::info('Registration successful - token issued', [
+            'user_id'  => $user->id,
+            'token_id' => explode('|', $token)[0] ?? null
+        ]);
+
+        return response()->json([
+            'user'    => $user,
+            'token'   => $token,
+            'message' => 'Registration successful'
+        ], 201);
     }
 }

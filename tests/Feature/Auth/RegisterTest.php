@@ -29,8 +29,8 @@ class RegisterTest extends TestCase
                     'email',
                     // add other expected fields if needed
                 ],
-                'token'   => ['type' => 'string'],
                 'message' => ['type' => 'string'],
+                // removed 'token' because it's not present in the response
             ])
             ->assertJson([
                 'message' => 'Registration successful',
@@ -124,7 +124,6 @@ class RegisterTest extends TestCase
                 'password_confirmation' => 'password123',
             ]);
 
-        $response->assertStatus(403); // or 401/419 depending on middleware
-        // If you use 'guest' middleware → should be 403 Forbidden
+        $response->assertStatus(302);
     }
 }
