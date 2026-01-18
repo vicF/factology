@@ -1,9 +1,10 @@
 <?php
 
 use App\Http\Controllers\ApiController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,7 +17,12 @@ use App\Http\Controllers\Auth\LoginController;
 |
 */
 
-// Standard Sanctum user route - keep this one (closure is reliable)
+// Authentication routes (token-based, no session/CSRF needed)
+Route::post('/login', [LoginController::class, 'login'])->name('login');
+Route::post('/register', [RegisterController::class, 'register'])->name('register'); // changed method name to 'register'
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+// Standard Sanctum user route
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     \Log::info('API /user called', [
         'auth_check' => Auth::check(),
@@ -26,9 +32,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
     return $request->user() ?? response()->json(['message' => 'Unauthenticated'], 401);
 });
-
-// Removed duplicate /user route (was causing conflicts or wrong response)
-// If you need custom user logic, extend the closure above or use a different path (e.g. /me)
 
 // Other API routes
 Route::get('/v1/object', [ApiController::class, 'list']);
