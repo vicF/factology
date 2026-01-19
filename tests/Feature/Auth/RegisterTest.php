@@ -126,4 +126,93 @@ class RegisterTest extends TestCase
 
         $response->assertStatus(302);
     }
+
+    // ────────────────────────────────────────────────
+    //   NEW TESTS: Login & Logout after registration
+    // ────────────────────────────────────────────────
+
+    /** @test */
+    public function registered_user_can_login_and_receive_new_token()
+    {
+        // First register the user
+        $this->postJson('/api/register', [
+            'name'                  => 'Login Test User',
+            'email'                 => 'loginuser@example.com',
+            'password'              => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        // Now attempt to login
+        $response = $this->postJson('/api/login', [
+            'email'    => 'loginuser@example.com',
+            'password' => 'password123',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'user' => [
+                    'id',
+                    'name',
+                    'email',
+                ],
+                'token',
+                'message',
+            ])
+            ->assertJson([
+                'message' => 'Login successful', // adjust if your message is different
+            ]);
+
+        $user = User::where('email', 'loginuser@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertGreaterThanOrEqual(1, $user->tokens()->count());
+    }
+
+    /** @test */
+    public function registered_user_can_logout_and_token_is_revoked()
+    {
+        // Register user
+        $registerResponse = $this->postJson('/api/register', [
+            'name'                  => 'Logout Test User',
+            'email'                 => 'logoutuser@example.com',
+            'password'              => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $token = $registerResponse->json('token');
+
+        // Make sure we have a valid token
+        $this->assertNotEmpty($token);
+
+        // Logout using the token
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/logout');
+
+        $response
+            ->assertStatus(200)
+            ->assertJson([
+                'message' => 'Logged out', // adjust to match your actual message
+            ]);
+
+        // Verify token was revoked
+        $user = User::where('email', 'logoutuser@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertCount(0, $user->tokens);
+
+        // Try to use the token again → should be 401
+        $protectedResponse = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->getJson('/api/user');
+
+        $protectedResponse->assertStatus(401);
+    }
+
+    /** @test */
+    public function logout_fails_without_authentication()
+    {
+        $response = $this->postJson('/api/logout');
+
+        $response->assertStatus(401);
+    }
 }
