@@ -29,8 +29,8 @@ class RegisterTest extends TestCase
                     'email',
                     // add other expected fields if needed
                 ],
-                'message' => ['type' => 'string'],
-                // removed 'token' because it's not present in the response
+                'token',
+                'message',
             ])
             ->assertJson([
                 'message' => 'Registration successful',
