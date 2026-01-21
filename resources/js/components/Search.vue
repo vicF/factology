@@ -82,7 +82,7 @@
 
                 processing.value = true;
                 try {
-                    const response = await axios.post('/api/v1/object', JSON.stringify({
+                    const response = await axios.post('/object', JSON.stringify({
                         "search": searchStore.searchQuery || props.searchText || route.query.q || '',
                         "type": type,
                         classes: searchStore.checkedItems,

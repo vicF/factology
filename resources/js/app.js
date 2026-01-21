@@ -30,7 +30,7 @@ app.config.globalProperties.$navigateToObject = function(id) {
 import axios from 'axios';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-axios.defaults.baseURL = 'http://localhost:8003';
+axios.defaults.baseURL = '/api/v1';
 axios.defaults.headers.common['Accept'] = 'application/json';
 
 // Automatically add Authorization header with Bearer token when available

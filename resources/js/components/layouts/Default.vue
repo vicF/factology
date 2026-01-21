@@ -86,7 +86,7 @@ export default {
 
         const checkAuth = async () => {
             try {
-                const response = await axios.get('/api/user', {noAuthRedirect: true});
+                const response = await axios.get('/user', {noAuthRedirect: true});
                 if (response.data && !authStore.authenticated) {
                     authStore.login(response.data);
                 }

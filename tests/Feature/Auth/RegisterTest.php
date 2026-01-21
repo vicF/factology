@@ -10,10 +10,12 @@ class RegisterTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected const API_PREFIX = '/api/v1';
+
     /** @test */
     public function user_can_register_with_valid_data_and_receive_token()
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
@@ -50,7 +52,7 @@ class RegisterTest extends TestCase
     /** @test */
     public function registration_fails_with_missing_name()
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson(self::API_PREFIX . '/register', [
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
@@ -64,7 +66,7 @@ class RegisterTest extends TestCase
     /** @test */
     public function registration_fails_with_invalid_email()
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
             'email'                 => 'not-an-email',
             'password'              => 'password123',
@@ -79,7 +81,7 @@ class RegisterTest extends TestCase
     /** @test */
     public function registration_fails_when_passwords_do_not_match()
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
@@ -99,7 +101,7 @@ class RegisterTest extends TestCase
             'email' => 'alreadyexists@example.com',
         ]);
 
-        $response = $this->postJson('/api/register', [
+        $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Duplicate User',
             'email'                 => 'alreadyexists@example.com',
             'password'              => 'password123',
@@ -117,7 +119,7 @@ class RegisterTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user, 'sanctum')
-            ->postJson('/api/register', [
+            ->postJson(self::API_PREFIX . '/register', [
                 'name'                  => 'Another User',
                 'email'                 => 'another@example.com',
                 'password'              => 'password123',
@@ -135,7 +137,7 @@ class RegisterTest extends TestCase
     public function registered_user_can_login_and_receive_new_token()
     {
         // First register the user
-        $this->postJson('/api/register', [
+        $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Login Test User',
             'email'                 => 'loginuser@example.com',
             'password'              => 'password123',
@@ -143,7 +145,7 @@ class RegisterTest extends TestCase
         ]);
 
         // Now attempt to login
-        $response = $this->postJson('/api/login', [
+        $response = $this->postJson(self::API_PREFIX . '/login', [
             'email'    => 'loginuser@example.com',
             'password' => 'password123',
         ]);
@@ -172,7 +174,7 @@ class RegisterTest extends TestCase
     public function registered_user_can_logout_and_token_is_revoked()
     {
         // Register user
-        $registerResponse = $this->postJson('/api/register', [
+        $registerResponse = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Logout Test User',
             'email'                 => 'logoutuser@example.com',
             'password'              => 'password123',
@@ -187,7 +189,7 @@ class RegisterTest extends TestCase
         // Logout using the token
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/logout');
+        ])->postJson(self::API_PREFIX . '/logout');
 
         $response
             ->assertStatus(200)
@@ -203,7 +205,7 @@ class RegisterTest extends TestCase
         // Try to use the token again → should be 401
         $protectedResponse = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->getJson('/api/user');
+        ])->getJson(self::API_PREFIX . '/user');
 
         $protectedResponse->assertStatus(401);
     }
@@ -211,7 +213,7 @@ class RegisterTest extends TestCase
     /** @test */
     public function logout_fails_without_authentication()
     {
-        $response = $this->postJson('/api/logout');
+        $response = $this->postJson(self::API_PREFIX . '/logout');
 
         $response->assertStatus(401);
     }

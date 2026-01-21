@@ -30,7 +30,7 @@ export const useObjectCacheStore = defineStore('objectCache', {
             } else {
                 // Fetch from Laravel API
                 try {
-                    const response = await axios.get(`/api/v1/object/${uuid}`);
+                    const response = await axios.get(`/object/${uuid}`);
                     const data = response.data;
                     this.setToCache(uuid, data);
                     return data;

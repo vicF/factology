@@ -1,0 +1,5 @@
+actor: FeatureTester
+suite_namespace: Tests\Feature
+modules:
+    # enable helpers as array
+    enabled: []

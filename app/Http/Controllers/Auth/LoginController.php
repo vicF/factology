@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\TransientToken;
 
@@ -74,31 +75,27 @@ class LoginController extends Controller
      */
     public function logout(Request $request)
     {
-        try {
-            $user = $request->user();
+        $user = $request->user();
 
-            if ($user) {
-                $currentToken = $user->currentAccessToken();
+        if ($user) {
+            $currentToken = $user->currentAccessToken();
 
-                // Only delete if it's a real database token (not TransientToken)
-                if ($currentToken && !$currentToken instanceof TransientToken) {
-                    $currentToken->delete();
-                    \Log::info('Token revoked on logout', ['user_id' => $user->id]);
-                } else {
-                    \Log::info('No revocable token found (transient or none) - logout proceeded', ['user_id' => $user->id]);
-                }
+            if ($currentToken) {
+                $currentToken->delete();
+                Log::info('Token revoked on logout', [
+                    'user_id' => $user->id,
+                    'token_id' => $currentToken->id ?? 'unknown'
+                ]);
+            } else {
+                Log::warning('No current access token found during logout', [
+                    'user_id' => $user->id
+                ]);
             }
-
-            // Optional: keep for compatibility if any session is somehow active
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-
-            return response()->json(['message' => 'Logged out'], 200);
-        } catch (\Exception $e) {
-            \Log::error('Logout error: ' . $e->getMessage());
-            return response()->json(['message' => 'Logged out'], 200);
         }
+
+        return response()->json([
+            'message' => 'Logged out'
+        ], 200);
     }
 
     /**

@@ -269,10 +269,10 @@ export default {
 
                 let response;
                 if (isEditMode.value) {
-                    response = await axios.put(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    response = await axios.put(`/object/${formData.value.thing_id}`, payload);
                     emit('object-updated', response.data);
                 } else {
-                    response = await axios.post(`/api/v1/object/${formData.value.thing_id}`, payload);
+                    response = await axios.post(`/object/${formData.value.thing_id}`, payload);
                     emit('object-created', response.data);
                     if (props.parentObjectId) {
                         router.push({ name: 'object', params: { id: props.parentObjectId } });

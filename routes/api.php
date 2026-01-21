@@ -12,39 +12,38 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
+| routes are loaded by the RouteServiceProvider and all will be assigned
+| to the "api" middleware group + api/v1 prefix.
 |
 */
 
-// Authentication routes (token-based, no session/CSRF needed)
-Route::post('/login', [LoginController::class, 'login'])->name('login');
-Route::post('/register', [RegisterController::class, 'register'])->name('register'); // changed method name to 'register'
-Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::prefix('v1')->group(function () {
 
-// Standard Sanctum user route
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    \Log::info('API /user called', [
-        'auth_check' => Auth::check(),
-        'user_id' => Auth::id(),
-        'session_id' => session()->getId(),
-    ]);
+    // Public authentication routes
+    Route::post('/login',    [LoginController::class, 'login'])->name('login');
+    Route::post('/register', [RegisterController::class, 'register'])->name('register');
+    Route::post('/logout',   [LoginController::class, 'logout'])->name('logout');
 
-    return $request->user() ?? response()->json(['message' => 'Unauthenticated'], 401);
-});
+    // Get current authenticated user
+    Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+        return $request->user();
+    })->name('user');
 
-// Other API routes
-Route::get('/v1/object', [ApiController::class, 'list']);
-Route::post('/v1/object', [ApiController::class, 'search']);
-Route::get('/v1/object/{id}', [ApiController::class, 'get']);
+    // ────────────────────────────────────────────────────────────────────────────────
+    // Your existing API endpoints
+    // ────────────────────────────────────────────────────────────────────────────────
 
-// Protected routes for objects and photos
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/v1/object/{id}', [ApiController::class, 'store']); // New object
-    Route::put('/v1/object/{id}', [ApiController::class, 'store']);  // Update object
-    Route::delete('/v1/object/{id}', [ApiController::class, 'delete']);
-    Route::delete('/v1/link/{id}', [ApiController::class, 'deleteLink']);
-    Route::post('/v1/photos', [ApiController::class, 'photos']);
-    Route::post('/v1/check_photos', [ApiController::class, 'checkPhotos']);
-    Route::post('/v1/photos/thumbs_upload', [ApiController::class, 'upload']);
+    Route::get('/object',     [ApiController::class, 'list']);
+    Route::post('/object',    [ApiController::class, 'search']);
+    Route::get('/object/{id}', [ApiController::class, 'get']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
+        Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
+        Route::delete('/object/{id}',         [ApiController::class, 'delete']);
+        Route::delete('/link/{id}',           [ApiController::class, 'deleteLink']);
+        Route::post('/photos',                [ApiController::class, 'photos']);
+        Route::post('/check_photos',          [ApiController::class, 'checkPhotos']);
+        Route::post('/photos/thumbs_upload',  [ApiController::class, 'upload']);
+    });
 });

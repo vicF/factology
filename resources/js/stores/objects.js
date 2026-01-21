@@ -48,7 +48,7 @@ export const useObjectsStore = defineStore('objects', {
         },
         async loadClassTree(thing_id, levels) {
             this.loading = true
-            await axios.post('/api/v1/object', JSON.stringify({
+            await axios.post('/object', JSON.stringify({
                 "tree": true,
                 "search": this.searchText,
                 "type": [2]

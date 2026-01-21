@@ -187,7 +187,7 @@ export default {
         const getObject = async () => {
             try {
                 loaded.value = false;
-                const response = await axios.get(`/api/v1/object/${route.params.uid}`);
+                const response = await axios.get(`/object/${route.params.uid}`);
                 object.value = response.data.data;
             } catch (error) {
                 // 401 or 404 → treat as "not accessible"
@@ -247,7 +247,7 @@ export default {
         const deleteObject = async () => {
             if (!confirm(t('Are you sure you want to delete this object?'))) return;
             try {
-                await axios.delete(`/api/v1/object/${object.value.thing_id}`);
+                await axios.delete(`/object/${object.value.thing_id}`);
                 router.push('/');
             } catch (error) {
                 alert(t('Failed to delete object'));
@@ -257,7 +257,7 @@ export default {
         const deleteLink = async (link_id) => {
             if (!confirm(t('Are you sure you want to delete this link?'))) return;
             try {
-                await axios.delete(`/api/v1/link/${link_id}`);
+                await axios.delete(`/link/${link_id}`);
                 await getObject();
             } catch (error) {
                 alert(t('Failed to delete link'));

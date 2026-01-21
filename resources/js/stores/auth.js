@@ -102,7 +102,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            const response = await axios.get('/api/user', {
+            const response = await axios.get('/user', {
                 headers: {
                     Authorization: `Bearer ${token.value}`
                 }
