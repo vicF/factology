@@ -3,12 +3,12 @@
 namespace Tests\Unit\Auth;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Traits\SafeRefreshDatabase;
 
 class TokenCreationTest extends TestCase
 {
-    use RefreshDatabase;
+    use SafeRefreshDatabase;
 
     /** @test */
     public function user_can_create_personal_access_token()

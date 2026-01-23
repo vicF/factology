@@ -10,48 +10,32 @@ abstract class TestCase extends BaseTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $this->preventUsageOfOriginalRefreshDatabase();
 
-        // Only meaningful when database is about to be used / refreshed
-        if ($this->isRefreshingDatabase()) {
-            $this->guardTestDatabaseName();
-        }
+        parent::setUp();
     }
 
     /**
-     * Check if RefreshDatabase trait is active in current test
+     * Throw exception if someone used the original RefreshDatabase trait.
+     * Forces developers to use SafeRefreshDatabase instead.
      */
-    private function isRefreshingDatabase(): bool
+    private function preventUsageOfOriginalRefreshDatabase(): void
     {
-        // Very reliable way: check if the trait added its refresh callback
-        return isset($this->refreshDatabaseCallback);
-    }
+        // class_uses() returns traits used directly by this class (not inherited)
+        $usedTraits = class_uses($this, false);
 
-    private function guardTestDatabaseName(): void
-    {
-        $dbName = DB::getDatabaseName();
+        $forbiddenTrait = \Illuminate\Foundation\Testing\RefreshDatabase::class;
 
-        $allowed = [
-            ':memory:',
-            'factology_tmp_test',
-        ];
-
-        // Also allow Laravel parallel testing suffixes: factology_tmp_test_1, _2, ...
-        if (preg_match('/^factology_tmp_test(_\d+)?$/', $dbName)) {
-            return;
+        if (isset($usedTraits[$forbiddenTrait])) {
+            throw new \RuntimeException(
+                "Forbidden: The original Illuminate\Foundation\Testing\RefreshDatabase trait " .
+                "is used in " . static::class . ".\n\n" .
+                "This can lead to destructive operations on the wrong database!\n\n" .
+                "→ Replace it with Tests\Traits\SafeRefreshDatabase\n" .
+                "→ Example:\n" .
+                "    use Tests\Traits\SafeRefreshDatabase;\n\n" .
+                "The safe version includes a guard that prevents running on non-test databases."
+            );
         }
-
-        if (in_array($dbName, $allowed, true)) {
-            return;
-        }
-
-        if (str_ends_with($dbName, '_test') || str_ends_with($dbName, '_tests')) {
-            return;
-        }
-
-        throw new \RuntimeException(
-            "Unsafe database name detected during test setup: '{$dbName}'.\n" .
-            "Only ':memory:', 'factology_tmp_test' (with optional _N suffix), or names ending in '_test'/'_tests' are allowed."
-        );
     }
 }

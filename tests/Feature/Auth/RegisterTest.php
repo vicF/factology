@@ -3,12 +3,12 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Tests\Traits\SafeRefreshDatabase;
 
 class RegisterTest extends TestCase
 {
-    use RefreshDatabase;
+    use SafeRefreshDatabase;
 
     protected const API_PREFIX = '/api/v1';
 
