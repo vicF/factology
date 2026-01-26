@@ -155,4 +155,28 @@ class Acceptance extends \Codeception\Module
         }
         $this->debug("\033[1;31m=== End of New ERROR Logs ===\033[0m\n");
     }
+
+    function debug(...$args): void
+    {
+        if (in_array('--verbose', $_SERVER['argv'] ?? [], true) ||
+            in_array('-v', $_SERVER['argv'] ?? [], true) ||
+            defined('CODECEPTION_DEBUG') && CODECEPTION_DEBUG) {
+
+            $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1] ?? [];
+            $file = $bt['file'] ?? 'unknown';
+            $line = $bt['line'] ?? '?';
+
+            fwrite(STDERR, "\n\033[0;36mDEBUG $file:$line\033[0m\n");
+
+            foreach ($args as $var) {
+                if (class_exists('\\Symfony\\Component\\VarDumper\\VarDumper')) {
+                    \Symfony\Component\VarDumper\VarDumper::dump($var);
+                } else {
+                    var_dump($var);
+                }
+            }
+
+            fwrite(STDERR, "\n");
+        }
+    }
 }

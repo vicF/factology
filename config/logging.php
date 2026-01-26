@@ -53,7 +53,21 @@ return [
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            // In development/testing: add 'test_debug' only when Codeception --debug is used
+            // Otherwise keep 'single' for file logging (or nothing for silence)
+            'channels' => function () {
+                $channels = ['single'];
+
+                if (PHP_SAPI === 'cli' && class_exists('Codeception\Util\Debug')) {
+                    $argv = $_SERVER['argv'] ?? [];
+                    $debugFlags = ['--debug', '-v', '-vv', '-vvv'];
+                    if (array_intersect($debugFlags, $argv)) {
+                        $channels[] = 'test_debug';
+                    }
+                }
+
+                return $channels;
+            },
             'ignore_exceptions' => false,
         ],
 
@@ -94,6 +108,22 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'handler' => StreamHandler::class,
             'formatter' => env('LOG_STDERR_FORMATTER'),
+            'with' => [
+                'stream' => 'php://stderr',
+            ],
+        ],
+
+        // New channel: only active during codecept run --debug
+        // Outputs to console (stderr) when --debug is used
+        'test_debug' => [
+            'driver' => 'monolog',
+            'level' => 'debug',
+            'handler' => StreamHandler::class,
+            'formatter' => Monolog\Formatter\LineFormatter::class,
+            'formatter_with' => [
+                'format' => "[%datetime%] %channel%.%level_name%: %message% %context% %extra%\n",
+                'useColor' => true, // optional: colors in terminal if supported
+            ],
             'with' => [
                 'stream' => 'php://stderr',
             ],

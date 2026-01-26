@@ -13,6 +13,34 @@ abstract class TestCase extends BaseTestCase
         $this->preventUsageOfOriginalRefreshDatabase();
 
         parent::setUp();
+
+        // Enable console logging only when Codeception is run with --debug
+        if (in_array('--debug', $_SERVER['argv'] ?? [], true)) {
+            // Get current stack channels safely (avoid calling closure directly)
+            $currentChannels = config('logging.channels.stack.channels');
+
+            // If it's a closure (from config file), evaluate it once to get the array
+            if ($currentChannels instanceof Closure) {
+                $currentChannels = $currentChannels();
+            }
+
+            // Ensure it's an array (fallback to ['single'] if something went wrong)
+            if (!is_array($currentChannels)) {
+                $currentChannels = ['single'];
+            }
+
+            // Add 'test_debug' if not already present
+            if (!in_array('test_debug', $currentChannels, true)) {
+                $currentChannels[] = 'test_debug';
+            }
+
+            config([
+                'logging.default' => 'stack',
+                'logging.channels.stack.channels' => $currentChannels,
+                // Optional: enforce debug level for this channel during tests
+                'logging.channels.test_debug.level' => 'debug',
+            ]);
+        }
     }
 
     /**

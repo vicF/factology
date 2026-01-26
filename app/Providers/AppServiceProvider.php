@@ -41,18 +41,20 @@ class AppServiceProvider extends ServiceProvider
         Blade::directive('edit', static function ($varName) {
             return '<?PHP
             if (Auth::check()) {
-            echo \'<a href="/object/\'.'.$varName.'.\'" target="_blank">📝</a>\';
+            echo \'<a href="/object/\'.' . $varName . '.\'" target="_blank">📝</a>\';
               }
              ?>';
         });
 
         DB::listen(function ($query) {
-            if (!str_contains($query->sql, 'telescope_')) {
-            logger()->info('Query executed', [
-                'sql' => $query->sql,
-                'bindings' => $query->bindings,
-                'time' => $query->time,
-            ]);
+            if (env('LOG_QUERIES') == 'yes') {
+                if (!str_contains($query->sql, 'telescope_')) {
+                    logger()->info('Query executed', [
+                        'sql'      => $query->sql,
+                        'bindings' => $query->bindings,
+                        'time'     => $query->time,
+                    ]);
+                }
             }
         });
     }
