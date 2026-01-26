@@ -182,32 +182,47 @@ class RegisterTest extends TestCase
         ]);
 
         $token = $registerResponse->json('token');
+        $this->assertNotEmpty($token, 'Token should be returned on registration');
 
-        // Make sure we have a valid token
-        $this->assertNotEmpty($token);
+        // Get user ID from response or DB
+        $user = User::where('email', 'logoutuser@example.com')->first();
+        $this->assertNotNull($user);
+        $initialTokenCount = $user->tokens()->count();
+        $this->assertGreaterThan(0, $initialTokenCount, 'At least one token should exist after register');
 
-        // Logout using the token
-        $response = $this->withHeaders([
+        // Logout
+        $logoutResponse = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
         ])->postJson(self::API_PREFIX . '/logout');
 
-        $response
+        $logoutResponse
             ->assertStatus(200)
-            ->assertJson([
-                'message' => 'Logged out', // adjust to match your actual message
-            ]);
+            ->assertJson(['message' => 'Logged out']);
 
-        // Verify token was revoked
-        $user = User::where('email', 'logoutuser@example.com')->first();
-        $this->assertNotNull($user);
-        $this->assertCount(0, $user->tokens);
+        // Refresh user relationship
+        $user->refresh();
 
-        // Try to use the token again → should be 401
+        // Debug: how many tokens remain?
+        $remainingTokens = $user->tokens()->get();
+        $this->assertCount(0, $remainingTokens, 'All tokens should be deleted after logout. Found: ' . $remainingTokens->count());
+
+        // Try protected route again with the same token
         $protectedResponse = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
         ])->getJson(self::API_PREFIX . '/user');
 
-        $protectedResponse->assertStatus(401);
+        // This is the failing assertion - keep it
+        $protectedResponse->assertStatus(401, 'Protected route should return 401 after token revocation');
+
+        // Extra debug info if it still fails
+        if ($protectedResponse->status() !== 401) {
+            dump([
+                'response_status' => $protectedResponse->status(),
+                'response_body'   => $protectedResponse->json(),
+                'token_used'      => substr($token, 0, 10) . '...',
+                'user_tokens_after_logout' => $user->tokens()->pluck('id')->toArray(),
+            ]);
+        }
     }
 
     /** @test */

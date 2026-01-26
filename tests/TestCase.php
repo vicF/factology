@@ -20,7 +20,7 @@ abstract class TestCase extends BaseTestCase
             $currentChannels = config('logging.channels.stack.channels');
 
             // If it's a closure (from config file), evaluate it once to get the array
-            if ($currentChannels instanceof Closure) {
+            if ($currentChannels instanceof \Closure) {
                 $currentChannels = $currentChannels();
             }
 
