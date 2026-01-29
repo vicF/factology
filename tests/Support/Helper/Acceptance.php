@@ -31,6 +31,7 @@ class Acceptance extends \Codeception\Module
     {
         parent::_afterStep($step);
         $this->dumpBrowserConsole();
+        $this->dumpNewLaravelErrors();
     }
 
     public function _failed(TestInterface $test, \Exception $fail)
@@ -77,7 +78,7 @@ class Acceptance extends \Codeception\Module
                 };
 
                 // This is the ONLY method that exists and works in Codeception 5.3.2
-                $this->debug($colored,false);
+                $this->debug($colored, false, true);
             }
 
             // Optional: fail only on real JS errors (skip 401/404 etc.)
@@ -107,7 +108,7 @@ class Acceptance extends \Codeception\Module
         $logFile = $projectRoot . '/storage/logs/laravel.log';
 
         if (!file_exists($logFile)) {
-            $this->debug("\033[33mLaravel log file not found: $logFile\033[0m");
+            $this->debug("\033[33mLaravel log file not found: $logFile\033[0m", false, true);
             return;
         }
 
@@ -119,7 +120,7 @@ class Acceptance extends \Codeception\Module
 
         $handle = fopen($logFile, 'r');
         if ($handle === false) {
-            $this->debug("\033[33mCould not open Laravel log file: $logFile\033[0m");
+            $this->debug("\033[33mCould not open Laravel log file: $logFile\033[0m", false, true);
             return;
         }
 
@@ -149,14 +150,14 @@ class Acceptance extends \Codeception\Module
             return;
         }
 
-        $this->debug("\n\033[1;31m=== New Laravel ERROR-level Log Entries ===\033[0m");
+        $this->debug("\n\033[1;31m=== New Laravel ERROR-level Log Entries ===\033[0m", false, true);
         //foreach ($errorLines as $line) {
-            $this->debug($newContent, false);
+            $this->debug($newContent, false, true);
         //}
-        $this->debug("\033[1;31m=== End of New ERROR Logs ===\033[0m\n");
+        $this->debug("\033[1;31m=== End of New ERROR Logs ===\033[0m\n", false, true);
     }
 
-    function debug($var, bool $trace =true): void
+    function debug($var, bool $trace =true, bool $alreadyFormatted = false): void
     {
         if (in_array('--debug', $_SERVER['argv'] ?? [], true) ||
             in_array('-v', $_SERVER['argv'] ?? [], true) ||
@@ -170,7 +171,7 @@ class Acceptance extends \Codeception\Module
             //foreach ($args as $var) {
                 // If it's a string that likely already contains ANSI escape codes,
                 // write it directly to preserve coloring
-                if (is_string($var) && preg_match('/\033\[[0-9;]*m/', $var)) {
+                if (is_string($var) && ($alreadyFormatted || preg_match('/\033\[[0-9;]*m/', $var))) {
                     fwrite(STDERR, $var . "\n");
                 } else {
                     if (class_exists('\\Symfony\\Component\\VarDumper\\VarDumper')) {
