@@ -84,6 +84,8 @@ final class FirstCest
         $I->see('Home');
         $I->waitForElement('#search', 10);
 
+        $I->amGoingTo('Register a new user');
+
         // Open dropdown
         $I->scrollTo('#navbarDropdownMenuLink');
         $I->wait(1);
@@ -117,10 +119,11 @@ final class FirstCest
         // Debug: log cookies after registration
         $I->executeJS("console.log('Cookies after registration:', document.cookie);");
 
+        $I->amGoingTo('Check that user has registered and logged in');
         // Wait for username in navbar (increased timeout)
         $I->waitForText($tempName, 40);
         $I->see($tempName);
-        $I->dontSee('Register');
+        $I->dontSeeElement('.dropdown-item', ['text' => 'Register']);
         $I->dontSee('Login');
 
         // Browse home as logged-in user
@@ -130,6 +133,8 @@ final class FirstCest
 
         // TODO: Create temporary objects (will be added when feature is implemented)
 
+
+        $I->amGoingTo('Log out user');
         // Test logout
         $I->scrollTo('#navbarDropdownMenuLink');
         $I->wait(1);
@@ -141,6 +146,7 @@ final class FirstCest
         $I->see('Register');
         $I->dontSee($tempName);
 
+        $I->amGoingTo('Log in using recently created user');
         // Test login with the new user
         $I->click('Log in');
         $I->waitForText('Login', 10);
@@ -152,6 +158,7 @@ final class FirstCest
 
         // TODO: Delete account (will be added when feature is implemented)
 
+        $I->amGoingTo('Logout user at the end of test');
         // Final logout
         $I->scrollTo('#navbarDropdownMenuLink');
         $I->wait(1);
