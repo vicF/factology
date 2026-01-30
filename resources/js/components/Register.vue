@@ -77,10 +77,8 @@ export default {
             try {
                 console.log('Starting registration process');
 
-                // Register the user
-                const response = await axios.post('/register', state.user, {
-                    withCredentials: true
-                });
+                // Register the user — no CSRF cookie needed for token-based flow
+                const response = await axios.post('/register', state.user);
 
                 console.log('Registration response:', response.data);
 
@@ -92,20 +90,16 @@ export default {
 
                 console.log('User logged in locally:', authenticatedUser.name);
 
-                // Small delay for cookie to settle
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // If backend returns token, store it and set Authorization header
+                if (response.data.token) {
+                    localStorage.setItem('token', response.data.token);
+                    axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+                }
 
-                // Redirect to root (home page)
+                // Redirect to home
                 console.log('Redirecting to home');
                 await router.push('/');
 
-                // Extra delay after redirect to allow app re-mount and route guards
-                await new Promise(resolve => setTimeout(resolve, 1500));
-
-                console.log('Post-redirect auth check starting');
-                await authStore.checkAuth();
-
-                console.log('Post-redirect auth check completed');
             } catch (error) {
                 console.error('Registration failed:', error);
 
