@@ -35,7 +35,7 @@
                                         <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
                                     </template>
                                     <template v-else>
-                                        <router-link class="dropdown-item" to="/login">Login</router-link>
+                                        <router-link class="dropdown-item" to="/login">Log in</router-link>
                                         <router-link class="dropdown-item" to="/register">Register</router-link>
                                     </template>
                                 </div>
@@ -86,7 +86,7 @@ export default {
 
         const checkAuth = async () => {
             try {
-                const response = await axios.get('/user', {noAuthRedirect: true});
+                const response = await axios.get('user', {noAuthRedirect: true});
                 if (response.data && !authStore.authenticated) {
                     authStore.login(response.data);
                 }
@@ -167,7 +167,7 @@ export default {
     },
     methods: {
         async logout() {
-            await axios.post('/logout').then(() => {
+            await axios.post('logout').then(() => {
                 this.authStore.logout();
                 this.$router.push({name: "dashboard"});
             }).catch(error => {

@@ -36,6 +36,7 @@ axios.defaults.headers.common['Accept'] = 'application/json';
 // Automatically add Authorization header with Bearer token when available
 axios.interceptors.request.use(config => {
     const authStore = useAuthStore(pinia);  // pass pinia instance to access store outside setup()
+    authStore.restoreAuth();
     if (authStore.token) {
         config.headers.Authorization = `Bearer ${authStore.token}`;
     }
@@ -69,5 +70,6 @@ app.config.globalProperties.$dateFromDb = dateFromDb;
 
 const authStore = useAuthStore();
 await authStore.checkAuth();
+
 
 app.mount('#app');

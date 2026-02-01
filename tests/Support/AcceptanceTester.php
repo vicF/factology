@@ -3,6 +3,7 @@ namespace Tests\Support;
 
 
 use Codeception\Lib\Actor\Shared\Retry;
+use Codeception\Scenario;
 
 /**
  * Inherited Methods
@@ -27,21 +28,15 @@ class AcceptanceTester extends \Codeception\Actor
     use _generated\AcceptanceTesterActions;
 
 
-    public const RETRY_NUM = 8;
-    public const RETRY_INTERVAL = 1000;
+    public const RETRY_NUM = 4;
+    public const RETRY_INTERVAL = 500;
 
-
-    /**
-     * AcceptanceTester constructor.
-     *
-     * @param $scenario
-     * @param int $userMarker
-     */
-    /*public function __construct($scenario = null, $userMarker = 0)
+    public function __construct(Scenario $scenario)
     {
-        parent::__construct($scenario, $userMarker);
-        $this->resetRetry();
-    }*/
+        parent::__construct($scenario);
+        $this->retry(self::RETRY_NUM, self::RETRY_INTERVAL);
+    }
+
 
     public function resetRetry()
     {
@@ -295,6 +290,36 @@ class AcceptanceTester extends \Codeception\Actor
             $this->debug('Paused on fail');
             $this->pause();
         }
+    }
+
+    public function openDropDownMenu(): void
+    {
+        // Open dropdown
+        $this->scrollTo('#navbarDropdownMenuLink');
+        $this->wait(1);
+        $this->click('#navbarDropdownMenuLink');
+        $this->waitForElementVisible('.dropdown-menu.show', 10);
+        $this->executeJS("console.log(document.querySelectorAll('.dropdown-item').length)");
+        $this->executeJS("console.log(document.querySelector('.dropdown-item')?.textContent)");
+    }
+
+    public function verifyUserIsLoggedOut(string $userName = null): void
+    {
+        if (!empty($userName)) {
+            $this->dontSee($userName);
+        }
+        $this->openDropDownMenu();
+        $this->see('Log in', 'a');
+        $this->see('Register', 'a');
+    }
+
+    public function verifyUserIsLoggedIn(string $userName): void
+    {
+        $this->see($userName);
+        $this->openDropDownMenu();
+        $this->see('Logout', 'a');
+        $this->dontSee('Register', 'a');
+        $this->dontSee('Log in', 'a');
     }
 
 

@@ -35,9 +35,11 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = userData;
         token.value = authToken;
 
-        localStorage.setItem('authenticated', 'true');
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('auth_token', authToken);
+
+        // Set global Axios header for all future requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
     }
 
     function login(userData, authToken) {
@@ -63,15 +65,17 @@ export const useAuthStore = defineStore('auth', () => {
             user.value = null;
             token.value = null;
 
-            localStorage.removeItem('authenticated');
             localStorage.removeItem('user');
             localStorage.removeItem('auth_token');
 
             console.log('AuthStore logout - Local storage cleared');
 
+            // Clear global header
+            delete axios.defaults.headers.common['Authorization'];
+
             // Navigate to /login
             console.log('AuthStore logout - Navigating to /login');
-            await router.push('/login');
+            await router.push('/');
             console.log('AuthStore logout - Navigation to /login successful');
         } catch (error) {
             console.error('AuthStore logout error:', {
@@ -83,10 +87,10 @@ export const useAuthStore = defineStore('auth', () => {
             authenticated.value = false;
             user.value = null;
             token.value = null;
-            localStorage.removeItem('authenticated');
             localStorage.removeItem('user');
             localStorage.removeItem('auth_token');
-            window.location.href = '/login';
+            delete axios.defaults.headers.common['Authorization'];
+            await router.push('/');
         }
     }
 
@@ -131,5 +135,26 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { authenticated, user, token, login, logout, checkAuth };
+    // New method: restore from localStorage on app start
+    function restoreAuth() {
+        const storedToken = localStorage.getItem('auth_token');
+        const storedUser = localStorage.getItem('user');
+
+        if (storedToken) {
+            token.value = storedToken;
+            axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        }
+
+        if (storedUser) {
+            try {
+                user.value = JSON.parse(storedUser);
+                authenticated.value = true;
+            } catch (e) {
+                console.error('Failed to restore user:', e);
+                localStorage.removeItem('user');
+            }
+        }
+    }
+
+    return { authenticated, user, token, login, logout, checkAuth, restoreAuth };
 });

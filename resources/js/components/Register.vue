@@ -37,7 +37,7 @@
                                 </button>
                             </div>
                             <div class="col-12 text-center">
-                                <label>Already have an account? <router-link :to="{name:'login'}">Login Now!</router-link></label>
+                                <label>Already have an account? <router-link :to="{name:'login'}">Log in Now!</router-link></label>
                             </div>
                         </form>
                     </div>
@@ -92,7 +92,7 @@ export default {
 
                 // If backend returns token, store it and set Authorization header
                 if (response.data.token) {
-                    localStorage.setItem('token', response.data.token);
+                    localStorage.setItem('auth_token', response.data.token);
                     axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
                 }
 

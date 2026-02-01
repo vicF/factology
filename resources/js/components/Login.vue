@@ -3,7 +3,7 @@
         <div class="col-12 col-md-6">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h1 class="text-center">{{ $t('Login') }}</h1>
+                    <h1 class="text-center">{{ $t('Log in') }}</h1>
                     <hr/>
 
                     <form @submit.prevent="login" class="row">
@@ -27,7 +27,7 @@
 
                         <div class="col-12 mb-2 d-flex gap-2">
                             <button type="submit" :disabled="processing" class="btn btn-primary flex-fill">
-                                {{ processing ? $t('Please wait') : $t('Login') }}
+                                {{ processing ? $t('Please wait') : $t('Log in') }}
                             </button>
                             <button type="button" class="btn btn-secondary flex-fill" @click="cancel">{{ $t('Cancel') }}</button>
                         </div>

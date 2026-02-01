@@ -35,8 +35,6 @@ final class FirstCest
         $I->executeInSelenium(function (\Facebook\WebDriver\Remote\RemoteWebDriver $driver) {
             $driver->manage()->deleteAllCookies();
         });
-
-        $I->retry(5, 500);
     }
 
 
@@ -54,7 +52,7 @@ final class FirstCest
         $I->amOnPage('/object/d591f9d2-686a-4749-98c3-8fc6bb9d34da');
         $I->see('Not Found');
         $I->amGoingTo('Log in as tester@mail.ru');
-        $I->click('Log in');
+        $I->click('Log in to see more');
         $I->fillField('email', 'tester@mail.ru');
         $I->fillField('password', 'qqqqqqq');
         $I->clickLoginButton();
@@ -85,12 +83,7 @@ final class FirstCest
         $I->waitForElement('#search', 10);
 
         $I->amGoingTo('Register a new user');
-
-        // Open dropdown
-        $I->scrollTo('#navbarDropdownMenuLink');
-        $I->wait(1);
-        $I->click('#navbarDropdownMenuLink');
-        $I->waitForElementVisible('.dropdown-menu.show', 10);
+        $I->verifyUserIsLoggedOut();
 
         // Click Register in dropdown
         $I->click('Register', '.dropdown-menu');
@@ -121,10 +114,7 @@ final class FirstCest
 
         $I->amGoingTo('Check that user has registered and logged in');
         // Wait for username in navbar (increased timeout)
-        $I->waitForText($tempName, 40);
-        $I->see($tempName);
-        $I->dontSeeElement('.dropdown-item', ['text' => 'Register']);
-        $I->dontSee('Login');
+        $I->verifyUserIsLoggedIn($tempName);
 
         // Browse home as logged-in user
         $I->amOnPage('/');
@@ -135,21 +125,16 @@ final class FirstCest
 
 
         $I->amGoingTo('Log out user');
+        $I->verifyUserIsLoggedIn($tempName);
         // Test logout
-        $I->scrollTo('#navbarDropdownMenuLink');
-        $I->wait(1);
-        $I->click('#navbarDropdownMenuLink');
-        $I->waitForElementVisible('.dropdown-menu.show', 10);
+
         $I->click('Logout', '.dropdown-menu');
-        $I->waitForText('Home', 10);
-        $I->see('Login');
-        $I->see('Register');
-        $I->dontSee($tempName);
+        $I->verifyUserIsLoggedOut($tempName);
 
         $I->amGoingTo('Log in using recently created user');
         // Test login with the new user
         $I->click('Log in');
-        $I->waitForText('Login', 10);
+        $I->waitForText('Log in', 10);
         $I->fillField('email', $tempEmail);
         $I->fillField('password', $tempPassword);
         $I->clickLoginButton();
