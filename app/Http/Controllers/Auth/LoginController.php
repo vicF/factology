@@ -40,8 +40,8 @@ class LoginController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
+        if (Auth::guard('web')->attempt($credentials)) {
+            $user = Auth::guard('web')->user();
 
             $token = $user->createToken(
                 name: 'spa-token',
