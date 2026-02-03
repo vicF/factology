@@ -1,22 +1,20 @@
-<!-- resources/js/components/inputs/ObjectField.vue -->
+<!-- resources/js/components/Fields/ObjectField.vue -->
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { useObjectCacheStore } from '@/stores/objectCache.js' // ← we'll create this store
-import { useClickOutside } from '@/composables/useClickOutside.js' // optional helper
+import { useObjectCacheStore } from '@/stores/objectCache.js'
+
+// Optional: if you have the composable already
+import { useClickOutside } from '@/composables/useClickOutside.js'
 
 const props = defineProps({
-    fieldName: String,        // form field name
-    modelValue: [String, null], // UUID or null
+    fieldName: String,
+    modelValue: [String, null],
     isEditable: {
         type: Boolean,
         default: true
     },
     label: String,
-    name: String,             // usually label for display when not editable
-    objectType: {             // e.g. 'product', 'category', 'user', 'document'...
-        type: String,
-        required: true
-    },
+    name: String,
     placeholder: {
         type: String,
         default: 'Search or paste UUID...'
@@ -25,16 +23,17 @@ const props = defineProps({
         type: Number,
         default: 12
     }
+    // objectType prop intentionally removed for now
 })
 
 const emit = defineEmits(['update:modelValue'])
 
-const objectStore = useObjectCacheStore()
+const cacheStore = useObjectCacheStore()
 
 // ── Local state ────────────────────────────────────────────────
 const searchText = ref('')
 const isOpen = ref(false)
-const selectedObject = ref(null)      // full object when selected
+const selectedObject = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const inputRef = ref(null)
@@ -46,12 +45,12 @@ const displayValue = computed(() => {
     if (selectedObject.value && selectedObject.value.uuid === props.modelValue) {
         return selectedObject.value.name || selectedObject.value.title || props.modelValue
     }
-    return props.modelValue // fallback - showing UUID
+    return props.modelValue // fallback
 })
 
 const hasSelection = computed(() => !!props.modelValue)
 
-// ── Dropdown visibility control ────────────────────────────────
+// ── Dropdown visibility ────────────────────────────────────────
 const openDropdown = async () => {
     if (!props.isEditable) return
     isOpen.value = true
@@ -66,39 +65,40 @@ const closeDropdown = () => {
     error.value = null
 }
 
-// Close when clicking outside
 useClickOutside([inputRef, dropdownRef], () => {
     if (isOpen.value) closeDropdown()
 })
 
 // ── Search & filtering ─────────────────────────────────────────
+// For now we use global recent / global search (no type filtering)
 const filteredObjects = computed(() => {
     if (!searchText.value.trim()) {
-        return objectStore.getRecentOrDefault(props.objectType, props.maxResults)
+        // If you later want recent per type → pass dummy or remove .getRecent()
+        return cacheStore.getRecent('global', props.maxResults) || []   // fallback to empty if method doesn't exist
     }
 
     const term = searchText.value.toLowerCase().trim()
-    return objectStore.searchObjects(props.objectType, term, props.maxResults)
+    return cacheStore.searchCached('global', term, props.maxResults) || []
 })
 
-// ── Load selected object if value exists on mount ──────────────
+// ── Load selected object on mount ──────────────────────────────
 onMounted(async () => {
-    if (props.modelValue && !objectStore.hasObject(props.objectType, props.modelValue)) {
+    if (props.modelValue && !cacheStore.hasCachedObject(props.modelValue)) {
         await loadObjectByUuid(props.modelValue)
     } else if (props.modelValue) {
-        selectedObject.value = objectStore.getObject(props.objectType, props.modelValue)
+        selectedObject.value = cacheStore.getCachedObject(props.modelValue)
     }
 })
 
-// ── Watch modelValue changes (e.g. from parent or paste) ───────
+// ── Watch modelValue ───────────────────────────────────────────
 watch(() => props.modelValue, async (newUuid) => {
     if (!newUuid) {
         selectedObject.value = null
         return
     }
 
-    if (objectStore.hasObject(props.objectType, newUuid)) {
-        selectedObject.value = objectStore.getObject(props.objectType, newUuid)
+    if (cacheStore.hasCachedObject(newUuid)) {
+        selectedObject.value = cacheStore.getCachedObject(newUuid)
     } else {
         await loadObjectByUuid(newUuid)
     }
@@ -106,13 +106,14 @@ watch(() => props.modelValue, async (newUuid) => {
 
 // ── Core logic ─────────────────────────────────────────────────
 async function loadObjectByUuid(uuid) {
-    if (!uuid || uuid.length < 20) return // quick sanity check
+    if (!uuid || uuid.length < 20) return
 
     loading.value = true
     error.value = null
 
     try {
-        const obj = await objectStore.fetchObject(props.objectType, uuid)
+        // No type passed — your current fetchOrGetObject doesn't require it
+        const obj = await cacheStore.fetchOrGetObject(uuid)
         if (obj) {
             selectedObject.value = obj
         } else {
@@ -140,11 +141,9 @@ function clearSelection() {
     searchText.value = ''
 }
 
-// ── Handle input change (typing or pasting) ────────────────────
 function onInput(e) {
     const val = e.target.value.trim()
 
-    // Detect paste of UUID-like string
     if (val.length > 30 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
         loadObjectByUuid(val)
     }
@@ -153,13 +152,11 @@ function onInput(e) {
 
 <template>
     <div class="object-field position-relative">
-        <!-- Label -->
         <label v-if="label" class="form-label">
             {{ label }}
             <small v-if="name">({{ name }})</small>
         </label>
 
-        <!-- ── READ-ONLY MODE ─────────────────────────────────────── -->
         <div
             v-if="!isEditable"
             class="form-control-plaintext d-flex align-items-center gap-2 py-1"
@@ -177,22 +174,20 @@ function onInput(e) {
             </small>
         </div>
 
-        <!-- ── EDITABLE MODE ──────────────────────────────────────── -->
         <template v-else>
-            <!-- Selected object display + clear button -->
             <div
                 v-if="hasSelection"
                 class="input-group input-group-sm"
                 :class="{ 'is-invalid': error }"
             >
-        <span class="input-group-text bg-light">
-          <component
-              v-if="selectedObject?.icon"
-              :is="selectedObject.icon"
-              style="width: 1.3em; height: 1.3em;"
-          />
-          <i v-else class="bi bi-link-45deg"></i>
-        </span>
+                <span class="input-group-text bg-light">
+                    <component
+                        v-if="selectedObject?.icon"
+                        :is="selectedObject.icon"
+                        style="width: 1.3em; height: 1.3em;"
+                    />
+                    <i v-else class="bi bi-link-45deg"></i>
+                </span>
                 <input
                     type="text"
                     class="form-control"
@@ -210,7 +205,6 @@ function onInput(e) {
                 </button>
             </div>
 
-            <!-- Search / paste input when nothing selected -->
             <div v-else class="position-relative">
                 <input
                     ref="inputRef"
@@ -223,14 +217,12 @@ function onInput(e) {
                     @input="onInput"
                 />
 
-                <!-- Dropdown panel -->
                 <div
                     v-if="isOpen"
                     ref="dropdownRef"
                     class="dropdown-menu show shadow-sm w-100 mt-1"
                     style="max-height: 320px; overflow-y: auto;"
                 >
-                    <!-- Loading / error state -->
                     <div v-if="loading" class="text-center py-4 text-muted">
                         <div class="spinner-border spinner-border-sm" role="status"></div>
                         <div class="mt-2">Loading...</div>
@@ -240,7 +232,6 @@ function onInput(e) {
                         {{ error }}
                     </div>
 
-                    <!-- Results -->
                     <template v-else>
                         <button
                             v-for="obj in filteredObjects"
@@ -249,7 +240,6 @@ function onInput(e) {
                             class="dropdown-item d-flex align-items-center gap-3 py-2 px-3"
                             @click="selectObject(obj)"
                         >
-                            <!-- Icon -->
                             <component
                                 v-if="obj.icon"
                                 :is="obj.icon"
@@ -258,7 +248,6 @@ function onInput(e) {
                             />
                             <i v-else class="bi bi-box flex-shrink-0"></i>
 
-                            <!-- Name + extra info -->
                             <div class="flex-grow-1 text-truncate">
                                 <div>{{ obj.name || obj.title || 'Unnamed' }}</div>
                                 <small v-if="obj.subtitle" class="text-muted">
@@ -266,7 +255,6 @@ function onInput(e) {
                                 </small>
                             </div>
 
-                            <!-- UUID hint -->
                             <small class="text-muted ms-auto font-monospace small">
                                 {{ obj.uuid.substring(0, 8) }}…
                             </small>
@@ -289,7 +277,6 @@ function onInput(e) {
                 </div>
             </div>
 
-            <!-- Hidden field for form submission -->
             <input
                 type="hidden"
                 :name="fieldName"

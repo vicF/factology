@@ -41,6 +41,10 @@ export const useObjectCacheStore = defineStore('objectCache', {
             return this.cache.get(uuid) || null;
         },
 
+        getObject(uuid) {
+            return this.getCachedObject(uuid);
+        },
+
         hasCachedObject(uuid) {
             return this.cache.has(uuid);
         },
