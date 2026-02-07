@@ -31,7 +31,24 @@ export default defineConfig({
             host: 'localhost',  // Force host for HMR
         },
         watch: {
-            usePolling: true,   // Recommended in Docker/containers
+            usePolling: false,   // Recommended in Docker/containers
         },
+        ignored: [
+            '**/storage/**',
+            '**/node_modules/**',
+            '**/vendor/**'
+        ]
     },
+    optimizeDeps: {
+        include: [
+            'vue',
+            'vue-router',
+            'pinia',
+            'axios',
+            'vue-i18n',
+            'uuid',
+            'luxon',
+            'bootstrap'
+        ]
+    }
 });
