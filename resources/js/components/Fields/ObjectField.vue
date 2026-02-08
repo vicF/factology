@@ -23,14 +23,12 @@ const props = defineProps({
         type: Number,
         default: 12
     }
-    // objectType prop intentionally removed for now
 })
 
 const emit = defineEmits(['update:modelValue'])
 
 const cacheStore = useObjectCacheStore()
 
-// ── Local state ────────────────────────────────────────────────
 const searchText = ref('')
 const isOpen = ref(false)
 const selectedObject = ref(null)
@@ -38,6 +36,7 @@ const loading = ref(false)
 const error = ref(null)
 const inputRef = ref(null)
 const dropdownRef = ref(null)
+const wrapperRef = ref(null) // NEW: ref to parent for positioning
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
@@ -45,18 +44,21 @@ const displayValue = computed(() => {
     if (selectedObject.value && selectedObject.value.uuid === props.modelValue) {
         return selectedObject.value.name || selectedObject.value.title || props.modelValue
     }
-    return props.modelValue // fallback
+    return props.modelValue // fallback - showing UUID
 })
 
 const hasSelection = computed(() => !!props.modelValue)
 
-// ── Dropdown visibility ────────────────────────────────────────
+// ── Dropdown visibility control ────────────────────────────────
 const openDropdown = async () => {
     if (!props.isEditable) return
     isOpen.value = true
-    searchText.value = ''
+    // Prefill search with current value when opening (better UX)
+    searchText.value = displayValue.value || ''
     await nextTick()
     inputRef.value?.focus()
+    // Optional: select text if editable
+    if (!hasSelection.value) inputRef.value?.select()
 }
 
 const closeDropdown = () => {
@@ -65,23 +67,21 @@ const closeDropdown = () => {
     error.value = null
 }
 
-useClickOutside([inputRef, dropdownRef], () => {
+useClickOutside([wrapperRef, dropdownRef], () => {
     if (isOpen.value) closeDropdown()
 })
 
 // ── Search & filtering ─────────────────────────────────────────
-// For now we use global recent / global search (no type filtering)
 const filteredObjects = computed(() => {
     if (!searchText.value.trim()) {
-        // If you later want recent per type → pass dummy or remove .getRecent()
-        return cacheStore.getRecent('global', props.maxResults) || []   // fallback to empty if method doesn't exist
+        return cacheStore.getRecent('global', props.maxResults) || []
     }
 
     const term = searchText.value.toLowerCase().trim()
     return cacheStore.searchCached('global', term, props.maxResults) || []
 })
 
-// ── Load selected object on mount ──────────────────────────────
+// ── Load selected object if value exists on mount ──────────────
 onMounted(async () => {
     if (props.modelValue && !cacheStore.hasCachedObject(props.modelValue)) {
         await loadObjectByUuid(props.modelValue)
@@ -90,7 +90,7 @@ onMounted(async () => {
     }
 })
 
-// ── Watch modelValue ───────────────────────────────────────────
+// ── Watch modelValue changes ───────────────────────────────────
 watch(() => props.modelValue, async (newUuid) => {
     if (!newUuid) {
         selectedObject.value = null
@@ -112,7 +112,6 @@ async function loadObjectByUuid(uuid) {
     error.value = null
 
     try {
-        // No type passed — your current fetchOrGetObject doesn't require it
         const obj = await cacheStore.fetchOrGetObject(uuid)
         if (obj) {
             selectedObject.value = obj
@@ -157,10 +156,7 @@ function onInput(e) {
             <small v-if="name">({{ name }})</small>
         </label>
 
-        <div
-            v-if="!isEditable"
-            class="form-control-plaintext d-flex align-items-center gap-2 py-1"
-        >
+        <div v-if="!isEditable" class="form-control-plaintext d-flex align-items-center gap-2 py-1">
             <component
                 v-if="selectedObject?.icon"
                 :is="selectedObject.icon"
@@ -174,54 +170,48 @@ function onInput(e) {
             </small>
         </div>
 
+        <!-- Editable mode – single input group always -->
         <template v-else>
-            <div
-                v-if="hasSelection"
-                class="input-group input-group-sm"
-                :class="{ 'is-invalid': error }"
-            >
-                <span class="input-group-text bg-light">
-                    <component
-                        v-if="selectedObject?.icon"
-                        :is="selectedObject.icon"
-                        style="width: 1.3em; height: 1.3em;"
+            <div ref="wrapperRef" class="position-relative">
+                <div class="input-group input-group-sm" :class="{ 'is-invalid': error }">
+                    <span class="input-group-text bg-light">
+                        <component
+                            v-if="selectedObject?.icon"
+                            :is="selectedObject.icon"
+                            style="width: 1.3em; height: 1.3em;"
+                        />
+                        <i v-else class="bi bi-link-45deg"></i>
+                    </span>
+
+                    <!-- Single input – conditionally readonly or editable -->
+                    <input
+                        ref="inputRef"
+                        :type="isOpen ? 'text' : 'text'"
+                        class="form-control"
+                        :value="isOpen ? searchText : displayValue"
+                        :readonly="!isOpen"
+                        :placeholder="isOpen ? placeholder : (displayValue || placeholder)"
+                        @focus="openDropdown"
+                        @input="onInput"
+                        @click="openDropdown"
                     />
-                    <i v-else class="bi bi-link-45deg"></i>
-                </span>
-                <input
-                    type="text"
-                    class="form-control"
-                    :value="displayValue"
-                    readonly
-                    @click="openDropdown"
-                />
-                <button
-                    class="btn btn-outline-secondary"
-                    type="button"
-                    @click="clearSelection"
-                    title="Clear selection"
-                >
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
 
-            <div v-else class="position-relative">
-                <input
-                    ref="inputRef"
-                    v-model="searchText"
-                    type="text"
-                    class="form-control"
-                    :placeholder="placeholder"
-                    :class="{ 'is-invalid': error }"
-                    @focus="openDropdown"
-                    @input="onInput"
-                />
+                    <button
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        @click="isOpen ? closeDropdown() : openDropdown()"
+                        :title="isOpen ? 'Close' : 'Select object'"
+                    >
+                        <i :class="isOpen ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
+                    </button>
+                </div>
 
+                <!-- Dropdown always below, shown only when open -->
                 <div
                     v-if="isOpen"
                     ref="dropdownRef"
                     class="dropdown-menu show shadow-sm w-100 mt-1"
-                    style="max-height: 320px; overflow-y: auto;"
+                    style="max-height: 320px; overflow-y: auto; z-index: 1050;"
                 >
                     <div v-if="loading" class="text-center py-4 text-muted">
                         <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -297,5 +287,10 @@ function onInput(e) {
 
 .dropdown-item .bi {
     opacity: 0.75;
+}
+
+/* Ensure dropdown is positioned relative to wrapper */
+.object-field .position-relative {
+    position: relative;
 }
 </style>
