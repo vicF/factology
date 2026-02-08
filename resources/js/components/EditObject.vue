@@ -147,8 +147,8 @@ export default {
             end: isEditMode.value ? props.object.end || '' : '',
             public: isEditMode.value ? props.object.public || 0 : 0,
             parent_id: props.params.parentId || null,
-            class_id: props.params.classId || null,
-            class_name: props.params.className || null,
+            class_id: props.object.class.thing_id || null,
+            class_name: props.object.class.name || null,
             type: props.params.type || 3,
             link_id: props.object?.class?.link_id || null,
         });

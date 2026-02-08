@@ -2,8 +2,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
-
-// Optional: if you have the composable already
 import { useClickOutside } from '@/composables/useClickOutside.js'
 
 const props = defineProps({
@@ -41,10 +39,16 @@ const wrapperRef = ref(null) // NEW: ref to parent for positioning
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
     if (!props.modelValue) return ''
-    if (selectedObject.value && selectedObject.value.uuid === props.modelValue) {
-        return selectedObject.value.name || selectedObject.value.title || props.modelValue
+
+    // Use synchronous getter – returns cached object instantly if present
+    const cached = cacheStore.getCachedObject(props.modelValue)
+
+    if (cached && (cached.data)) {
+        return cached.data.name
     }
-    return props.modelValue // fallback - showing UUID
+
+    // Fallback: use passed :name prop if exists, then UUID
+    return props.name || props.modelValue
 })
 
 const hasSelection = computed(() => !!props.modelValue)
@@ -53,7 +57,7 @@ const hasSelection = computed(() => !!props.modelValue)
 const openDropdown = async () => {
     if (!props.isEditable) return
     isOpen.value = true
-    // Prefill search with current value when opening (better UX)
+    // Prefill search with current display value when opening (better UX)
     searchText.value = displayValue.value || ''
     await nextTick()
     inputRef.value?.focus()
@@ -239,12 +243,14 @@ function onInput(e) {
                             <i v-else class="bi bi-box flex-shrink-0"></i>
 
                             <div class="flex-grow-1 text-truncate">
+                                <!-- Show name (or title) in dropdown items -->
                                 <div>{{ obj.name || obj.title || 'Unnamed' }}</div>
                                 <small v-if="obj.subtitle" class="text-muted">
                                     {{ obj.subtitle }}
                                 </small>
                             </div>
 
+                            <!-- Always show short UUID as hint -->
                             <small class="text-muted ms-auto font-monospace small">
                                 {{ obj.uuid.substring(0, 8) }}…
                             </small>
