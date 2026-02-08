@@ -35,6 +35,7 @@ const error = ref(null)
 const inputRef = ref(null)
 const dropdownRef = ref(null)
 const wrapperRef = ref(null) // NEW: ref to parent for positioning
+const previousDisplay = ref('')  // NEW: remember name before clearing on open
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
@@ -56,18 +57,29 @@ const hasSelection = computed(() => !!props.modelValue)
 // ── Dropdown visibility control ────────────────────────────────
 const openDropdown = async () => {
     if (!props.isEditable) return
+
+    // Remember current display value before clearing
+    previousDisplay.value = displayValue.value || ''
+
     isOpen.value = true
-    // Prefill search with current display value when opening (better UX)
-    searchText.value = displayValue.value || ''
+    // Clear input for clean search (user can start typing immediately)
+    searchText.value = ''
+
     await nextTick()
     inputRef.value?.focus()
-    // Optional: select text if editable
-    if (!hasSelection.value) inputRef.value?.select()
+    inputRef.value?.select()  // highlight empty field
 }
 
 const closeDropdown = () => {
     isOpen.value = false
-    searchText.value = ''
+
+    // If nothing selected after close → restore previous name
+    if (!props.modelValue && previousDisplay.value) {
+        searchText.value = previousDisplay.value
+    } else {
+        searchText.value = ''
+    }
+
     error.value = null
 }
 

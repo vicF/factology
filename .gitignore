@@ -20,3 +20,4 @@ npm-debug.log
 public
 public/thumbs
 yarn-error.log
+.vite_cache/
