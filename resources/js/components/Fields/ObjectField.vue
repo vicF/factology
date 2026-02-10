@@ -3,6 +3,7 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useClickOutside } from '@/composables/useClickOutside.js'
+import {THING_TYPE} from "../../constants.js";
 
 const props = defineProps({
     fieldName: String,
@@ -20,6 +21,10 @@ const props = defineProps({
     maxResults: {
         type: Number,
         default: 12
+    },
+    type: {
+        type: Number,
+        default: THING_TYPE
     }
 })
 
@@ -44,8 +49,8 @@ const displayValue = computed(() => {
     // Use synchronous getter – returns cached object instantly if present
     const cached = cacheStore.getCachedObject(props.modelValue)
 
-    if (cached && (cached.data)) {
-        return cached.data.name
+    if (cached ) {
+        return cached.name
     }
 
     // Fallback: use passed :name prop if exists, then UUID
@@ -73,7 +78,7 @@ const openDropdown = async () => {
 const closeDropdown = () => {
     isOpen.value = false
 
-    // If nothing selected after close → restore previous name
+    // If nothing selected after close → restore previous name in input
     if (!props.modelValue && previousDisplay.value) {
         searchText.value = previousDisplay.value
     } else {
@@ -88,13 +93,16 @@ useClickOutside([wrapperRef, dropdownRef], () => {
 })
 
 // ── Search & filtering ─────────────────────────────────────────
+// Already shows recent when searchText is empty (on open without typing)
 const filteredObjects = computed(() => {
+    console.debug('called filteredObjects');
     if (!searchText.value.trim()) {
-        return cacheStore.getRecent('global', props.maxResults) || []
+        // Show recent objects when dropdown opens and no search yet
+        return cacheStore.getRecent(props.type, props.maxResults) || []
     }
 
     const term = searchText.value.toLowerCase().trim()
-    return cacheStore.searchCached('global', term, props.maxResults) || []
+    return cacheStore.searchCached('object', term, props.maxResults) || []
 })
 
 // ── Load selected object if value exists on mount ──────────────
@@ -256,15 +264,15 @@ function onInput(e) {
 
                             <div class="flex-grow-1 text-truncate">
                                 <!-- Show name (or title) in dropdown items -->
-                                <div>{{ obj.name || obj.title || 'Unnamed' }}</div>
-                                <small v-if="obj.subtitle" class="text-muted">
-                                    {{ obj.subtitle }}
+                                <div>{{ obj.name  || 'Unknown' }}</div>
+                                <small v-if="obj.description" class="text-muted">
+                                    {{ obj.description }}
                                 </small>
                             </div>
 
                             <!-- Always show short UUID as hint -->
                             <small class="text-muted ms-auto font-monospace small">
-                                {{ obj.uuid.substring(0, 8) }}…
+                                {{ obj.thing_id.substring(0, 8) }}…
                             </small>
                         </button>
 

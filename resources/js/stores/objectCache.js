@@ -1,6 +1,7 @@
 // resources/js/stores/objectCache.js
 import { defineStore } from 'pinia';
 import axios from 'axios';
+import { THING_TYPE } from '@/constants.js'
 
 export const useObjectCacheStore = defineStore('objectCache', {
     state: () => ({
@@ -12,8 +13,14 @@ export const useObjectCacheStore = defineStore('objectCache', {
 
     actions: {
         // Add or update object in cache + update recent list
-        cacheObject(uuid, data, type = null) {
+        cacheObject(uuid, data, type = THING_TYPE) {
             if (!uuid) return;
+
+            // NEW: Skip caching if uuid is invalid or data lacks matching uuid
+            if (typeof uuid !== 'string' || uuid.trim() === '' || !data?.thing_id || data.thing_id !== uuid) {
+                console.warn('Skipping cache insert - invalid or missing uuid:', { passedUuid: uuid, dataUuid: data?.uuid });
+                return;
+            }
 
             // Promote / insert into cache with LRU behavior
             if (this.cache.has(uuid)) {
@@ -28,12 +35,16 @@ export const useObjectCacheStore = defineStore('objectCache', {
             if (type) {
                 const key = `recent:${type}`;
                 let list = this.recent.get(key) || [];
-                list = list.filter(id => id !== uuid);     // remove if already present
-                list.unshift(uuid);                         // add to front
-                if (list.length > this.maxRecentPerType) {
-                    list.pop();
+
+                // NEW: Only add valid uuid to recent list
+                if (uuid && typeof uuid === 'string' && uuid.trim() !== '') {
+                    list = list.filter(id => id !== uuid);     // remove if already present
+                    list.unshift(uuid);                         // add to front
+                    if (list.length > this.maxRecentPerType) {
+                        list.pop();
+                    }
+                    this.recent.set(key, list);
                 }
-                this.recent.set(key, list);
             }
         },
 
@@ -71,10 +82,10 @@ export const useObjectCacheStore = defineStore('objectCache', {
 
             try {
                 const response = await axios.get(`/object/${uuid}`);
-                const data = response.data;
+                const data = response.data.data;
 
                 // Try to determine type if not provided
-                const inferredType = type || data.class_id || data.type || 'unknown';
+                const inferredType = data.type || THING_TYPE;
                 this.cacheObject(uuid, data, inferredType);
 
                 return data;

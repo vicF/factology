@@ -26,6 +26,7 @@
                                 :isEditable="true"
                                 :label="$t('Class')"
                                 :name="formData.class_name"
+                                :type=CLASS_TYPE()
                                 required
                             />
                         </div>
@@ -119,9 +120,15 @@ import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
+import {CLASS_TYPE} from "../constants.js";
 
 export default {
     name: 'EditObject',
+    methods: {
+        CLASS_TYPE() {
+            return CLASS_TYPE
+        }
+    },
     components: { LinkedObject, ObjectField, TextField, DateField, RadioGroupField },
     props: {
         object: { type: Object, default: null },
