@@ -151,10 +151,10 @@ async function loadObjectByUuid(uuid) {
 }
 
 async function selectObject(obj) {
-    if (!obj?.uuid) return
+    if (!obj?.thing_id) return
 
     selectedObject.value = obj
-    emit('update:modelValue', obj.uuid)
+    emit('update:modelValue', obj.thing_id)
     closeDropdown()
 }
 
