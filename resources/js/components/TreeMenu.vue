@@ -34,81 +34,105 @@
     </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed } from 'vue';
 import { useSearchStore } from '../stores/search';
-import { computed, ref } from 'vue';
 import { eventBus } from '../eventBus';
 
-export default {
-    props: ['id', 'name', 'nodes', 'depth'],
-    name: 'tree-menu',
-    data() {
-        return {
-            showChildren: true,
-            checkedItems: [],
-        };
+// Props definition
+const props = defineProps({
+    id: {
+        type: [String, Number],
+        required: true
     },
-    setup(props, { emit }) {
-        const store = useSearchStore();
-        const showIcons = ref(false);
-
-        const isChecked = computed(() => {
-            return store.checkedItems.includes(props.id);
-        });
-
-        function onCheckboxChange() {
-            store.toggleItem(props.id);
-            emit('update-checked', store.checkedItems);
-            // Emit a new event to trigger search with selected class IDs
-            eventBus.emit('trigger-search');
-        }
-
-        const openCreateSubclassModal = () => {
-            console.log('TreeMenu.vue - openCreateSubclassModal triggered');
-            console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
-            if (!props.id) {
-                console.warn('TreeMenu.vue - Warning: props.id is undefined for subclass creation');
-            }
-            const payload = {
-                title: `Subclass of ${props.name || 'Unnamed'}`,
-                params: { parentId: props.id, type: 2 }
-            };
-            console.log('TreeMenu.vue - Emitting open-create-modal for subclass:', payload);
-            eventBus.emit('open-create-modal', payload);
-        };
-
-        const openCreateObjectModal = () => {
-            console.log('TreeMenu.vue - openCreateObjectModal triggered');
-             console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
-            if (!props.id) {
-                console.warn('TreeMenu.vue - Warning: props.id is undefined for object creation');
-            }
-            const payload = {
-                title: `Object of ${props.name || 'Unnamed'}`,
-                params: { classId: props.id, className: props.name, type: 3 }
-            };
-            console.log('TreeMenu.vue - Emitting open-create-modal for object:', payload);
-            eventBus.emit('open-create-modal', payload);
-        };
-
-        return { isChecked, onCheckboxChange, showIcons, openCreateSubclassModal, openCreateObjectModal };
+    name: {
+        type: String,
+        required: true
     },
-    computed: {
-        showToggle() {
-            return this.nodes && this.nodes.length > 0;
-        },
-        indent() {
-            return { marginLeft: `${this.depth * 15}px` };
-        }
+    nodes: {
+        type: Array,
+        default: () => []
     },
-    methods: {
-        toggleChildren() {
-            this.showChildren = !this.showChildren;
-        },
-        handleCheckedUpdate(checkedItems) {
-            this.checkedItems = checkedItems;
-        }
+    depth: {
+        type: Number,
+        default: 0
+    },
+    checkedItems: {
+        type: Array,
+        default: () => []
     }
+});
+
+// Emits definition
+const emit = defineEmits(['update-checked']);
+
+// Component name
+defineOptions({
+    name: 'tree-menu'
+});
+
+// Store
+const store = useSearchStore();
+
+// State
+const showChildren = ref(true);
+const showIcons = ref(false);
+
+// Computed
+const isChecked = computed(() => {
+    return store.checkedItems.includes(props.id);
+});
+
+const showToggle = computed(() => {
+    return props.nodes && props.nodes.length > 0;
+});
+
+const indent = computed(() => {
+    return { marginLeft: `${props.depth * 15}px` };
+});
+
+// Methods
+const toggleChildren = () => {
+    showChildren.value = !showChildren.value;
+};
+
+const onCheckboxChange = () => {
+    store.toggleItem(props.id);
+    emit('update-checked', store.checkedItems);
+    eventBus.emit('trigger-search');
+};
+
+const openCreateSubclassModal = () => {
+    console.log('TreeMenu.vue - openCreateSubclassModal triggered');
+    console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
+    if (!props.id) {
+        console.warn('TreeMenu.vue - Warning: props.id is undefined for subclass creation');
+    }
+    const payload = {
+        title: `Subclass of ${props.name || 'Unnamed'}`,
+        params: { parentId: props.id, type: 2 }
+    };
+    console.log('TreeMenu.vue - Emitting open-create-modal for subclass:', payload);
+    eventBus.emit('open-create-modal', payload);
+};
+
+const openCreateObjectModal = () => {
+    console.log('TreeMenu.vue - openCreateObjectModal triggered');
+    console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
+    if (!props.id) {
+        console.warn('TreeMenu.vue - Warning: props.id is undefined for object creation');
+    }
+    const payload = {
+        title: `Object of ${props.name || 'Unnamed'}`,
+        params: { classId: props.id, className: props.name, type: 3 }
+    };
+    console.log('TreeMenu.vue - Emitting open-create-modal for object:', payload);
+    eventBus.emit('open-create-modal', payload);
+};
+
+const handleCheckedUpdate = (checkedItems) => {
+    // This is just passing through the event from child components
+    emit('update-checked', checkedItems);
 };
 </script>
 

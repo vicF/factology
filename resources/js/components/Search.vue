@@ -1,5 +1,5 @@
 <template>
-    <div id="search">  <!-- v-cloak removed – only change -->
+    <div id="search">
         <div v-if="!loaded" class="row">Loading...</div>
         <div v-else class="row">
             <div class="col">
@@ -28,11 +28,11 @@
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                            <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
+                                        <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
                                     </RouterLink>
-                                        {{ link.translation }}
+                                    {{ link.translation }}
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                            {{ link.name }}
+                                        {{ link.name }}
                                     </RouterLink>
                                 </div>
                             </div>
@@ -47,90 +47,101 @@
     </div>
 </template>
 
-<script>
-    import TreeMenu from './TreeMenu.vue';
-    import { useSearchStore } from '../stores/search';
-    import { ref, onMounted, watch } from 'vue';
-    import axios from 'axios';
-    import { useRoute } from 'vue-router';
-    import {eventBus} from "../eventBus";
+<script setup>
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import axios from 'axios';
+import { eventBus } from "../eventBus";
+import { useSearchStore } from '../stores/search';
+import TreeMenu from './TreeMenu.vue';
 
-    export default {
-        name: "Search",
-        components: { TreeMenu },
-        props: ['searchText', 'typeThing', 'typeClass'],
-        setup(props) {
-            const objects = ref([]);
-            const loaded = ref(false);
-            const validationErrors = ref({});
-            const processing = ref(false);
-            const route = useRoute();
-            const searchStore = useSearchStore();
+// Props
+const props = defineProps({
+    searchText: String,
+    typeThing: String,
+    typeClass: String
+});
 
-            // Sync props with store
-            if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
-            if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
+// Component name
+defineOptions({
+    name: "Search"
+});
 
-            const getThumbUrl = (thing_id) => {
-                return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
-            };
+// Composables
+const route = useRoute();
+const searchStore = useSearchStore();
 
-            const getObjects = async () => {
-                let type = [];
-                if (searchStore.typeThing) type.push(3);
-                if (searchStore.typeClass) type.push(2);
+// State
+const objects = ref([]);
+const loaded = ref(false);
+const validationErrors = ref({});
+const processing = ref(false);
 
-                processing.value = true;
-                try {
-                    const response = await axios.post('/object', JSON.stringify({
-                        "search": searchStore.searchQuery || props.searchText || route.query.q || '',
-                        "type": type,
-                        classes: searchStore.checkedItems,
-                    }));
-                    validationErrors.value = {};
-                    let data = JSON.parse(response.data);
-                    objects.value = data.things;
-                    console.log('Links:', data.links);
-                } catch (error) {
-                    console.error(error);
-                    if (error.response && error.response.status === 422) {
-                        validationErrors.value = error.response.data.errors;
-                    } else {
-                        validationErrors.value = {};
-                        alert(error.response ? error.response.data.message : error.message);
-                    }
-                } finally {
-                    processing.value = false;
-                    loaded.value = true;
-                }
-            };
+// Sync props with store
+if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
+if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
 
-            watch(() => route.query.q, (newQuery, oldQuery) => {
-                if (newQuery !== oldQuery) {
-                    console.log('Search.vue - Query param changed:', newQuery);
-                    searchStore.setSearchQuery(newQuery || '');
-                    getObjects();
-                }
-            });
+// Helper functions
+const getThumbUrl = (thing_id) => {
+    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
+};
 
-            onMounted(() => {
-                eventBus.on('trigger-search', () => {
-                    console.log('Search.vue - trigger-search received, searchQuery:', searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
-                    getObjects();
-                });
-                getObjects();
-            });
+// Main data fetching
+const getObjects = async () => {
+    const type = [];
+    if (searchStore.typeThing) type.push(3);
+    if (searchStore.typeClass) type.push(2);
 
-            return {
-                objects,
-                loaded,
-                getThumbUrl,
-                getObjects,
-                validationErrors,
-                processing
-            };
+    processing.value = true;
+    try {
+        const response = await axios.post('/object', {
+            "search": searchStore.searchQuery || props.searchText || route.query.q || '',
+            "type": type,
+            classes: searchStore.checkedItems,
+        });
+
+        validationErrors.value = {};
+        objects.value = response.data.things;
+        console.log('Links:', response.data.links);
+    } catch (error) {
+        console.error(error);
+        if (error.response?.status === 422) {
+            validationErrors.value = error.response.data.errors;
+        } else {
+            validationErrors.value = {};
+            alert(error.response?.data?.message || error.message);
         }
-    };
+    } finally {
+        processing.value = false;
+        loaded.value = true;
+    }
+};
+
+// Event handler
+const triggerSearchHandler = () => {
+    console.log('Search.vue - trigger-search received, searchQuery:',
+        searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
+    getObjects();
+};
+
+// Watchers
+watch(() => route.query.q, (newQuery, oldQuery) => {
+    if (newQuery !== oldQuery) {
+        console.log('Search.vue - Query param changed:', newQuery);
+        searchStore.setSearchQuery(newQuery || '');
+        getObjects();
+    }
+});
+
+// Lifecycle
+onMounted(() => {
+    eventBus.on('trigger-search', triggerSearchHandler);
+    getObjects();
+});
+
+onUnmounted(() => {
+    eventBus.off('trigger-search', triggerSearchHandler);
+});
 </script>
 
 <style scoped>

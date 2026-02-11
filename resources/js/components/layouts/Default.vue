@@ -62,132 +62,122 @@
     </div>
 </template>
 
-<script>
-import { computed } from 'vue';
-import LanguageSwitcher from "../LanguageSwitcher.vue";
-import ClassTree from "../ClassTree.vue";
-import { useRouter, useRoute } from 'vue-router';
-import { ref, watch, onMounted } from 'vue';
-import { eventBus } from '../../eventBus.js';
-import { useAuthStore } from '../../stores/auth';
-import axios from 'axios';
-import { useSearchStore } from '../../stores/search';
+<script setup>
+import { computed, ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
-export default {
-    name: "default-layout",
-    components: {LanguageSwitcher, ClassTree},
-    setup() {
-        const router = useRouter();
-        const route = useRoute();
-        const authStore = useAuthStore();
-        const showModal = ref(false);
-        const selectedType = ref('');
-        const searchStore = useSearchStore();
+import LanguageSwitcher from "../LanguageSwitcher.vue"
+import ClassTree from "../ClassTree.vue"
 
-        const checkAuth = async () => {
-            try {
-                const response = await axios.get('user', {noAuthRedirect: true});
-                if (response.data && !authStore.authenticated) {
-                    authStore.login(response.data);
-                }
-                console.log('Authenticated:', authStore.authenticated);
-                console.log('User:', authStore.user);
-            } catch (error) {
-                if (error.response?.status === 401) {
-                    console.log('Not authenticated yet (401)');
-                } else {
-                    console.error('Auth check failed:', error.response?.status);
-                }
-                if (authStore.authenticated) {
-                    authStore.logout();
-                }
-            }
-        };
+import { eventBus } from '../../eventBus.js'
+import { useAuthStore } from '../../stores/auth'
+import { useSearchStore } from '../../stores/search'
+import axios from 'axios'
 
-        const searchQuery = computed({
-            get() {
-                return searchStore.searchQuery;
-            },
-            set(value) {
-                console.log('default.vue - Updating searchQuery:', value);
-                searchStore.setSearchQuery(value);
-            }
-        });
+const router = useRouter()
+const route  = useRoute()
 
-        const submitSearch = () => {
-            console.log('default.vue - Emitting trigger-search');
-            eventBus.emit('trigger-search');
-        };
+const authStore    = useAuthStore()
+const searchStore  = useSearchStore()
 
-        onMounted(() => {
-            checkAuth();
-        });
+const showModal    = ref(false)
+const selectedType = ref('')
 
-        watch(() => route.path, () => {
-            checkAuth();
-        });
+// ---------------------------------------------------------------------------
 
-        watch(() => route.query.q, (newQuery) => {
-            searchQuery.value = newQuery || '';
-        });
+const checkAuth = async () => {
+    try {
+        const response = await axios.get('user', { noAuthRedirect: true })
+        if (response.data && !authStore.authenticated) {
+            authStore.login(response.data)
+        }
+        console.log('Authenticated:', authStore.authenticated)
+        console.log('User:', authStore.user)
+    } catch (error) {
+        if (error.response?.status === 401) {
+            console.log('Not authenticated yet (401)')
+        } else {
+            console.error('Auth check failed:', error.response?.status)
+        }
+        if (authStore.authenticated) {
+            authStore.logout()
+        }
+    }
+}
 
-        watch(
-            () => authStore.authenticated,
-            (isAuthenticated) => {
-                if (isAuthenticated && route.matched.some(r => r.components?.default?.name === 'login')) {
-                    const redirect = route.query.redirect || '/';
-                    console.debug('router.replace(' + redirect + ')');
-                    router.replace(redirect);
-                }
-            },
-            {immediate: true}
-        );
-
-        return {
-            authStore,
-            checkAuth,
-            route,
-            router,
-            searchQuery,
-            selectedType,
-            showModal,
-            submitSearch,
-        };
+const searchQuery = computed({
+    get() {
+        return searchStore.searchQuery
     },
-    computed: {
-        eventBus() {
-            return eventBus
-        },
-        user() {
-            return this.authStore.user || null;
-        },
-        authenticated() {
-            return this.authStore.authenticated;
-        },
+    set(value) {
+        console.log('default.vue - Updating searchQuery:', value)
+        searchStore.setSearchQuery(value)
+    }
+})
+
+const submitSearch = () => {
+    console.log('default.vue - Emitting trigger-search')
+    eventBus.emit('trigger-search')
+}
+
+// ---------------------------------------------------------------------------
+
+onMounted(() => {
+    checkAuth()
+})
+
+watch(() => route.path, () => {
+    checkAuth()
+})
+
+watch(() => route.query.q, (newQuery) => {
+    searchQuery.value = newQuery || ''
+})
+
+watch(
+    () => authStore.authenticated,
+    (isAuthenticated) => {
+        if (isAuthenticated && route.matched.some(r => r.components?.default?.name === 'login')) {
+            const redirect = route.query.redirect || '/'
+            console.debug('router.replace(' + redirect + ')')
+            router.replace(redirect)
+        }
     },
-    methods: {
-        async logout() {
-            await axios.post('logout').then(() => {
-                this.authStore.logout();
-                this.$router.push({name: "dashboard"});
-            }).catch(error => {
-                console.error('Logout failed:', error);
-            });
-        },
-        openCreateModal(type) {
-            this.selectedType = type;
-            this.showModal = true;
-        },
-        closeModal() {
-            this.showModal = false;
-            this.selectedType = '';
-        },
-        handleObjectCreated(object) {
-            console.log('Object created:', object);
-            this.$router.push({path: '/', query: {q: this.searchQuery}});
-        },
-    },
-};
+    { immediate: true }
+)
+
+// ---------------------------------------------------------------------------
+
+const user = computed(() => authStore.user || null)
+const authenticated = computed(() => authStore.authenticated)
+
+// Note: eventBus is used directly — no need for computed wrapper anymore
+
+// ---------------------------------------------------------------------------
+
+const logout = async () => {
+    await axios.post('logout').then(() => {
+        authStore.logout()
+        router.push({ name: "dashboard" })
+    }).catch(error => {
+        console.error('Logout failed:', error)
+    })
+}
+
+const openCreateModal = (type) => {
+    selectedType.value = type
+    showModal.value = true
+}
+
+const closeModal = () => {
+    showModal.value = false
+    selectedType.value = ''
+}
+
+const handleObjectCreated = (object) => {
+    console.log('Object created:', object)
+    router.push({ path: '/', query: { q: searchQuery.value } })
+}
 </script>
 
 <style scoped>
