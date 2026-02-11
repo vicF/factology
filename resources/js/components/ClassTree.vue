@@ -1,23 +1,42 @@
 <template>
     <div>
         Classes:
-        <TreeMenu :id="classes.id" :name="classes.name" :nodes="classes.nodes" :depth="0" />
+        <TreeMenu
+            v-if="classes && classes.id"
+            :id="classes.id"
+            :name="classes.name || 'Root Classes'"
+            :nodes="classes.nodes || []"
+            :depth="0"
+        />
+        <div v-else class="text-muted p-3">
+            No classes available
+        </div>
     </div>
 </template>
 
 <script setup>
 import TreeMenu from "./TreeMenu.vue";
 import { useObjectsStore } from '@/stores/objects';
-import { ref, onMounted } from 'vue';
-import { eventBus } from '../eventBus'; // Added import - make sure path is correct
+import { ref, onMounted, computed } from 'vue';
+import { eventBus } from '../eventBus';
 
-const classes = ref([]);
-const loaded = ref(false);
 const objectsStore = useObjectsStore();
+
+const classes = ref({
+    id: null,
+    name: '',
+    nodes: []
+});
+const loaded = ref(false);
 
 const getClasses = async () => {
     await objectsStore.loadClassTree();
-    classes.value = objectsStore.classes;
+    // Ensure we have valid structure even if empty
+    classes.value = objectsStore.classes || {
+        id: null,
+        name: '',
+        nodes: []
+    };
     loaded.value = true;
 };
 
@@ -25,27 +44,30 @@ onMounted(() => {
     getClasses();
 });
 
-// Note: props would need to be defined if this component receives props
-// For now, these functions reference 'props' which isn't defined in the original
-// You'll need to define props if this component receives them
+// Only define these if they're actually used
 const openCreateSubclassModal = () => {
+    if (!classes.value?.id) {
+        console.warn('ClassTree.vue - No class selected for subclass creation');
+        return;
+    }
     eventBus.emit('open-create-modal', {
-        title: `Subclass of ${props.name}`,
-        params: { parentId: props.id, type: 2 }
+        title: `Subclass of ${classes.value.name}`,
+        params: { parentId: classes.value.id, type: 2 }
     });
 };
 
 const openCreateObjectModal = () => {
+    if (!classes.value?.id) {
+        console.warn('ClassTree.vue - No class selected for object creation');
+        return;
+    }
     console.log('ClassTree.vue - Emitting open-create-modal for object:', {
-        title: `Object of ${props.name}`,
-        params: { classId: props.id, type: 3 }
+        title: `Object of ${classes.value.name}`,
+        params: { classId: classes.value.id, type: 3 }
     });
     eventBus.emit('open-create-modal', {
-        title: `Object of ${props.name}`,
-        params: { classId: props.id, className: props.name, type: 3 } // Type 3 for objects
+        title: `Object of ${classes.value.name}`,
+        params: { classId: classes.value.id, className: classes.value.name, type: 3 }
     });
 };
 </script>
-
-<style scoped>
-</style>

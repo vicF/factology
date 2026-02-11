@@ -1,6 +1,11 @@
 <template>
     <div id="search">
         <div v-if="!loaded" class="row">Loading...</div>
+        <div v-else-if="objects.length === 0" class="row">
+            <div class="col text-center py-5">
+                <p>No results found</p>
+            </div>
+        </div>
         <div v-else class="row">
             <div class="col">
                 <div class="row mt-5">
@@ -23,7 +28,7 @@
 
                             <!-- Links Column -->
                             <div class="col-md-6">
-                                <div v-for="(link, linkIndex) in thing.links" :key="`${link.link_type_id}-${link.thing_id}-${link.other_thing_id}-${linkIndex}`">
+                                <div v-for="(link, linkIndex) in thing.links || []" :key="`${link.link_type_id}-${link.thing_id}-${link.other_thing_id}-${linkIndex}`">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
                                     </RouterLink>
@@ -53,7 +58,6 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
-import TreeMenu from './TreeMenu.vue';
 
 // Props
 const props = defineProps({
@@ -77,40 +81,67 @@ const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
 
-// Sync props with store
-if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
-if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
+// Sync props with store - FIXED: Check for boolean/string values properly
+if (props.typeThing !== undefined && props.typeThing !== null) {
+    searchStore.setTypeThing(props.typeThing === 'true' || props.typeThing === true);
+}
+if (props.typeClass !== undefined && props.typeClass !== null) {
+    searchStore.setTypeClass(props.typeClass === 'true' || props.typeClass === true);
+}
 
 // Helper functions
 const getThumbUrl = (thing_id) => {
+    if (!thing_id) return '';
     return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
 };
 
-// Main data fetching
+// Main data fetching - FIXED: Response handling
 const getObjects = async () => {
     const type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
 
     processing.value = true;
+    loaded.value = false;
+
     try {
+        const searchQuery = searchStore.searchQuery || props.searchText || route.query.q || '';
+        console.log('Search.vue - Searching for:', searchQuery, 'types:', type, 'classes:', searchStore.checkedItems);
+
         const response = await axios.post('/object', {
-            "search": searchStore.searchQuery || props.searchText || route.query.q || '',
-            "type": type,
+            search: searchQuery,
+            type: type,
             classes: searchStore.checkedItems,
         });
 
+        console.log('Search.vue - Response:', response.data);
+
         validationErrors.value = {};
-        objects.value = response.data.things;
-        console.log('Links:', response.data.links);
+
+        // FIXED: Proper response parsing
+        if (typeof response.data === 'string') {
+            try {
+                const parsed = JSON.parse(response.data);
+                objects.value = parsed.things || [];
+                console.log('Search.vue - Parsed objects:', objects.value);
+            } catch (e) {
+                console.error('Search.vue - Failed to parse response:', e);
+                objects.value = [];
+            }
+        } else {
+            objects.value = response.data.things || response.data || [];
+        }
+
     } catch (error) {
-        console.error(error);
+        console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
-            validationErrors.value = error.response.data.errors;
+            validationErrors.value = error.response.data.errors || {};
         } else {
             validationErrors.value = {};
-            alert(error.response?.data?.message || error.message);
+            const errorMessage = error.response?.data?.message || error.message;
+            console.error('Search.vue - Error message:', errorMessage);
         }
+        objects.value = [];
     } finally {
         processing.value = false;
         loaded.value = true;
@@ -133,9 +164,23 @@ watch(() => route.query.q, (newQuery, oldQuery) => {
     }
 });
 
+// Watch for store changes that should trigger search
+watch(() => searchStore.checkedItems, () => {
+    console.log('Search.vue - checkedItems changed, triggering search');
+    getObjects();
+}, { deep: true });
+
+watch(() => searchStore.searchQuery, (newQuery) => {
+    console.log('Search.vue - searchQuery changed:', newQuery);
+    // Don't trigger search here to avoid double requests
+    // The route watcher or eventBus will handle it
+});
+
 // Lifecycle
 onMounted(() => {
     eventBus.on('trigger-search', triggerSearchHandler);
+
+    // Initial load
     getObjects();
 });
 
