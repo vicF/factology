@@ -114,7 +114,7 @@ const getObjects = async () => {
             classes: searchStore.checkedItems,
         });
 
-        console.log('Search.vue - Response:', response.data);
+        //console.log('Search.vue - Response:', response.data);
 
         validationErrors.value = {};
 
