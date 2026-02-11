@@ -155,6 +155,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import { useAuthStore } from '../stores/auth';
+import { useObjectCacheStore } from '@/stores/objectCache.js'
 
 export default {
     name: "Object",
@@ -179,6 +180,7 @@ export default {
         const treeModalParams = ref({});
 
         const authenticated = computed(() => authStore.authenticated);
+        const cacheStore = useObjectCacheStore();
 
         const getThumbUrl = (thing_id) => {
             return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
@@ -189,6 +191,7 @@ export default {
                 loaded.value = false;
                 const response = await axios.get(`/object/${route.params.uid}`);
                 object.value = response.data.data;
+                cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
             } catch (error) {
                 // 401 or 404 → treat as "not accessible"
                 if (error.response?.status === 401 || error.response?.status === 404) {

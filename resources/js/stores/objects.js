@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia'
-
+// @TODO this is in fact classes tree store. Need to rename or maybe merge with objectCache somehow
 // You can name the return value of `defineStore()` anything you want,
 // but it's best to use the name of the store and surround it with `use`
 // and `Store` (e.g. `useUserStore`, `useCartStore`, `useProductStore`)
