@@ -156,13 +156,21 @@ const authenticated = computed(() => authStore.authenticated)
 // ---------------------------------------------------------------------------
 
 const logout = async () => {
-    await axios.post('logout').then(() => {
-        authStore.logout()
-        router.push({ name: "dashboard" })
-    }).catch(error => {
-        console.error('Logout failed:', error)
-    })
-}
+    try {
+        await authStore.logout();
+        router.push('/');
+    } catch (error) {
+        // If it's a 401, the user is already logged out - this is fine
+        if (error.response?.status === 401) {
+            console.log('Already logged out');
+            // Still clear local state and redirect
+            authStore.clearAuth();
+            router.push('/');
+        } else {
+            console.error('Logout failed:', error);
+        }
+    }
+};
 
 const openCreateModal = (type) => {
     selectedType.value = type
