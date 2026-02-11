@@ -148,7 +148,7 @@
     </div>
 </template>
 
-<script>
+<script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
@@ -157,181 +157,154 @@ import EditObject from './EditObject.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 
-export default {
-    name: "Object",
-    components: { EditObject },
-    props: ["searchText", "typeThing", "typeClass"],
-    setup(props) {
-        const router = useRouter();
-        const route = useRoute();
-        const { t } = useI18n();
-        const authStore = useAuthStore();
+// Props definition
+const props = defineProps({
+    searchText: String,
+    typeThing: String,
+    typeClass: String
+});
 
-        const object = ref(null);
-        const loaded = ref(false);
+// Composables
+const router = useRouter();
+const route = useRoute();
+const { t } = useI18n();
+const authStore = useAuthStore();
+const cacheStore = useObjectCacheStore();
 
-        // Модалки
-        const showEditModal = ref(false);
-        const showTreeModal = ref(false);
-        const showCreateLinkedModal = ref(false);
+// State
+const object = ref(null);
+const loaded = ref(false);
 
-        const editObject = ref(null);
-        const modalParams = ref({});
-        const treeModalParams = ref({});
+// Modals
+const showEditModal = ref(false);
+const showTreeModal = ref(false);
+const showCreateLinkedModal = ref(false);
 
-        const authenticated = computed(() => authStore.authenticated);
-        const cacheStore = useObjectCacheStore();
+const editObject = ref(null);
+const modalParams = ref({});
+const treeModalParams = ref({});
 
-        const getThumbUrl = (thing_id) => {
-            return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
-        };
+// Computed
+const authenticated = computed(() => authStore.authenticated);
 
-        const getObject = async () => {
-            try {
-                loaded.value = false;
-                const response = await axios.get(`/object/${route.params.uid}`);
-                object.value = response.data.data;
-                cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
-            } catch (error) {
-                // 401 or 404 → treat as "not accessible"
-                if (error.response?.status === 401 || error.response?.status === 404) {
-                    console.log('Object not accessible for current user');
-                    object.value = null;
-                } else {
-                    console.error('Get object error:', error);
-                    //alert(t('Error loading object'));
-                }
-            } finally {
-                loaded.value = true;
-            }
-        };
-
-        const handleApiError = (error) => {
-            const status = error.response?.status;
-            if (status === 401) {
-                const data = error.response?.data;
-                if (data?.data?.public === 1) {
-                    object.value = data.data;
-                    loaded.value = true;
-                } else {
-                    localStorage.removeItem('authenticated');
-                    router.push({ path: '/login', query: { redirect: route.fullPath } });
-                }
-            } else {
-                //alert(t('Error loading object'));
-                loaded.value = true;
-            }
-        };
-
-        // Открыть создание в дереве классов
-        const openCreateModal = (type) => {
-            modalParams.value = {
-                classId: object.value.class?.thing_id,
-                type: type === 'Class' ? 2 : 3
-            };
-            showTreeModal.value = true;
-        };
-
-        // Открыть редактирование текущего объекта
-        const openEditModal = () => {
-            editObject.value = { ...object.value };
-            modalParams.value = {
-                classId: object.value.class?.thing_id,
-                type: object.value.type || 3
-            };
-            showEditModal.value = true;
-        };
-
-        // === НОВАЯ КНОПКА: Создать связанный объект ===
-        const openCreateLinkedModal = () => {
-            showCreateLinkedModal.value = true;
-        };
-
-        const deleteObject = async () => {
-            if (!confirm(t('Are you sure you want to delete this object?'))) return;
-            try {
-                await axios.delete(`/object/${object.value.thing_id}`);
-                router.push('/');
-            } catch (error) {
-                alert(t('Failed to delete object'));
-            }
-        };
-
-        const deleteLink = async (link_id) => {
-            if (!confirm(t('Are you sure you want to delete this link?'))) return;
-            try {
-                await axios.delete(`/link/${link_id}`);
-                await getObject();
-            } catch (error) {
-                alert(t('Failed to delete link'));
-            }
-        };
-
-        // Создание через ClassTree
-        const handleObjectCreated = (newObject) => {
-            console.log('Object.vue - Created via tree:', newObject);
-            showTreeModal.value = false;
-            router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
-        };
-
-        // Обновление текущего объекта
-        const handleObjectUpdated = (updatedObject) => {
-            console.log('Object.vue - Object updated:', updatedObject);
-            object.value = { ...object.value, ...updatedObject.data };
-            showEditModal.value = false;
-        };
-
-        // === СОЗДАНИЕ СВЯЗАННОГО ОБЪЕКТА (главное!) ===
-        const handleLinkedObjectCreated = async () => {
-            console.log('Object.vue - Linked object created → refreshing current object');
-            showCreateLinkedModal.value = false;
-            await getObject();
-        };
-
-        // Формируем linkRecords только для редактирования
-        const linkRecords = computed(() => {
-            if (!Array.isArray(object.value?.links)) return [];
-            return object.value.links.map(l => ({
-                link_id: l.link_id,
-                link_type_id: l.link_type_id,
-                other_thing_id: l.thing_id,
-                description: l.description || '',
-                public: l.public ?? 0,
-            }));
-        });
-
-        onMounted(() => {
-            getObject();
-        });
-
-        watch(() => route.params.uid, (newUid) => {
-            if (newUid) getObject();
-        });
-
-        return {
-            object,
-            loaded,
-            showEditModal,
-            showTreeModal,
-            showCreateLinkedModal,
-            editObject,
-            modalParams,
-            treeModalParams,
-            getThumbUrl,
-            openCreateModal,
-            openEditModal,
-            openCreateLinkedModal,
-            deleteObject,
-            deleteLink,
-            handleObjectCreated,
-            handleObjectUpdated,
-            handleLinkedObjectCreated,
-            linkRecords,
-            t,
-            authenticated,
-        };
-    },
+// Methods
+const getThumbUrl = (thing_id) => {
+    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
 };
+
+const getObject = async () => {
+    try {
+        loaded.value = false;
+        const response = await axios.get(`/object/${route.params.uid}`);
+        object.value = response.data.data;
+        cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
+    } catch (error) {
+        if (error.response?.status === 401 || error.response?.status === 404) {
+            console.log('Object not accessible for current user');
+            object.value = null;
+        } else {
+            console.error('Get object error:', error);
+        }
+    } finally {
+        loaded.value = true;
+    }
+};
+
+const handleApiError = (error) => {
+    const status = error.response?.status;
+    if (status === 401) {
+        const data = error.response?.data;
+        if (data?.data?.public === 1) {
+            object.value = data.data;
+            loaded.value = true;
+        } else {
+            localStorage.removeItem('authenticated');
+            router.push({ path: '/login', query: { redirect: route.fullPath } });
+        }
+    } else {
+        loaded.value = true;
+    }
+};
+
+const openCreateModal = (type) => {
+    modalParams.value = {
+        classId: object.value.class?.thing_id,
+        type: type === 'Class' ? 2 : 3
+    };
+    showTreeModal.value = true;
+};
+
+const openEditModal = () => {
+    editObject.value = { ...object.value };
+    modalParams.value = {
+        classId: object.value.class?.thing_id,
+        type: object.value.type || 3
+    };
+    showEditModal.value = true;
+};
+
+const openCreateLinkedModal = () => {
+    showCreateLinkedModal.value = true;
+};
+
+const deleteObject = async () => {
+    if (!confirm(t('Are you sure you want to delete this object?'))) return;
+    try {
+        await axios.delete(`/object/${object.value.thing_id}`);
+        router.push('/');
+    } catch (error) {
+        alert(t('Failed to delete object'));
+    }
+};
+
+const deleteLink = async (link_id) => {
+    if (!confirm(t('Are you sure you want to delete this link?'))) return;
+    try {
+        await axios.delete(`/link/${link_id}`);
+        await getObject();
+    } catch (error) {
+        alert(t('Failed to delete link'));
+    }
+};
+
+const handleObjectCreated = (newObject) => {
+    console.log('Object.vue - Created via tree:', newObject);
+    showTreeModal.value = false;
+    router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
+};
+
+const handleObjectUpdated = (updatedObject) => {
+    console.log('Object.vue - Object updated:', updatedObject);
+    object.value = { ...object.value, ...updatedObject.data };
+    showEditModal.value = false;
+};
+
+const handleLinkedObjectCreated = async () => {
+    console.log('Object.vue - Linked object created → refreshing current object');
+    showCreateLinkedModal.value = false;
+    await getObject();
+};
+
+const linkRecords = computed(() => {
+    if (!Array.isArray(object.value?.links)) return [];
+    return object.value.links.map(l => ({
+        link_id: l.link_id,
+        link_type_id: l.link_type_id,
+        other_thing_id: l.thing_id,
+        description: l.description || '',
+        public: l.public ?? 0,
+    }));
+});
+
+// Lifecycle
+onMounted(() => {
+    getObject();
+});
+
+// Watchers
+watch(() => route.params.uid, (newUid) => {
+    if (newUid) getObject();
+});
 </script>
 
 <style scoped>

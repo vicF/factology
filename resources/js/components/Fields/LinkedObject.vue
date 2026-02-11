@@ -17,6 +17,15 @@
                 class="form-control"
                 placeholder="Введите UUID связанного объекта"
             />{{ linkedObjectName }}
+<!--            <ObjectField
+                fieldName="class_id"
+                v-model="localLinkedObjectUuid"
+                :isEditable="true"
+                :label="$t('Связанный объект')"
+                :name="formData.class_name"
+                :type=THING_TYPE()
+                required
+            />-->
         </div>
         <div class="form-group">
             <label>UUID типа связи</label>
@@ -42,6 +51,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import ObjectField from "./ObjectField.vue";
+import { THING_TYPE } from '@/constants.js'
 
 const props = defineProps({
     currentObjectUuid: { type: String, required: true },
