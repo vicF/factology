@@ -3,7 +3,8 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useClickOutside } from '@/composables/useClickOutside.js'
-import {THING_TYPE} from "../../constants.js";
+import { THING_TYPE } from "../../constants.js";
+import axios from 'axios';
 
 const props = defineProps({
     fieldName: String,
@@ -39,46 +40,57 @@ const loading = ref(false)
 const error = ref(null)
 const inputRef = ref(null)
 const dropdownRef = ref(null)
-const wrapperRef = ref(null) // NEW: ref to parent for positioning
-const previousDisplay = ref('')  // NEW: remember name before clearing on open
+const wrapperRef = ref(null)
+const previousDisplay = ref('')
+const searchResults = ref([])
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
     if (!props.modelValue) return ''
 
-    // Use synchronous getter – returns cached object instantly if present
     const cached = cacheStore.getCachedObject(props.modelValue)
 
-    if (cached ) {
+    if (cached) {
         return cached.name
     }
 
-    // Fallback: use passed :name prop if exists, then UUID
     return props.name || props.modelValue
 })
 
 const hasSelection = computed(() => !!props.modelValue)
 
+const filteredObjects = computed(() => {
+    // If we have search results from server, show them
+    if (searchResults.value && searchResults.value.length > 0) {
+        return searchResults.value;
+    }
+
+    // If no search text, show recent objects
+    if (!searchText.value.trim()) {
+        return cacheStore.getRecent(props.type, props.maxResults) || []
+    }
+
+    // Otherwise search in cache
+    const term = searchText.value.toLowerCase().trim()
+    return cacheStore.searchCached('object', term, props.maxResults) || []
+})
+
 // ── Dropdown visibility control ────────────────────────────────
 const openDropdown = async () => {
     if (!props.isEditable) return
 
-    // Remember current display value before clearing
     previousDisplay.value = displayValue.value || ''
-
     isOpen.value = true
-    // Clear input for clean search (user can start typing immediately)
     searchText.value = ''
 
     await nextTick()
     inputRef.value?.focus()
-    inputRef.value?.select()  // highlight empty field
+    inputRef.value?.select()
 }
 
 const closeDropdown = () => {
     isOpen.value = false
 
-    // If nothing selected after close → restore previous name in input
     if (!props.modelValue && previousDisplay.value) {
         searchText.value = previousDisplay.value
     } else {
@@ -86,23 +98,11 @@ const closeDropdown = () => {
     }
 
     error.value = null
+    searchResults.value = []
 }
 
 useClickOutside([wrapperRef, dropdownRef], () => {
     if (isOpen.value) closeDropdown()
-})
-
-// ── Search & filtering ─────────────────────────────────────────
-// Already shows recent when searchText is empty (on open without typing)
-const filteredObjects = computed(() => {
-    console.debug('called filteredObjects');
-    if (!searchText.value.trim()) {
-        // Show recent objects when dropdown opens and no search yet
-        return cacheStore.getRecent(props.type, props.maxResults) || []
-    }
-
-    const term = searchText.value.toLowerCase().trim()
-    return cacheStore.searchCached('object', term, props.maxResults) || []
 })
 
 // ── Load selected object if value exists on mount ──────────────
@@ -164,11 +164,58 @@ function clearSelection() {
     searchText.value = ''
 }
 
-function onInput(e) {
+async function onInput(e) {
     const val = e.target.value.trim()
+    searchText.value = val
 
+    // Check if it's a UUID
     if (val.length > 30 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
-        loadObjectByUuid(val)
+        searchResults.value = []
+        await loadObjectByUuid(val)
+    } else if (val.length >= 2) {
+        try {
+            loading.value = true
+
+            let type = [];
+            if (props.type === 3) type.push(3);
+            if (props.type === 2) type.push(2);
+
+            const response = await axios.post('/object', {
+                search: val,
+                type: type,
+                classes: []
+            });
+
+            // Parse response and convert things object to array
+            if (typeof response.data === 'string') {
+                const parsed = JSON.parse(response.data);
+                if (parsed.things && typeof parsed.things === 'object') {
+                    searchResults.value = Object.values(parsed.things);
+                } else {
+                    searchResults.value = parsed.things || [];
+                }
+            } else {
+                if (response.data.things && typeof response.data.things === 'object') {
+                    searchResults.value = Object.values(response.data.things);
+                } else if (Array.isArray(response.data.things)) {
+                    searchResults.value = response.data.things;
+                } else if (Array.isArray(response.data)) {
+                    searchResults.value = response.data;
+                } else {
+                    searchResults.value = [];
+                }
+            }
+
+            error.value = null;
+        } catch (err) {
+            console.error('Search failed:', err);
+            error.value = 'Search failed';
+            searchResults.value = [];
+        } finally {
+            loading.value = false;
+        }
+    } else {
+        searchResults.value = [];
     }
 }
 </script>
@@ -180,6 +227,7 @@ function onInput(e) {
             <small v-if="name">({{ name }})</small>
         </label>
 
+        <!-- Readonly mode -->
         <div v-if="!isEditable" class="form-control-plaintext d-flex align-items-center gap-2 py-1">
             <component
                 v-if="selectedObject?.icon"
@@ -194,9 +242,9 @@ function onInput(e) {
             </small>
         </div>
 
-        <!-- Editable mode – single input group always -->
+        <!-- Editable mode -->
         <template v-else>
-            <div ref="wrapperRef" class="position-relative">
+            <div ref="wrapperRef" class="position-relative" style="overflow: visible !important;">
                 <div class="input-group input-group-sm" :class="{ 'is-invalid': error }">
                     <span class="input-group-text bg-light">
                         <component
@@ -207,10 +255,9 @@ function onInput(e) {
                         <i v-else class="bi bi-link-45deg"></i>
                     </span>
 
-                    <!-- Single input – conditionally readonly or editable -->
                     <input
                         ref="inputRef"
-                        :type="isOpen ? 'text' : 'text'"
+                        type="text"
                         class="form-control"
                         :value="isOpen ? searchText : displayValue"
                         :readonly="!isOpen"
@@ -230,64 +277,64 @@ function onInput(e) {
                     </button>
                 </div>
 
-                <!-- Dropdown always below, shown only when open -->
+                <!-- Dropdown -->
                 <div
                     v-if="isOpen"
                     ref="dropdownRef"
-                    class="dropdown-menu show shadow-sm w-100 mt-1"
-                    style="max-height: 320px; overflow-y: auto; z-index: 1050;"
+                    class="dropdown-menu show"
+                    style="
+                        display: block;
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        width: 100%;
+                        max-height: 320px;
+                        overflow-y: auto;
+                        z-index: 9999;
+                        margin-top: 4px;
+                        padding: 0.5rem 0;
+                    "
                 >
+                    <!-- Loading state -->
                     <div v-if="loading" class="text-center py-4 text-muted">
                         <div class="spinner-border spinner-border-sm" role="status"></div>
                         <div class="mt-2">Loading...</div>
                     </div>
 
+                    <!-- Error state -->
                     <div v-else-if="error" class="alert alert-danger m-2 py-2 small">
                         {{ error }}
                     </div>
 
+                    <!-- Results -->
                     <template v-else>
-                        <button
-                            v-for="obj in filteredObjects"
-                            :key="obj.uuid"
-                            type="button"
-                            class="dropdown-item d-flex align-items-center gap-3 py-2 px-3"
-                            @click="selectObject(obj)"
-                        >
-                            <component
-                                v-if="obj.icon"
-                                :is="obj.icon"
-                                class="flex-shrink-0"
-                                style="width: 1.5em; height: 1.5em;"
-                            />
-                            <i v-else class="bi bi-box flex-shrink-0"></i>
-
-                            <div class="flex-grow-1 text-truncate">
-                                <!-- Show name (or title) in dropdown items -->
-                                <div>{{ obj.name  || 'Unknown' }}</div>
-                                <small v-if="obj.description" class="text-muted">
-                                    {{ obj.description }}
-                                </small>
-                            </div>
-
-                            <!-- Always show short UUID as hint -->
-                            <small class="text-muted ms-auto font-monospace small">
-                                {{ obj.thing_id.substring(0, 8) }}…
-                            </small>
-                        </button>
-
-                        <div
-                            v-if="!filteredObjects.length && searchText"
-                            class="text-center py-4 text-muted small"
-                        >
-                            No matching objects found
+                        <!-- No results -->
+                        <div v-if="filteredObjects.length === 0" class="text-center py-4 text-muted small">
+                            {{ searchText ? 'No matching objects found' : 'Start typing or paste UUID' }}
                         </div>
 
-                        <div
-                            v-if="!filteredObjects.length && !searchText"
-                            class="text-center py-4 text-muted small"
-                        >
-                            Start typing or paste UUID
+                        <!-- Results list -->
+                        <div v-else>
+                            <button
+                                v-for="(obj, index) in filteredObjects"
+                                :key="obj.thing_id || index"
+                                type="button"
+                                class="dropdown-item d-flex align-items-center gap-3 py-2 px-3"
+                                @click="selectObject(obj)"
+                            >
+                                <i class="bi bi-box flex-shrink-0"></i>
+
+                                <div class="flex-grow-1 text-truncate text-start">
+                                    <div>{{ obj.name || 'Unnamed' }}</div>
+                                    <small v-if="obj.description" class="text-muted d-block text-truncate">
+                                        {{ obj.description }}
+                                    </small>
+                                </div>
+
+                                <small class="text-muted ms-auto font-monospace">
+                                    {{ (obj.thing_id || '').substring(0, 6) }}…
+                                </small>
+                            </button>
                         </div>
                     </template>
                 </div>
@@ -303,8 +350,48 @@ function onInput(e) {
 </template>
 
 <style scoped>
+.object-field {
+    position: relative;
+}
+
+.object-field .position-relative {
+    position: relative;
+    overflow: visible !important;
+}
+
 .object-field .dropdown-menu {
+    display: block;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
     min-width: 360px;
+    background: white;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.175);
+    margin-top: 0.25rem;
+    padding: 0.5rem 0;
+    z-index: 9999;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    clear: both;
+    text-align: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+    background-color: transparent;
+    border: 0;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
 }
 
 .dropdown-item:hover {
@@ -315,8 +402,18 @@ function onInput(e) {
     opacity: 0.75;
 }
 
-/* Ensure dropdown is positioned relative to wrapper */
-.object-field .position-relative {
-    position: relative;
+.input-group-sm .form-control,
+.input-group-sm .btn {
+    font-size: 0.875rem;
+}
+
+.object-field {
+    z-index: 1;
+}
+
+.object-field .dropdown-menu.show {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 </style>
