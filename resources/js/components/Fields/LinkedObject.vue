@@ -1,40 +1,43 @@
 <template>
     <div class="linked-object">
-        <div class="form-group">
-            <label>UUID текущего объекта:</label>
+<!--        <div class="form-group">
+            <label>UUID связанного объекта:</label>
             <input
                 type="text"
                 v-model="localCurrentObjectUuid"
                 readonly
                 class="form-control"
             />{{ currentObjectName }}
-        </div>
-        <div class="form-group">
-            <label>UUID связанного объекта</label>
-            <input
+        </div>-->
+ <div class="form-group">
+             <ObjectField
+                 fieldName="linked_object"
+                 v-model="localLinkedObjectUuid"
+                 :isEditable="true"
+                 :label="$t('Linked object')"
+                 :name="thing_type"
+                 :type="THING_TYPE"
+                 required
+             />
+<!--            <input
                 type="text"
                 v-model="localLinkedObjectUuid"
                 class="form-control"
                 placeholder="Введите UUID связанного объекта"
-            />{{ linkedObjectName }}
-<!--            <ObjectField
-                fieldName="class_id"
-                v-model="localLinkedObjectUuid"
-                :isEditable="true"
-                :label="$t('Связанный объект')"
-                :name="formData.class_name"
-                :type=THING_TYPE()
-                required
-            />-->
+            />{{ linkedObjectName }}-->
+
         </div>
         <div class="form-group">
-            <label>UUID типа связи</label>
-            <input
-                type="text"
+<!--            <label>UUID типа связи</label>-->
+            <ObjectField
+                fieldName="link_type"
                 v-model="localLinkTypeUuid"
-                class="form-control"
-                placeholder="Введите UUID типа связи"
-            />{{ linkTypeName }}
+                :isEditable="true"
+                :label="$t('Link type')"
+                :name="link_type"
+                :type="LINK_TYPE"
+                required
+            />
         </div>
         <div class="form-group">
             <label>Комментарий</label>
@@ -53,6 +56,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import { THING_TYPE } from '@/constants.js'
+import {CLASS_TYPE, LINK_TYPE} from "../../constants.js";
 
 const props = defineProps({
     currentObjectUuid: { type: String, required: true },
