@@ -91,6 +91,9 @@
                                 <button v-if="authenticated" class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">
                                     {{ $t('Delete') }}
                                 </button>
+                                <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditLinkModal">
+                                    {{ $t('Edit') }}
+                                </button>
                             </div>
                         </div>
                     </div>
