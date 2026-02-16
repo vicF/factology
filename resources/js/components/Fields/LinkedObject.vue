@@ -195,12 +195,12 @@ function removeSelf() {
 </script>
 
 <style scoped>
-.linked-object {
+/*.linked-object {
     border: 1px solid #ddd;
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 4px;
-}
+}*/
 
 .form-group {
     margin-bottom: 10px;

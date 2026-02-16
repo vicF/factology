@@ -88,10 +88,10 @@
                             </div>
                             <div v-if="link.translation">{{ link.translation }}</div>
                             <div>
-                                <button v-if="authenticated" class="btn btn-danger btn-sm mt-2" @click="deleteLink(link.link_id)">
+                                <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
                                     {{ $t('Delete') }}
                                 </button>
-                                <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditLinkModal">
+                                <button v-if="authenticated" class="btn btn-primary btn-sm ms-2" @click="openEditLinkModal(link)">
                                     {{ $t('Edit') }}
                                 </button>
                             </div>
@@ -148,6 +148,16 @@
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
         />
+
+        <!-- === МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ССЫЛКИ === -->
+        <EditLinkModal
+            v-if="showEditLinkModal"
+            :link="editingLink"
+            :currentObjectUuid="object?.thing_id"
+            :currentObjectName="object?.name"
+            @save="handleLinkSave"
+            @close="showEditLinkModal = false"
+        />
     </div>
 </template>
 
@@ -157,6 +167,7 @@ import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
+import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 
@@ -182,10 +193,12 @@ const loaded = ref(false);
 const showEditModal = ref(false);
 const showTreeModal = ref(false);
 const showCreateLinkedModal = ref(false);
+const showEditLinkModal = ref(false);
 
 const editObject = ref(null);
 const modalParams = ref({});
 const treeModalParams = ref({});
+const editingLink = ref(null);
 
 // Computed
 const authenticated = computed(() => authStore.authenticated);
@@ -250,6 +263,11 @@ const openCreateLinkedModal = () => {
     showCreateLinkedModal.value = true;
 };
 
+const openEditLinkModal = (link) => {
+    editingLink.value = link;
+    showEditLinkModal.value = true;
+};
+
 const deleteObject = async () => {
     if (!confirm(t('Are you sure you want to delete this object?'))) return;
     try {
@@ -267,6 +285,43 @@ const deleteLink = async (link_id) => {
         await getObject();
     } catch (error) {
         alert(t('Failed to delete link'));
+    }
+};
+
+const handleLinkSave = async (result) => {
+    showEditLinkModal.value = false;
+
+    if (result.delete) {
+        // Удаление ссылки
+        await deleteLink(result.linkId);
+    } else {
+        // Обновление ссылки
+        await updateLink(result.data);
+    }
+};
+
+const updateLink = async (linkData) => {
+    try {
+        // Подготавливаем данные для отправки
+        const payload = {
+            thing_id: linkData.thing_id,
+            link_type_id: linkData.link_type_id,
+            description: linkData.description,
+            // Сохраняем существующие даты
+            start: linkData.start,
+            end: linkData.end,
+            link_start: linkData.link_start,
+            link_end: linkData.link_end
+        };
+
+        await axios.put(`/link/${linkData.link_id}`, payload);
+
+        // Обновляем объект после успешного обновления ссылки
+        await getObject();
+
+    } catch (error) {
+        console.error('Failed to update link:', error);
+        alert(t('Failed to update link'));
     }
 };
 

@@ -77,7 +77,7 @@
                             {{ $t('Add Link') }}
                         </button>
 
-                        <div v-for="item in linkedObjects" :key="item.id">
+                        <div v-for="item in linkedObjects" :key="item.id" class="linked-object-form">
                             <LinkedObject
                                 :current-object-uuid="formData.thing_id"
                                 :current-object-name="formData.name"
@@ -297,4 +297,10 @@ onUnmounted(() => {
 .btn-primary:hover { background-color: #0056b3; }
 .btn-secondary { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 .btn-secondary:hover { background-color: #5a6268; }
+.linked-object-form {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
 </style>
