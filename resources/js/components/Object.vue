@@ -1,3 +1,4 @@
+<!-- Object page -->
 <template>
     <div class="container" id="search">
         <!-- Loading state -->
@@ -17,6 +18,9 @@
                     </button>
                     <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal">
                         {{ $t('Edit') }}
+                    </button>
+                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openEditLinkModal">
+                        {{ $t('Link') }}
                     </button>
                     <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject">
                         {{ $t('Delete') }}

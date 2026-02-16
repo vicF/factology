@@ -1,43 +1,44 @@
+<!-- Edit link between two objects -->
 <template>
-    <div class="linked-object">
-<!--        <div class="form-group">
-            <label>UUID связанного объекта:</label>
-            <input
-                type="text"
-                v-model="localCurrentObjectUuid"
-                readonly
-                class="form-control"
-            />{{ currentObjectName }}
-        </div>-->
- <div class="form-group">
-             <ObjectField
-                 fieldName="linked_object"
-                 v-model="localLinkedObjectUuid"
-                 :isEditable="true"
-                 :label="$t('Linked object')"
-                 :name="thing_type"
-                 :type="THING_TYPE"
-                 required
-             />
-<!--            <input
-                type="text"
-                v-model="localLinkedObjectUuid"
-                class="form-control"
-                placeholder="Введите UUID связанного объекта"
-            />{{ linkedObjectName }}-->
 
-        </div>
+    <div class="linked-object">
+        <ObjectField
+            fieldName="current_object"
+            v-model="localCurrentObjectUuid"
+            :isEditable="false"
+            :name="thing_type"
+            :type="THING_TYPE"
+            required
+        />
+        <!--        <div class="form-group">
+                    <label>UUID связанного объекта:</label>
+                    <input
+                        type="text"
+                        v-model="localCurrentObjectUuid"
+                        readonly
+                        class="form-control"
+                    />{{ currentObjectName }}
+                </div>-->
         <div class="form-group">
-<!--            <label>UUID типа связи</label>-->
+            <!--            <label>UUID типа связи</label>-->
             <ObjectField
                 fieldName="link_type"
                 v-model="localLinkTypeUuid"
                 :isEditable="true"
-                :label="$t('Link type')"
                 :name="link_type"
                 :type="LINK_TYPE"
                 required
-            />
+            /><button class="btn btn-primary" @click="switchObjects">Switch</button>
+        </div>
+        <div class="form-group">
+            <ObjectField
+                fieldName="linked_object"
+                v-model="localLinkedObjectUuid"
+                :isEditable="true"
+                :name="thing_type"
+                :type="THING_TYPE"
+                required
+            /><button class="btn btn-primary" @click="createObject">Create</button>
         </div>
         <div class="form-group">
             <label>Комментарий</label>
@@ -52,20 +53,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
-import { useObjectCacheStore } from '@/stores/objectCache.js';
+import {ref, computed, watch, onMounted} from 'vue';
+import {useObjectCacheStore} from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
-import { THING_TYPE } from '@/constants.js'
+import {THING_TYPE} from '@/constants.js'
 import {CLASS_TYPE, LINK_TYPE} from "../../constants.js";
 
 const props = defineProps({
-    currentObjectUuid: { type: String, required: true },
-    currentObjectName: { type: String, required: false },
-    linkedObjectUuid: { type: String, default: '' },
-    linkTypeUuid: { type: String, default: '' },
-    comment: { type: String, default: '' },
-    linkId: { type: [String, Number, null], default: null },
-    index: { type: Number, required: true },
+    currentObjectUuid: {type: String, required: true},
+    currentObjectName: {type: String, required: false},
+    linkedObjectUuid: {type: String, default: ''},
+    linkTypeUuid: {type: String, default: ''},
+    comment: {type: String, default: ''},
+    linkId: {type: [String, Number, null], default: null},
+    index: {type: Number, required: true},
 });
 
 const emit = defineEmits(['update', 'remove']);
@@ -132,7 +133,7 @@ watch(
         localCurrentObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    { immediate: true }
+    {immediate: true}
 );
 
 watch(
@@ -141,7 +142,7 @@ watch(
         localLinkTypeUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    { immediate: true }
+    {immediate: true}
 );
 
 watch(
@@ -150,7 +151,7 @@ watch(
         localLinkedObjectUuid.value = newVal;
         fetchObjectName(newVal);
     },
-    { immediate: true }
+    {immediate: true}
 );
 
 watch(
