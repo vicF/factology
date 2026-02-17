@@ -118,7 +118,7 @@ import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import { CLASS_TYPE } from "../constants.js";
+import { CLASS_TYPE, LINK_TO_PARENT } from "../constants.js";
 
 // Props definition
 const props = defineProps({

@@ -254,18 +254,19 @@ class ApiController extends BaseController
     public function searchTree()
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
-
+        $linkToParent = UUID::LINK_TO_PARENT;
+        $something = UUID::SOMETHING;
         $rawSql =
             "with recursive descendants
                 (name, level, id, parent_id, description, translation)  as (
                     select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
                     from things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
-                    where c.type=2 and c.thing_id = '3e15244c-a9e1-4a91-a0ca-1c65722a64df'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
+                    where c.type=2 and c.thing_id = '$something'
                     union distinct
                     select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
                     from descendants d, things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
                     where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
                 )
                 select * from descendants ORDER BY level;";
@@ -299,7 +300,7 @@ class ApiController extends BaseController
             //->auth()
             ->leftJoin('links', static function ($join) {
                 $join->on('things.thing_id', 'links.one_thing_id')
-                    ->whereRaw('links.link_type_id = ?', UUID::PARENT);
+                    ->whereRaw('links.link_type_id = ?', UUID::LINK_TO_PARENT);
             })
             ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
             ->orderByRaw('type = ?, type = ? DESC', [UUID::GENERAL, UUID::G_CLASS])->get())->keyBy('thing_id')->toArray();
