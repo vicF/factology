@@ -1,3 +1,4 @@
+<!-- Dialog to create new or edit existing object, including it's name, dates etc. -->
 <template>
     <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
         <div class="modal-dialog">
@@ -6,7 +7,13 @@
                     <h5 class="modal-title" :id="modalLabelId">
                         {{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button
+                        type="button"
+                        class="btn-close"
+                        :data-bs-dismiss="hasUnsavedChanges ? false : 'modal'"
+                        :aria-label="$t('Close')"
+                        @click="handleCloseClick"
+                    ></button>
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
@@ -104,10 +111,33 @@
             </div>
         </div>
     </div>
+
+    <!-- Unsaved Changes Confirmation Modal -->
+    <div class="modal fade" :id="confirmModalId" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>{{ $t('You have unsaved changes. Are you sure you want to close?') }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        {{ $t('Cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-danger" @click="confirmClose">
+                        {{ $t('Close without Saving') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
@@ -159,33 +189,64 @@ const formData = ref({
 
 const linkedObjects = ref([]);
 let modalInstance = null;
+let confirmModalInstance = null;
+
+// Unsaved changes tracking
+const originalFormData = ref({});
+const originalLinkedObjects = ref([]);
+
+const hasUnsavedChanges = computed(() => {
+    // Check form data changes
+    const formChanged = Object.keys(originalFormData.value).some(key => {
+        // Handle null/undefined/empty string equality
+        const original = originalFormData.value[key] || '';
+        const current = formData.value[key] || '';
+        return original !== current;
+    });
+
+    // Check linked objects changes
+    const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
+
+    return formChanged || linksChanged;
+});
 
 // Modal IDs
 const modalId = `editObjectModal-${formData.value.thing_id}`;
 const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
+const confirmModalId = `confirmModal-${formData.value.thing_id}`;
 
-// Initialize linked objects
-if (isEditMode.value) {
-    linkedObjects.value = props.initialLinkedObjects
-        .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
-        .map(item => ({
+// Initialize data and store original state
+const initializeData = () => {
+    // Initialize linked objects
+    if (isEditMode.value) {
+        linkedObjects.value = props.initialLinkedObjects
+            .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
+            .map(item => ({
+                id: uuidv4(),
+                currentObjectUuid: formData.value.thing_id,
+                linkedObjectUuid: item.other_thing_id || '',
+                linkTypeUuid: item.link_type_id || '',
+                comment: item.description || '',
+                linkId: item.link_id || null,
+            }));
+    } else if (props.parentObjectId) {
+        linkedObjects.value = [{
             id: uuidv4(),
             currentObjectUuid: formData.value.thing_id,
-            linkedObjectUuid: item.other_thing_id || '',
-            linkTypeUuid: item.link_type_id || '',
-            comment: item.description || '',
-            linkId: item.link_id || null,
-        }));
-} else if (props.parentObjectId) {
-    linkedObjects.value = [{
-        id: uuidv4(),
-        currentObjectUuid: formData.value.thing_id,
-        linkedObjectUuid: props.parentObjectId,
-        linkTypeUuid: props.parentLinkType,
-        comment: '',
-        linkId: null,
-    }];
-}
+            linkedObjectUuid: props.parentObjectId,
+            linkTypeUuid: props.parentLinkType,
+            comment: '',
+            linkId: null,
+        }];
+    }
+
+    // Store original state for unsaved changes detection
+    originalFormData.value = JSON.parse(JSON.stringify(formData.value));
+    originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
+};
+
+// Call initialize
+initializeData();
 
 // Methods
 const addNewLinkedObject = () => {
@@ -205,6 +266,19 @@ const updateItem = ({ index, data }) => {
 
 const removeItem = (index) => {
     linkedObjects.value.splice(index, 1);
+};
+
+const handleCloseClick = () => {
+    if (hasUnsavedChanges.value) {
+        confirmModalInstance?.show();
+    } else {
+        modalInstance?.hide();
+    }
+};
+
+const confirmClose = () => {
+    confirmModalInstance?.hide();
+    modalInstance?.hide();
 };
 
 const submitForm = async () => {
@@ -280,26 +354,64 @@ const submitForm = async () => {
     }
 };
 
+// Global Esc key handler
+const handleGlobalKeyDown = (e) => {
+    if (e.key === 'Escape' && modalInstance?._isShown) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (hasUnsavedChanges.value) {
+            confirmModalInstance?.show();
+        } else {
+            modalInstance?.hide();
+        }
+    }
+};
+
 // Lifecycle hooks
 onMounted(async () => {
-    /*try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('EditObject.vue - CSRF cookie fetched');
-    } catch (err) {
-        console.warn('CSRF cookie already exists');
-    }*/
-
     const modalElement = document.getElementById(modalId);
+    const confirmModalElement = document.getElementById(confirmModalId);
+
     if (modalElement) {
         modalInstance = new Modal(modalElement);
         modalInstance.show();
         modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
     }
+
+    if (confirmModalElement) {
+        confirmModalInstance = new Modal(confirmModalElement);
+    }
+
+    // Add global keydown listener for Esc
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
 });
 
 onUnmounted(() => {
     if (modalInstance) modalInstance.dispose();
+    if (confirmModalInstance) confirmModalInstance.dispose();
+    window.removeEventListener('keydown', handleGlobalKeyDown, true);
 });
+
+// Watch for object changes to reset original state
+watch(() => props.object, (newObject) => {
+    if (newObject) {
+        formData.value = {
+            thing_id: newObject.thing_id || newObject.id || uuidv4(),
+            name: newObject.name || '',
+            description: newObject.description || '',
+            start: newObject.start || '',
+            end: newObject.end || '',
+            public: newObject.public || 0,
+            parent_id: props.params.parentId || null,
+            class_id: props.params.classId || newObject.class?.thing_id || null,
+            class_name: props.params.className || newObject.class?.name || null,
+            type: props.params.type || 3,
+            link_id: newObject.class?.link_id || null,
+        };
+        initializeData();
+    }
+}, { deep: true });
 </script>
 
 <style scoped>
@@ -308,6 +420,8 @@ onUnmounted(() => {
 .btn-primary:hover { background-color: #0056b3; }
 .btn-secondary { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 .btn-secondary:hover { background-color: #5a6268; }
+.btn-danger { background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-danger:hover { background-color: #c82333; }
 .linked-object-form {
     border: 1px solid #ddd;
     padding: 15px;
