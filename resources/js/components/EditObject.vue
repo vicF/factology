@@ -10,9 +10,8 @@
                     <button
                         type="button"
                         class="btn-close"
-                        :data-bs-dismiss="hasUnsavedChanges ? false : 'modal'"
+                        data-bs-dismiss="modal"
                         :aria-label="$t('Close')"
-                        @click="handleCloseClick"
                     ></button>
                 </div>
                 <div class="modal-body">
@@ -99,7 +98,11 @@
                         </div>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                data-bs-dismiss="modal"
+                            >
                                 {{ $t('Close') }}
                             </button>
                             <button type="submit" class="btn btn-primary">
@@ -268,17 +271,32 @@ const removeItem = (index) => {
     linkedObjects.value.splice(index, 1);
 };
 
-const handleCloseClick = () => {
-    if (hasUnsavedChanges.value) {
-        confirmModalInstance?.show();
-    } else {
+const confirmClose = () => {
+    confirmModalInstance?.hide();
+
+    // Now force close the main modal
+    const modalElement = document.getElementById(modalId);
+    if (modalElement) {
+        // Temporarily remove the hide event listener to avoid recursion
+        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance?.hide();
+        // Re-attach the listener after a short delay
+        setTimeout(() => {
+            modalElement.addEventListener('hide.bs.modal', handleHideModal);
+        }, 100);
     }
 };
 
-const confirmClose = () => {
-    confirmModalInstance?.hide();
-    modalInstance?.hide();
+// Handle modal hide event (triggered by close buttons, Esc key, or backdrop click)
+const handleHideModal = (event) => {
+    if (hasUnsavedChanges.value) {
+        // Prevent the modal from hiding
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Show confirmation dialog
+        confirmModalInstance?.show();
+    }
 };
 
 const submitForm = async () => {
@@ -328,12 +346,7 @@ const submitForm = async () => {
 
         if (linksToAdd.length > 0) {
             payload.links_to_add = linksToAdd;
-            console.log('EditObject.vue - links_to_add будет отправлено:', linksToAdd);
-        } else {
-            console.log('EditObject.vue - links_to_add пусто (но это нормально, если нет новых связей)');
         }
-
-        console.log('EditObject.vue - FINAL PAYLOAD:', JSON.stringify(payload, null, 2));
 
         let response;
         if (isEditMode.value) {
@@ -354,20 +367,6 @@ const submitForm = async () => {
     }
 };
 
-// Global Esc key handler
-const handleGlobalKeyDown = (e) => {
-    if (e.key === 'Escape' && modalInstance?._isShown) {
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (hasUnsavedChanges.value) {
-            confirmModalInstance?.show();
-        } else {
-            modalInstance?.hide();
-        }
-    }
-};
-
 // Lifecycle hooks
 onMounted(async () => {
     const modalElement = document.getElementById(modalId);
@@ -375,22 +374,26 @@ onMounted(async () => {
 
     if (modalElement) {
         modalInstance = new Modal(modalElement);
-        modalInstance.show();
+
+        // Add hide event listener to intercept close attempts
+        modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
+
+        modalInstance.show();
     }
 
     if (confirmModalElement) {
         confirmModalInstance = new Modal(confirmModalElement);
     }
-
-    // Add global keydown listener for Esc
-    window.addEventListener('keydown', handleGlobalKeyDown, true);
 });
 
 onUnmounted(() => {
+    const modalElement = document.getElementById(modalId);
+    if (modalElement) {
+        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+    }
     if (modalInstance) modalInstance.dispose();
     if (confirmModalInstance) confirmModalInstance.dispose();
-    window.removeEventListener('keydown', handleGlobalKeyDown, true);
 });
 
 // Watch for object changes to reset original state
