@@ -15,23 +15,24 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 </script>
 
-<template><TextField
-    fieldName="link_description"
-    v-model="object.name"
-    :isEditable="isEditable"
-/>
+<template>
     <template v-if="isEditable">
-        <div>{{label}}<template v-if="label">:</template><input
-            :type="type"
-            :name="fieldName"
-            :value="modelValue"
-            class="form-control"
-            @input="$emit('update:modelValue', $event.target.value)"
-        /></div>
+        <div class="mb-3">
+            <label v-if="label" :for="fieldName" class="form-label">{{ label }}</label>
+            <input
+                :type="type"
+                :name="fieldName"
+                :id="fieldName"
+                :value="modelValue"
+                class="form-control"
+                @input="$emit('update:modelValue', $event.target.value)"
+            />
+        </div>
     </template>
     <template v-else>
-        <div v-if="modelValue">{{label}}<template v-if="label">:</template>
-            {{ modelValue }}
+        <div v-if="modelValue" class="field-display">
+            <span v-if="label" class="field-label">{{ label }}:</span>
+            <span class="field-value">{{ modelValue }}</span>
         </div>
     </template>
 </template>

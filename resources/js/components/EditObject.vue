@@ -140,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
@@ -369,6 +369,9 @@ const submitForm = async () => {
 
 // Lifecycle hooks
 onMounted(async () => {
+    // Wait for next tick to ensure DOM is ready
+    await nextTick();
+
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
 
@@ -379,7 +382,10 @@ onMounted(async () => {
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
 
-        modalInstance.show();
+        // Small delay to ensure Bootstrap is ready
+        setTimeout(() => {
+            modalInstance.show();
+        }, 100);
     }
 
     if (confirmModalElement) {

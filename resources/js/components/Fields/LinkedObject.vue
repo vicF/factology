@@ -5,7 +5,7 @@
             fieldName="current_object"
             v-model="localCurrentObjectUuid"
             :isEditable="false"
-            :name="thing_type"
+            name="thing_type"
             :type="THING_TYPE"
             required
         />
@@ -15,7 +15,7 @@
                 fieldName="link_type"
                 v-model="localLinkTypeUuid"
                 :isEditable="true"
-                :name="link_type"
+                name="link_type"
                 :type="LINK_TYPE"
                 required
                 class="flex-field"
@@ -28,7 +28,7 @@
                 fieldName="linked_object"
                 v-model="localLinkedObjectUuid"
                 :isEditable="true"
-                :name="thing_type"
+                name="linked_object"
                 :type="THING_TYPE"
                 required
                 class="flex-field"
@@ -53,8 +53,7 @@
 import {ref, computed, watch, onMounted} from 'vue';
 import {useObjectCacheStore} from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
-import {THING_TYPE} from '@/constants.js'
-import {CLASS_TYPE, LINK_TYPE} from "../../constants.js";
+import {CLASS_TYPE, LINK_TYPE, THING_TYPE} from "../../constants.js";
 
 const props = defineProps({
     currentObjectUuid: {type: String, required: true},
