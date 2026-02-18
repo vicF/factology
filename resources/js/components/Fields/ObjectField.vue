@@ -144,6 +144,16 @@ useClickOutside([wrapperRef, dropdownRef], () => {
     if (isOpen.value) closeDropdown()
 })
 
+// ── Global Esc key handler ─────────────────────────────────────
+const handleGlobalKeyDown = (e) => {
+    // Only handle Escape when dropdown is open
+    if (e.key === 'Escape' && isOpen.value) {
+        e.stopPropagation(); // Prevent event from reaching parent
+        e.preventDefault();  // Prevent default browser behavior
+        closeDropdown();
+    }
+};
+
 // ── Load selected object if value exists on mount ──────────────
 onMounted(async () => {
     if (props.modelValue && !cacheStore.hasCachedObject(props.modelValue)) {
@@ -155,12 +165,16 @@ onMounted(async () => {
     // Add event listeners for position updates
     window.addEventListener('scroll', updateDropdownPosition, true)
     window.addEventListener('resize', updateDropdownPosition)
+
+    // Add global keydown listener for Esc
+    window.addEventListener('keydown', handleGlobalKeyDown, true); // Use capture phase
 })
 
 onUnmounted(() => {
     // Clean up event listeners
     window.removeEventListener('scroll', updateDropdownPosition, true)
     window.removeEventListener('resize', updateDropdownPosition)
+    window.removeEventListener('keydown', handleGlobalKeyDown, true);
 })
 
 // ── Watch modelValue changes ───────────────────────────────────
