@@ -118,7 +118,7 @@ import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import { CLASS_TYPE, LINK_TO_PARENT } from "../constants.js";
+import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT} from "../constants.js";
 
 // Props definition
 const props = defineProps({
@@ -151,8 +151,8 @@ const formData = ref({
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? props.object.public || 0 : 0,
     parent_id: props.params.parentId || null,
-    class_id: props.object?.class?.thing_id || null,
-    class_name: props.object?.class?.name || null,
+    class_id: props.params.classId || props.object?.class?.thing_id || null,
+    class_name: props.params.className || props.object?.class?.name || null,
     type: props.params.type || 3,
     link_id: props.object?.class?.link_id || null,
 });
@@ -233,8 +233,19 @@ const submitForm = async () => {
         if (formData.value.class_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
-                link_type_id: 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                link_type_id: LINK_TO_CLASS,
                 other_thing_id: formData.value.class_id,
+                description: '',
+                link_id: formData.value.link_id || undefined,
+                public: 1,
+            };
+        }
+
+        if (formData.value.parent_id) {
+            payload.class = {
+                one_thing_id: formData.value.thing_id,
+                link_type_id: LINK_TO_PARENT,
+                other_thing_id: formData.value.parent_id,
                 description: '',
                 link_id: formData.value.link_id || undefined,
                 public: 1,

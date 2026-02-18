@@ -1,6 +1,5 @@
 <!-- Edit link between two objects -->
 <template>
-
     <div class="linked-object">
         <ObjectField
             fieldName="current_object"
@@ -10,17 +9,8 @@
             :type="THING_TYPE"
             required
         />
-        <!--        <div class="form-group">
-                    <label>UUID связанного объекта:</label>
-                    <input
-                        type="text"
-                        v-model="localCurrentObjectUuid"
-                        readonly
-                        class="form-control"
-                    />{{ currentObjectName }}
-                </div>-->
-        <div class="form-group">
-            <!--            <label>UUID типа связи</label>-->
+
+        <div class="form-group flex-group">
             <ObjectField
                 fieldName="link_type"
                 v-model="localLinkTypeUuid"
@@ -28,9 +18,12 @@
                 :name="link_type"
                 :type="LINK_TYPE"
                 required
-            /><button class="btn btn-primary" @click="switchObjects">Switch</button>
+                class="flex-field"
+            />
+            <button class="btn btn-primary flex-button" @click="switchObjects">Switch</button>
         </div>
-        <div class="form-group">
+
+        <div class="form-group flex-group">
             <ObjectField
                 fieldName="linked_object"
                 v-model="localLinkedObjectUuid"
@@ -38,8 +31,11 @@
                 :name="thing_type"
                 :type="THING_TYPE"
                 required
-            /><button class="btn btn-primary" @click="createObject">Create</button>
+                class="flex-field"
+            />
+            <button class="btn btn-primary flex-button" @click="createObject">Create</button>
         </div>
+
         <div class="form-group">
             <label>Комментарий</label>
             <textarea
@@ -48,6 +44,7 @@
                 placeholder="Введите комментарий"
             ></textarea>
         </div>
+
         <button class="btn btn-danger" @click="removeSelf">Удалить</button>
     </div>
 </template>
@@ -196,15 +193,51 @@ function removeSelf() {
 </script>
 
 <style scoped>
-/*.linked-object {
+.linked-object {
     border: 1px solid #ddd;
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 4px;
-}*/
+}
 
 .form-group {
     margin-bottom: 10px;
+}
+
+/* Стили для групп с кнопкой справа */
+.flex-group {
+    display: flex;
+    align-items: stretch; /* Растягиваем элементы по высоте */
+    gap: 8px; /* Отступ между полем и кнопкой */
+    margin-bottom: 10px;
+}
+
+.flex-field {
+    flex: 1; /* Поле занимает всё доступное пространство */
+    min-width: 0; /* Предотвращает переполнение */
+}
+
+.flex-button {
+    flex-shrink: 0; /* Кнопка не сжимается */
+    height: auto; /* Высота автоматически */
+    padding: 0 15px; /* Горизонтальные отступы, вертикальные - 0 */
+    white-space: nowrap; /* Текст кнопки не переносится */
+    display: flex;
+    align-items: center; /* Центрируем текст по вертикали */
+    margin: 0; /* Убираем внешние отступы */
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1; /* Убираем лишнюю высоту строки */
+}
+
+/* Альтернативный вариант - если нужна точная высота как у поля ввода */
+.flex-button-fixed {
+    flex-shrink: 0;
+    height: 38px; /* Стандартная высота Bootstrap input */
+    padding: 0 15px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
 }
 
 .form-control {
@@ -225,5 +258,18 @@ function removeSelf() {
 
 .btn-danger:hover {
     background-color: #c82333;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background-color: #0069d9;
 }
 </style>

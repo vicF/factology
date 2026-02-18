@@ -43,7 +43,8 @@ class ApiController extends BaseController
             $model = new Anything($request->toArray());
             $model->save();
             if ($request->parent_id) {
-                $model->setLink(UUID::PARENT, $request->parent_id, 'Child of');
+
+                $model->setLink([UUID::LINK_TO_PARENT], $request->parent_id, 'Child of');
             }
             if ($request->class) {
                 $model->setClass($request->class);
