@@ -9,6 +9,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.0.2",
+        "dedoc/scramble": "^0.13.14",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.0",
         "laravel/sanctum": "^3.2",
@@ -75,7 +76,11 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true
-        }
+        },
+        "exclude-from-classmap": [
+            "vendor/*/app/Providers/*.php",
+            "vendor/*/src/Providers/*.php"
+        ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true
