@@ -1,4 +1,4 @@
-<!-- resources/js/components/Fields/ObjectField.vue -->
+<!-- Universal component to fill UUID for any type of object or link -->
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
@@ -243,7 +243,9 @@ async function onInput(e) {
     // Check if it's a UUID
     if (val.length > 30 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
         searchResults.value = []
-        await loadObjectByUuid(val)
+        //await loadObjectByUuid(val)
+        emit('update:modelValue', val)
+        closeDropdown()
     } else if (val.length >= 2) {
         try {
             loading.value = true
