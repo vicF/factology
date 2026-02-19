@@ -14,6 +14,11 @@ use Illuminate\Support\Facades\Log;
 
 class ApiController extends BaseController
 {
+    /**
+     * List objects
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function list()
     {
         return response()->json(
@@ -23,6 +28,13 @@ class ApiController extends BaseController
             ]);
     }
 
+    /**
+     * Get object
+     *
+     *
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function get($id)
     {
         return response()->json(
@@ -34,6 +46,8 @@ class ApiController extends BaseController
 
 
     /**
+     * Store object
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -71,6 +85,12 @@ class ApiController extends BaseController
         });
     }
 
+    /**
+     * Upload file
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function upload(Request $request)
     {
         $stored = 0;
@@ -120,12 +140,26 @@ class ApiController extends BaseController
             ]);
     }
 
+    /**
+     * Delete object
+     *
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
+     */
     public function delete($id)
     {
         Anything::deleteById($id);
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Delete link
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function deleteLink(Request $request, $id)
     {
         try {
@@ -143,6 +177,13 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Retrieve photos
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Throwable
+     */
     public function photos(Request $request)
     {
         try {
@@ -168,6 +209,13 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Check photos
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Throwable
+     */
     public function checkPhotos(Request $request)
     {
         try {
@@ -187,11 +235,11 @@ class ApiController extends BaseController
 
 
     /**
-     * Moved here from Controller
+     * Search objects
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function search()
+    public function search(): \Illuminate\Http\JsonResponse
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
         if (@$requestBody['tree']) {
@@ -251,6 +299,11 @@ class ApiController extends BaseController
 
     }
 
+    /**
+     * Get classes tree
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function searchTree()
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
