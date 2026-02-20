@@ -39,9 +39,9 @@
         <div class="form-group">
             <label>Комментарий</label>
             <textarea
-                v-model="localComment"
+                v-model="translation"
                 class="form-control"
-                placeholder="Введите комментарий"
+                placeholder="Пояснение"
             ></textarea>
         </div>
 
@@ -60,7 +60,7 @@ const props = defineProps({
     currentObjectName: {type: String, required: false},
     linkedObjectUuid: {type: String, default: ''},
     linkTypeUuid: {type: String, default: ''},
-    comment: {type: String, default: ''},
+    translation: {type: String, default: ''},
     linkId: {type: [String, Number, null], default: null},
     index: {type: Number, required: true},
 });
@@ -70,7 +70,7 @@ const emit = defineEmits(['update', 'remove']);
 const localCurrentObjectUuid = ref(props.currentObjectUuid);
 const localLinkedObjectUuid = ref(props.linkedObjectUuid);
 const localLinkTypeUuid = ref(props.linkTypeUuid);
-const localComment = ref(props.comment);
+const translation = ref(props.translation);
 
 const store = useObjectCacheStore();
 
@@ -106,7 +106,7 @@ const emitUpdate = () => {
             currentObjectUuid: localCurrentObjectUuid.value,
             linkedObjectUuid: localLinkedObjectUuid.value,
             linkTypeUuid: localLinkTypeUuid.value,
-            translation: localComment.value,
+            translation: translation.value,
             linkId: props.linkId,
         },
     });
@@ -117,7 +117,7 @@ const emitUpdate = () => {
             currentObjectUuid: localCurrentObjectUuid.value,
             linkedObjectUuid: localLinkedObjectUuid.value,
             linkTypeUuid: localLinkTypeUuid.value,
-            translation: localComment.value,
+            translation: translation.value,
             linkId: props.linkId,
         },
     });
@@ -167,7 +167,7 @@ watch(
 );
 
 watch(
-    () => localComment.value,
+    () => translation.value,
     () => {
         emitUpdate();
     }

@@ -381,7 +381,7 @@ const linkRecords = computed(() => {
         link_id: l.link_id,
         link_type_id: l.link_type_id,
         other_thing_id: l.thing_id,
-        description: l.description || '',
+        translation: l.translation || '',
         public: l.public ?? 0,
     }));
 });

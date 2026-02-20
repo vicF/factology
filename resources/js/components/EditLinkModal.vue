@@ -14,7 +14,7 @@
                         :currentObjectName="currentObjectName"
                         :linkedObjectUuid="linkData.linkedObjectUuid"
                         :linkTypeUuid="linkData.linkTypeUuid"
-                        :comment="linkData.comment"
+                        :translation="linkData.translation"
                         :linkId="linkData.linkId"
                         :index="0"
                         @update="handleLinkUpdate"
@@ -63,7 +63,7 @@ onMounted(() => {
     linkData.value = {
         linkedObjectUuid: props.link.thing_id,
         linkTypeUuid: props.link.link_type_id,
-        comment: props.link.description || '',
+        translation: props.link.translation || '',
         linkId: props.link.link_id
     };
 });
@@ -90,7 +90,7 @@ const save = () => {
             one_thing_id: linkData.value.linkedObjectUuid,
             other_thing_id: props.currentObjectUuid,
             link_type_id: linkData.value.linkTypeUuid,
-            translation: linkData.value.comment,
+            translation: linkData.value.translation,
             // Сохраняем оригинальные даты, если они есть
             start: props.link.start,
             end: props.link.end,
