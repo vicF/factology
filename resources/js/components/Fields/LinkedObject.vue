@@ -106,7 +106,7 @@ const emitUpdate = () => {
             currentObjectUuid: localCurrentObjectUuid.value,
             linkedObjectUuid: localLinkedObjectUuid.value,
             linkTypeUuid: localLinkTypeUuid.value,
-            comment: localComment.value,
+            translation: localComment.value,
             linkId: props.linkId,
         },
     });
@@ -117,7 +117,7 @@ const emitUpdate = () => {
             currentObjectUuid: localCurrentObjectUuid.value,
             linkedObjectUuid: localLinkedObjectUuid.value,
             linkTypeUuid: localLinkTypeUuid.value,
-            comment: localComment.value,
+            translation: localComment.value,
             linkId: props.linkId,
         },
     });

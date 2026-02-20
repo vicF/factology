@@ -327,17 +327,22 @@ const updateLink = async (linkData) => {
     try {
         // Подготавливаем данные для отправки
         const payload = {
-            thing_id: linkData.thing_id,
+            one_thing_id: linkData.one_thing_id,
+            other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
-            description: linkData.description,
+            translation: linkData.translation,
             // Сохраняем существующие даты
-            start: linkData.start,
-            end: linkData.end,
+            //start: linkData.start,
+            //end: linkData.end,
             link_start: linkData.link_start,
-            link_end: linkData.link_end
+            link_end: linkData.link_end,
+            link_id:linkData.link_id
         };
-
-        await axios.put(`/link/${linkData.link_id}`, payload);
+        if(linkData.link_id) {
+            await axios.put(`/link/${linkData.link_id}`, payload);
+        } else {
+            await axios.post(`/link`, payload);
+        }
 
         // Обновляем объект после успешного обновления ссылки
         await getObject();

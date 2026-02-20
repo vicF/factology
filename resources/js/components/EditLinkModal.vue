@@ -1,3 +1,4 @@
+<!-- Component to edit one link -->
 <template>
     <div class="modal fade show" tabindex="-1" style="display: block;" @click.self="close">
         <div class="modal-dialog modal-lg">
@@ -85,10 +86,11 @@ const save = () => {
     emit('save', {
         delete: false,
         data: {
-            link_id: props.link.link_id,
-            thing_id: linkData.value.linkedObjectUuid,
+            link_id: linkData.value.linkId,
+            one_thing_id: linkData.value.linkedObjectUuid,
+            other_thing_id: props.currentObjectUuid,
             link_type_id: linkData.value.linkTypeUuid,
-            description: linkData.value.comment,
+            translation: linkData.value.comment,
             // Сохраняем оригинальные даты, если они есть
             start: props.link.start,
             end: props.link.end,

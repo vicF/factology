@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Eloquent\Link;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -87,6 +88,30 @@ class ApiController extends BaseController
     }
 
     /**
+     * Store link
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeLink(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->toArray();
+        if(!empty($data['link_id'])) {
+            DB::table('links')
+                ->where('link_id', $data['link_id'])
+                ->update($data);
+        } else {
+            DB::table('links')
+                ->insert($data);
+        }
+        return response()->json(
+            [
+                'data'    => $data,
+                'success' => true
+            ]);
+    }
+
+    /**
      * Upload file
      *
      * @param \Illuminate\Http\Request $request
@@ -153,6 +178,7 @@ class ApiController extends BaseController
         Anything::deleteById($id);
         return response()->json(['success' => true]);
     }
+
 
     /**
      * Delete link
