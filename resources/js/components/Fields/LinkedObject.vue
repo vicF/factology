@@ -101,6 +101,7 @@ async function fetchObjectName(uuid) {
 }
 
 const openCreateObjectModal = () => {
+    const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
         title: `Create new object linked to "${currentObjectName.value || 'current object'}"`,
         params: {
