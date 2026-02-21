@@ -152,6 +152,7 @@ import DateField from './Fields/DateField.vue';
 import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT} from "../constants.js";
+import {eventBus} from "../eventBus.js";
 
 // Props definition
 const props = defineProps({
@@ -161,10 +162,11 @@ const props = defineProps({
     initialLinkedObjects: { type: Array, default: () => [] },
     parentObjectId: { type: String, default: null },
     parentLinkType: { type: String, default: '2da45f14-69c6-4d56-9f2f-809fda14abf5' },
+    callback: { type: Object, default: null }
 });
 
 // Emits definition
-const emit = defineEmits(['close', 'object-created', 'object-updated']);
+const emit = defineEmits(['close', 'object-created', 'object-updated', 'callback-complete']);
 
 // Composables
 const { t } = useI18n();
@@ -232,15 +234,30 @@ const initializeData = () => {
                 comment: item.description || '',
                 linkId: item.link_id || null,
             }));
-    } else if (props.parentObjectId) {
-        linkedObjects.value = [{
-            id: uuidv4(),
-            currentObjectUuid: formData.value.thing_id,
-            linkedObjectUuid: props.parentObjectId,
-            linkTypeUuid: props.parentLinkType,
-            comment: '',
-            linkId: null,
-        }];
+    } else {
+        // For new objects, also use initialLinkedObjects if provided
+        if (props.initialLinkedObjects && props.initialLinkedObjects.length > 0) {
+            linkedObjects.value = props.initialLinkedObjects.map(item => ({
+                id: uuidv4(),
+                currentObjectUuid: formData.value.thing_id,
+                linkedObjectUuid: item.other_thing_id || item.linkedObjectUuid || '',
+                linkTypeUuid: item.link_type_id || item.linkTypeUuid || '',
+                comment: item.description || item.comment || '',
+                linkId: item.link_id || item.linkId || null,
+            }));
+        } else if (props.parentObjectId) {
+            // Fallback to parentObjectId for backward compatibility
+            linkedObjects.value = [{
+                id: uuidv4(),
+                currentObjectUuid: formData.value.thing_id,
+                linkedObjectUuid: props.parentObjectId,
+                linkTypeUuid: props.parentLinkType,
+                comment: '',
+                linkId: null,
+            }];
+        } else {
+            linkedObjects.value = [];
+        }
     }
 
     // Store original state for unsaved changes detection
@@ -355,6 +372,17 @@ const submitForm = async () => {
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
+            if (props.callback && props.callback.type === 'link-created') {
+                // Emit event with the new object ID
+                eventBus.emit('link-created', {
+                    requestId: props.callback.requestId,
+                    newObjectId: formData.value.thing_id,
+                    newObjectName: formData.value.name,
+                    index: props.callback.index,
+                    linkTypeUuid: props.callback.linkTypeUuid,
+                    comment: props.callback.comment
+                });
+            }
             if (props.parentObjectId) {
                 router.push({ name: 'object', params: { id: props.parentObjectId } });
             }

@@ -33,11 +33,11 @@
                 required
                 class="flex-field"
             />
-            <button class="btn btn-primary flex-button" @click="createObject">Create</button>
+            <button class="btn btn-primary flex-button" @click="openCreateObjectModal">Create</button>
         </div>
 
         <div class="form-group">
-            <label>Комментарий</label>
+            <!--            <label>Комментарий</label>-->
             <textarea
                 v-model="translation"
                 class="form-control"
@@ -50,10 +50,11 @@
 </template>
 
 <script setup>
-import {ref, computed, watch, onMounted} from 'vue';
+import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
 import {useObjectCacheStore} from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import {CLASS_TYPE, LINK_TYPE, THING_TYPE} from "../../constants.js";
+import {eventBus} from "../../eventBus.js";
 
 const props = defineProps({
     currentObjectUuid: {type: String, required: true},
@@ -98,6 +99,24 @@ async function fetchObjectName(uuid) {
         console.error(`Failed to fetch object for UUID ${uuid}:`, error);
     }
 }
+
+const openCreateObjectModal = () => {
+    const payload = {
+        title: `Create new object linked to "${currentObjectName.value || 'current object'}"`,
+        params: {
+            type: 3, // THING_TYPE
+        },
+        callback: {
+            type: 'link-created',
+            requestId: requestId,
+            targetComponent: 'linked-object',
+            index: props.index,
+            linkTypeUuid: localLinkTypeUuid.value,
+            comment: translation.value
+        }
+    };
+    eventBus.emit('open-create-modal', payload);
+};
 
 const emitUpdate = () => {
     console.log('LinkedObject.vue - Emitting update:', {
@@ -184,7 +203,35 @@ onMounted(() => {
     fetchObjectName(localLinkedObjectUuid.value);
     fetchObjectName(localLinkTypeUuid.value);
     fetchObjectName(props.currentObjectUuid);
+    eventBus.on('link-created', handleLinkCreated);
 });
+
+onUnmounted(() => {
+    // Clean up listener
+    eventBus.off('link-created', handleLinkCreated);
+});
+
+const handleLinkCreated = (data) => {
+    // Check if this callback is for this specific component instance
+    // You might want to store the requestId when opening the modal
+    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
+        console.log('Link created, updating linked object:', data);
+
+        // Update the linked object UUID with the newly created object
+        localLinkedObjectUuid.value = data.newObjectId;
+
+        // Optionally update link type and comment if they were provided
+        if (data.linkTypeUuid) {
+            localLinkTypeUuid.value = data.linkTypeUuid;
+        }
+
+        if (data.comment !== undefined) {
+            translation.value = data.comment;
+        }
+
+        // The emitUpdate will be triggered by the watchers
+    }
+};
 
 function removeSelf() {
     emit('remove', props.index);
