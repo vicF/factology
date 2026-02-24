@@ -605,7 +605,7 @@ class Anything
 
     }
 
-    protected function setLinkTranslation(&$link)
+    protected function setLinkTranslation(array &$link)
     {
         if (empty($link['translation'])) {
             try {
@@ -624,7 +624,7 @@ class Anything
         }
     }
 
-    public function setLink($link): bool
+    public function setLink(array $link): bool
     {
         $this->setLinkTranslation($link);
         if (@$link['link_id']) {
@@ -648,7 +648,7 @@ class Anything
             ]);
     }
 
-    public function addLink($link): bool
+    public function addLink(array $link): bool
     {
         $this->setLinkTranslation($link);
         return DB::table('links')->insert([
@@ -662,7 +662,7 @@ class Anything
     public function setAsChildOf($parentClass): bool
     {
         $parentName = Thing::find($parentClass)->name;
-        return $this->setLink(UUID::PARENT, $parentClass, "\"{$this->name}\" is child of \"{$parentName}\"");
+        return $this->setLink(UUID::LINK_TO_PARENT, $parentClass, "\"{$this->name}\" is child of \"{$parentName}\"");
     }
 
 
@@ -860,7 +860,7 @@ class Anything
             ->join('things', 'links.one_thing_id', 'things.thing_id') // For auth
             ->auth()
             ->where('links.one_thing_id', $this->thing_id)
-            ->where('link_type_id', UUID::PARENT)
+            ->where('link_type_id', UUID::LINK_TO_PARENT)
             ->get('other_thing_id')->toArray();
     }
 

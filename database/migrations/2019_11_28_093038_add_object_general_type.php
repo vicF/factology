@@ -28,7 +28,7 @@ class AddObjectGeneralType extends Migration
 
 
         DB::table('things')
-            ->where(Thing::ID, UUID::PARENT)
+            ->where(Thing::ID, UUID::LINK_TO_PARENT)
             ->update(
                 [
                     'type' => Anything::LINK,

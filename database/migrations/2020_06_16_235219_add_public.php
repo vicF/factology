@@ -21,7 +21,7 @@ class AddPublic extends Migration
             $table->boolean('public')->default(false)->comment('If true it can be read by anybody');
         });
         DB::table('things')->whereIn('thing_id',
-            [UUID::ANYTHING, UUID::LINK, UUID::SOMETHING, UUID::LINK_TO_CLASS, UUID::PARENT])->update(['public'=> true]);
+            [UUID::ANYTHING, UUID::LINK, UUID::SOMETHING, UUID::LINK_TO_CLASS, UUID::LINK_TO_PARENT])->update(['public' => true]);
     }
 
     /**

@@ -41,6 +41,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
+        Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
+        Route::put('/link/{id}',              [ApiController::class, 'storeLink']);     // update
         Route::delete('/link/{id}',           [ApiController::class, 'deleteLink']);
         Route::post('/photos',                [ApiController::class, 'photos']);
         Route::post('/check_photos',          [ApiController::class, 'checkPhotos']);

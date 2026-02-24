@@ -1,3 +1,4 @@
+<!-- One element of class tree -->
 <template>
     <div class="tree-menu">
         <div
@@ -14,8 +15,8 @@
             <div class="node-content">
                 <span class="node-name">{{ name }}</span>
                 <span class="action-icons" :class="{ 'visible': showIcons }">
-                    <span class="add-subclass" @click="openCreateSubclassModal">+</span>
-                    <span class="add-object" @click="openCreateObjectModal">📦</span>
+                    <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
+                    <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${name}&quot;`">📦</span>
                 </span>
             </div>
         </div>

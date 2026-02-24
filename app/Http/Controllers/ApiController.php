@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Eloquent\Link;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -14,6 +15,11 @@ use Illuminate\Support\Facades\Log;
 
 class ApiController extends BaseController
 {
+    /**
+     * List objects
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function list()
     {
         return response()->json(
@@ -23,6 +29,13 @@ class ApiController extends BaseController
             ]);
     }
 
+    /**
+     * Get object
+     *
+     *
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function get($id)
     {
         return response()->json(
@@ -34,6 +47,8 @@ class ApiController extends BaseController
 
 
     /**
+     * Store object
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -43,7 +58,8 @@ class ApiController extends BaseController
             $model = new Anything($request->toArray());
             $model->save();
             if ($request->parent_id) {
-                $model->setLink(UUID::PARENT, $request->parent_id, 'Child of');
+
+                $model->setLink([UUID::LINK_TO_PARENT], $request->parent_id, 'Child of');
             }
             if ($request->class) {
                 $model->setClass($request->class);
@@ -71,6 +87,36 @@ class ApiController extends BaseController
         });
     }
 
+    /**
+     * Store link
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeLink(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->toArray();
+        if(!empty($data['link_id'])) {
+            DB::table('links')
+                ->where('link_id', $data['link_id'])
+                ->update($data);
+        } else {
+            DB::table('links')
+                ->insert($data);
+        }
+        return response()->json(
+            [
+                'data'    => $data,
+                'success' => true
+            ]);
+    }
+
+    /**
+     * Upload file
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function upload(Request $request)
     {
         $stored = 0;
@@ -120,12 +166,27 @@ class ApiController extends BaseController
             ]);
     }
 
+    /**
+     * Delete object
+     *
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
+     */
     public function delete($id)
     {
         Anything::deleteById($id);
         return response()->json(['success' => true]);
     }
 
+
+    /**
+     * Delete link
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function deleteLink(Request $request, $id)
     {
         try {
@@ -143,6 +204,13 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Retrieve photos
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Throwable
+     */
     public function photos(Request $request)
     {
         try {
@@ -168,6 +236,13 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Check photos
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Throwable
+     */
     public function checkPhotos(Request $request)
     {
         try {
@@ -187,11 +262,11 @@ class ApiController extends BaseController
 
 
     /**
-     * Moved here from Controller
+     * Search objects
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function search()
+    public function search(): \Illuminate\Http\JsonResponse
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
         if (@$requestBody['tree']) {
@@ -251,21 +326,27 @@ class ApiController extends BaseController
 
     }
 
+    /**
+     * Get classes tree
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function searchTree()
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
-
+        $linkToParent = UUID::LINK_TO_PARENT;
+        $something = UUID::SOMETHING;
         $rawSql =
             "with recursive descendants
                 (name, level, id, parent_id, description, translation)  as (
                     select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
                     from things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
-                    where c.type=2 and c.thing_id = '3e15244c-a9e1-4a91-a0ca-1c65722a64df'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
+                    where c.type=2 and c.thing_id = '$something'
                     union distinct
                     select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
                     from descendants d, things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '361c19af-c011-4051-9329-49c75d1ca0fb'
+                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
                     where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
                 )
                 select * from descendants ORDER BY level;";
@@ -299,7 +380,7 @@ class ApiController extends BaseController
             //->auth()
             ->leftJoin('links', static function ($join) {
                 $join->on('things.thing_id', 'links.one_thing_id')
-                    ->whereRaw('links.link_type_id = ?', UUID::PARENT);
+                    ->whereRaw('links.link_type_id = ?', UUID::LINK_TO_PARENT);
             })
             ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
             ->orderByRaw('type = ?, type = ? DESC', [UUID::GENERAL, UUID::G_CLASS])->get())->keyBy('thing_id')->toArray();

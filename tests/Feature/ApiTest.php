@@ -79,7 +79,7 @@ class ApiTest extends TestCase
                     'link'        => [
                         [
                             'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                            'uuid'        => '3e15244c-a9e1-4a91-a0ca-1c65722a64df',
+                            'uuid'        => UUID::SOMETHING,
                             'description' => 'This test object is of class Something'
                         ]
                     ]

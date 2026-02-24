@@ -1,9 +1,9 @@
 <template>
     <div>
-        <button @click="changeLanguage('en')" :class="{ active: locale === 'en' }">
+        <button @click="changeLanguage('en')" :class="{ active: locale === 'en' }" class="btn btn-light">
             English
         </button>
-        <button @click="changeLanguage('ru')" :class="{ active: locale === 'ru' }">
+        <button @click="changeLanguage('ru')" :class="{ active: locale === 'ru' }" class="btn btn-light">
             Русский
         </button>
     </div>
