@@ -1,6 +1,7 @@
 <!-- Edit link between two objects -->
 <template>
     <div class="linked-object">
+        <div class="form-group flex-group">
         <ObjectField
             fieldName="current_object"
             v-model="localCurrentObjectUuid"
@@ -9,7 +10,7 @@
             :type="THING_TYPE"
             required
         />
-
+        </div>
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="link_type"
@@ -149,7 +150,9 @@ const switchObjects = () => {
     localCurrentObjectUuid.value = localLinkedObjectUuid.value;
     localLinkedObjectUuid.value = temp;
 
-    // The emitUpdate will be triggered by the watchers
+    // Immediately emit the update with swapped values
+    //emitUpdate();
+
     console.log('Switched objects:', {
         newCurrent: localCurrentObjectUuid.value,
         newLinked: localLinkedObjectUuid.value

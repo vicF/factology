@@ -10,8 +10,7 @@
                 <div class="modal-body">
                     <LinkedObject
                         v-if="linkData"
-                        :currentObjectUuid="currentObjectUuid"
-                        :currentObjectName="currentObjectName"
+                        :currentObjectUuid="linkData.currentObjectUuid"
                         :linkedObjectUuid="linkData.linkedObjectUuid"
                         :linkTypeUuid="linkData.linkTypeUuid"
                         :translation="linkData.translation"
@@ -61,7 +60,8 @@ const linkData = ref(null);
 onMounted(() => {
     // Преобразуем данные ссылки в формат, понятный LinkedObject
     linkData.value = {
-        linkedObjectUuid: props.link.thing_id,
+        currentObjectUuid:props.link.one_thing_id,
+        linkedObjectUuid: props.link.other_thing_id,
         linkTypeUuid: props.link.link_type_id,
         translation: props.link.translation || '',
         linkId: props.link.link_id
@@ -87,8 +87,8 @@ const save = () => {
         delete: false,
         data: {
             link_id: linkData.value.linkId,
-            one_thing_id: linkData.value.linkedObjectUuid,
-            other_thing_id: linkData.value.currentObjectUuid,
+            one_thing_id: linkData.value.currentObjectUuid,
+            other_thing_id: linkData.value.linkedObjectUuid,
             link_type_id: linkData.value.linkTypeUuid,
             translation: linkData.value.translation,
             // Сохраняем оригинальные даты, если они есть

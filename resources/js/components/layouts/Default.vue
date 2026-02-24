@@ -12,8 +12,7 @@
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home <span
-                                class="sr-only">(current)</span></router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link">Home</router-link>
                         </li>
                     </ul>
                     <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
