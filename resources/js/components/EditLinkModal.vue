@@ -88,7 +88,7 @@ const save = () => {
         data: {
             link_id: linkData.value.linkId,
             one_thing_id: linkData.value.linkedObjectUuid,
-            other_thing_id: props.currentObjectUuid,
+            other_thing_id: linkData.value.currentObjectUuid,
             link_type_id: linkData.value.linkTypeUuid,
             translation: linkData.value.translation,
             // Сохраняем оригинальные даты, если они есть
