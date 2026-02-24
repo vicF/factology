@@ -1,6 +1,11 @@
 <template>
-    <div id="search">  <!-- v-cloak removed – only change -->
+    <div id="search">
         <div v-if="!loaded" class="row">Loading...</div>
+        <div v-else-if="objects.length === 0" class="row">
+            <div class="col text-center py-5">
+                <p>No results found</p>
+            </div>
+        </div>
         <div v-else class="row">
             <div class="col">
                 <div class="row mt-5">
@@ -23,16 +28,16 @@
 
                             <!-- Links Column -->
                             <div class="col-md-6">
-                                <div v-for="(link, linkIndex) in thing.links" :key="`${link.link_type_id}-${link.thing_id}-${link.other_thing_id}-${linkIndex}`">
+                                <div v-for="(link, linkIndex) in thing.links || []" :key="`${link.link_type_id}-${link.thing_id}-${link.other_thing_id}-${linkIndex}`">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
                                         <img :src="getThumbUrl(link.link_type_id)" width="10" />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                            <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
+                                        <img :src="getThumbUrl(link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id)" width="10" />
                                     </RouterLink>
-                                        {{ link.translation }}
+                                    {{ link.translation }}
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id === thing.thing_id ? link.other_thing_id : link.thing_id } }">
-                                            {{ link.name }}
+                                        {{ link.name }}
                                     </RouterLink>
                                 </div>
                             </div>
@@ -47,90 +52,141 @@
     </div>
 </template>
 
-<script>
-    import TreeMenu from './TreeMenu.vue';
-    import { useSearchStore } from '../stores/search';
-    import { ref, onMounted, watch } from 'vue';
-    import axios from 'axios';
-    import { useRoute } from 'vue-router';
-    import {eventBus} from "../eventBus";
+<script setup>
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import axios from 'axios';
+import { eventBus } from "../eventBus";
+import { useSearchStore } from '../stores/search';
 
-    export default {
-        name: "Search",
-        components: { TreeMenu },
-        props: ['searchText', 'typeThing', 'typeClass'],
-        setup(props) {
-            const objects = ref([]);
-            const loaded = ref(false);
-            const validationErrors = ref({});
-            const processing = ref(false);
-            const route = useRoute();
-            const searchStore = useSearchStore();
+// Props
+const props = defineProps({
+    searchText: String,
+    typeThing: String,
+    typeClass: String
+});
 
-            // Sync props with store
-            if (props.typeThing !== undefined) searchStore.setTypeThing(props.typeThing);
-            if (props.typeClass !== undefined) searchStore.setTypeClass(props.typeClass);
+// Component name
+defineOptions({
+    name: "Search"
+});
 
-            const getThumbUrl = (thing_id) => {
-                return '/thumbs/' + thing_id.charAt(0) + '/' + thing_id.charAt(1) + '/' + thing_id + '.jpg';
-            };
+// Composables
+const route = useRoute();
+const searchStore = useSearchStore();
 
-            const getObjects = async () => {
-                let type = [];
-                if (searchStore.typeThing) type.push(3);
-                if (searchStore.typeClass) type.push(2);
+// State
+const objects = ref([]);
+const loaded = ref(false);
+const validationErrors = ref({});
+const processing = ref(false);
 
-                processing.value = true;
-                try {
-                    const response = await axios.post('/object', JSON.stringify({
-                        "search": searchStore.searchQuery || props.searchText || route.query.q || '',
-                        "type": type,
-                        classes: searchStore.checkedItems,
-                    }));
-                    validationErrors.value = {};
-                    let data = JSON.parse(response.data);
-                    objects.value = data.things;
-                    console.log('Links:', data.links);
-                } catch (error) {
-                    console.error(error);
-                    if (error.response && error.response.status === 422) {
-                        validationErrors.value = error.response.data.errors;
-                    } else {
-                        validationErrors.value = {};
-                        alert(error.response ? error.response.data.message : error.message);
-                    }
-                } finally {
-                    processing.value = false;
-                    loaded.value = true;
-                }
-            };
+// Sync props with store - FIXED: Check for boolean/string values properly
+if (props.typeThing !== undefined && props.typeThing !== null) {
+    searchStore.setTypeThing(props.typeThing === 'true' || props.typeThing === true);
+}
+if (props.typeClass !== undefined && props.typeClass !== null) {
+    searchStore.setTypeClass(props.typeClass === 'true' || props.typeClass === true);
+}
 
-            watch(() => route.query.q, (newQuery, oldQuery) => {
-                if (newQuery !== oldQuery) {
-                    console.log('Search.vue - Query param changed:', newQuery);
-                    searchStore.setSearchQuery(newQuery || '');
-                    getObjects();
-                }
-            });
+// Helper functions
+const getThumbUrl = (thing_id) => {
+    if (!thing_id) return '';
+    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
+};
 
-            onMounted(() => {
-                eventBus.on('trigger-search', () => {
-                    console.log('Search.vue - trigger-search received, searchQuery:', searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
-                    getObjects();
-                });
-                getObjects();
-            });
+// Main data fetching - FIXED: Response handling
+const getObjects = async () => {
+    const type = [];
+    if (searchStore.typeThing) type.push(3);
+    if (searchStore.typeClass) type.push(2);
 
-            return {
-                objects,
-                loaded,
-                getThumbUrl,
-                getObjects,
-                validationErrors,
-                processing
-            };
+    processing.value = true;
+    loaded.value = false;
+
+    try {
+        const searchQuery = searchStore.searchQuery || props.searchText || route.query.q || '';
+        console.log('Search.vue - Searching for:', searchQuery, 'types:', type, 'classes:', searchStore.checkedItems);
+
+        const response = await axios.post('/object', {
+            search: searchQuery,
+            type: type,
+            classes: searchStore.checkedItems,
+        });
+
+        //console.log('Search.vue - Response:', response.data);
+
+        validationErrors.value = {};
+
+        // FIXED: Proper response parsing
+        if (typeof response.data === 'string') {
+            try {
+                const parsed = JSON.parse(response.data);
+                objects.value = parsed.things || [];
+                console.log('Search.vue - Parsed objects:', objects.value);
+            } catch (e) {
+                console.error('Search.vue - Failed to parse response:', e);
+                objects.value = [];
+            }
+        } else {
+            objects.value = response.data.things || response.data || [];
         }
-    };
+
+    } catch (error) {
+        console.error('Search.vue - Error:', error);
+        if (error.response?.status === 422) {
+            validationErrors.value = error.response.data.errors || {};
+        } else {
+            validationErrors.value = {};
+            const errorMessage = error.response?.data?.message || error.message;
+            console.error('Search.vue - Error message:', errorMessage);
+        }
+        objects.value = [];
+    } finally {
+        processing.value = false;
+        loaded.value = true;
+    }
+};
+
+// Event handler
+const triggerSearchHandler = () => {
+    console.log('Search.vue - trigger-search received, searchQuery:',
+        searchStore.searchQuery, 'classIds:', searchStore.checkedItems);
+    getObjects();
+};
+
+// Watchers
+watch(() => route.query.q, (newQuery, oldQuery) => {
+    if (newQuery !== oldQuery) {
+        console.log('Search.vue - Query param changed:', newQuery);
+        searchStore.setSearchQuery(newQuery || '');
+        getObjects();
+    }
+});
+
+// Watch for store changes that should trigger search
+watch(() => searchStore.checkedItems, () => {
+    console.log('Search.vue - checkedItems changed, triggering search');
+    getObjects();
+}, { deep: true });
+
+watch(() => searchStore.searchQuery, (newQuery) => {
+    console.log('Search.vue - searchQuery changed:', newQuery);
+    // Don't trigger search here to avoid double requests
+    // The route watcher or eventBus will handle it
+});
+
+// Lifecycle
+onMounted(() => {
+    eventBus.on('trigger-search', triggerSearchHandler);
+
+    // Initial load
+    getObjects();
+});
+
+onUnmounted(() => {
+    eventBus.off('trigger-search', triggerSearchHandler);
+});
 </script>
 
 <style scoped>

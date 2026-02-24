@@ -2,12 +2,12 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "vite --host",
-        "build": "vite build",
-        "test": "npm run test:php && npm run test:js",
-        "test:php": "vendor/bin/phpunit",
-        "test:js": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --colors",
-        "test:js:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.cjs --watch"
+        "dev": "vite --host=127.0.0.1 --port=5173 --clearScreen=false",
+        "dev:debug": "vite --host=127.0.0.1 --port=5173 --debug",
+        "dev:no-cache": "vite --host=127.0.0.1 --port=5173 --force",
+        "build": "vite build --mode=production",
+        "build:analyze": "vite build --mode=production --ssrManifest",
+        "preview": "vite preview --host=127.0.0.1 --port=4173"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",

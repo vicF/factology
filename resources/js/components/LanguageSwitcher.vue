@@ -1,36 +1,22 @@
 <template>
     <div>
-        <button @click="changeLanguage('en')" :class="{ active: currentLocale === 'en' }">
+        <button @click="changeLanguage('en')" :class="{ active: locale === 'en' }" class="btn btn-light">
             English
         </button>
-        <button @click="changeLanguage('ru')" :class="{ active: currentLocale === 'ru' }">
+        <button @click="changeLanguage('ru')" :class="{ active: locale === 'ru' }" class="btn btn-light">
             Русский
         </button>
     </div>
 </template>
 
-<script>
+<script setup>
+import { useI18n } from 'vue-i18n';
 import { setLanguage } from "../lang/i18n.js";
 
-export default {
-    data() {
-        return {
-            currentLocale: this.$i18n.locale
-        };
-    },
-    methods: {
-        changeLanguage(lang) {
-            setLanguage(lang);
-            // Update local state to reflect the change without needing a page reload
-            this.currentLocale = lang;
-        }
-    },
-    watch: {
-        // Watch for changes in the i18n locale and update currentLocale
-        '$i18n.locale'(newLocale) {
-            this.currentLocale = newLocale;
-        }
-    }
+const { locale } = useI18n();
+
+const changeLanguage = (lang) => {
+    setLanguage(lang);
 };
 </script>
 

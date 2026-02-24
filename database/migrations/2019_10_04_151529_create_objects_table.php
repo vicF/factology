@@ -59,7 +59,7 @@ class CreateObjectsTable extends Migration
 
             $things->insert(
                 [
-                    Thing::ID     => UUID::PARENT,
+                    Thing::ID     => UUID::LINK_TO_PARENT,
                     'name'        => 'Parent',
                     'description' => 'Type of parent link whatever it can mean'
                 ]
@@ -87,16 +87,16 @@ class CreateObjectsTable extends Migration
                 [
                     Thing::ID        => UUID::LINK,   // LINK class is child of Anything
                     'translation'    => '"Link" is subclass of "Anything"',
-                    Link::TYPE       => UUID::PARENT,
+                    Link::TYPE       => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::ANYTHING
                 ]
             );
 
             $links->insert(
                 [
-                    Thing::ID        => UUID::PARENT,   // PARENT is subclass of LINK
+                    Thing::ID        => UUID::LINK_TO_PARENT,   // PARENT is subclass of LINK
                     'translation'    => '"Parent" is subclass of "Link"',
-                    Link::TYPE       => UUID::PARENT,
+                    Link::TYPE       => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::LINK
                 ]
             );
@@ -105,7 +105,7 @@ class CreateObjectsTable extends Migration
                 [
                     Thing::ID        => UUID::LINK_TO_CLASS,   // LINK_TO_CLASS is subclass of LINK
                     'translation'    => '"Class of" is subclass of "Link"',
-                    Link::TYPE       => UUID::PARENT,
+                    Link::TYPE       => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::LINK
                 ]
             );
@@ -114,7 +114,7 @@ class CreateObjectsTable extends Migration
                 [
                     Thing::ID        => UUID::SOMETHING,   // LINK_TO_CLASS is subclass of LINK
                     'translation'    => '"Something" is subclass of "Anything"',
-                    Link::TYPE       => UUID::PARENT,
+                    Link::TYPE       => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::ANYTHING
                 ]
             );

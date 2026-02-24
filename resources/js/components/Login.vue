@@ -42,67 +42,52 @@
     </div>
 </template>
 
-<script>
+<script setup>
 import { reactive, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 
-export default {
-    name: "login",
-    setup() {
-        const router = useRouter();
-        const route = useRoute();
-        const { t } = useI18n();
-        const authStore = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+const { t } = useI18n();
+const authStore = useAuthStore();
 
-        const auth = reactive({
-            email: "",
-            password: ""
-        });
+const auth = reactive({
+    email: "",
+    password: ""
+});
 
-        const validationErrors = ref({});
-        const processing = ref(false);
+const validationErrors = ref({});
+const processing = ref(false);
 
-        const login = async () => {
-            processing.value = true;
-            validationErrors.value = {};
+const login = async () => {
+    processing.value = true;
+    validationErrors.value = {};
 
-            try {
-                const response = await axios.post('/login', auth);
+    try {
+        const response = await axios.post('/login', auth);
 
-                // Changed: pass both user and token to the store
-                authStore.login(response.data.user, response.data.token);
+        authStore.login(response.data.user, response.data.token);
 
-                const redirectTo = route.query.redirect || '/';
-                console.debug('await router.push(redirectTo);');
-                await router.push(redirectTo);
+        const redirectTo = route.query.redirect || '/';
+        console.debug('await router.push(redirectTo);');
+        await router.push(redirectTo);
 
-            } catch (error) {
-                if (error.response?.status === 422) {
-                    validationErrors.value = error.response.data.errors;
-                } else {
-                    alert(t('Login failed'));
-                }
-            } finally {
-                processing.value = false;
-            }
-        };
-
-        const cancel = () => {
-            router.push({name: 'dashboard'});
-        };
-
-        return {
-            auth,
-            validationErrors,
-            processing,
-            login,
-            cancel,
-            t
-        };
+    } catch (error) {
+        if (error.response?.status === 422) {
+            validationErrors.value = error.response.data.errors;
+        } else {
+            alert(t('Login failed'));
+        }
+    } finally {
+        processing.value = false;
     }
+};
+
+const cancel = () => {
+    router.push({name: 'dashboard'});
 };
 </script>
 

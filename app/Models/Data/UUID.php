@@ -22,7 +22,7 @@ class UUID
     public const LINK = '4b27fd0c-d8be-425c-a529-2186b2589e76';
     public const SOMETHING = '3e15244c-a9e1-4a91-a0ca-1c65722a64df';
     public const LINK_TO_CLASS = 'c217c185-742f-4a9f-8e69-acea2b4f5aea';
-    public const PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
+    public const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
     public const FILE_TYPE = '46cfb494-5dc1-436c-82e0-e7d6ec55b85b';
     public const TYPE = '12011201-d51d-4fe9-b4a1-a829e9dac8bf';
     public const LINK_TO_STORAGE = '1dcb897e-0f64-499f-b80d-2cac4a025ed4';
