@@ -4,7 +4,7 @@
         <ObjectField
             fieldName="current_object"
             v-model="localCurrentObjectUuid"
-            :isEditable="false"
+            :isEditable="true"
             name="thing_type"
             :type="THING_TYPE"
             required
@@ -140,6 +140,19 @@ const emitUpdate = () => {
             translation: translation.value,
             linkId: props.linkId,
         },
+    });
+};
+
+const switchObjects = () => {
+    // Swap the values
+    const temp = localCurrentObjectUuid.value;
+    localCurrentObjectUuid.value = localLinkedObjectUuid.value;
+    localLinkedObjectUuid.value = temp;
+
+    // The emitUpdate will be triggered by the watchers
+    console.log('Switched objects:', {
+        newCurrent: localCurrentObjectUuid.value,
+        newLinked: localLinkedObjectUuid.value
     });
 };
 
