@@ -165,6 +165,7 @@
             @close="showEditLinkModal = false"
         />
     </div>
+    <RelationGraph></RelationGraph>
 </template>
 
 <script setup>
@@ -175,7 +176,8 @@ import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
-import { useObjectCacheStore } from '@/stores/objectCache.js'
+import { useObjectCacheStore } from '@/stores/objectCache.js';
+import RelationGraph from './RelationGraph.vue';
 
 // Props definition
 const props = defineProps({
