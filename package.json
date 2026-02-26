@@ -2,12 +2,12 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "vite --host=127.0.0.1 --port=5173 --clearScreen=false",
-        "dev:debug": "vite --host=127.0.0.1 --port=5173 --debug",
-        "dev:no-cache": "vite --host=127.0.0.1 --port=5173 --force",
+        "dev": "vite --host=0.0.0.0 --port=5173 --clearScreen=false",
+        "dev:debug": "vite --host=0.0.0.0 --port=5173 --debug",
+        "dev:no-cache": "vite --host=0.0.0.0 --port=5173 --force",
         "build": "vite build --mode=production",
         "build:analyze": "vite build --mode=production --ssrManifest",
-        "preview": "vite preview --host=127.0.0.1 --port=4173"
+        "preview": "vite preview --host=0.0.0.0 --port=4173"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",

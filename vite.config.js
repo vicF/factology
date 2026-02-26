@@ -1,4 +1,4 @@
-// vite.config.js (Updated - removed problematic SCSS options)
+// vite.config.js - Optimized for Docker + Windows
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
@@ -21,6 +21,8 @@ export default defineConfig({
                     config: { delay: 300 }
                 }
             ],
+            // Add this to help with Docker
+            valet: false,
         }),
         vue({
             template: {
@@ -47,28 +49,51 @@ export default defineConfig({
     },
 
     server: {
-        host: '127.0.0.1',
+        // CHANGE THIS: Listen on all interfaces in Docker
+        host: '0.0.0.0',  // Was '127.0.0.1'
         port: 5173,
         strictPort: true,
 
+        // ADD THIS: CORS for Docker
+        cors: {
+            origin: [
+                'http://localhost',
+                'http://localhost:8003',  // Your Laravel port
+                'http://127.0.0.1:8003',
+                'http://0.0.0.0:8003',
+            ],
+            methods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
+            credentials: true,
+        },
+
         hmr: {
-            host: '127.0.0.1',
+            // CHANGE THIS: Use 'localhost' for browser connections
+            host: 'localhost',  // Was '127.0.0.1'
             port: 5173,
             protocol: 'ws',
             timeout: 60000,
             overlay: true,
+            // ADD THIS: Client port for Docker
+            clientPort: 5173,
         },
 
         watch: {
-            usePolling: false,
-            useFsEvents: true,
+            // CHANGE THIS: Use polling for Docker filesystem
+            usePolling: true,  // Was false
+            interval: 1000,     // Check every second
+            binaryInterval: 1000,
+            awaitWriteFinish: {
+                stabilityThreshold: 500,
+                pollInterval: 100
+            },
+
+            // ADD THIS: Better polling settings
+            useFsEvents: false,  // Disable fs events, use polling
 
             ignored: [
                 '**/storage/**',
                 '**/storage/framework/cache/**',
                 '**/storage/logs/**',
-                '**/node_modules/**',
-                '**/node_modules/.cache/**',
                 '**/vendor/**',
                 '**/.git/**',
                 '**/.idea/**',
@@ -78,16 +103,18 @@ export default defineConfig({
                 '**/tests/**',
                 '**/coverage/**',
                 '**/docker/**',
+                // REMOVED node_modules from ignored - we need to watch package.json
             ],
         },
 
         fs: {
-            strict: true,
+            // CHANGE THIS: Less strict for Docker
+            strict: false,  // Was true
             allow: [
                 '.',
+                '..',  // Allow going up a level
                 '/resources',
-                '/node_modules/@vue',
-                '/node_modules/vite',
+                '/node_modules',
             ],
             deny: [
                 '.env',
@@ -97,8 +124,13 @@ export default defineConfig({
             ],
         },
 
-        cors: true,
+        // REMOVE this - we're using cors above
+        // cors: true,
+
         proxy: {},
+
+        // ADD THIS: Force exit on close
+        forceExit: true,
     },
 
     build: {
@@ -127,6 +159,14 @@ export default defineConfig({
         reportCompressedSize: false,
         emptyOutDir: true,
         copyPublicDir: true,
+
+        // ADD THIS: For Docker builds
+        commonjsOptions: {
+            include: [/node_modules/],
+            extensions: ['.js', '.cjs'],
+            strictRequires: true,
+            transformMixedEsModules: true,
+        },
     },
 
     optimizeDeps: {
@@ -144,6 +184,7 @@ export default defineConfig({
             '@popperjs/core',
             'lodash',
             'mitt',
+            'relation-graph',  // Added from your logs
         ],
 
         exclude: [
@@ -151,7 +192,9 @@ export default defineConfig({
             'vue-demi',
         ],
 
-        force: false,
+        // CHANGE THIS: Force optimize on start for Docker
+        force: true,  // Was false
+
         disabled: false,
 
         esbuildOptions: {
@@ -164,14 +207,13 @@ export default defineConfig({
 
     cacheDir: '.vite_cache',
 
-    // FIXED CSS CONFIG - simplified
     css: {
         devSourcemap: true,
         preprocessorOptions: {
             scss: {
-                // Only add if you have global variables to import
-                // additionalData: `@import "resources/css/variables.scss";`,
                 quietDeps: true,
+                // ADD THIS: For Docker path resolution
+                includePaths: ['node_modules'],
             },
         },
     },
@@ -182,12 +224,35 @@ export default defineConfig({
     },
 
     logLevel: 'info',
-    customLogger: undefined,
+
+    // ADD THIS: More detailed logging for debugging
+    customLogger: {
+        info: (msg, options) => {
+            console.log(`[Vite] ${msg}`);
+        },
+        warn: (msg, options) => {
+            console.warn(`[Vite] ${msg}`);
+        },
+        error: (msg, options) => {
+            console.error(`[Vite] ${msg}`);
+        },
+    },
+
     envPrefix: ['VITE_', 'LARAVEL_VITE_'],
 
     define: {
         __VUE_OPTIONS_API__: true,
         __VUE_PROD_DEVTOOLS__: false,
         __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+    },
+
+    // ADD THIS: For better Docker performance
+    experimental: {
+        renderBuiltUrl: (filename, { hostType }) => {
+            if (hostType === 'js') {
+                return { runtime: `window.__dynamic_base__ + ${JSON.stringify(filename)}` };
+            }
+            return { relative: true };
+        },
     },
 });
