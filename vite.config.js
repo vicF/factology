@@ -89,21 +89,9 @@ export default defineConfig({
 
             // ADD THIS: Better polling settings
             useFsEvents: false,  // Disable fs events, use polling
-
             ignored: [
-                '**/storage/**',
-                '**/storage/framework/cache/**',
-                '**/storage/logs/**',
-                '**/vendor/**',
-                '**/.git/**',
-                '**/.idea/**',
-                '**/.vscode/**',
-                '**/bootstrap/cache/**',
-                '**/public/build/**',
-                '**/tests/**',
-                '**/coverage/**',
-                '**/docker/**',
-                // REMOVED node_modules from ignored - we need to watch package.json
+                '!**/resources/js/**',  // DON'T ignore JS folder (negation pattern)
+                '**/*',                  // Ignore everything else
             ],
         },
 
@@ -170,39 +158,13 @@ export default defineConfig({
     },
 
     optimizeDeps: {
+        entries: ['resources/js/app.js'],  // ONLY scan from this entry
         include: [
-            'vue',
-            'vue-router',
-            'pinia',
-            'axios',
-            'vue-i18n',
-            '@vueuse/core',
-            '@vueuse/head',
-            'luxon',
-            'uuid',
-            'bootstrap',
-            '@popperjs/core',
-            'lodash',
-            'mitt',
-            'relation-graph',  // Added from your logs
+            'vue', 'vue-router', 'pinia', 'axios',
+            'vue-i18n', 'bootstrap', '@popperjs/core',
+            'lodash', 'mitt', 'luxon', 'uuid'
         ],
-
-        exclude: [
-            '@vue/compat',
-            'vue-demi',
-        ],
-
-        // CHANGE THIS: Force optimize on start for Docker
-        force: true,  // Was false
-
-        disabled: false,
-
-        esbuildOptions: {
-            target: 'es2020',
-            supported: {
-                'top-level-await': true,
-            },
-        },
+        exclude: ['@vue/compat', 'vue-demi'],
     },
 
     cacheDir: '.vite_cache',

@@ -13,7 +13,7 @@
 
 <script>
 // relation-graph also supports usage in the main.js file with Vue.use(RelationGraph); this way, you don't need the following line of code for import.
-import RelationGraph from 'relation-graph'
+import RelationGraph from 'relation-graph-vue3'
 export default {
     name: 'Demo',
     components: { RelationGraph },
