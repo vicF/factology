@@ -142,7 +142,7 @@
 
                 <!-- Graph Tab Content -->
                 <div v-show="activeTab === 'graph'" class="tab-content">
-                    <Graph :objectUid="object.thing_id" />
+                    <Graph :object="object" />
                 </div>
             </div>
         </div>

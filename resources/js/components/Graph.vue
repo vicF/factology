@@ -13,8 +13,19 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import { ref, onMounted } from 'vue'
+import {ref, watch, onMounted} from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
+const props = defineProps({
+    object: {
+        type: Object,
+        required: true
+    }
+})
+
+const router = useRouter()
+const {t} = useI18n()
 const graphRef = ref(null)
 
 const graphOptions = {
@@ -23,57 +34,163 @@ const graphOptions = {
     // https://www.relation-graph.com/#/docs/graph
     // You can also use this GUI tool to generate configuration content.
     // https://www.relation-graph.com/#/options-tools
+    defaultLineColor: '#99b3ff',
+    defaultNodeColor: '#4a6bff',
+    defaultNodeBorderColor: '#1e3b8a',
+    defaultNodeFontColor: '#ffffff',
+    defaultLineShape: 4,
+    defaultLineTextColor: '#666666',
+    defaultNodeWidth: 120,
+    defaultNodeHeight: 60,
+    allowShowDownloadButton: false,
+    allowShowFullscreenButton: false,
+    moveToCenterWhenChange: true,
+    zoomToFitWhenChange: true,
+    layout: {
+        layoutName: 'tree',
+        maxLevel: 2
+    }
 }
 
 const onNodeClick = (nodeObject, $event) => {
     console.log('onNodeClick:', nodeObject)
+    if (nodeObject.id && nodeObject.data?.type !== 'link_type') {
+        router.push({name: 'object', params: {uid: nodeObject.id}})
+    }
 }
 
 const onLineClick = (lineObject, $event) => {
     console.log('onLineClick:', lineObject)
 }
 
-const showGraph = () => {
-    const jsonData = {
-        rootId: 'a',
-        nodes: [
-            // You can also use slots directly without defining these cumbersome attributes and use CSS styles to define the appearance of your nodes.
-            // Example of using slots: https://www.relation-graph.com/#/demo/node-style
-            { id: 'a', text: 'A', borderColor: 'yellow' },
-            { id: 'b', text: 'B', color: '#43a2f1', fontColor: 'yellow' },
-            { id: 'c', text: 'C', nodeShape: 1, width: 80, height: 60 },
-            { id: 'e', text: 'E', nodeShape: 0, width: 150, height: 150 }
-        ],
-        lines: [
-            { from: 'a', to: 'b', text: 'line1', color: '#43a2f1' },
-            { from: 'a', to: 'c', text: 'line2' },
-            { from: 'a', to: 'e', text: 'line3' },
-            { from: 'b', to: 'e', color: '#67C23A' }
-        ]
-    }
-    // The node and line in the above data can refer to the options in "Node" and "Link & Line" for configuration.
-    // Node: https://www.relation-graph.com/#/docs/node
-    // Link & Line: https://www.relation-graph.com/#/docs/link
+const buildGraphData = (object) => {
+    if (!object) return {nodes: [], lines: []}
 
-    graphRef.value.setJsonData(jsonData, (graphInstance) => {
-        // Called when the relation-graph is completed
-    });
-    // The graphRef.value.setJsonData(jsonData, callback) method is a convenient method that is equivalent to the following code:
-    //  const graphInstance = graphRef.value.getInstance();
-    //  graphInstance.addNodes(jsonData.nodes);
-    //  graphInstance.addLines(jsonData.lines);
-    //  graphInstance.rootNode = graphInstance.getNodeById(jsonData.rootId);
-    //  await graphInstance.doLayout(); // Layout using the layouter set in graphOptions
-    //  await graphInstance.moveToCenter(); // Find the center based on node distribution and center the view
-    //  await graphInstance.zoomToFit(); // Zoom to fit, so that all nodes can be displayed in the visible area
+    const nodes = []
+    const lines = []
+    const nodeIds = new Set()
+
+    // Главный узел
+    nodes.push({
+        id: object.thing_id,
+        text: object.name || t('Unnamed'),
+        color: '#4a6bff',
+        borderColor: '#1e3b8a',
+        fontColor: '#ffffff',
+        data: object
+    })
+    nodeIds.add(object.thing_id)
+
+    // Класс объекта
+    if (object.class && object.class.thing_id) {
+        if (!nodeIds.has(object.class.thing_id)) {
+            nodes.push({
+                id: object.class.thing_id,
+                text: object.class.name || t('Class'),
+                color: '#6c757d',
+                borderColor: '#495057',
+                fontColor: '#ffffff',
+                data: object.class
+            })
+            nodeIds.add(object.class.thing_id)
+        }
+
+        lines.push({
+            id: `class-${object.thing_id}-${object.class.thing_id}`,
+            from: object.thing_id,
+            to: object.class.thing_id,
+            text: t('is a'),
+            color: '#6c757d'
+        })
+    }
+
+    // Связанные объекты
+    if (object.links && Array.isArray(object.links)) {
+        object.links.forEach((link, index) => {
+            // Связанный объект
+            if (link.thing_id && !nodeIds.has(link.thing_id)) {
+                nodes.push({
+                    id: link.thing_id,
+                    text: link.name || t('Linked object'),
+                    color: '#28a745',
+                    borderColor: '#1e7e34',
+                    fontColor: '#ffffff',
+                    data: link
+                })
+                nodeIds.add(link.thing_id)
+            }
+
+            // Тип связи
+            if (link.link_type_id && !nodeIds.has(link.link_type_id)) {
+                nodes.push({
+                    id: link.link_type_id,
+                    text: link.link_type_name || t('Link type'),
+                    color: '#ffc107',
+                    borderColor: '#d39e00',
+                    fontColor: '#212529',
+                    data: {type: 'link_type', id: link.link_type_id}
+                })
+                nodeIds.add(link.link_type_id)
+            }
+
+            // Связь между главным объектом и связанным
+            if (link.thing_id) {
+                lines.push({
+                    id: `link-${index}-${link.link_id || ''}`,
+                    from: object.thing_id,
+                    to: link.thing_id,
+                    text: link.link_type_name || t('connected'),
+                    color: '#28a745'
+                })
+            }
+
+            // Связь между связанным объектом и типом связи
+            if (link.thing_id && link.link_type_id) {
+                lines.push({
+                    id: `link-type-${index}-${link.link_id || ''}`,
+                    from: link.thing_id,
+                    to: link.link_type_id,
+                    text: t('uses type'),
+                    color: '#ffc107',
+                    lineShape: 2,
+                    lineDash: [5, 3]
+                })
+            }
+        })
+    }
+
+    return {nodes, lines}
 }
 
-onMounted(() => {
-    showGraph()
-})
+// Функция для обновления графа
+const updateGraph = () => {
+    if (!graphRef.value || !props.object) return
 
-// Component name (optional, for devtools)
-defineOptions({
-    name: 'Demo'
+    const graphData = buildGraphData(props.object)
+
+    if (graphData.nodes.length === 0) return
+
+    console.log('Updating graph with data:', graphData)
+
+    graphRef.value.setJsonData({
+        rootId: props.object.thing_id,
+        nodes: graphData.nodes,
+        lines: graphData.lines
+    }, (instance) => {
+        console.log('Graph updated successfully')
+    })
+}
+
+// Следим за объектом
+watch(() => props.object, (newObject) => {
+    if (newObject) {
+        updateGraph()
+    }
+}, {immediate: true, deep: true})
+
+onMounted(() => {
+    if (props.object) {
+        updateGraph()
+    }
 })
 </script>
