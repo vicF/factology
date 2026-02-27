@@ -141,8 +141,12 @@
                 </div>
 
                 <!-- Graph Tab Content -->
-                <div v-if="activeTab === 'graph'" class="tab-content">
-                    <Graph :object="object" />
+                <div v-show="activeTab === 'graph'" class="tab-content">
+                    <Graph
+                        v-if="graphInitialized"
+                        ref="graphComponent"
+                        :object="object"
+                    />
                 </div>
             </div>
         </div>
@@ -229,6 +233,8 @@ const editObject = ref(null);
 const modalParams = ref({});
 const treeModalParams = ref({});
 const editingLink = ref(null);
+const graphInitialized = ref(false);
+const graphComponentRef = ref(null);
 
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
@@ -425,6 +431,22 @@ watch(() => route.params.uid, (newUid) => {
         getObject();
     }
 });
+
+watch(activeTab, (newTab) => {
+    if (newTab === 'graph' && !graphInitialized.value) {
+        // При первом переключении на граф - инициализируем
+        console.log('First time opening graph tab, initializing...')
+        graphInitialized.value = true
+    }
+}, { immediate: true }) // immediate, чтобы проверить, может мы уже на вкладке графа при загрузке
+
+// Если нужно обновить граф при изменении объекта (но не пересоздавать)
+watch(() => object.value, (newObject) => {
+    if (graphInitialized.value && graphComponent.value) {
+        // Обновляем данные графа без пересоздания
+        graphComponent.value.updateData(newObject)
+    }
+}, { deep: true })
 </script>
 
 <style scoped>
