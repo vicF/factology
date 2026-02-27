@@ -1,6 +1,6 @@
 <template>
-    <div>
-        <div style="height:calc(100vh - 60px);"><!-- The size of the parent element determines the size of the graph. -->
+    <div class="graph-wrapper">
+        <div style="height:calc(100vh - 60px);" ref="containerRef" class="graph-container"><!-- The size of the parent element determines the size of the graph. -->
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
@@ -208,3 +208,27 @@ onMounted(async () => {
     }
 })
 </script>
+<style scoped>
+.graph-wrapper {
+    /*padding: 4px; /* Отступ для рамки */
+    /*background: linear-gradient(145deg, #f0f0f0 0%, #ffffff 100%);
+    border-radius: 16px;
+    /*box-shadow: 0 10px 30px rgba(0,0,0,0.1);*/
+}
+
+.graph-container {
+    width: 100%;
+    height: calc(100vh - 60px);
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #fafafa;
+    /*box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);*/
+}
+
+/* Для более темной темы */
+.graph-container.dark {
+    border-color: #404040;
+    background-color: #1e1e1e;
+}
+</style>
