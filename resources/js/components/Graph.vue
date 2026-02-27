@@ -1,13 +1,26 @@
 <template>
     <div class="graph-wrapper">
-        <div style="height:calc(100vh - 60px);" ref="containerRef" class="graph-container">
-            <!-- The size of the parent element determines the size of the graph. -->
+        <div ref="containerRef" class="graph-container">
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
                 :on-node-click="onNodeClick"
                 :on-line-click="onLineClick"
-            />
+            >
+                <!-- Кастомный слот для узлов -->
+                <template #node="{ node }">
+                    <div class="custom-node" :style="getNodeStyle(node)">
+                        <div class="node-image">
+                            <img
+                                :src="getThumbUrl(node.id)"
+                                :alt="node.text"
+                                @error="handleImageError"
+                            />
+                        </div>
+                        <div class="node-text">{{ node.text }}</div>
+                    </div>
+                </template>
+            </RelationGraph>
         </div>
     </div>
 </template>
@@ -15,8 +28,8 @@
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
 import {inject, nextTick, onMounted, ref, watch} from 'vue'
-import {useRouter} from 'vue-router'
-import {useI18n} from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 
 const getThumbUrl = inject('getThumbUrl');
@@ -29,15 +42,16 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const {t} = useI18n()
+const { t } = useI18n()
 const graphRef = ref(null)
+const containerRef = ref(null)
 
 const graphOptions = {
-    /*defaultJunctionPoint: 'border',
     // Here you can refer to the options in "Graph" for setting:
     // https://www.relation-graph.com/#/docs/graph
     // You can also use this GUI tool to generate configuration content.
     // https://www.relation-graph.com/#/options-tools
+    defaultJunctionPoint: 'border',
     defaultLineColor: '#99b3ff',
     defaultNodeColor: '#4a6bff',
     defaultNodeBorderColor: '#1e3b8a',
@@ -45,23 +59,25 @@ const graphOptions = {
     defaultLineShape: 4,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
-    defaultNodeHeight: 60,*/
-    "defaultNodeShape": 1,
-    allowShowDownloadButton: true,
-    allowShowFullscreenButton: true,
-    moveToCenterWhenChange: true,
-    zoomToFitWhenChange: true,
-    /*    layout: {
-            layoutName: 'tree',
-            maxLevel: 2
-        },*/
-    // Фиксируем область просмотра
-    /*    viewPadding: {
-            top: 50,
-            left: 50
-        }*/
+    defaultNodeHeight: 80, // Увеличил высоту для картинки
+    allowShowDownloadButton: false,
+    allowShowFullscreenButton: false,
+    moveToCenterWhenChange: false,
+    zoomToFitWhenChange: false,
+    layout: {
+        layoutName: 'tree',
+        maxLevel: 2
+    }
 }
 
+
+// Обработка ошибок загрузки изображений
+const handleImageError = (event) => {
+    event.target.src = '/default-placeholder.jpg'; // Замените на ваш плейсхолдер
+    event.target.style.opacity = '0.5';
+};
+
+// Стили для узла
 const getNodeStyle = (node) => {
     return {
         background: node.color || '#4a6bff',
@@ -72,16 +88,19 @@ const getNodeStyle = (node) => {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         width: '100%',
         height: '100%',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        transition: 'transform 0.2s, box-shadow 0.2s'
     };
 };
 
-const onNodeClick = (nodeObject, $event) => {
-    console.log('onNodeClick:', nodeObject)
-    if (nodeObject.id && nodeObject.data?.type !== 'link_type') {
-        router.push({name: 'object', params: {uid: nodeObject.id}})
+const onNodeClick = (node, event) => {
+    console.log('onNodeClick:', node)
+    if (node.id && node.data?.type !== 'link_type') {
+        router.push({name: 'object', params: {uid: node.id}})
     }
 }
 
@@ -103,6 +122,8 @@ const buildGraphData = (object) => {
         color: '#4a6bff',
         borderColor: '#1e3b8a',
         fontColor: '#ffffff',
+        width: 150,
+        height: 100, // Увеличен для картинки
         data: object
     })
     nodeIds.add(object.thing_id)
@@ -116,6 +137,8 @@ const buildGraphData = (object) => {
                 color: '#6c757d',
                 borderColor: '#495057',
                 fontColor: '#ffffff',
+                width: 130,
+                height: 90,
                 data: object.class
             })
             nodeIds.add(object.class.thing_id)
@@ -158,13 +181,13 @@ const buildGraphData = (object) => {
             }
 
             // Связь
-            lines.push({
+                lines.push({
                 id: link.link_id,
                 from: link.one_thing_id,
                 to: link.other_thing_id,
                 text: link.translation || t('connected'),
-                color: '#28a745'
-            })
+                    color: '#28a745'
+                })
 
         })
     }
@@ -198,7 +221,16 @@ const updateGraph = async () => {
     })
 }
 
-// Следим за объектом
+// Публичный метод для обновления данных
+const updateData = async (newObject) => {
+    if (!newObject || !graphRef.value) return
+    await updateGraph()
+}
+
+defineExpose({
+    updateData
+})
+
 watch(() => props.object, async (newObject) => {
     if (newObject) {
         await nextTick()
@@ -213,27 +245,61 @@ onMounted(async () => {
     }
 })
 </script>
+
 <style scoped>
 .graph-wrapper {
-    /*padding: 4px; /* Отступ для рамки */
-    /*background: linear-gradient(145deg, #f0f0f0 0%, #ffffff 100%);
-    border-radius: 16px;
-    /*box-shadow: 0 10px 30px rgba(0,0,0,0.1);*/
+    width: 100%;
+    height: 100%;
 }
 
 .graph-container {
     width: 100%;
-    height: calc(100vh - 60px);
-    border: 2px solid #e0e0e0;
-    border-radius: 12px;
+    height: 500px;
+    border-radius: 8px;
     overflow: hidden;
-    background-color: #fafafa;
-    /*box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);*/
+    background-color: #f8f9fa;
 }
 
-/* Для более темной темы */
-.graph-container.dark {
-    border-color: #404040;
-    background-color: #1e1e1e;
+/* Стили для кастомного узла */
+:deep(.custom-node) {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+:deep(.custom-node:hover) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+:deep(.node-image) {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 5px;
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.node-image img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+:deep(.node-text) {
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    word-break: break-word;
+    max-width: 100%;
+    padding: 0 2px;
+}
+
+/* Адаптивная высота */
+@media (min-height: 800px) {
+    .graph-container {
+        height: 600px;
+    }
 }
 </style>
