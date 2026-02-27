@@ -13,9 +13,9 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import {ref, watch, onMounted} from 'vue'
-import {useRouter} from 'vue-router'
-import {useI18n} from 'vue-i18n'
+import { ref, watch, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
     object: {
@@ -25,11 +25,11 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const {t} = useI18n()
+const { t } = useI18n()
 const graphRef = ref(null)
 
 const graphOptions = {
-    defaultJunctionPoint: 'border'
+    /*defaultJunctionPoint: 'border',
     // Here you can refer to the options in "Graph" for setting:
     // https://www.relation-graph.com/#/docs/graph
     // You can also use this GUI tool to generate configuration content.
@@ -41,21 +41,26 @@ const graphOptions = {
     defaultLineShape: 4,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
-    defaultNodeHeight: 60,
-    allowShowDownloadButton: false,
-    allowShowFullscreenButton: false,
+    defaultNodeHeight: 60,*/
+    allowShowDownloadButton: true,
+    allowShowFullscreenButton: true,
     moveToCenterWhenChange: true,
     zoomToFitWhenChange: true,
-    layout: {
+/*    layout: {
         layoutName: 'tree',
         maxLevel: 2
-    }
+    },*/
+    // Фиксируем область просмотра
+/*    viewPadding: {
+        top: 50,
+        left: 50
+    }*/
 }
 
 const onNodeClick = (nodeObject, $event) => {
     console.log('onNodeClick:', nodeObject)
     if (nodeObject.id && nodeObject.data?.type !== 'link_type') {
-        router.push({name: 'object', params: {uid: nodeObject.id}})
+        router.push({ name: 'object', params: { uid: nodeObject.id } })
     }
 }
 
@@ -64,7 +69,7 @@ const onLineClick = (lineObject, $event) => {
 }
 
 const buildGraphData = (object) => {
-    if (!object) return {nodes: [], lines: []}
+    if (!object) return { nodes: [], lines: [] }
 
     const nodes = []
     const lines = []
@@ -128,7 +133,7 @@ const buildGraphData = (object) => {
                     color: '#ffc107',
                     borderColor: '#d39e00',
                     fontColor: '#212529',
-                    data: {type: 'link_type', id: link.link_type_id}
+                    data: { type: 'link_type', id: link.link_type_id }
                 })
                 nodeIds.add(link.link_type_id)
             }
@@ -159,11 +164,10 @@ const buildGraphData = (object) => {
         })
     }
 
-    return {nodes, lines}
+    return { nodes, lines }
 }
 
-// Функция для обновления графа
-const updateGraph = () => {
+const updateGraph = async () => {
     if (!graphRef.value || !props.object) return
 
     const graphData = buildGraphData(props.object)
@@ -172,23 +176,33 @@ const updateGraph = () => {
 
     console.log('Updating graph with data:', graphData)
 
-    graphRef.value.setJsonData({
+    // Загружаем данные
+    await graphRef.value.setJsonData({
         rootId: props.object.thing_id,
         nodes: graphData.nodes,
         lines: graphData.lines
-    }, (instance) => {
-        console.log('Graph updated successfully')
+    }, async (instance) => {
+        // Этот колбэк вызывается после завершения загрузки
+        console.log('Graph loaded, setting zoom')
+
+        // Только центрируем, без масштабирования
+        await instance.moveToCenter()
+
+        // Не используем zoomToFit, просто центрируем
+        console.log('Graph centered')
     })
 }
 
 // Следим за объектом
-watch(() => props.object, (newObject) => {
+watch(() => props.object, async (newObject) => {
     if (newObject) {
+        await nextTick()
         updateGraph()
     }
-}, {immediate: true, deep: true})
+}, { immediate: true, deep: true })
 
-onMounted(() => {
+onMounted(async () => {
+    await nextTick()
     if (props.object) {
         updateGraph()
     }

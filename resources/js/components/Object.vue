@@ -141,7 +141,7 @@
                 </div>
 
                 <!-- Graph Tab Content -->
-                <div v-show="activeTab === 'graph'" class="tab-content">
+                <div v-if="activeTab === 'graph'" class="tab-content">
                     <Graph :object="object" />
                 </div>
             </div>
