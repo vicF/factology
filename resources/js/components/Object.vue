@@ -203,6 +203,10 @@ import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
+import { inject } from 'vue';
+
+// Просто инжектим функцию
+const getThumbUrl = inject('getThumbUrl');
 
 // Props definition
 const props = defineProps({
@@ -239,11 +243,6 @@ const graphComponentRef = ref(null);
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
 
-// Methods
-const getThumbUrl = (thing_id) => {
-    if (!thing_id) return ''; // Return empty string if no ID provided
-    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
-};
 
 const getObject = async () => {
     try {
@@ -442,9 +441,10 @@ watch(activeTab, (newTab) => {
 
 // Если нужно обновить граф при изменении объекта (но не пересоздавать)
 watch(() => object.value, (newObject) => {
-    if (graphInitialized.value && graphComponent.value) {
-        // Обновляем данные графа без пересоздания
-        graphComponent.value.updateData(newObject)
+    // Используем правильное имя - graphComponentRef
+    if (graphInitialized.value && graphComponentRef.value && newObject) {
+        console.log('Object changed, updating graph data')
+        graphComponentRef.value.updateData(newObject)
     }
 }, { deep: true })
 </script>

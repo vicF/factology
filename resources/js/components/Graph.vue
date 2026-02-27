@@ -1,6 +1,7 @@
 <template>
     <div class="graph-wrapper">
-        <div style="height:calc(100vh - 60px);" ref="containerRef" class="graph-container"><!-- The size of the parent element determines the size of the graph. -->
+        <div style="height:calc(100vh - 60px);" ref="containerRef" class="graph-container">
+            <!-- The size of the parent element determines the size of the graph. -->
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
@@ -13,9 +14,12 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import { ref, watch, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import {inject, nextTick, onMounted, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
+
+
+const getThumbUrl = inject('getThumbUrl');
 
 const props = defineProps({
     object: {
@@ -25,7 +29,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const { t } = useI18n()
+const {t} = useI18n()
 const graphRef = ref(null)
 
 const graphOptions = {
@@ -42,25 +46,42 @@ const graphOptions = {
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
     defaultNodeHeight: 60,*/
+    "defaultNodeShape": 1,
     allowShowDownloadButton: true,
     allowShowFullscreenButton: true,
     moveToCenterWhenChange: true,
     zoomToFitWhenChange: true,
-/*    layout: {
-        layoutName: 'tree',
-        maxLevel: 2
-    },*/
+    /*    layout: {
+            layoutName: 'tree',
+            maxLevel: 2
+        },*/
     // Фиксируем область просмотра
-/*    viewPadding: {
-        top: 50,
-        left: 50
-    }*/
+    /*    viewPadding: {
+            top: 50,
+            left: 50
+        }*/
 }
+
+const getNodeStyle = (node) => {
+    return {
+        background: node.color || '#4a6bff',
+        border: `2px solid ${node.borderColor || '#1e3b8a'}`,
+        color: node.fontColor || '#ffffff',
+        borderRadius: '8px',
+        padding: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box'
+    };
+};
 
 const onNodeClick = (nodeObject, $event) => {
     console.log('onNodeClick:', nodeObject)
     if (nodeObject.id && nodeObject.data?.type !== 'link_type') {
-        router.push({ name: 'object', params: { uid: nodeObject.id } })
+        router.push({name: 'object', params: {uid: nodeObject.id}})
     }
 }
 
@@ -69,7 +90,7 @@ const onLineClick = (lineObject, $event) => {
 }
 
 const buildGraphData = (object) => {
-    if (!object) return { nodes: [], lines: [] }
+    if (!object) return {nodes: [], lines: []}
 
     const nodes = []
     const lines = []
@@ -113,58 +134,42 @@ const buildGraphData = (object) => {
     if (object.links && Array.isArray(object.links)) {
         object.links.forEach((link, index) => {
             // Связанный объект
-            if (link.thing_id && !nodeIds.has(link.thing_id)) {
+            if (!nodeIds.has(link.one_thing_id)) {
                 nodes.push({
-                    id: link.thing_id,
+                    id: link.one_thing_id,
+                    text: link.name || t('Class'),
+                    color: '#6c757d',
+                    borderColor: '#495057',
+                    fontColor: '#ffffff',
+                    data: object.class
+                })
+                nodeIds.add(object.class.thing_id)
+            }
+            if (!nodeIds.has(link.other_thing_id)) {
+                nodes.push({
+                    id: link.other_thing_id,
                     text: link.name || t('Linked object'),
                     color: '#28a745',
                     borderColor: '#1e7e34',
                     fontColor: '#ffffff',
                     data: link
                 })
-                nodeIds.add(link.thing_id)
+                nodeIds.add(link.other_thing_id)
             }
 
-            // Тип связи
-            if (link.link_type_id && !nodeIds.has(link.link_type_id)) {
-                nodes.push({
-                    id: link.link_type_id,
-                    text: link.link_type_name || t('Link type'),
-                    color: '#ffc107',
-                    borderColor: '#d39e00',
-                    fontColor: '#212529',
-                    data: { type: 'link_type', id: link.link_type_id }
-                })
-                nodeIds.add(link.link_type_id)
-            }
+            // Связь
+            lines.push({
+                id: link.link_id,
+                from: link.one_thing_id,
+                to: link.other_thing_id,
+                text: link.translation || t('connected'),
+                color: '#28a745'
+            })
 
-            // Связь между главным объектом и связанным
-            if (link.thing_id) {
-                lines.push({
-                    id: `link-${index}-${link.link_id || ''}`,
-                    from: object.thing_id,
-                    to: link.thing_id,
-                    text: link.link_type_name || t('connected'),
-                    color: '#28a745'
-                })
-            }
-
-            // Связь между связанным объектом и типом связи
-            if (link.thing_id && link.link_type_id) {
-                lines.push({
-                    id: `link-type-${index}-${link.link_id || ''}`,
-                    from: link.thing_id,
-                    to: link.link_type_id,
-                    text: t('uses type'),
-                    color: '#ffc107',
-                    lineShape: 2,
-                    lineDash: [5, 3]
-                })
-            }
         })
     }
 
-    return { nodes, lines }
+    return {nodes, lines}
 }
 
 const updateGraph = async () => {
@@ -199,7 +204,7 @@ watch(() => props.object, async (newObject) => {
         await nextTick()
         updateGraph()
     }
-}, { immediate: true, deep: true })
+}, {immediate: true, deep: true})
 
 onMounted(async () => {
     await nextTick()
