@@ -144,7 +144,7 @@
                 <div v-show="activeTab === 'graph'" class="tab-content">
                     <Graph
                         v-if="graphInitialized"
-                        ref="graphComponent"
+                        ref="graphComponentRef"
                         :object="object"
                     />
                 </div>
@@ -432,11 +432,16 @@ watch(() => route.params.uid, (newUid) => {
 });
 
 watch(activeTab, (newTab) => {
-    if (newTab === 'graph' && !graphInitialized.value) {
-        // При первом переключении на граф - инициализируем
-        console.log('First time opening graph tab, initializing...')
-        graphInitialized.value = true
+    if (newTab === 'graph') {
+        if (!graphInitialized.value) {
+            // При первом переключении на граф - инициализируем
+            console.log('First time opening graph tab, initializing...')
+            graphInitialized.value = true
+        } else {
+            graphComponentRef.value.refreshView();
+        }
     }
+
 }, { immediate: true }) // immediate, чтобы проверить, может мы уже на вкладке графа при загрузке
 
 // Если нужно обновить граф при изменении объекта (но не пересоздавать)
@@ -447,6 +452,7 @@ watch(() => object.value, (newObject) => {
         graphComponentRef.value.updateData(newObject)
     }
 }, { deep: true })
+
 </script>
 
 <style scoped>

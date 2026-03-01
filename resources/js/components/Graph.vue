@@ -146,9 +146,9 @@ const buildGraphData = (object) => {
 
         lines.push({
             id: `class-${object.thing_id}-${object.class.thing_id}`,
-            from: object.thing_id,
-            to: object.class.thing_id,
-            text: t('is a'),
+            from: object.class.thing_id,
+            to: object.thing_id,
+            text: t('is'),
             color: '#6c757d'
         })
     }
@@ -166,7 +166,7 @@ const buildGraphData = (object) => {
                     fontColor: '#ffffff',
                     data: object.class
                 })
-                nodeIds.add(object.class.thing_id)
+                nodeIds.add(link.one_thing_id)
             }
             if (!nodeIds.has(link.other_thing_id)) {
                 nodes.push({
@@ -183,8 +183,8 @@ const buildGraphData = (object) => {
             // Связь
                 lines.push({
                 id: link.link_id,
-                from: link.one_thing_id,
-                to: link.other_thing_id,
+                from: link.other_thing_id,
+                to: link.one_thing_id,
                 text: link.translation || t('connected'),
                     color: '#28a745'
                 })
@@ -227,8 +227,47 @@ const updateData = async (newObject) => {
     await updateGraph()
 }
 
+// Публичный метод, который делает то же, что и кнопка "刷新"
+const refreshView = () => {
+    console.log('1. refreshView called');
+
+    if (!graphRef.value) {
+        console.log('2. graphRef.value is null');
+        return;
+    }
+
+    console.log('3. graphRef.value exists', graphRef.value);
+
+    const instance = graphRef.value.getInstance();
+    console.log('4. instance:', instance);
+
+    if (instance) {
+        console.log('5. instance methods:', Object.keys(instance));
+
+        if (typeof instance.refresh === 'function') {
+            console.log('6. refresh is a function, calling it');
+            instance.refresh();
+            console.log('7. refresh called successfully');
+        } else {
+            console.log('6. refresh is NOT a function', instance.refresh);
+
+            // Попробуем альтернативные методы
+            if (typeof instance.doLayout === 'function') {
+                console.log('Trying doLayout + moveToCenter + zoomToFit');
+                instance.doLayout().then(() => {
+                    instance.moveToCenter();
+                    instance.zoomToFit(20);
+                });
+            }
+        }
+    } else {
+        console.log('5. instance is null');
+    }
+};
+
 defineExpose({
-    updateData
+    updateData,
+    refreshView
 })
 
 watch(() => props.object, async (newObject) => {
