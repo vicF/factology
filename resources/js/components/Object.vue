@@ -194,7 +194,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -225,7 +225,9 @@ const cacheStore = useObjectCacheStore();
 // State
 const object = ref(null);
 const loaded = ref(false);
-const activeTab = ref('details'); // 'details' or 'graph'
+
+// Глобальное состояние вкладки - читаем из localStorage при инициализации
+const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
 
 // Modals
 const showEditModal = ref(false);
@@ -242,7 +244,6 @@ const graphComponentRef = ref(null);
 
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
-
 
 const getObject = async () => {
     try {
@@ -417,41 +418,66 @@ const linkRecords = computed(() => {
 
 // Lifecycle
 onMounted(() => {
+    // Если сохранена вкладка графа, инициализируем его
+    if (activeTab.value === 'graph') {
+        graphInitialized.value = true;
+    }
+
     getObject();
 });
 
 // Watchers
-watch(() => route.params.uid, (newUid) => {
-    if (newUid) {
+watch(() => route.params.uid, (newUid, oldUid) => {
+    if (newUid && newUid !== oldUid) {
         // Reset state when navigating to a new object
         object.value = null;
         loaded.value = false;
-        activeTab.value = 'details'; // Reset to details tab when changing objects
+
+        // НЕ сбрасываем activeTab - сохраняем глобальное состояние
+
         getObject();
     }
 });
 
+// Сохраняем глобальное состояние вкладки при изменении
 watch(activeTab, (newTab) => {
+    localStorage.setItem('globalActiveTab', newTab);
+    console.log('Saved global tab state:', newTab);
+
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
-            // При первом переключении на граф - инициализируем
-            console.log('First time opening graph tab, initializing...')
-            graphInitialized.value = true
+            // First time opening graph tab - initialize
+            console.log('First time opening graph tab, initializing...');
+            graphInitialized.value = true;
         } else {
-            graphComponentRef.value.refreshView();
+            // Graph already exists, just refresh the view
+            console.log('Refreshing existing graph view');
+            // Wait for next tick to ensure DOM is ready
+            nextTick(() => {
+                if (graphComponentRef.value) {
+                    graphComponentRef.value.refreshView();
+                }
+            });
         }
     }
+}, { immediate: true });
 
-}, { immediate: true }) // immediate, чтобы проверить, может мы уже на вкладке графа при загрузке
-
-// Если нужно обновить граф при изменении объекта (но не пересоздавать)
+// Update graph when object changes (but don't recreate)
 watch(() => object.value, (newObject) => {
-    // Используем правильное имя - graphComponentRef
     if (graphInitialized.value && graphComponentRef.value && newObject) {
-        console.log('Object changed, updating graph data')
-        graphComponentRef.value.updateData(newObject)
+        console.log('Object changed, updating graph data');
+        graphComponentRef.value.updateData(newObject);
+
+        // If graph tab is active, refresh view after update
+        if (activeTab.value === 'graph') {
+            setTimeout(() => {
+                if (graphComponentRef.value) {
+                    graphComponentRef.value.refreshView();
+                }
+            }, 200);
+        }
     }
-}, { deep: true })
+}, { deep: true });
 
 </script>
 
