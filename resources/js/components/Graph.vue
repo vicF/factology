@@ -11,8 +11,9 @@
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
                         <div class="node-image">
+                            <!-- Image компонент только для картинки -->
                             <Image
-                                :node="node"
+                                :node-id="node.id"
                                 :alt="node.text"
                             />
                         </div>
@@ -26,11 +27,10 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import {inject, nextTick, onMounted, ref, watch} from 'vue'
+import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Image from "./Image.vue";
-
+import Image from './Image.vue'
 
 const getThumbUrl = inject('getThumbUrl');
 
@@ -47,10 +47,6 @@ const graphRef = ref(null)
 const containerRef = ref(null)
 
 const graphOptions = {
-    // Here you can refer to the options in "Graph" for setting:
-    // https://www.relation-graph.com/#/docs/graph
-    // You can also use this GUI tool to generate configuration content.
-    // https://www.relation-graph.com/#/options-tools
     defaultJunctionPoint: 'border',
     defaultLineColor: '#99b3ff',
     defaultNodeColor: '#4a6bff',
@@ -60,7 +56,7 @@ const graphOptions = {
     defaultLineShape: 1,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
-    defaultNodeHeight: 80, // Увеличил высоту для картинки
+    defaultNodeHeight: 80,
     allowShowDownloadButton: false,
     allowShowFullscreenButton: false,
     moveToCenterWhenChange: false,
@@ -68,39 +64,12 @@ const graphOptions = {
     layout: {
         layoutName: 'force',
         maxLevel: 3,
-        "distance_coefficient": 1,
-        "from": "top",
-        "force_node_repulsion": 1,
-        "force_line_elastic": 1
+        distance_coefficient: 1,
+        from: 'top',
+        force_node_repulsion: 1,
+        force_line_elastic: 1
     }
 }
-
-
-// Обработка ошибок загрузки изображений
-const handleImageError = (event) => {
-    event.target.src = '/default-placeholder.jpg'; // Замените на ваш плейсхолдер
-    event.target.style.opacity = '0.5';
-};
-
-// Стили для узла
-const getNodeStyle = (node) => {
-    return {
-        background: node.color || '#4a6bff',
-        border: `2px solid ${node.borderColor || '#1e3b8a'}`,
-        color: node.fontColor || '#ffffff',
-        //borderRadius: '8px',
-        padding: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
-        boxSizing: 'border-box',
-        cursor: 'pointer',
-        transition: 'transform 0.2s, box-shadow 0.2s'
-    };
-};
 
 const onNodeClick = (node, event) => {
     console.log('onNodeClick:', node)
@@ -111,6 +80,24 @@ const onNodeClick = (node, event) => {
 
 const onLineClick = (lineObject, $event) => {
     console.log('onLineClick:', lineObject)
+}
+
+const getNodeStyle = (node) => {
+    return {
+        background: node.color || '#4a6bff',
+        border: `2px solid ${node.borderColor || '#1e3b8a'}`,
+        color: node.fontColor || '#ffffff',
+        padding: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        transition: 'transform 0.2s, box-shadow 0.2s'
+    }
 }
 
 const buildGraphData = (object) => {
@@ -128,7 +115,7 @@ const buildGraphData = (object) => {
         borderColor: '#1e3b8a',
         fontColor: '#ffffff',
         width: 150,
-        height: 100, // Увеличен для картинки
+        height: 100,
         data: object
     })
     nodeIds.add(object.thing_id)
@@ -160,8 +147,7 @@ const buildGraphData = (object) => {
 
     // Связанные объекты
     if (object.links && Array.isArray(object.links)) {
-        object.links.forEach((link, index) => {
-            // Связанный объект
+        object.links.forEach((link) => {
             if (!nodeIds.has(link.one_thing_id)) {
                 nodes.push({
                     id: link.one_thing_id,
@@ -185,15 +171,13 @@ const buildGraphData = (object) => {
                 nodeIds.add(link.other_thing_id)
             }
 
-            // Связь
-                lines.push({
+            lines.push({
                 id: link.link_id,
                 from: link.other_thing_id,
                 to: link.one_thing_id,
                 text: link.translation || t('connected'),
-                    color: '#28a745'
-                })
-
+                color: '#28a745'
+            })
         })
     }
 
@@ -209,70 +193,27 @@ const updateGraph = async () => {
 
     console.log('Updating graph with data:', graphData)
 
-    // Загружаем данные
     await graphRef.value.setJsonData({
         rootId: props.object.thing_id,
         nodes: graphData.nodes,
         lines: graphData.lines
     }, async (instance) => {
-        // Этот колбэк вызывается после завершения загрузки
         console.log('Graph loaded, setting zoom')
-
-        // Только центрируем, без масштабирования
         await instance.moveToCenter()
-
-        // Не используем zoomToFit, просто центрируем
         console.log('Graph centered')
     })
 }
 
-// Публичный метод для обновления данных
-const updateData = async (newObject) => {
-    if (!newObject || !graphRef.value) return
-    await updateGraph()
-}
-
-// Публичный метод, который делает то же, что и кнопка "刷新"
-const refreshView = () => {
-    console.log('1. refreshView called');
-
-    if (!graphRef.value) {
-        console.log('2. graphRef.value is null');
-        return;
-    }
-
-    console.log('3. graphRef.value exists', graphRef.value);
-
-    const instance = graphRef.value.getInstance();
-    console.log('4. instance:', instance);
-
-    if (instance) {
-        console.log('5. instance methods:', Object.keys(instance));
-
-        if (typeof instance.refresh === 'function') {
-            console.log('6. refresh is a function, calling it');
-            instance.refresh();
-            console.log('7. refresh called successfully');
-        } else {
-            console.log('6. refresh is NOT a function', instance.refresh);
-
-            // Попробуем альтернативные методы
-            if (typeof instance.doLayout === 'function') {
-                console.log('Trying doLayout + moveToCenter + zoomToFit');
-                instance.doLayout().then(() => {
-                    instance.moveToCenter();
-                    instance.zoomToFit(20);
-                });
+defineExpose({
+    updateData: updateGraph,
+    refreshView: () => {
+        if (graphRef.value) {
+            const instance = graphRef.value.getInstance()
+            if (instance && typeof instance.refresh === 'function') {
+                instance.refresh()
             }
         }
-    } else {
-        console.log('5. instance is null');
     }
-};
-
-defineExpose({
-    updateData,
-    refreshView
 })
 
 watch(() => props.object, async (newObject) => {
@@ -304,34 +245,17 @@ onMounted(async () => {
     background-color: #f8f9fa;
 }
 
-/* Стили для кастомного узла */
-:deep(.custom-node) {
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-:deep(.custom-node:hover) {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 10;
-}
-
-:deep(.node-image) {
+.node-image {
     width: 40px;
-    height: 40px;
-    /*border-radius: 50%;*/
-    overflow: hidden;
+    height: 30px;
     margin-bottom: 5px;
     border: 2px solid white;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border-radius: 3px;
 }
 
-:deep(.node-image img) {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-:deep(.node-text) {
+.node-text {
     font-size: 12px;
     font-weight: bold;
     text-align: center;
@@ -340,7 +264,6 @@ onMounted(async () => {
     padding: 0 2px;
 }
 
-/* Адаптивная высота */
 @media (min-height: 800px) {
     .graph-container {
         height: 600px;
