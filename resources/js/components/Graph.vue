@@ -7,6 +7,7 @@
                 :on-node-click="onNodeClick"
                 :on-line-click="onLineClick"
             >
+                <!-- Кастомный слот для узлов -->
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
                         <div class="node-image-area">
@@ -45,6 +46,40 @@ const graphRef = ref(null)
 const containerRef = ref(null)
 const graphWrapperRef = ref(null)
 
+// Функция для расчета высоты графа до низа страницы
+const setGraphHeightToBottom = () => {
+    if (!graphWrapperRef.value) return
+
+    const rect = graphWrapperRef.value.getBoundingClientRect()
+    const viewportHeight = window.innerHeight
+
+    // Высота от текущей позиции до низа страницы минус небольшой отступ
+    const heightToBottom = viewportHeight - rect.top - 20
+
+    console.log('Setting graph height:', {
+        top: rect.top,
+        viewportHeight,
+        heightToBottom
+    })
+
+    // Устанавливаем высоту не меньше 500px
+    if (heightToBottom > 500) {
+        graphWrapperRef.value.style.height = `${heightToBottom}px`
+
+        // Обновляем размер графа
+        if (graphRef.value) {
+            const instance = graphRef.value.getInstance()
+            if (instance && typeof instance.resize === 'function') {
+                setTimeout(() => {
+                    instance.resize()
+                    // После изменения размера центрируем
+                    instance.moveToCenter()
+                }, 100)
+            }
+        }
+    }
+}
+
 const graphOptions = {
     defaultJunctionPoint: 'border',
     defaultLineColor: '#99b3ff',
@@ -55,11 +90,11 @@ const graphOptions = {
     defaultLineShape: 1,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
-    defaultNodeHeight: 100, // Увеличил высоту для картинки
+    defaultNodeHeight: 100,
     allowShowDownloadButton: false,
     allowShowFullscreenButton: false,
-    moveToCenterWhenChange: true, // Центрируем при загрузке
-    zoomToFitWhenChange: false, // НЕ масштабируем автоматически
+    moveToCenterWhenChange: true,
+    zoomToFitWhenChange: false,
     layout: {
         layoutName: 'force',
         maxLevel: 3,
@@ -197,7 +232,7 @@ const updateGraph = async () => {
         nodes: graphData.nodes,
         lines: graphData.lines
     }, async (instance) => {
-        console.log('Graph loaded, setting zoom')
+        console.log('Graph loaded, centering')
         await instance.moveToCenter()
         console.log('Graph centered')
     })
@@ -219,40 +254,46 @@ watch(() => props.object, async (newObject) => {
     if (newObject) {
         await nextTick()
         updateGraph()
+        // После обновления данных пересчитываем высоту
+        setTimeout(setGraphHeightToBottom, 200)
     }
 }, {immediate: true, deep: true})
 
 onMounted(async () => {
     await nextTick()
+
+    // Устанавливаем высоту при монтировании
+    setGraphHeightToBottom()
+
     if (props.object) {
         updateGraph()
     }
 
-    // Добавляем обработчик resize
-    window.addEventListener('resize', () => {
-        if (graphRef.value) {
-            const instance = graphRef.value.getInstance()
-            if (instance && typeof instance.resize === 'function') {
-                instance.resize()
-            }
-        }
-    })
+    // Следим за изменением размеров окна
+    window.addEventListener('resize', setGraphHeightToBottom)
+
+    // Также следим за скроллом, потому что позиция может меняться
+    window.addEventListener('scroll', setGraphHeightToBottom)
 })
 
 onUnmounted(() => {
-    window.removeEventListener('resize', () => {})
+    window.removeEventListener('resize', setGraphHeightToBottom)
+    window.removeEventListener('scroll', setGraphHeightToBottom)
 })
 </script>
 
 <style scoped>
 .graph-wrapper {
     width: 100%;
-    height: 600px; /* Фиксированная высота */
-    min-height: 600px;
     position: relative;
+    transition: height 0.2s ease;
+    min-height: 600px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    overflow: hidden; /* Важно: скрываем только то, что выходит за границы контейнера */
+    overflow: hidden;
+    margin: 10px 0;
+    height: auto;
+    /* Важно: граф будет позиционироваться относительно своего места */
 }
 
 .graph-container {
@@ -261,7 +302,7 @@ onUnmounted(() => {
     background-color: #f8f9fa;
 }
 
-/* Стили для кастомного узла */
+/* Стили для узлов */
 .custom-node {
     display: flex;
     flex-direction: column;
@@ -300,18 +341,5 @@ onUnmounted(() => {
     max-width: 100%;
     padding: 0 2px;
     color: inherit;
-}
-
-/* Адаптивная высота для больших экранов */
-@media (min-height: 800px) {
-    .graph-wrapper {
-        height: 700px;
-    }
-}
-
-@media (min-height: 1000px) {
-    .graph-wrapper {
-        height: 800px;
-    }
 }
 </style>
