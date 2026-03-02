@@ -21,6 +21,10 @@ export default defineConfig({
         watch: {
             usePolling: true,          // Критически важно
             interval: 1000,             // Проверка раз в секунду
+            awaitWriteFinish: {
+                stabilityThreshold: 500,  // Увеличим до 500мс
+                pollInterval: 100
+            }
         },
     },
 });
