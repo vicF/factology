@@ -11,10 +11,9 @@
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
                         <div class="node-image">
-                            <img
-                                :src="getThumbUrl(node.id)"
+                            <Image
+                                :node="node"
                                 :alt="node.text"
-                                @error="handleImageError"
                             />
                         </div>
                         <div class="node-text">{{ node.text }}</div>
@@ -30,6 +29,7 @@ import RelationGraph from 'relation-graph-vue3'
 import {inject, nextTick, onMounted, ref, watch} from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import Image from "./Image.vue";
 
 
 const getThumbUrl = inject('getThumbUrl');
