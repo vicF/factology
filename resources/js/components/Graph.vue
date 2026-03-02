@@ -1,5 +1,5 @@
 <template>
-    <div class="graph-wrapper">
+    <div class="graph-wrapper" ref="graphWrapperRef">
         <div ref="containerRef" class="graph-container">
             <RelationGraph
                 ref="graphRef"
@@ -7,11 +7,9 @@
                 :on-node-click="onNodeClick"
                 :on-line-click="onLineClick"
             >
-                <!-- Кастомный слот для узлов -->
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
-                        <div class="node-image">
-                            <!-- Image компонент только для картинки -->
+                        <div class="node-image-area">
                             <Image
                                 :node-id="node.id"
                                 :alt="node.text"
@@ -27,7 +25,7 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import { inject, nextTick, onMounted, ref, watch } from 'vue'
+import { inject, nextTick, onMounted, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Image from './Image.vue'
@@ -45,6 +43,7 @@ const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
 const containerRef = ref(null)
+const graphWrapperRef = ref(null)
 
 const graphOptions = {
     defaultJunctionPoint: 'border',
@@ -56,11 +55,11 @@ const graphOptions = {
     defaultLineShape: 1,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
-    defaultNodeHeight: 80,
+    defaultNodeHeight: 100, // Увеличил высоту для картинки
     allowShowDownloadButton: false,
     allowShowFullscreenButton: false,
-    moveToCenterWhenChange: false,
-    zoomToFitWhenChange: false,
+    moveToCenterWhenChange: true, // Центрируем при загрузке
+    zoomToFitWhenChange: false, // НЕ масштабируем автоматически
     layout: {
         layoutName: 'force',
         maxLevel: 3,
@@ -228,31 +227,69 @@ onMounted(async () => {
     if (props.object) {
         updateGraph()
     }
+
+    // Добавляем обработчик resize
+    window.addEventListener('resize', () => {
+        if (graphRef.value) {
+            const instance = graphRef.value.getInstance()
+            if (instance && typeof instance.resize === 'function') {
+                instance.resize()
+            }
+        }
+    })
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', () => {})
 })
 </script>
 
 <style scoped>
 .graph-wrapper {
     width: 100%;
-    height: 100%;
+    height: 600px; /* Фиксированная высота */
+    min-height: 600px;
+    position: relative;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden; /* Важно: скрываем только то, что выходит за границы контейнера */
 }
 
 .graph-container {
     width: 100%;
-    height: 500px;
-    border-radius: 8px;
-    overflow: hidden;
+    height: 100%;
     background-color: #f8f9fa;
 }
 
-.node-image {
-    width: 40px;
-    height: 30px;
-    margin-bottom: 5px;
+/* Стили для кастомного узла */
+.custom-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    padding: 8px;
+}
+
+.custom-node:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+.node-image-area {
+    width: 60px;
+    height: 45px;
     border: 2px solid white;
+    border-radius: 4px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    border-radius: 3px;
+    background-color: #f0f0f0;
+    margin-bottom: 5px;
 }
 
 .node-text {
@@ -262,11 +299,19 @@ onMounted(async () => {
     word-break: break-word;
     max-width: 100%;
     padding: 0 2px;
+    color: inherit;
 }
 
+/* Адаптивная высота для больших экранов */
 @media (min-height: 800px) {
-    .graph-container {
-        height: 600px;
+    .graph-wrapper {
+        height: 700px;
+    }
+}
+
+@media (min-height: 1000px) {
+    .graph-wrapper {
+        height: 800px;
     }
 }
 </style>
