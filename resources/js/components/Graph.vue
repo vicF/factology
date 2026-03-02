@@ -56,7 +56,8 @@ const graphOptions = {
     defaultNodeColor: '#4a6bff',
     defaultNodeBorderColor: '#1e3b8a',
     defaultNodeFontColor: '#ffffff',
-    defaultLineShape: 4,
+    defaultNodeShape: 1,
+    defaultLineShape: 1,
     defaultLineTextColor: '#666666',
     defaultNodeWidth: 120,
     defaultNodeHeight: 80, // Увеличил высоту для картинки
@@ -65,8 +66,12 @@ const graphOptions = {
     moveToCenterWhenChange: false,
     zoomToFitWhenChange: false,
     layout: {
-        layoutName: 'tree',
-        maxLevel: 2
+        layoutName: 'force',
+        maxLevel: 3,
+        "distance_coefficient": 1,
+        "from": "top",
+        "force_node_repulsion": 1,
+        "force_line_elastic": 1
     }
 }
 
@@ -83,7 +88,7 @@ const getNodeStyle = (node) => {
         background: node.color || '#4a6bff',
         border: `2px solid ${node.borderColor || '#1e3b8a'}`,
         color: node.fontColor || '#ffffff',
-        borderRadius: '8px',
+        //borderRadius: '8px',
         padding: '8px',
         display: 'flex',
         flexDirection: 'column',
@@ -313,7 +318,7 @@ onMounted(async () => {
 :deep(.node-image) {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    /*border-radius: 50%;*/
     overflow: hidden;
     margin-bottom: 5px;
     border: 2px solid white;
