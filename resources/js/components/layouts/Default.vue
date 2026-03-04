@@ -72,6 +72,16 @@ import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import axios from 'axios'
+import { provide } from 'vue';
+
+// Маленькая функция для получения URL картинки
+const getThumbUrl = (thing_id) => {
+    if (!thing_id) return '';
+    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
+};
+
+// Делаем функцию доступной для всех дочерних компонентов
+provide('getThumbUrl', getThumbUrl);
 
 const router = useRouter()
 const route  = useRoute()

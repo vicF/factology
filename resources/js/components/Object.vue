@@ -45,82 +45,108 @@
                     </button>
                 </h1>
 
-                <div class="col-md-10 col-md-offset-1">
-                    <div class="row rounded border p-3 rounded-4">
-                        <div class="col-md-2" style="font-size: x-small">
-                            <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
-                            </RouterLink>
-                        </div>
-                        <div class="col-md-10">
-                            <div>{{ $t('Start') }}: {{ object.start ? $dateFromDb(object.start) : '-' }}</div>
-                            <div>{{ $t('End') }}: {{ object.end ? $dateFromDb(object.end) : '-' }}</div>
-                            <div>{{ $t('Description') }}: {{ object.description || '-' }}</div>
-                            <div v-if="object.record_created">{{ $t('Record created') }}: {{ object.record_created }}</div>
-                            <div v-if="object.record_updated">{{ $t('Record updated') }}: {{ object.record_updated }}</div>
-                            <div>{{ $t('Access') }}: {{ object.public ? $t('Public') : $t('Private') }}</div>
-                        </div>
-                    </div>
+                <!-- Bootstrap Tabs with right alignment -->
+                <ul class="nav nav-tabs justify-content-end mb-3">
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{ active: activeTab === 'details' }" @click="activeTab = 'details'" href="#">
+                            {{ $t('Details') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'" href="#">
+                            {{ $t('Graph') }}
+                        </a>
+                    </li>
+                </ul>
 
-                    <!-- class -->
-                    <div class="row p-3" v-if="object.class">
-                        <div class="col-md-2">
-                            <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
-                            </RouterLink>
-                            <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
-                                <img :src="getThumbUrl(object.class.link_type_id)" width="50"/>
-                            </RouterLink>
-                        </div>
-                        <div class="col-md-10">
-                            <div v-if="object.class.name">
-                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                    {{ object.class.name }}
-                                </RouterLink>
-                            </div>
-                            <div v-if="object.class.description">
-                                {{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}
-                            </div>
-                            <div v-if="object.class.translation">{{ object.class.translation }}</div>
-                        </div>
-                    </div>
-
-                    <!-- Going through links -->
-                    <div v-if="object.links && object.links.length">
-                        <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
-                            <div class="col-md-2">
-                                <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                    <img :src="getThumbUrl(link.thing_id)" width="50"/>
-                                </RouterLink>
-                                <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                    <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                <!-- Details Tab Content -->
+                <div v-show="activeTab === 'details'" class="tab-content">
+                    <div class="col-md-10 col-md-offset-1">
+                        <div class="row rounded border p-3 rounded-4">
+                            <div class="col-md-2" style="font-size: x-small">
+                                <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
+                                    <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
-                                <div v-if="link.name">
-                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                        {{ link.name }}
+                                <div>{{ $t('Start') }}: {{ object.start ? $dateFromDb(object.start) : '-' }}</div>
+                                <div>{{ $t('End') }}: {{ object.end ? $dateFromDb(object.end) : '-' }}</div>
+                                <div>{{ $t('Description') }}: {{ object.description || '-' }}</div>
+                                <div v-if="object.record_created">{{ $t('Record created') }}: {{ object.record_created }}</div>
+                                <div v-if="object.record_updated">{{ $t('Record updated') }}: {{ object.record_updated }}</div>
+                                <div>{{ $t('Access') }}: {{ object.public ? $t('Public') : $t('Private') }}</div>
+                            </div>
+                        </div>
+
+                        <!-- class -->
+                        <div class="row p-3" v-if="object.class">
+                            <div class="col-md-2">
+                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
+                                    <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
+                                </RouterLink>
+                                <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
+                                    <img :src="getThumbUrl(object.class.link_type_id)" width="50"/>
+                                </RouterLink>
+                            </div>
+                            <div class="col-md-10">
+                                <div v-if="object.class.name">
+                                    <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
+                                        {{ object.class.name }}
                                     </RouterLink>
                                 </div>
-                                <div v-if="link.start">{{ $t('Start') }}: {{ $dateFromDb(link.start) }}</div>
-                                <div v-if="link.end">{{ $t('End') }}: {{ $dateFromDb(link.end) }}</div>
-                                <div v-if="link.link_start">{{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}</div>
-                                <div v-if="link.link_end">{{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}</div>
-                                <div v-if="link.description">
-                                    {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
+                                <div v-if="object.class.description">
+                                    {{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}
                                 </div>
-                                <div v-if="link.translation">{{ link.translation }}</div>
-                                <div>
-                                    <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
-                                        {{ $t('Delete') }}
-                                    </button>
-                                    <button v-if="authenticated" class="btn btn-primary btn-sm ms-2" @click="openEditLinkModal(link)">
-                                        {{ $t('Edit') }}
-                                    </button>
+                                <div v-if="object.class.translation">{{ object.class.translation }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Going through links -->
+                        <div v-if="object.links && object.links.length">
+                            <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
+                                <div class="col-md-2">
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                        <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                    </RouterLink>
+                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
+                                        <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                    </RouterLink>
+                                </div>
+                                <div class="col-md-10">
+                                    <div v-if="link.name">
+                                        <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                            {{ link.name }}
+                                        </RouterLink>
+                                    </div>
+                                    <div v-if="link.start">{{ $t('Start') }}: {{ $dateFromDb(link.start) }}</div>
+                                    <div v-if="link.end">{{ $t('End') }}: {{ $dateFromDb(link.end) }}</div>
+                                    <div v-if="link.link_start">{{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}</div>
+                                    <div v-if="link.link_end">{{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}</div>
+                                    <div v-if="link.description">
+                                        {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
+                                    </div>
+                                    <div v-if="link.translation">{{ link.translation }}</div>
+                                    <div>
+                                        <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
+                                            {{ $t('Delete') }}
+                                        </button>
+                                        <button v-if="authenticated" class="btn btn-primary btn-sm ms-2" @click="openEditLinkModal(link)">
+                                            {{ $t('Edit') }}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Graph Tab Content -->
+                <div v-show="activeTab === 'graph'" class="tab-content">
+                    <Graph
+                        v-if="graphInitialized"
+                        ref="graphComponentRef"
+                        :object="object"
+                    />
                 </div>
             </div>
         </div>
@@ -168,14 +194,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
-import { useObjectCacheStore } from '@/stores/objectCache.js'
+import { useObjectCacheStore } from '@/stores/objectCache.js';
+import Graph from './Graph.vue';
+import { inject } from 'vue';
+
+// Просто инжектим функцию
+const getThumbUrl = inject('getThumbUrl');
 
 // Props definition
 const props = defineProps({
@@ -195,6 +226,9 @@ const cacheStore = useObjectCacheStore();
 const object = ref(null);
 const loaded = ref(false);
 
+// Глобальное состояние вкладки - читаем из localStorage при инициализации
+const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
+
 // Modals
 const showEditModal = ref(false);
 const showTreeModal = ref(false);
@@ -205,15 +239,11 @@ const editObject = ref(null);
 const modalParams = ref({});
 const treeModalParams = ref({});
 const editingLink = ref(null);
+const graphInitialized = ref(false);
+const graphComponentRef = ref(null);
 
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
-
-// Methods
-const getThumbUrl = (thing_id) => {
-    if (!thing_id) return ''; // Return empty string if no ID provided
-    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
-};
 
 const getObject = async () => {
     try {
@@ -388,18 +418,67 @@ const linkRecords = computed(() => {
 
 // Lifecycle
 onMounted(() => {
+    // Если сохранена вкладка графа, инициализируем его
+    if (activeTab.value === 'graph') {
+        graphInitialized.value = true;
+    }
+
     getObject();
 });
 
 // Watchers
-watch(() => route.params.uid, (newUid) => {
-    if (newUid) {
+watch(() => route.params.uid, (newUid, oldUid) => {
+    if (newUid && newUid !== oldUid) {
         // Reset state when navigating to a new object
         object.value = null;
         loaded.value = false;
+
+        // НЕ сбрасываем activeTab - сохраняем глобальное состояние
+
         getObject();
     }
 });
+
+// Сохраняем глобальное состояние вкладки при изменении
+watch(activeTab, (newTab) => {
+    localStorage.setItem('globalActiveTab', newTab);
+    console.log('Saved global tab state:', newTab);
+
+    if (newTab === 'graph') {
+        if (!graphInitialized.value) {
+            // First time opening graph tab - initialize
+            console.log('First time opening graph tab, initializing...');
+            graphInitialized.value = true;
+        } else {
+            // Graph already exists, just refresh the view
+            console.log('Refreshing existing graph view');
+            // Wait for next tick to ensure DOM is ready
+            nextTick(() => {
+                if (graphComponentRef.value) {
+                    graphComponentRef.value.refreshView();
+                }
+            });
+        }
+    }
+}, { immediate: true });
+
+// Update graph when object changes (but don't recreate)
+watch(() => object.value, (newObject) => {
+    if (graphInitialized.value && graphComponentRef.value && newObject) {
+        console.log('Object changed, updating graph data');
+        graphComponentRef.value.updateData(newObject);
+
+        // If graph tab is active, refresh view after update
+        if (activeTab.value === 'graph') {
+            setTimeout(() => {
+                if (graphComponentRef.value) {
+                    graphComponentRef.value.refreshView();
+                }
+            }, 200);
+        }
+    }
+}, { deep: true });
+
 </script>
 
 <style scoped>
@@ -410,5 +489,26 @@ watch(() => route.params.uid, (newUid) => {
 }
 .btn-success:hover {
     background-color: #218838;
+}
+
+/* Style for right-aligned tabs */
+.nav-tabs {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    cursor: pointer;
+}
+
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: #e9ecef #e9ecef #dee2e6;
+    isolation: isolate;
 }
 </style>
