@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
+        Route::post('/object',                [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
         Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
