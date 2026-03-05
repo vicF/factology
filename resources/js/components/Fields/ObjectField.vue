@@ -26,6 +26,10 @@ const props = defineProps({
     type: {
         type: Number,
         default: THING_TYPE
+    },
+    dropdownMinWidth: {
+        type: String,
+        default: '360px'
     }
 })
 
@@ -44,6 +48,7 @@ const wrapperRef = ref(null)
 const previousDisplay = ref('')
 const searchResults = ref([])
 const dropdownStyles = ref({})
+const isClickingDropdown = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
@@ -76,6 +81,22 @@ const filteredObjects = computed(() => {
     return cacheStore.searchCached('object', term, props.maxResults) || []
 })
 
+// ── Custom click outside handler for teleported dropdown ─────
+const handleClickOutside = (event) => {
+    if (!isOpen.value) return
+
+    // Check if click is on wrapper or its children
+    const isClickOnWrapper = wrapperRef.value?.contains(event.target)
+
+    // Check if click is on dropdown or its children
+    const isClickOnDropdown = dropdownRef.value?.contains(event.target)
+
+    // If click is outside both wrapper and dropdown, close it
+    if (!isClickOnWrapper && !isClickOnDropdown) {
+        closeDropdown()
+    }
+}
+
 // ── Dropdown visibility control ────────────────────────────────
 const calculateDropdownPosition = () => {
     if (!wrapperRef.value) return
@@ -89,8 +110,8 @@ const calculateDropdownPosition = () => {
         top: `${rect.bottom + scrollY + 4}px`,
         left: `${rect.left + scrollX}px`,
         width: `${rect.width}px`,
-        minWidth: '360px',
-        maxWidth: `${Math.min(rect.width, 600)}px`,
+        minWidth: props.dropdownMinWidth,
+        maxWidth: `${rect.width}px`,
         maxHeight: '320px',
         overflowY: 'auto',
         zIndex: 99999,
@@ -103,7 +124,8 @@ const calculateDropdownPosition = () => {
         fontSize: '0.875rem',
         textAlign: 'left',
         listStyle: 'none',
-        backgroundClip: 'padding-box'
+        backgroundClip: 'padding-box',
+        boxSizing: 'border-box'
     }
 }
 
@@ -139,20 +161,19 @@ const closeDropdown = () => {
     searchResults.value = []
 }
 
-// Click outside with teleported dropdown
-useClickOutside([wrapperRef, dropdownRef], () => {
-    if (isOpen.value) closeDropdown()
-})
+// ── Global click handler ─────────────────────────────────────
+const handleGlobalClick = (event) => {
+    handleClickOutside(event)
+}
 
 // ── Global Esc key handler ─────────────────────────────────────
 const handleGlobalKeyDown = (e) => {
-    // Only handle Escape when dropdown is open
     if (e.key === 'Escape' && isOpen.value) {
-        e.stopPropagation(); // Prevent event from reaching parent
-        e.preventDefault();  // Prevent default browser behavior
-        closeDropdown();
+        e.stopPropagation()
+        e.preventDefault()
+        closeDropdown()
     }
-};
+}
 
 // ── Load selected object if value exists on mount ──────────────
 onMounted(async () => {
@@ -162,19 +183,21 @@ onMounted(async () => {
         selectedObject.value = cacheStore.getCachedObject(props.modelValue)
     }
 
-    // Add event listeners for position updates
+    // Add event listeners
     window.addEventListener('scroll', updateDropdownPosition, true)
     window.addEventListener('resize', updateDropdownPosition)
+    window.addEventListener('keydown', handleGlobalKeyDown, true)
 
-    // Add global keydown listener for Esc
-    window.addEventListener('keydown', handleGlobalKeyDown, true); // Use capture phase
+    // Use mousedown for better responsiveness
+    document.addEventListener('mousedown', handleGlobalClick)
 })
 
 onUnmounted(() => {
     // Clean up event listeners
     window.removeEventListener('scroll', updateDropdownPosition, true)
     window.removeEventListener('resize', updateDropdownPosition)
-    window.removeEventListener('keydown', handleGlobalKeyDown, true);
+    window.removeEventListener('keydown', handleGlobalKeyDown, true)
+    document.removeEventListener('mousedown', handleGlobalClick)
 })
 
 // ── Watch modelValue changes ───────────────────────────────────
@@ -225,9 +248,18 @@ async function loadObjectByUuid(uuid) {
 async function selectObject(obj) {
     if (!obj?.thing_id) return
 
+    // Prevent any click outside handlers from interfering
+    isClickingDropdown.value = true
+
+    console.debug('Selected object ', obj.thing_id);
     selectedObject.value = obj
     emit('update:modelValue', obj.thing_id)
     closeDropdown()
+
+    // Reset after a short delay
+    setTimeout(() => {
+        isClickingDropdown.value = false
+    }, 100)
 }
 
 function clearSelection() {
@@ -243,7 +275,6 @@ async function onInput(e) {
     // Check if it's a UUID
     if (val.length > 30 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
         searchResults.value = []
-        //await loadObjectByUuid(val)
         emit('update:modelValue', val)
         closeDropdown()
     } else if (val.length >= 2) {
@@ -297,6 +328,11 @@ async function onInput(e) {
         searchResults.value = [];
     }
 }
+
+// Handle mousedown on dropdown to prevent blur
+const handleDropdownMouseDown = (e) => {
+    e.preventDefault() // Prevent input blur
+}
 </script>
 
 <template>
@@ -323,8 +359,8 @@ async function onInput(e) {
 
         <!-- Editable mode -->
         <template v-else>
-            <div ref="wrapperRef" class="position-relative">
-                <div class="input-group input-group-sm" :class="{ 'is-invalid': error }">
+            <div ref="wrapperRef" class="position-relative w-100">
+                <div class="input-group input-group-sm w-100" :class="{ 'is-invalid': error }">
                     <span class="input-group-text bg-light">
                         <component
                             v-if="selectedObject?.icon"
@@ -345,8 +381,6 @@ async function onInput(e) {
                         @input="onInput"
                         @click="openDropdown"
                         @keydown.esc="closeDropdown"
-                        @keydown.down.prevent="() => {}"
-                        @keydown.up.prevent="() => {}"
                     />
 
                     <button
@@ -366,6 +400,7 @@ async function onInput(e) {
                         ref="dropdownRef"
                         class="object-field-dropdown"
                         :style="dropdownStyles"
+                        @mousedown="handleDropdownMouseDown"
                     >
                         <!-- Loading state -->
                         <div v-if="loading" class="text-center py-4 text-muted">
@@ -396,19 +431,20 @@ async function onInput(e) {
                                     type="button"
                                     class="dropdown-item"
                                     @click="selectObject(obj)"
+                                    @mousedown.prevent="" <!-- Prevent mousedown from closing -->
                                 >
-                                    <i class="bi bi-box flex-shrink-0"></i>
+                                <i class="bi bi-box flex-shrink-0"></i>
 
-                                    <div class="flex-grow-1 text-truncate text-start">
-                                        <div>{{ obj.name || 'Unnamed' }}</div>
-                                        <small v-if="obj.description" class="text-muted d-block text-truncate">
-                                            {{ obj.description }}
-                                        </small>
-                                    </div>
-
-                                    <small class="text-muted ms-auto font-monospace">
-                                        {{ (obj.thing_id || '').substring(0, 6) }}…
+                                <div class="flex-grow-1 text-truncate text-start">
+                                    <div>{{ obj.name || 'Unnamed' }}</div>
+                                    <small v-if="obj.description" class="text-muted d-block text-truncate">
+                                        {{ obj.description }}
                                     </small>
+                                </div>
+
+                                <small class="text-muted ms-auto font-monospace">
+                                    {{ (obj.thing_id || '').substring(0, 6) }}…
+                                </small>
                                 </button>
                             </div>
                         </template>
@@ -434,6 +470,11 @@ async function onInput(e) {
 .object-field .position-relative {
     position: relative;
     overflow: visible !important;
+    width: 100%;
+}
+
+.input-group {
+    width: 100%;
 }
 
 .input-group-sm .form-control,
@@ -441,17 +482,19 @@ async function onInput(e) {
     font-size: 0.875rem;
 }
 
-/* Keep only component-specific styles here */
 .form-control-plaintext {
     min-height: calc(1.8125rem + 2px);
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
 }
+
+.w-100 {
+    width: 100% !important;
+}
 </style>
 
-<!-- Global styles - add to your main CSS file or use :global() -->
+<!-- Global styles -->
 <style>
-/* These styles need to be global for teleported dropdown */
 .object-field-dropdown {
     position: absolute;
     background: white;
@@ -466,6 +509,7 @@ async function onInput(e) {
     text-align: left;
     list-style: none;
     background-clip: padding-box;
+    box-sizing: border-box;
 }
 
 .object-field-dropdown .dropdown-item {
@@ -482,6 +526,7 @@ async function onInput(e) {
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     gap: 0.75rem;
+    box-sizing: border-box;
 }
 
 .object-field-dropdown .dropdown-item:last-child {
@@ -513,5 +558,10 @@ async function onInput(e) {
 /* Ensure dropdown is above everything */
 .object-field-dropdown {
     z-index: 99999 !important;
+}
+
+.object-field-dropdown,
+.object-field-dropdown * {
+    box-sizing: border-box;
 }
 </style>
