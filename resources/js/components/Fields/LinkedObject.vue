@@ -6,7 +6,7 @@
             fieldName="current_object"
             v-model="localCurrentObjectUuid"
             :isEditable="true"
-            name="thing_type"
+            name="Current Object"
             :type="THING_TYPE"
             required
         />
@@ -16,7 +16,7 @@
                 fieldName="link_type"
                 v-model="localLinkTypeUuid"
                 :isEditable="true"
-                name="link_type"
+                name="Link type"
                 :type="LINK_TYPE"
                 required
                 class="flex-field"
@@ -29,7 +29,7 @@
                 fieldName="linked_object"
                 v-model="localLinkedObjectUuid"
                 :isEditable="true"
-                name="linked_object"
+                name="Linked object"
                 :type="THING_TYPE"
                 required
                 class="flex-field"
