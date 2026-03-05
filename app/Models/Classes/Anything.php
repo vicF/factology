@@ -651,12 +651,17 @@ class Anything
     public function addLink(array $link): bool
     {
         $this->setLinkTranslation($link);
-        return DB::table('links')->insert([
-            'one_thing_id'   => $this->thing_id,
-            'link_type_id'   => $link['link_type_id'],
-            'other_thing_id' => $link['other_thing_id'],
-            'translation'    => $link['translation'],
-        ]);
+
+        return DB::table('links')->updateOrInsert(
+            [
+                'one_thing_id'   => $this->thing_id,
+                'link_type_id'   => $link['link_type_id'],
+                'other_thing_id' => $link['other_thing_id'],
+            ],
+            [
+                'translation'    => $link['translation'],
+            ]
+        );
     }
 
     public function setAsChildOf($parentClass): bool

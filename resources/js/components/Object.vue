@@ -31,16 +31,16 @@
             <div class="col">
                 <h1>
                     {{ object.name || '' }}
-                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkedModal">
+                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkedModal" title="Create new object linked to this one">
                         {{ $t('Create') }}
                     </button>
-                    <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal">
+                    <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal" title="Edit this object">
                         {{ $t('Edit') }}
                     </button>
-                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openEditLinkModal">
+                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openEditLinkModal" title="Link this object to another">
                         {{ $t('Link') }}
                     </button>
-                    <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject">
+                    <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject" title="Delete this object">
                         {{ $t('Delete') }}
                     </button>
                 </h1>

@@ -54,6 +54,99 @@ class ApiController extends BaseController
      */
     public function store(Request $request): \Illuminate\Http\JsonResponse
     {
+        $validated = $request->validate([
+            /**
+             * UUID of the main object
+             * @example "6c541c84-b7e2-41de-8f7c-20b8e6f516d4"
+             */
+            'thing_id' => ['required', 'string', 'uuid'],
+
+            /**
+             * Name of the object
+             * @example "Гоблинский Пунш"
+             */
+            'name' => ['required', 'string', 'max:255'],
+
+            /**
+             * Description of the object
+             * @example "Бар такой"
+             */
+            'description' => ['nullable', 'string', 'max:1000'],
+
+            /**
+             * Start date/time as numeric string: YYYYMMDDHHMMSS
+             * @example 20260228111234
+             */
+            'start' => ['nullable', 'string', 'regex:/^\d*$/'],
+
+            /**
+             * End date/time as numeric string: YYYYMMDDHHMMSS
+             * @example 20260228181234
+             */
+            'end' => [
+                'nullable',
+                'string',
+                'regex:/^\d*$/',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($request->has('start') && $value < $request->start) {
+                        $fail('The end date must be after the start date.');
+                    }
+                },
+            ],
+
+            /**
+             * Public flag (0 or 1)
+             * @example 1
+             */
+            'public' => ['required', 'integer', 'in:0,1'],
+
+            /**
+             * UUID of parent object (if any)
+             * @example null
+             */
+            'parent_id' => ['nullable', 'string', 'uuid'],
+
+            /**
+             * Type identifier
+             * @example 3
+             */
+            'type' => ['required', 'integer', 'min:1', 'max:5'],
+
+            /**
+             * Class relationship data (optional)
+             */
+            'class' => ['sometimes', 'array'],
+
+            /**
+             * UUID of the first related object
+             * @example "6c541c84-b7e2-41de-8f7c-20b8e6f516d4"
+             */
+            'class.one_thing_id' => ['required_with:class', 'string', 'uuid'],
+
+            /**
+             * UUID of the link type
+             * @example "c217c185-742f-4a9f-8e69-acea2b4f5aea"
+             */
+            'class.link_type_id' => ['required_with:class', 'string', 'uuid'],
+
+            /**
+             * UUID of the other related object
+             * @example "602f1b6b-1383-442b-908c-1a027d7a8010"
+             */
+            'class.other_thing_id' => ['required_with:class', 'string', 'uuid'],
+
+            /**
+             * Description of the relationship
+             * @example null
+             */
+            'class.description' => ['nullable', 'string', 'max:1000'],
+
+            /**
+             * Public flag for the relationship
+             * @example 1
+             */
+            'class.public' => ['nullable', 'integer', 'in:0,1'],
+        ]);
         return DB::transaction(static function () use ($request) {
             $model = new Anything($request->toArray());
             $model->save();
