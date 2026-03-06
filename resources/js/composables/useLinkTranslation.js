@@ -2,9 +2,6 @@
 import { ref, computed, watch } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 
-/**
- * Композабл для управления переводом и генерации предпросмотра
- */
 export function useLinkTranslation(options = {}) {
     const {
         initialData = {},
@@ -22,7 +19,7 @@ export function useLinkTranslation(options = {}) {
     const translation = ref(initialData.translation || '')
 
     // Флаг ручного режима
-    const isManuallyEdited = ref(!!initialData.translation) // если есть описание с сервера
+    const isManuallyEdited = ref(!!initialData.translation && initialData.translation.length > 0)
 
     // Функция генерации предпросмотра
     const defaultFormatter = (current, linked, type) => {
@@ -30,12 +27,10 @@ export function useLinkTranslation(options = {}) {
 
         const parts = []
 
-        // Получаем объекты из кэша
         const currentObj = current ? cacheStore.getCachedObject(current) : null
         const linkedObj = linked ? cacheStore.getCachedObject(linked) : null
         const typeObj = type ? cacheStore.getCachedObject(type) : null
 
-        // Форматируем текущий объект
         if (current) {
             if (currentObj?.name) {
                 parts.push(currentObj.name)
@@ -44,12 +39,10 @@ export function useLinkTranslation(options = {}) {
             }
         }
 
-        // Добавляем стрелку если есть оба объекта
         if (current && linked) {
             parts.push('→')
         }
 
-        // Форматируем связанный объект
         if (linked) {
             if (linkedObj?.name) {
                 parts.push(linkedObj.name)
@@ -58,7 +51,6 @@ export function useLinkTranslation(options = {}) {
             }
         }
 
-        // Добавляем тип связи
         if (type) {
             const typeText = typeObj?.name || type.slice(0, 4)
             parts.push(`(${typeText})`)
@@ -67,7 +59,6 @@ export function useLinkTranslation(options = {}) {
         return parts.join(' ')
     }
 
-    // Выбираем форматтер
     const formatter = customFormatter || defaultFormatter
 
     // Генерируемое описание (только для просмотра)
@@ -78,27 +69,38 @@ export function useLinkTranslation(options = {}) {
     // Методы для управления
     const setCurrent = (uuid) => {
         currentUuid.value = uuid
-        // Не сбрасываем ручной режим при изменении UUID
     }
 
     const setLinked = (uuid) => {
         linkedUuid.value = uuid
-        // Не сбрасываем ручной режим при изменении UUID
     }
 
     const setType = (uuid) => {
         typeUuid.value = uuid
-        // Не сбрасываем ручной режим при изменении UUID
     }
 
     const setTranslation = (text) => {
         translation.value = text
-        isManuallyEdited.value = true // Включаем ручной режим при редактировании
+        isManuallyEdited.value = true
     }
 
-    const resetManualMode = () => {
+    // Сброс к автоматически сгенерированному
+    const resetToGenerated = () => {
+        translation.value = generatedTranslation.value
+        isManuallyEdited.value = true // Оставляем в ручном режиме, но с автоматическим текстом
+    }
+
+    // Начать ручное редактирование с копированием автоматического текста
+    const startManualEdit = () => {
+        if (!isManuallyEdited.value && generatedTranslation.value) {
+            translation.value = generatedTranslation.value
+        }
+        isManuallyEdited.value = true
+    }
+
+    // Полностью сбросить ручной режим
+    const disableManualMode = () => {
         isManuallyEdited.value = false
-        // Очищаем ручное описание
         translation.value = ''
     }
 
@@ -115,36 +117,34 @@ export function useLinkTranslation(options = {}) {
         currentUuid.value && linkedUuid.value
     )
 
-    // Данные для отправки (только ручное описание)
+    // Данные для отправки
     const toJSON = computed(() => ({
         currentObjectUuid: currentUuid.value,
         linkedObjectUuid: linkedUuid.value,
         linkTypeUuid: typeUuid.value,
-        translation: translation.value // только ручное описание
+        translation: translation.value
     }))
 
     return {
-        // Реактивные данные
         currentUuid,
         linkedUuid,
         typeUuid,
-        translation, // ручное описание
-        generatedTranslation, // автоматическое (только для просмотра)
+        translation,
+        generatedTranslation,
         isManuallyEdited,
         isValid,
 
-        // Методы
         setCurrent,
         setLinked,
         setType,
         setTranslation,
-        resetManualMode,
+        resetToGenerated,
+        startManualEdit,
+        disableManualMode,
         reset,
 
-        // Данные
         toJSON,
 
-        // Для отладки
         debug: computed(() => ({
             current: currentUuid.value,
             linked: linkedUuid.value,

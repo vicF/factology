@@ -47,63 +47,59 @@
 
         <!-- Поле для ручного ввода (сохраняется на сервер) -->
         <div class="form-group">
-            <label class="form-label">
-                Description (manual)
-                <small class="text-muted ms-2">- saved to server</small>
-            </label>
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <label class="form-label mb-0">
+                    Description
+                    <small class="text-muted ms-2">(manual, saved to server)</small>
+                </label>
+
+                <!-- Кнопка сброса к автоматическому появляется только в ручном режиме -->
+                <button
+                    v-if="linkManager.isManuallyEdited.value"
+                    class="btn btn-sm btn-link text-decoration-none p-0"
+                    @click="resetToGenerated"
+                    title="Reset to auto-generated text"
+                >
+                    <i class="bi bi-arrow-repeat me-1"></i>
+                    Reset to generated
+                </button>
+            </div>
+
             <textarea
                 :value="linkManager.translation.value"
                 @input="e => linkManager.setTranslation(e.target.value)"
                 class="form-control"
-                placeholder="Enter manual description..."
+                :placeholder="generatedPlaceholder"
                 rows="2"
             ></textarea>
+
+            <!-- Подсказка, что показывается в данный момент -->
+            <small class="text-muted d-block mt-1">
+                <i class="bi bi-info-circle me-1"></i>
+                <span v-if="linkManager.isManuallyEdited.value">
+                    Using manual description.
+                    <a href="#" @click.prevent="resetToGenerated">Switch to auto-generated</a>
+                </span>
+                <span v-else>
+                    Auto-generated from selected objects.
+                    <a href="#" @click.prevent="startManualEdit">Edit manually</a>
+                </span>
+            </small>
         </div>
 
-        <!-- Автоматически генерируемое описание (только для просмотра) -->
-        <div class="form-group" v-if="linkManager.generatedTranslation.value">
-            <label class="form-label text-muted">
-                Generated preview
-                <small class="text-muted ms-2">- auto-generated, not saved</small>
-            </label>
+        <!-- Предпросмотр автоматической генерации (только если есть ручной режим) -->
+        <div class="form-group" v-if="linkManager.isManuallyEdited.value && linkManager.generatedTranslation.value">
             <div class="generated-preview p-2 bg-light rounded border">
+                <small class="text-muted d-block mb-1">
+                    <i class="bi bi-magic me-1"></i>
+                    Auto-generated preview:
+                </small>
                 {{ linkManager.generatedTranslation.value }}
             </div>
         </div>
 
-        <!-- Индикатор режима -->
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <span
-                v-if="linkManager.isManuallyEdited.value"
-                class="badge bg-warning text-dark"
-            >
-                ✎ Manual mode
-            </span>
-            <span
-                v-else-if="linkManager.generatedTranslation.value"
-                class="badge bg-info text-dark"
-            >
-                ↻ Auto-generated
-            </span>
-
-            <button
-                v-if="linkManager.isManuallyEdited.value"
-                class="btn btn-sm btn-outline-secondary ms-auto"
-                @click="resetToGenerated"
-            >
-                Reset to generated
-            </button>
-        </div>
-
         <div class="d-flex gap-2 mt-3">
             <button class="btn btn-danger" @click="removeSelf">Удалить</button>
-
-            <span
-                v-if="linkManager.isValid.value"
-                class="badge bg-success ms-auto align-self-center"
-            >
-                ✓ Ready to link
-            </span>
         </div>
 
         <!-- Отладка (можно убрать) -->
@@ -145,6 +141,14 @@ const linkManager = useLinkTranslation({
     }
 });
 
+// Плейсхолдер для textarea
+const generatedPlaceholder = computed(() => {
+    if (!linkManager.currentUuid.value || !linkManager.linkedUuid.value) {
+        return 'Select both objects to see auto-generated description...';
+    }
+    return linkManager.generatedTranslation.value || 'Auto-generated description...';
+});
+
 // Имена объектов для отображения
 const currentObjectName = ref(props.currentObjectName || '');
 const linkedObjectName = ref('');
@@ -182,7 +186,13 @@ const loadObjectNames = async () => {
 
 // Сброс к автоматически сгенерированному описанию
 const resetToGenerated = () => {
-    linkManager.resetManualMode();
+    linkManager.resetToGenerated();
+};
+
+// Начать ручное редактирование
+const startManualEdit = () => {
+    // Копируем сгенерированный текст в ручное поле
+    linkManager.startManualEdit();
 };
 
 // Открытие модального окна создания объекта
@@ -369,9 +379,8 @@ onUnmounted(() => {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     color: #495057;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     line-height: 1.5;
-    min-height: 38px;
 }
 
 .btn-danger {
@@ -400,39 +409,30 @@ onUnmounted(() => {
     background-color: #0069d9;
 }
 
-.btn-outline-secondary {
-    background-color: transparent;
-    border: 1px solid #6c757d;
-    color: #6c757d;
-    padding: 4px 8px;
-    font-size: 0.8rem;
+.btn-link {
+    color: #007bff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
 }
 
-.btn-outline-secondary:hover {
-    background-color: #6c757d;
-    color: white;
-}
-
-.badge {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.badge.bg-warning {
-    background-color: #ffc107;
-}
-
-.badge.bg-info {
-    background-color: #17a2b8;
+.btn-link:hover {
+    text-decoration: underline !important;
+    color: #0056b3;
 }
 
 .text-muted a {
     color: #6c757d;
     text-decoration: underline;
+    cursor: pointer;
 }
 
 .text-muted a:hover {
     color: #495057;
+}
+
+.bi {
+    font-size: 0.9rem;
 }
 </style>
