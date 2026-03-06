@@ -45,23 +45,57 @@
             </button>
         </div>
 
+        <!-- Поле для ручного ввода (сохраняется на сервер) -->
         <div class="form-group">
+            <label class="form-label">
+                Description (manual)
+                <small class="text-muted ms-2">- saved to server</small>
+            </label>
             <textarea
                 :value="linkManager.translation.value"
                 @input="e => linkManager.setTranslation(e.target.value)"
                 class="form-control"
-                placeholder="Translation (auto-generated or manual input)"
+                placeholder="Enter manual description..."
+                rows="2"
             ></textarea>
-            <small
-                v-if="linkManager.isManuallyEdited.value"
-                class="text-muted d-block mt-1"
-            >
-                ✎ Manual mode - auto-update paused.
-                <a href="#" @click.prevent="resetAutoTranslation">Reset to auto</a>
-            </small>
         </div>
 
-        <div class="d-flex gap-2">
+        <!-- Автоматически генерируемое описание (только для просмотра) -->
+        <div class="form-group" v-if="linkManager.generatedTranslation.value">
+            <label class="form-label text-muted">
+                Generated preview
+                <small class="text-muted ms-2">- auto-generated, not saved</small>
+            </label>
+            <div class="generated-preview p-2 bg-light rounded border">
+                {{ linkManager.generatedTranslation.value }}
+            </div>
+        </div>
+
+        <!-- Индикатор режима -->
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span
+                v-if="linkManager.isManuallyEdited.value"
+                class="badge bg-warning text-dark"
+            >
+                ✎ Manual mode
+            </span>
+            <span
+                v-else-if="linkManager.generatedTranslation.value"
+                class="badge bg-info text-dark"
+            >
+                ↻ Auto-generated
+            </span>
+
+            <button
+                v-if="linkManager.isManuallyEdited.value"
+                class="btn btn-sm btn-outline-secondary ms-auto"
+                @click="resetToGenerated"
+            >
+                Reset to generated
+            </button>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
             <button class="btn btn-danger" @click="removeSelf">Удалить</button>
 
             <span
@@ -71,11 +105,16 @@
                 ✓ Ready to link
             </span>
         </div>
+
+        <!-- Отладка (можно убрать) -->
+        <div v-if="false" class="debug-info mt-3 small text-muted">
+            <pre>{{ JSON.stringify(linkManager.debug, null, 2) }}</pre>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import { LINK_TYPE, THING_TYPE } from "../../constants.js";
@@ -87,7 +126,7 @@ const props = defineProps({
     currentObjectName: { type: String, required: false },
     linkedObjectUuid: { type: String, default: '' },
     linkTypeUuid: { type: String, default: '' },
-    translation: { type: String, default: '' },
+    translation: { type: String, default: '' }, // ручное описание с сервера
     linkId: { type: [String, Number, null], default: null },
     index: { type: Number, required: true },
 });
@@ -102,7 +141,7 @@ const linkManager = useLinkTranslation({
         currentObjectUuid: props.currentObjectUuid,
         linkedObjectUuid: props.linkedObjectUuid,
         linkTypeUuid: props.linkTypeUuid,
-        translation: props.translation
+        translation: props.translation // ручное описание
     }
 });
 
@@ -141,8 +180,8 @@ const loadObjectNames = async () => {
     }
 };
 
-// Сброс к автоматическому переводу
-const resetAutoTranslation = () => {
+// Сброс к автоматически сгенерированному описанию
+const resetToGenerated = () => {
     linkManager.resetManualMode();
 };
 
@@ -160,7 +199,7 @@ const openCreateObjectModal = () => {
             targetComponent: 'linked-object',
             index: props.index,
             linkTypeUuid: linkManager.typeUuid.value,
-            comment: linkManager.translation.value
+            comment: linkManager.translation.value // передаем ручное описание
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -220,6 +259,7 @@ watch(() => props.linkedObjectUuid, (newVal) => {
 });
 
 watch(() => props.translation, (newVal) => {
+    // Обновляем только если значение отличается и не в ручном режиме
     if (newVal !== linkManager.translation.value && !linkManager.isManuallyEdited.value) {
         linkManager.setTranslation(newVal);
     }
@@ -231,7 +271,7 @@ watch(
         linkManager.currentUuid.value,
         linkManager.linkedUuid.value,
         linkManager.typeUuid.value,
-        linkManager.translation.value
+        linkManager.translation.value // только ручное описание
     ],
     () => {
         emit('update', {
@@ -240,7 +280,7 @@ watch(
                 currentObjectUuid: linkManager.currentUuid.value,
                 linkedObjectUuid: linkManager.linkedUuid.value,
                 linkTypeUuid: linkManager.typeUuid.value,
-                translation: linkManager.translation.value,
+                translation: linkManager.translation.value, // только ручное описание
                 linkId: props.linkId,
             }
         });
@@ -271,7 +311,19 @@ onUnmounted(() => {
 }
 
 .form-group {
-    margin-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.form-label small {
+    font-weight: normal;
+    font-size: 0.8rem;
 }
 
 .flex-group {
@@ -304,6 +356,22 @@ onUnmounted(() => {
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    font-family: inherit;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.generated-preview {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    min-height: 38px;
 }
 
 .btn-danger {
@@ -332,9 +400,31 @@ onUnmounted(() => {
     background-color: #0069d9;
 }
 
+.btn-outline-secondary {
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    color: #6c757d;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+
 .badge {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107;
+}
+
+.badge.bg-info {
+    background-color: #17a2b8;
 }
 
 .text-muted a {
