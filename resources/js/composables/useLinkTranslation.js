@@ -31,18 +31,6 @@ export function useLinkTranslation(options = {}) {
         const linkedObj = linked ? cacheStore.getCachedObject(linked) : null
         const typeObj = type ? cacheStore.getCachedObject(type) : null
 
-        if (current) {
-            if (currentObj?.name) {
-                parts.push(currentObj.name)
-            } else {
-                parts.push(`[${current.slice(0, 8)}]`)
-            }
-        }
-
-        if (current && linked) {
-            parts.push('→')
-        }
-
         if (linked) {
             if (linkedObj?.name) {
                 parts.push(linkedObj.name)
@@ -51,11 +39,24 @@ export function useLinkTranslation(options = {}) {
             }
         }
 
+        parts.push('→')
+
         if (type) {
             const typeText = typeObj?.name || type.slice(0, 4)
             parts.push(`(${typeText})`)
         }
 
+        if (current && linked) {
+            parts.push('→')
+        }
+
+        if (current) {
+            if (currentObj?.name) {
+                parts.push(currentObj.name)
+            } else {
+                parts.push(`[${current.slice(0, 8)}]`)
+            }
+        }
         return parts.join(' ')
     }
 
