@@ -488,5 +488,9 @@ class ApiController extends BaseController
         }
         return view('classes', ['class' => $data[UUID::ANYTHING]]);
     }
+
+    public function thumb() {
+        echo '';
+    }
 }
 
