@@ -4,8 +4,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="current_object"
-                :modelValue="linkManager.currentUuid.value"
-                @update:modelValue="linkManager.setCurrent"
+                v-model="currentUuid"
                 :isEditable="true"
                 name="Current Object"
                 :type="THING_TYPE"
@@ -16,8 +15,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="link_type"
-                :modelValue="linkManager.typeUuid.value"
-                @update:modelValue="linkManager.setType"
+                v-model="typeUuid"
                 :isEditable="true"
                 name="Link type"
                 :type="LINK_TYPE"
@@ -32,8 +30,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="linked_object"
-                :modelValue="linkManager.linkedUuid.value"
-                @update:modelValue="linkManager.setLinked"
+                v-model="linkedUuid"
                 :isEditable="true"
                 name="Linked object"
                 :type="THING_TYPE"
@@ -52,59 +49,29 @@
                     Description
                     <small class="text-muted ms-2">(manual, saved to server)</small>
                 </label>
-
-                <!-- Кнопка сброса к автоматическому появляется только в ручном режиме -->
-                <button
-                    v-if="linkManager.isManuallyEdited.value"
-                    class="btn btn-sm btn-link text-decoration-none p-0"
-                    @click="resetToGenerated"
-                    title="Reset to auto-generated text"
-                >
-                    <i class="bi bi-arrow-repeat me-1"></i>
-                    Reset to generated
-                </button>
             </div>
 
             <textarea
-                :value="linkManager.translation.value"
-                @input="e => linkManager.setTranslation(e.target.value)"
+                v-model="manualTranslation"
                 class="form-control"
-                :placeholder="generatedPlaceholder"
+                placeholder="Enter manual description..."
                 rows="2"
             ></textarea>
-
-            <!-- Подсказка, что показывается в данный момент -->
-            <small class="text-muted d-block mt-1">
-                <i class="bi bi-info-circle me-1"></i>
-                <span v-if="linkManager.isManuallyEdited.value">
-                    Using manual description.
-                    <a href="#" @click.prevent="resetToGenerated">Switch to auto-generated</a>
-                </span>
-                <span v-else>
-                    Auto-generated from selected objects.
-                    <a href="#" @click.prevent="startManualEdit">Edit manually</a>
-                </span>
-            </small>
         </div>
 
-        <!-- Предпросмотр автоматической генерации (только если есть ручной режим) -->
-        <div class="form-group" v-if="linkManager.isManuallyEdited.value && linkManager.generatedTranslation.value">
+        <!-- Автоматически сгенерированное описание -->
+        <div class="form-group" v-if="generatedDescription">
             <div class="generated-preview p-2 bg-light rounded border">
                 <small class="text-muted d-block mb-1">
                     <i class="bi bi-magic me-1"></i>
                     Auto-generated preview:
                 </small>
-                {{ linkManager.generatedTranslation.value }}
+                {{ generatedDescription }}
             </div>
         </div>
 
         <div class="d-flex gap-2 mt-3">
             <button class="btn btn-danger" @click="removeSelf">Удалить</button>
-        </div>
-
-        <!-- Отладка (можно убрать) -->
-        <div v-if="false" class="debug-info mt-3 small text-muted">
-            <pre>{{ JSON.stringify(linkManager.debug, null, 2) }}</pre>
         </div>
     </div>
 </template>
@@ -115,14 +82,14 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import { LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
-import { useLinkTranslation } from '@/composables/useLinkTranslation.js';
+import { generateLinkDescription } from '@/composables/useLinkTranslation.js';
 
 const props = defineProps({
     currentObjectUuid: { type: String, required: true },
     currentObjectName: { type: String, required: false },
     linkedObjectUuid: { type: String, default: '' },
     linkTypeUuid: { type: String, default: '' },
-    translation: { type: String, default: '' }, // ручное описание с сервера
+    translation: { type: String, default: '' },
     linkId: { type: [String, Number, null], default: null },
     index: { type: Number, required: true },
 });
@@ -131,22 +98,30 @@ const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Используем композабл для управления переводом
-const linkManager = useLinkTranslation({
-    initialData: {
-        currentObjectUuid: props.currentObjectUuid,
-        linkedObjectUuid: props.linkedObjectUuid,
-        linkTypeUuid: props.linkTypeUuid,
-        translation: props.translation // ручное описание
-    }
-});
+// Локальные состояния
+const currentUuid = ref(props.currentObjectUuid);
+const linkedUuid = ref(props.linkedObjectUuid);
+const typeUuid = ref(props.linkTypeUuid);
+const manualTranslation = ref(props.translation);
 
-// Плейсхолдер для textarea
-const generatedPlaceholder = computed(() => {
-    if (!linkManager.currentUuid.value || !linkManager.linkedUuid.value) {
-        return 'Select both objects to see auto-generated description...';
-    }
-    return linkManager.generatedTranslation.value || 'Auto-generated description...';
+// Создаем объект link для генерации описания
+const linkForGeneration = computed(() => ({
+    thing_id: currentUuid.value,
+    other_thing_id: linkedUuid.value,
+    link_type_id: typeUuid.value,
+    name: 'Current',
+    link_name: 'Link'
+}));
+
+// Создаем объект для передачи в функцию
+const objectForGeneration = computed(() => ({
+    name: props.currentObjectName || 'Current Object'
+}));
+
+// Автоматически сгенерированное описание
+const generatedDescription = computed(() => {
+    if (!currentUuid.value || !linkedUuid.value) return '';
+    return generateLinkDescription(linkForGeneration.value, objectForGeneration.value);
 });
 
 // Имена объектов для отображения
@@ -156,43 +131,32 @@ const linkTypeName = ref('');
 
 // Загрузка имен объектов из кэша
 const loadObjectNames = async () => {
-    if (linkManager.currentUuid.value) {
+    if (currentUuid.value) {
         try {
-            const obj = await store.getObject(linkManager.currentUuid.value);
+            const obj = await store.getObject(currentUuid.value);
             if (obj?.name) currentObjectName.value = obj.name;
         } catch (e) {
             console.warn('Failed to load current object name:', e);
         }
     }
 
-    if (linkManager.linkedUuid.value) {
+    if (linkedUuid.value) {
         try {
-            const obj = await store.getObject(linkManager.linkedUuid.value);
+            const obj = await store.getObject(linkedUuid.value);
             if (obj?.name) linkedObjectName.value = obj.name;
         } catch (e) {
             console.warn('Failed to load linked object name:', e);
         }
     }
 
-    if (linkManager.typeUuid.value) {
+    if (typeUuid.value) {
         try {
-            const obj = await store.getObject(linkManager.typeUuid.value);
+            const obj = await store.getObject(typeUuid.value);
             if (obj?.name) linkTypeName.value = obj.name;
         } catch (e) {
             console.warn('Failed to load link type name:', e);
         }
     }
-};
-
-// Сброс к автоматически сгенерированному описанию
-const resetToGenerated = () => {
-    linkManager.resetToGenerated();
-};
-
-// Начать ручное редактирование
-const startManualEdit = () => {
-    // Копируем сгенерированный текст в ручное поле
-    linkManager.startManualEdit();
 };
 
 // Открытие модального окна создания объекта
@@ -208,8 +172,8 @@ const openCreateObjectModal = () => {
             requestId: requestId,
             targetComponent: 'linked-object',
             index: props.index,
-            linkTypeUuid: linkManager.typeUuid.value,
-            comment: linkManager.translation.value // передаем ручное описание
+            linkTypeUuid: typeUuid.value,
+            comment: manualTranslation.value
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -217,13 +181,13 @@ const openCreateObjectModal = () => {
 
 // Переключение объектов
 const switchObjects = () => {
-    const temp = linkManager.currentUuid.value;
-    linkManager.setCurrent(linkManager.linkedUuid.value);
-    linkManager.setLinked(temp);
+    const temp = currentUuid.value;
+    currentUuid.value = linkedUuid.value;
+    linkedUuid.value = temp;
 
     console.log('Switched objects:', {
-        newCurrent: linkManager.currentUuid.value,
-        newLinked: linkManager.linkedUuid.value
+        newCurrent: currentUuid.value,
+        newLinked: linkedUuid.value
     });
 };
 
@@ -236,61 +200,29 @@ const removeSelf = () => {
 const handleLinkCreated = (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
         console.log('Link created, updating linked object:', data);
-
-        linkManager.setLinked(data.newObjectId);
+        linkedUuid.value = data.newObjectId;
 
         if (data.linkTypeUuid) {
-            linkManager.setType(data.linkTypeUuid);
+            typeUuid.value = data.linkTypeUuid;
         }
 
         if (data.comment !== undefined) {
-            linkManager.setTranslation(data.comment);
+            manualTranslation.value = data.comment;
         }
     }
 };
 
-// Следим за изменениями props
-watch(() => props.currentObjectUuid, (newVal) => {
-    if (newVal !== linkManager.currentUuid.value) {
-        linkManager.setCurrent(newVal);
-    }
-});
-
-watch(() => props.linkTypeUuid, (newVal) => {
-    if (newVal !== linkManager.typeUuid.value) {
-        linkManager.setType(newVal);
-    }
-});
-
-watch(() => props.linkedObjectUuid, (newVal) => {
-    if (newVal !== linkManager.linkedUuid.value) {
-        linkManager.setLinked(newVal);
-    }
-});
-
-watch(() => props.translation, (newVal) => {
-    // Обновляем только если значение отличается и не в ручном режиме
-    if (newVal !== linkManager.translation.value && !linkManager.isManuallyEdited.value) {
-        linkManager.setTranslation(newVal);
-    }
-});
-
-// Следим за изменениями в linkManager и эмитим update
+// Следим за изменениями и эмитим update
 watch(
-    () => [
-        linkManager.currentUuid.value,
-        linkManager.linkedUuid.value,
-        linkManager.typeUuid.value,
-        linkManager.translation.value // только ручное описание
-    ],
+    [currentUuid, linkedUuid, typeUuid, manualTranslation],
     () => {
         emit('update', {
             index: props.index,
             data: {
-                currentObjectUuid: linkManager.currentUuid.value,
-                linkedObjectUuid: linkManager.linkedUuid.value,
-                linkTypeUuid: linkManager.typeUuid.value,
-                translation: linkManager.translation.value, // только ручное описание
+                currentObjectUuid: currentUuid.value,
+                linkedObjectUuid: linkedUuid.value,
+                linkTypeUuid: typeUuid.value,
+                translation: manualTranslation.value,
                 linkId: props.linkId,
             }
         });
@@ -303,11 +235,13 @@ watch(
 
 // Инициализация
 onMounted(async () => {
+    console.log('LinkedObject mounted');
     await loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
 
 onUnmounted(() => {
+    console.log('LinkedObject unmounted');
     eventBus.off('link-created', handleLinkCreated);
 });
 </script>
