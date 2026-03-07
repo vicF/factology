@@ -403,19 +403,23 @@ class ApiController extends BaseController
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = DB::table('links')
-            ->select('links.*', 'things.name')
+            ->select('links.*', 'things.name', 'link_types.name as link_name')
             ->whereIn('links.one_thing_id', $ids)
             ->orWhere('other_thing_id', $ids)
             ->leftJoin('things', function ($join) {
                 $join->on('links.other_thing_id', '=', 'things.thing_id');
                 $join->where('links.deleted', '=', 0);
             })
+            ->leftJoin('things as link_types', function ($join) {
+                $join->on('links.link_type_id', '=', 'link_types.thing_id');
+                $join->where('links.deleted', '=', 0);
+            })
             ->get()->toArray();
 
-        return response()->json(json_encode([
+        return response()->json([
             'things' => $data->toArray(),
             'links'  => $links,
-        ]));
+        ]);
 
     }
 
