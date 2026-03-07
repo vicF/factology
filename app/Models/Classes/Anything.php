@@ -309,7 +309,7 @@ class Anything
         }
     }
 
-    public static function getClassSpecificDataById($id, $class): array
+    public static function  getClassSpecificDataById($id, $class): array
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
@@ -319,17 +319,21 @@ class Anything
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
-            ->leftJoin('things', 'links.other_thing_id', '=', 'things.thing_id')
+            ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
+            ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
             ->limit(50);
 
         $second = DB::table('links') // other way links
         ->where('links.other_thing_id', $thing['thing_id'])
-            ->leftJoin('things', 'links.one_thing_id', '=', 'things.thing_id')
+            ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
+            ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
+            ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
             ->limit(50);
 
         $thing['links'] = $first
             ->union($second)
-            ->orderBy('start') // replace 'your_column_name' with the column you want to use for ordering
+            ->orderBy('link_start')
             ->get();
         return $thing;
     }
