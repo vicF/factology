@@ -132,7 +132,7 @@
                                 </div>
                                 <div class="col-md-10">
                                     <div v-if="link.name">
-                                        <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                        <RouterLink :to="{ name: 'object', params: { uid: link.one_thing_id === object.thing_id?link.other_thing_id:link.one_thing_id } }">
                                             {{ link.name }}
                                         </RouterLink>
                                     </div>

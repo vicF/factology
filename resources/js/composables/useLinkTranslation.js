@@ -9,11 +9,11 @@ export function generateLinkDescription(link, object) {
 
     const parts = []
 
-    parts.push((link.thing_id === link.other_thing_id)? link.name: object.name)
+    parts.push((object.thing_id === link.one_thing_id)? link.name: object.name)
     parts.push('→')
     parts.push(link.link_name)
     parts.push('→')
-    parts.push((link.thing_id === link.other_thing_id)? object.name:link.name)
+    parts.push((object.thing_id === link.one_thing_id)? object.name:link.name)
 
     return parts.join(' ')
 }
