@@ -10,6 +10,8 @@
                 <div class="modal-body">
                     <LinkedObject
                         v-if="linkData"
+                        :currentObject="currentObject"
+                        :link="props.link"
                         :currentObjectUuid="linkData.currentObjectUuid"
                         :linkedObjectUuid="linkData.linkedObjectUuid"
                         :linkTypeUuid="linkData.linkTypeUuid"
@@ -43,13 +45,9 @@ const props = defineProps({
         type: Object,
         required: true
     },
-    currentObjectUuid: {
-        type: String,
+    currentObject: {
+        type: Object,
         required: true
-    },
-    currentObjectName: {
-        type: String,
-        default: ''
     }
 });
 
@@ -60,7 +58,7 @@ const linkData = ref(null);
 onMounted(() => {
     // Преобразуем данные ссылки в формат, понятный LinkedObject
     linkData.value = {
-        currentObjectUuid:props.link.one_thing_id,
+        currentObjectUuid: props.link.one_thing_id,
         linkedObjectUuid: props.link.other_thing_id,
         linkTypeUuid: props.link.link_type_id,
         translation: props.link.translation || '',

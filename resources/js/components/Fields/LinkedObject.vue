@@ -59,14 +59,10 @@
             ></textarea>
         </div>
 
-        <!-- Автоматически сгенерированное описание -->
+        <!-- Автоматически сгенерированное описание используя link и currentObject -->
         <div class="form-group" v-if="generatedDescription">
-            <div class="generated-preview p-2 bg-light rounded border">
-                <small class="text-muted d-block mb-1">
-                    <i class="bi bi-magic me-1"></i>
-                    Auto-generated preview:
-                </small>
-                {{ generatedDescription }}
+            <div class="link-description mt-1 text-muted">
+                <small>{{ generatedDescription }}</small>
             </div>
         </div>
 
@@ -85,8 +81,14 @@ import { eventBus } from "../../eventBus.js";
 import { generateLinkDescription } from '@/composables/useLinkTranslation.js';
 
 const props = defineProps({
+    // Текущий объект (из Object.vue)
+    currentObject: { type: Object, required: true },
+
+    // Данные ссылки которую редактируем
+    link: { type: Object, required: true },
+
+    // Отдельные поля для обратной совместимости
     currentObjectUuid: { type: String, required: true },
-    currentObjectName: { type: String, required: false },
     linkedObjectUuid: { type: String, default: '' },
     linkTypeUuid: { type: String, default: '' },
     translation: { type: String, default: '' },
@@ -104,28 +106,30 @@ const linkedUuid = ref(props.linkedObjectUuid);
 const typeUuid = ref(props.linkTypeUuid);
 const manualTranslation = ref(props.translation);
 
-// Создаем объект link для генерации описания
-const linkForGeneration = computed(() => ({
-    thing_id: currentUuid.value,
-    other_thing_id: linkedUuid.value,
-    link_type_id: typeUuid.value,
-    name: 'Current',
-    link_name: 'Link'
-}));
+// Используем переданный link для генерации описания
+const linkForGeneration = computed(() => {
+    // Берем переданный link как основу
+    const baseLink = props.link || {};
 
-// Создаем объект для передачи в функцию
-const objectForGeneration = computed(() => ({
-    name: props.currentObjectName || 'Current Object'
-}));
+    // Обновляем UUID из локальных состояний (на случай если они изменились)
+    return {
+        ...baseLink,
+        thing_id: currentUuid.value,
+        other_thing_id: linkedUuid.value,
+        link_type_id: typeUuid.value,
+        name: baseLink.name || linkedObjectName.value || 'Linked Object',
+        link_name: baseLink.link_name || linkTypeName.value || 'Link'
+    };
+});
 
-// Автоматически сгенерированное описание
+// Автоматически сгенерированное описание используя link и currentObject
 const generatedDescription = computed(() => {
     if (!currentUuid.value || !linkedUuid.value) return '';
-    return generateLinkDescription(linkForGeneration.value, objectForGeneration.value);
+    return generateLinkDescription(linkForGeneration.value, props.currentObject);
 });
 
 // Имена объектов для отображения
-const currentObjectName = ref(props.currentObjectName || '');
+const currentObjectName = ref(props.currentObject?.name || '');
 const linkedObjectName = ref('');
 const linkTypeName = ref('');
 
@@ -235,7 +239,8 @@ watch(
 
 // Инициализация
 onMounted(async () => {
-    console.log('LinkedObject mounted');
+    console.log('LinkedObject mounted with link:', props.link);
+    console.log('LinkedObject mounted with currentObject:', props.currentObject);
     await loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
@@ -309,12 +314,15 @@ onUnmounted(() => {
     box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
 
-.generated-preview {
+.link-description {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     color: #495057;
     font-size: 0.9rem;
     line-height: 1.5;
+    padding: 8px;
+    border-radius: 4px;
+    font-style: italic;
 }
 
 .btn-danger {
@@ -341,29 +349,6 @@ onUnmounted(() => {
 
 .btn-primary:hover {
     background-color: #0069d9;
-}
-
-.btn-link {
-    color: #007bff;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
-
-.btn-link:hover {
-    text-decoration: underline !important;
-    color: #0056b3;
-}
-
-.text-muted a {
-    color: #6c757d;
-    text-decoration: underline;
-    cursor: pointer;
-}
-
-.text-muted a:hover {
-    color: #495057;
 }
 
 .bi {

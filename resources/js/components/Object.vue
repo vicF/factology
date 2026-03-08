@@ -213,8 +213,7 @@
         <EditLinkModal
             v-if="showEditLinkModal"
             :link="editingLink"
-            :currentObjectUuid="object?.thing_id"
-            :currentObjectName="object?.name"
+            :currentObject="object"
             @save="handleLinkSave"
             @close="showEditLinkModal = false"
         />
