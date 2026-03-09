@@ -36,10 +36,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/object',     [ApiController::class, 'list']);
     Route::post('/object',    [ApiController::class, 'search']);
     Route::get('/object/{id}', [ApiController::class, 'get']);
+    Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
-        Route::post('/object',                [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
         Route::post('/link',                  [ApiController::class, 'storeLink']);     // create

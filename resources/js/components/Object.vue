@@ -8,6 +8,24 @@
             </div>
         </div>
 
+        <!-- Server Error (500) -->
+        <div v-else-if="serverError" class="row">
+            <div class="col text-center py-5">
+                <div class="alert alert-danger">
+                    <h4>{{ $t('Server Error') }}</h4>
+                    <p>
+                        {{ $t('An unexpected error occurred on the server. Please try again later or contact support if the problem persists.') }}
+                    </p>
+                    <button @click="retryLoading" class="btn btn-primary mt-3">
+                        {{ $t('Try Again') }}
+                    </button>
+                    <router-link to="/" class="btn btn-secondary mt-3 ms-2">
+                        {{ $t('Go to Home') }}
+                    </router-link>
+                </div>
+            </div>
+        </div>
+
         <!-- Object not accessible or doesn't exist -->
         <div v-else-if="!object" class="row">
             <div class="col text-center py-5">
@@ -114,7 +132,7 @@
                                 </div>
                                 <div class="col-md-10">
                                     <div v-if="link.name">
-                                        <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
+                                        <RouterLink :to="{ name: 'object', params: { uid: link.one_thing_id === object.thing_id?link.other_thing_id:link.one_thing_id } }">
                                             {{ link.name }}
                                         </RouterLink>
                                     </div>
@@ -125,8 +143,22 @@
                                     <div v-if="link.description">
                                         {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
                                     </div>
-                                    <div v-if="link.translation">{{ link.translation }}</div>
-                                    <div>
+
+                                    <!-- Используем сгенерированный перевод из композабла -->
+                                    <div class="link-description mt-1">
+                                        <LinkDescription
+                                            :link="link"
+                                            :object="object"
+                                            size="small"
+                                        />
+                                    </div>
+
+                                    <!-- Ручной перевод с сервера (если есть) -->
+                                    <div v-if="link.translation" class="mt-1">
+                                        <small>{{ link.translation }}</small>
+                                    </div>
+
+                                    <div class="mt-2">
                                         <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
                                             {{ $t('Delete') }}
                                         </button>
@@ -185,8 +217,7 @@
         <EditLinkModal
             v-if="showEditLinkModal"
             :link="editingLink"
-            :currentObjectUuid="object?.thing_id"
-            :currentObjectName="object?.name"
+            :currentObject="object"
             @save="handleLinkSave"
             @close="showEditLinkModal = false"
         />
@@ -225,6 +256,7 @@ const cacheStore = useObjectCacheStore();
 // State
 const object = ref(null);
 const loaded = ref(false);
+const serverError = ref(false); // New state for 500 errors
 
 // Глобальное состояние вкладки - читаем из localStorage при инициализации
 const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
@@ -248,6 +280,7 @@ const authenticated = computed(() => authStore?.authenticated || false);
 const getObject = async () => {
     try {
         loaded.value = false;
+        serverError.value = false; // Reset server error state
         const response = await axios.get(`/object/${route.params.uid}`);
         object.value = response.data.data;
         if (object.value?.thing_id) {
@@ -256,7 +289,11 @@ const getObject = async () => {
     } catch (error) {
         console.error('Get object error:', error);
 
-        if (error.response?.status === 404) {
+        if (error.response?.status === 500) {
+            // Handle 500 - Internal Server Error
+            serverError.value = true;
+            object.value = null;
+        } else if (error.response?.status === 404) {
             // Object doesn't exist - set object to null and show not found message
             object.value = null;
         } else if (error.response?.status === 401) {
@@ -281,6 +318,11 @@ const getObject = async () => {
     } finally {
         loaded.value = true;
     }
+};
+
+// Retry loading after server error
+const retryLoading = () => {
+    getObject();
 };
 
 const openCreateModal = (type) => {
@@ -432,6 +474,7 @@ watch(() => route.params.uid, (newUid, oldUid) => {
         // Reset state when navigating to a new object
         object.value = null;
         loaded.value = false;
+        serverError.value = false; // Reset server error on navigation
 
         // НЕ сбрасываем activeTab - сохраняем глобальное состояние
 
@@ -510,5 +553,11 @@ watch(() => object.value, (newObject) => {
 .nav-tabs .nav-link:hover {
     border-color: #e9ecef #e9ecef #dee2e6;
     isolation: isolate;
+}
+
+.link-translation {
+    font-style: italic;
+    color: #6c757d;
+    font-size: 0.9em;
 }
 </style>

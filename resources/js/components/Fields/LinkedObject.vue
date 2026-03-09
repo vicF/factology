@@ -2,257 +2,249 @@
 <template>
     <div class="linked-object">
         <div class="form-group flex-group">
-        <ObjectField
-            fieldName="current_object"
-            v-model="localCurrentObjectUuid"
-            :isEditable="true"
-            name="Current Object"
-            :type="THING_TYPE"
-            required
-        />
+            <ObjectField
+                fieldName="current_object"
+                v-model="currentUuid"
+                :isEditable="true"
+                name="Current Object"
+                :type="THING_TYPE"
+                required
+            />
         </div>
+
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="link_type"
-                v-model="localLinkTypeUuid"
+                v-model="typeUuid"
                 :isEditable="true"
                 name="Link type"
                 :type="LINK_TYPE"
                 required
                 class="flex-field"
             />
-            <button class="btn btn-primary flex-button" @click="switchObjects">Switch</button>
+            <button class="btn btn-primary flex-button" @click="switchObjects">
+                Switch
+            </button>
         </div>
 
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="linked_object"
-                v-model="localLinkedObjectUuid"
+                v-model="linkedUuid"
                 :isEditable="true"
                 name="Linked object"
                 :type="THING_TYPE"
                 required
                 class="flex-field"
             />
-            <button class="btn btn-primary flex-button" @click="openCreateObjectModal">Create</button>
+            <button class="btn btn-primary flex-button" @click="openCreateObjectModal">
+                Create
+            </button>
         </div>
 
+        <!-- Поле для ручного ввода (сохраняется на сервер) -->
         <div class="form-group">
-            <!--            <label>Комментарий</label>-->
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <label class="form-label mb-0">
+                    Description
+                    <small class="text-muted ms-2">(manual, saved to server)</small>
+                </label>
+            </div>
+
             <textarea
-                v-model="translation"
+                v-model="manualTranslation"
                 class="form-control"
-                placeholder="Пояснение"
+                placeholder="Enter manual description..."
+                rows="2"
             ></textarea>
         </div>
 
-        <button class="btn btn-danger" @click="removeSelf">Удалить</button>
+        <!-- Автоматически сгенерированное описание используя link и currentObject -->
+        <div class="form-group" >
+            <LinkDescription
+                :link="linkForGeneration"
+                :object="currentObject"
+                size="medium"
+            />
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-danger" @click="removeSelf">Удалить</button>
+        </div>
     </div>
 </template>
 
 <script setup>
-import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
-import {useObjectCacheStore} from '@/stores/objectCache.js';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
-import {CLASS_TYPE, LINK_TYPE, THING_TYPE} from "../../constants.js";
-import {eventBus} from "../../eventBus.js";
+import { LINK_TYPE, THING_TYPE } from "../../constants.js";
+import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
-    currentObjectUuid: {type: String, required: true},
-    currentObjectName: {type: String, required: false},
-    linkedObjectUuid: {type: String, default: ''},
-    linkTypeUuid: {type: String, default: ''},
-    translation: {type: String, default: ''},
-    linkId: {type: [String, Number, null], default: null},
-    index: {type: Number, required: true},
+    // Текущий объект (из Object.vue)
+    currentObject: { type: Object, required: true },
+
+    // Данные ссылки которую редактируем
+    link: { type: Object, required: true },
+
+    // Отдельные поля для обратной совместимости
+    oneThingUuid: { type: String, required: true },
+    otherThingUuid: { type: String, default: '' },
+    linkTypeUuid: { type: String, default: '' },
+    translation: { type: String, default: '' },
+    linkId: { type: [String, Number, null], default: null },
+    index: { type: Number, required: true },
 });
 
 const emit = defineEmits(['update', 'remove']);
 
-const localCurrentObjectUuid = ref(props.currentObjectUuid);
-const localLinkedObjectUuid = ref(props.linkedObjectUuid);
-const localLinkTypeUuid = ref(props.linkTypeUuid);
-const translation = ref(props.translation);
-
 const store = useObjectCacheStore();
 
-const currentObjectName = computed(() => {
-    const obj = store.cache.get(props.currentObjectUuid);
-    return obj?.name || props.currentObjectName || 'Loading...';
+// Локальные состояния
+const currentUuid = ref(props.oneThingUuid);
+const linkedUuid = ref(props.otherThingUuid);
+const typeUuid = ref(props.linkTypeUuid);
+const manualTranslation = ref(props.translation);
+
+// Используем переданный link для генерации описания
+const linkForGeneration = computed(() => {
+    // Берем переданный link как основу
+    const baseLink = props.link || {};
+
+    // Обновляем UUID из локальных состояний (на случай если они изменились)
+    return {
+        ...baseLink,
+        thing_id: currentUuid.value,
+        other_thing_id: linkedUuid.value,
+        link_type_id: typeUuid.value,
+        name: baseLink.name || linkedObjectName.value || 'Linked Object',
+        link_name: baseLink.link_name || linkTypeName.value || 'Link'
+    };
 });
 
-const linkedObjectName = computed(() => {
-    const obj = store.cache.get(localLinkedObjectUuid.value);
-    return obj?.data?.name || props.linkedObjectName || 'Not set';
-});
 
-const linkTypeName = computed(() => {
-    const obj = store.cache.get(localLinkTypeUuid.value);
-    return obj?.data?.name || 'Not set';
-});
+// Имена объектов для отображения
+const currentObjectName = ref(props.currentObject?.name || '');
+const linkedObjectName = ref('');
+const linkTypeName = ref('');
 
-async function fetchObjectName(uuid) {
-    if (!uuid || uuid.trim() === '') return;
-    try {
-        await store.getObject(uuid);
-        console.log(`Fetched name for ${uuid}`);
-    } catch (error) {
-        console.error(`Failed to fetch object for UUID ${uuid}:`, error);
+// Загрузка имен объектов из кэша
+const loadObjectNames = async () => {
+    if (currentUuid.value) {
+        try {
+            const obj = await store.getObject(currentUuid.value);
+            if (obj?.name) currentObjectName.value = obj.name;
+        } catch (e) {
+            console.warn('Failed to load current object name:', e);
+        }
     }
-}
 
+    if (linkedUuid.value) {
+        try {
+            const obj = await store.getObject(linkedUuid.value);
+            if (obj?.name) linkedObjectName.value = obj.name;
+        } catch (e) {
+            console.warn('Failed to load linked object name:', e);
+        }
+    }
+
+    if (typeUuid.value) {
+        try {
+            const obj = await store.getObject(typeUuid.value);
+            if (obj?.name) linkTypeName.value = obj.name;
+        } catch (e) {
+            console.warn('Failed to load link type name:', e);
+        }
+    }
+};
+
+// Открытие модального окна создания объекта
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
         title: `Create new object linked to "${currentObjectName.value || 'current object'}"`,
         params: {
-            type: 3, // THING_TYPE
+            type: THING_TYPE,
         },
         callback: {
             type: 'link-created',
             requestId: requestId,
             targetComponent: 'linked-object',
             index: props.index,
-            linkTypeUuid: localLinkTypeUuid.value,
-            comment: translation.value
+            linkTypeUuid: typeUuid.value,
+            comment: manualTranslation.value
         }
     };
     eventBus.emit('open-create-modal', payload);
 };
 
-const emitUpdate = () => {
-    console.log('LinkedObject.vue - Emitting update:', {
-        index: props.index,
-        data: {
-            currentObjectUuid: localCurrentObjectUuid.value,
-            linkedObjectUuid: localLinkedObjectUuid.value,
-            linkTypeUuid: localLinkTypeUuid.value,
-            translation: translation.value,
-            linkId: props.linkId,
-        },
-    });
-
-    emit('update', {
-        index: props.index,
-        data: {
-            currentObjectUuid: localCurrentObjectUuid.value,
-            linkedObjectUuid: localLinkedObjectUuid.value,
-            linkTypeUuid: localLinkTypeUuid.value,
-            translation: translation.value,
-            linkId: props.linkId,
-        },
-    });
-};
-
+// Переключение объектов
 const switchObjects = () => {
-    // Swap the values
-    const temp = localCurrentObjectUuid.value;
-    localCurrentObjectUuid.value = localLinkedObjectUuid.value;
-    localLinkedObjectUuid.value = temp;
-
-    // Immediately emit the update with swapped values
-    //emitUpdate();
+    const temp = currentUuid.value;
+    currentUuid.value = linkedUuid.value;
+    linkedUuid.value = temp;
 
     console.log('Switched objects:', {
-        newCurrent: localCurrentObjectUuid.value,
-        newLinked: localLinkedObjectUuid.value
+        newCurrent: currentUuid.value,
+        newLinked: linkedUuid.value
     });
 };
 
-watch(
-    () => props.currentObjectUuid,
-    (newVal) => {
-        localCurrentObjectUuid.value = newVal;
-        fetchObjectName(newVal);
-    },
-    {immediate: true}
-);
+// Удаление компонента
+const removeSelf = () => {
+    emit('remove', props.index);
+};
 
-watch(
-    () => props.linkTypeUuid,
-    (newVal) => {
-        localLinkTypeUuid.value = newVal;
-        fetchObjectName(newVal);
-    },
-    {immediate: true}
-);
+// Обработчик создания объекта через модальное окно
+const handleLinkCreated = (data) => {
+    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
+        console.log('Link created, updating linked object:', data);
+        linkedUuid.value = data.newObjectId;
 
-watch(
-    () => props.linkedObjectUuid,
-    (newVal) => {
-        localLinkedObjectUuid.value = newVal;
-        fetchObjectName(newVal);
-    },
-    {immediate: true}
-);
+        if (data.linkTypeUuid) {
+            typeUuid.value = data.linkTypeUuid;
+        }
 
-watch(
-    () => localLinkedObjectUuid.value,
-    (newVal) => {
-        fetchObjectName(newVal);
-        emitUpdate();
+        if (data.comment !== undefined) {
+            manualTranslation.value = data.comment;
+        }
     }
-);
+};
 
+// Следим за изменениями и эмитим update
 watch(
-    () => localLinkTypeUuid.value,
-    (newVal) => {
-        fetchObjectName(newVal);
-        emitUpdate();
-    }
-);
-
-watch(
-    () => translation.value,
+    [currentUuid, linkedUuid, typeUuid, manualTranslation],
     () => {
-        emitUpdate();
-    }
+        emit('update', {
+            index: props.index,
+            data: {
+                oneThingUuid: currentUuid.value,
+                otherThingUuid: linkedUuid.value,
+                linkTypeUuid: typeUuid.value,
+                translation: manualTranslation.value,
+                linkId: props.linkId,
+            }
+        });
+
+        // Загружаем имена при изменении UUID
+        loadObjectNames();
+    },
+    { deep: true }
 );
 
-watch(
-    () => props.linkId,
-    () => {
-        emitUpdate();
-    }
-);
-
-onMounted(() => {
-    fetchObjectName(localLinkedObjectUuid.value);
-    fetchObjectName(localLinkTypeUuid.value);
-    fetchObjectName(props.currentObjectUuid);
+// Инициализация
+onMounted(async () => {
+    console.log('LinkedObject mounted with link:', props.link);
+    console.log('LinkedObject mounted with currentObject:', props.currentObject);
+    await loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
 
 onUnmounted(() => {
-    // Clean up listener
+    console.log('LinkedObject unmounted');
     eventBus.off('link-created', handleLinkCreated);
 });
-
-const handleLinkCreated = (data) => {
-    // Check if this callback is for this specific component instance
-    // You might want to store the requestId when opening the modal
-    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        console.log('Link created, updating linked object:', data);
-
-        // Update the linked object UUID with the newly created object
-        localLinkedObjectUuid.value = data.newObjectId;
-
-        // Optionally update link type and comment if they were provided
-        if (data.linkTypeUuid) {
-            localLinkTypeUuid.value = data.linkTypeUuid;
-        }
-
-        if (data.comment !== undefined) {
-            translation.value = data.comment;
-        }
-
-        // The emitUpdate will be triggered by the watchers
-    }
-};
-
-function removeSelf() {
-    emit('remove', props.index);
-}
 </script>
 
 <style scoped>
@@ -264,43 +256,44 @@ function removeSelf() {
 }
 
 .form-group {
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
-/* Стили для групп с кнопкой справа */
+.form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.form-label small {
+    font-weight: normal;
+    font-size: 0.8rem;
+}
+
 .flex-group {
     display: flex;
-    align-items: stretch; /* Растягиваем элементы по высоте */
-    gap: 8px; /* Отступ между полем и кнопкой */
+    align-items: stretch;
+    gap: 8px;
     margin-bottom: 10px;
 }
 
 .flex-field {
-    flex: 1; /* Поле занимает всё доступное пространство */
-    min-width: 0; /* Предотвращает переполнение */
+    flex: 1;
+    min-width: 0;
 }
 
 .flex-button {
-    flex-shrink: 0; /* Кнопка не сжимается */
-    height: auto; /* Высота автоматически */
-    padding: 0 15px; /* Горизонтальные отступы, вертикальные - 0 */
-    white-space: nowrap; /* Текст кнопки не переносится */
-    display: flex;
-    align-items: center; /* Центрируем текст по вертикали */
-    margin: 0; /* Убираем внешние отступы */
-    border-radius: 4px;
-    font-size: 14px;
-    line-height: 1; /* Убираем лишнюю высоту строки */
-}
-
-/* Альтернативный вариант - если нужна точная высота как у поля ввода */
-.flex-button-fixed {
     flex-shrink: 0;
-    height: 38px; /* Стандартная высота Bootstrap input */
+    height: auto;
     padding: 0 15px;
     white-space: nowrap;
     display: flex;
     align-items: center;
+    margin: 0;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1;
 }
 
 .form-control {
@@ -308,6 +301,24 @@ function removeSelf() {
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    font-family: inherit;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.link-description {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding: 8px;
+    border-radius: 4px;
+    font-style: italic;
 }
 
 .btn-danger {
@@ -334,5 +345,9 @@ function removeSelf() {
 
 .btn-primary:hover {
     background-color: #0069d9;
+}
+
+.bi {
+    font-size: 0.9rem;
 }
 </style>

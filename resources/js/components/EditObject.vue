@@ -87,7 +87,7 @@
                             <LinkedObject
                                 :current-object-uuid="formData.thing_id"
                                 :current-object-name="formData.name"
-                                :linked-object-uuid="item.linkedObjectUuid"
+                                :linked-object-uuid="item.otherThingUuid"
                                 :link-type-uuid="item.linkTypeUuid"
                                 :comment="item.comment"
                                 :link-id="item.linkId"
@@ -228,8 +228,8 @@ const initializeData = () => {
             .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
             .map(item => ({
                 id: uuidv4(),
-                currentObjectUuid: formData.value.thing_id,
-                linkedObjectUuid: item.other_thing_id || '',
+                oneThingUuid: formData.value.thing_id,
+                otherThingUuid: item.other_thing_id || '',
                 linkTypeUuid: item.link_type_id || '',
                 comment: item.description || '',
                 linkId: item.link_id || null,
@@ -239,8 +239,8 @@ const initializeData = () => {
         if (props.initialLinkedObjects && props.initialLinkedObjects.length > 0) {
             linkedObjects.value = props.initialLinkedObjects.map(item => ({
                 id: uuidv4(),
-                currentObjectUuid: formData.value.thing_id,
-                linkedObjectUuid: item.other_thing_id || item.linkedObjectUuid || '',
+                oneThingUuid: formData.value.thing_id,
+                otherThingUuid: item.other_thing_id || item.otherThingUuid || '',
                 linkTypeUuid: item.link_type_id || item.linkTypeUuid || '',
                 comment: item.description || item.comment || '',
                 linkId: item.link_id || item.linkId || null,
@@ -249,8 +249,8 @@ const initializeData = () => {
             // Fallback to parentObjectId for backward compatibility
             linkedObjects.value = [{
                 id: uuidv4(),
-                currentObjectUuid: formData.value.thing_id,
-                linkedObjectUuid: props.parentObjectId,
+                oneThingUuid: formData.value.thing_id,
+                otherThingUuid: props.parentObjectId,
                 linkTypeUuid: props.parentLinkType,
                 comment: '',
                 linkId: null,
@@ -272,8 +272,8 @@ initializeData();
 const addNewLinkedObject = () => {
     linkedObjects.value.push({
         id: uuidv4(),
-        currentObjectUuid: formData.value.thing_id,
-        linkedObjectUuid: '',
+        oneThingUuid: formData.value.thing_id,
+        otherThingUuid: '',
         linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
         comment: '',
         linkId: null,
@@ -319,11 +319,11 @@ const handleHideModal = (event) => {
 const submitForm = async () => {
     try {
         const linksToAdd = linkedObjects.value
-            .filter(item => item.linkedObjectUuid?.trim() && !item.linkId)
+            .filter(item => item.otherThingUuid?.trim() && !item.linkId)
             .map(item => ({
                 one_thing_id: formData.value.thing_id,
                 link_type_id: item.linkTypeUuid,
-                other_thing_id: item.linkedObjectUuid,
+                other_thing_id: item.otherThingUuid,
                 description: item.comment || '',
                 public: 0,
             }));

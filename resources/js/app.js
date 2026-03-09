@@ -9,11 +9,15 @@ const pinia = createPinia();
 import App from './components/App.vue';
 import router from './router';
 import i18n from './lang/i18n';
+import LinkDescription from './components/LinkDescription.vue';
+
 
 const app = createApp(App);
 app.use(router);
 app.use(i18n);
 app.use(pinia);
+// Глобальная регистрация
+app.component('LinkDescription', LinkDescription);
 
 app.config.globalProperties.$truncateText = function(text, length) {
     if (text.length <= length) {
