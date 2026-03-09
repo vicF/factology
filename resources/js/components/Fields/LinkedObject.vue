@@ -60,10 +60,12 @@
         </div>
 
         <!-- Автоматически сгенерированное описание используя link и currentObject -->
-        <div class="form-group" v-if="generatedDescription">
-            <div class="link-description mt-1 text-muted">
-                <small>{{ generatedDescription }}</small>
-            </div>
+        <div class="form-group" >
+            <LinkDescription
+                :link="linkForGeneration"
+                :object="currentObject"
+                size="medium"
+            />
         </div>
 
         <div class="d-flex gap-2 mt-3">
@@ -78,7 +80,6 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import { LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
-import { generateLinkDescription } from '@/composables/useLinkTranslation.js';
 
 const props = defineProps({
     // Текущий объект (из Object.vue)
@@ -88,8 +89,8 @@ const props = defineProps({
     link: { type: Object, required: true },
 
     // Отдельные поля для обратной совместимости
-    currentObjectUuid: { type: String, required: true },
-    linkedObjectUuid: { type: String, default: '' },
+    oneThingUuid: { type: String, required: true },
+    otherThingUuid: { type: String, default: '' },
     linkTypeUuid: { type: String, default: '' },
     translation: { type: String, default: '' },
     linkId: { type: [String, Number, null], default: null },
@@ -101,8 +102,8 @@ const emit = defineEmits(['update', 'remove']);
 const store = useObjectCacheStore();
 
 // Локальные состояния
-const currentUuid = ref(props.currentObjectUuid);
-const linkedUuid = ref(props.linkedObjectUuid);
+const currentUuid = ref(props.oneThingUuid);
+const linkedUuid = ref(props.otherThingUuid);
 const typeUuid = ref(props.linkTypeUuid);
 const manualTranslation = ref(props.translation);
 
@@ -122,11 +123,6 @@ const linkForGeneration = computed(() => {
     };
 });
 
-// Автоматически сгенерированное описание используя link и currentObject
-const generatedDescription = computed(() => {
-    if (!currentUuid.value || !linkedUuid.value) return '';
-    return generateLinkDescription(linkForGeneration.value, props.currentObject);
-});
 
 // Имена объектов для отображения
 const currentObjectName = ref(props.currentObject?.name || '');
@@ -223,8 +219,8 @@ watch(
         emit('update', {
             index: props.index,
             data: {
-                currentObjectUuid: currentUuid.value,
-                linkedObjectUuid: linkedUuid.value,
+                oneThingUuid: currentUuid.value,
+                otherThingUuid: linkedUuid.value,
                 linkTypeUuid: typeUuid.value,
                 translation: manualTranslation.value,
                 linkId: props.linkId,

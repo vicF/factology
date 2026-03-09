@@ -12,8 +12,8 @@
                         v-if="linkData"
                         :currentObject="currentObject"
                         :link="props.link"
-                        :currentObjectUuid="linkData.currentObjectUuid"
-                        :linkedObjectUuid="linkData.linkedObjectUuid"
+                        :oneThingUuid="linkData.oneThingUuid"
+                        :otherThingUuid="linkData.otherThingUuid"
                         :linkTypeUuid="linkData.linkTypeUuid"
                         :translation="linkData.translation"
                         :linkId="linkData.linkId"
@@ -58,8 +58,8 @@ const linkData = ref(null);
 onMounted(() => {
     // Преобразуем данные ссылки в формат, понятный LinkedObject
     linkData.value = {
-        currentObjectUuid: props.link.one_thing_id,
-        linkedObjectUuid: props.link.other_thing_id,
+        oneThingUuid: props.link.one_thing_id,
+        otherThingUuid: props.link.other_thing_id,
         linkTypeUuid: props.link.link_type_id,
         translation: props.link.translation || '',
         linkId: props.link.link_id
@@ -85,8 +85,8 @@ const save = () => {
         delete: false,
         data: {
             link_id: linkData.value.linkId,
-            one_thing_id: linkData.value.currentObjectUuid,
-            other_thing_id: linkData.value.linkedObjectUuid,
+            one_thing_id: linkData.value.oneThingUuid,
+            other_thing_id: linkData.value.otherThingUuid,
             link_type_id: linkData.value.linkTypeUuid,
             translation: linkData.value.translation,
             // Сохраняем оригинальные даты, если они есть

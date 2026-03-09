@@ -145,13 +145,17 @@
                                     </div>
 
                                     <!-- Используем сгенерированный перевод из композабла -->
-                                    <div class="link-description mt-1 text-muted">
-                                        <small>{{ generateLinkDescription(link, object) }}</small>
+                                    <div class="link-description mt-1">
+                                        <LinkDescription
+                                            :link="link"
+                                            :object="object"
+                                            size="small"
+                                        />
                                     </div>
 
                                     <!-- Ручной перевод с сервера (если есть) -->
                                     <div v-if="link.translation" class="mt-1">
-                                        <small class="text-info">{{ link.translation }}</small>
+                                        <small>{{ link.translation }}</small>
                                     </div>
 
                                     <div class="mt-2">
@@ -231,7 +235,6 @@ import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
 import { inject } from 'vue';
-import { generateLinkDescription } from '../composables/useLinkTranslation.js';
 
 // Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
