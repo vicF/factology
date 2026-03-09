@@ -8,12 +8,11 @@ export function generateLinkDescription(link, object) {
     //const cacheStore = useObjectCacheStore()
 
     const parts = []
-
-    parts.push((object.thing_id === link.one_thing_id)? link.name: object.name)
+    parts.push((object.thing_id === link.one_thing_id)? object.name:link.name)
     parts.push('→')
     parts.push(link.link_name)
     parts.push('→')
-    parts.push((object.thing_id === link.one_thing_id)? object.name:link.name)
+    parts.push((object.thing_id === link.one_thing_id)? link.name: object.name)
 
     return parts.join(' ')
 }
