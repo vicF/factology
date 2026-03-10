@@ -96,7 +96,6 @@ const props = defineProps({
     link: { type: Object, default: null },
 
     // Обязательные поля для работы компонента
-    currentObjectUuid: { type: String, required: true },
     linkedObjectUuid: { type: String, default: '' },
     linkTypeUuid: { type: String, default: '' },
     translation: { type: String, default: '' },
@@ -114,7 +113,7 @@ const hasLinkAndObject = computed(() =>
 );
 
 // Локальные состояния
-const currentUuid = ref(props.currentObjectUuid);
+const currentUuid = ref(props.currentObject?.thing_id || '');
 const linkedUuid = ref(props.linkedObjectUuid);
 const typeUuid = ref(props.linkTypeUuid);
 const manualTranslation = ref(props.translation);
@@ -246,8 +245,8 @@ onMounted(async () => {
     console.log('LinkedObject mounted with props:', {
         currentObject: props.currentObject,
         link: props.link,
-        currentObjectUuid: props.currentObjectUuid,
-        linkedObjectUuid: props.linkedObjectUuid,
+        currentUuid: currentUuid.value,
+        linkedUuid: props.linkedObjectUuid,
         linkTypeUuid: props.linkTypeUuid
     });
     await loadObjectNames();
