@@ -65,7 +65,7 @@
                 </small>
                 <LinkDescription
                     :link="link"
-                    :object="currentObjectForPreview"
+                    :object="currentObject"
                     size="medium"
                 />
             </div>
@@ -86,7 +86,10 @@ import { LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
+    // Объект ссылки со всеми полями
     link: { type: Object, required: true },
+    // Текущий объект (для предпросмотра)
+    currentObject: { type: Object, required: true },
     index: { type: Number, required: true },
 });
 
@@ -94,22 +97,19 @@ const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Используем сам переданный link напрямую
+// Используем переданные объекты напрямую
 const link = computed({
     get: () => props.link,
     set: (newValue) => {
-        // Можно добавить логику если нужно
-        console.log('Link updated:', newValue);
+        // Обновляем через emit, так как props нельзя менять напрямую
+        emit('update', {
+            index: props.index,
+            data: newValue
+        });
     }
 });
 
-// Объект для предпросмотра (текущий объект - первый)
-const currentObjectForPreview = computed(() => ({
-    thing_id: link.value.one_thing_id,
-    name: oneObjectName.value || 'Object'
-}));
-
-// Имена объектов для отображения
+// Имена объектов для отображения (из кэша)
 const oneObjectName = ref('');
 const otherObjectName = ref('');
 const typeName = ref('');
@@ -157,14 +157,11 @@ const openCreateObjectModal = () => {
 // Переключение объектов
 const swapObjects = () => {
     const temp = link.value.one_thing_id;
-    link.value.one_thing_id = link.value.other_thing_id;
-    link.value.other_thing_id = temp;
-
-    // Явно вызываем обновление
-    emit('update', {
-        index: props.index,
-        data: { ...link.value }
-    });
+    link.value = {
+        ...link.value,
+        one_thing_id: link.value.other_thing_id,
+        other_thing_id: temp
+    };
 };
 
 // Удаление компонента
@@ -175,36 +172,35 @@ const removeSelf = () => {
 // Обработчик создания объекта через модальное окно
 const handleLinkCreated = (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        if (!link.value.other_thing_id) {
-            link.value.other_thing_id = data.newObjectId;
-        }
-        if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
-        if (data.comment !== undefined) link.value.translation = data.comment;
+        const updates = {};
 
-        // Явно вызываем обновление
-        emit('update', {
-            index: props.index,
-            data: { ...link.value }
-        });
+        if (!link.value.other_thing_id) {
+            updates.other_thing_id = data.newObjectId;
+        }
+        if (data.linkTypeUuid) {
+            updates.link_type_id = data.linkTypeUuid;
+        }
+        if (data.comment !== undefined) {
+            updates.translation = data.comment;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            link.value = { ...link.value, ...updates };
+        }
     }
 };
 
-// Следим за изменениями и эмитим update
-watch(
-    () => link.value,
-    () => {
-        emit('update', {
-            index: props.index,
-            data: { ...link.value }
-        });
-        loadObjectNames();
-    },
-    { deep: true, immediate: true }
-);
+// Следим за изменениями в link
+watch(() => link.value, () => {
+    loadObjectNames();
+}, { deep: true, immediate: true });
 
 // Инициализация
 onMounted(() => {
-    console.log('LinkedObject mounted with link:', link.value);
+    console.log('LinkedObject mounted with:', {
+        link: link.value,
+        currentObject: props.currentObject
+    });
     loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });

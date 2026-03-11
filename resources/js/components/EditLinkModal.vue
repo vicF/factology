@@ -9,14 +9,8 @@
                 </div>
                 <div class="modal-body">
                     <LinkedObject
-                        v-if="linkData"
+                        :link="editingLink"
                         :currentObject="currentObject"
-                        :link="props.link"
-                        :oneThingUuid="linkData.oneThingUuid"
-                        :otherThingUuid="linkData.otherThingUuid"
-                        :linkTypeUuid="linkData.linkTypeUuid"
-                        :translation="linkData.translation"
-                        :linkId="linkData.linkId"
                         :index="0"
                         @update="handleLinkUpdate"
                         @remove="handleLinkRemove"
@@ -37,39 +31,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 
 const props = defineProps({
-    link: {
-        type: Object,
-        required: true
-    },
-    currentObject: {
-        type: Object,
-        required: true
-    }
+    link: { type: Object, required: true },
+    currentObject: { type: Object, required: true }
 });
 
 const emit = defineEmits(['close', 'save']);
 
-const linkData = ref(null);
-
-onMounted(() => {
-    // Преобразуем данные ссылки в формат, понятный LinkedObject
-    linkData.value = {
-        oneThingUuid: props.link.one_thing_id,
-        otherThingUuid: props.link.other_thing_id,
-        linkTypeUuid: props.link.link_type_id,
-        translation: props.link.translation || '',
-        linkId: props.link.link_id
-    };
-});
+// Создаем реактивную копию link для редактирования
+const editingLink = ref({ ...props.link });
 
 const handleLinkUpdate = (updateData) => {
-    // Сохраняем обновленные данные
-    linkData.value = {
-        ...linkData.value,
+    // Обновляем editingLink данными из LinkedObject
+    editingLink.value = {
+        ...editingLink.value,
         ...updateData.data
     };
 };
@@ -83,18 +61,7 @@ const handleLinkRemove = () => {
 const save = () => {
     emit('save', {
         delete: false,
-        data: {
-            link_id: linkData.value.linkId,
-            one_thing_id: linkData.value.oneThingUuid,
-            other_thing_id: linkData.value.otherThingUuid,
-            link_type_id: linkData.value.linkTypeUuid,
-            translation: linkData.value.translation,
-            // Сохраняем оригинальные даты, если они есть
-            start: props.link.start,
-            end: props.link.end,
-            link_start: props.link.link_start,
-            link_end: props.link.link_end
-        }
+        data: editingLink.value
     });
 };
 
