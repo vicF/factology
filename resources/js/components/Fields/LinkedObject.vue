@@ -3,10 +3,10 @@
     <div class="linked-object">
         <div class="form-group flex-group">
             <ObjectField
-                fieldName="current_object"
-                v-model="currentUuid"
+                fieldName="one_thing"
+                v-model="oneUuid"
                 :isEditable="true"
-                name="Current Object"
+                name="First object"
                 :type="THING_TYPE"
                 required
             />
@@ -22,17 +22,21 @@
                 required
                 class="flex-field"
             />
-            <button class="btn btn-primary flex-button" @click="switchObjects">
-                Switch
+            <button
+                class="btn btn-primary flex-button"
+                @click="swapObjects"
+                :disabled="!oneUuid || !otherUuid"
+            >
+                Swap
             </button>
         </div>
 
         <div class="form-group flex-group">
             <ObjectField
-                fieldName="linked_object"
-                v-model="linkedUuid"
+                fieldName="other_thing"
+                v-model="otherUuid"
                 :isEditable="true"
-                name="Linked object"
+                name="Second object"
                 :type="THING_TYPE"
                 required
                 class="flex-field"
@@ -42,25 +46,18 @@
             </button>
         </div>
 
-        <!-- Поле для ручного ввода (сохраняется на сервер) -->
+        <!-- Поле для ручного описания -->
         <div class="form-group">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <label class="form-label mb-0">
-                    Description
-                    <small class="text-muted ms-2">(manual, saved to server)</small>
-                </label>
-            </div>
-
             <textarea
-                v-model="manualTranslation"
+                v-model="description"
                 class="form-control"
-                placeholder="Enter manual description..."
+                placeholder="Enter description..."
                 rows="2"
             ></textarea>
         </div>
 
-        <!-- Автоматически сгенерированное описание (только если есть и link и currentObject) -->
-        <div class="form-group" v-if="hasLinkAndObject">
+        <!-- Автоматически сгенерированное описание через компонент LinkDescription -->
+        <div class="form-group" v-if="oneUuid && otherUuid && typeUuid">
             <div class="generated-preview p-2 bg-light rounded border">
                 <small class="text-muted d-block mb-1">
                     <i class="bi bi-magic me-1"></i>
@@ -68,7 +65,7 @@
                 </small>
                 <LinkDescription
                     :link="linkForGeneration"
-                    :object="props.currentObject"
+                    :object="currentObjectForPreview"
                     size="medium"
                 />
             </div>
@@ -84,21 +81,18 @@
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
-import LinkDescription from './../LinkDescription.vue';
+import LinkDescription from './../LinkDescription.vue';  // Импортируем компонент
 import { LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
-    // Текущий объект (из Object.vue) - опционально
-    currentObject: { type: Object, default: null },
-
-    // Данные ссылки которую редактируем - опционально
+    // Может быть полный объект ссылки
     link: { type: Object, default: null },
-
-    // Обязательные поля для работы компонента
-    linkedObjectUuid: { type: String, default: '' },
-    linkTypeUuid: { type: String, default: '' },
-    translation: { type: String, default: '' },
+    // Или отдельные значения
+    oneUuid: { type: String, default: '' },
+    otherUuid: { type: String, default: '' },
+    typeUuid: { type: String, default: '' },
+    description: { type: String, default: '' },
     linkId: { type: [String, Number, null], default: null },
     index: { type: Number, required: true },
 });
@@ -107,62 +101,51 @@ const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Проверяем, есть ли оба объекта для генерации описания
-const hasLinkAndObject = computed(() =>
-    props.link && props.currentObject && props.currentObject.thing_id
-);
-
 // Локальные состояния
-const currentUuid = ref(props.currentObject?.thing_id || '');
-const linkedUuid = ref(props.linkedObjectUuid);
-const typeUuid = ref(props.linkTypeUuid);
-const manualTranslation = ref(props.translation);
+const oneUuid = ref(props.oneUuid || props.link?.one_thing_id || '');
+const otherUuid = ref(props.otherUuid || props.link?.other_thing_id || '');
+const typeUuid = ref(props.typeUuid || props.link?.link_type_id || '');
+const description = ref(props.description || props.link?.translation || '');
 
-// Используем переданный link для генерации описания
-const linkForGeneration = computed(() => {
-    if (!props.link) return null;
+// Создаем объект link для компонента LinkDescription
+const linkForGeneration = computed(() => ({
+    one_thing_id: oneUuid.value,
+    other_thing_id: otherUuid.value,
+    link_type_id: typeUuid.value,
+    name: otherObjectName.value || 'Object',
+    link_name: typeName.value || 'Link'
+}));
 
-    return {
-        one_thing_id: currentUuid.value,
-        other_thing_id: linkedUuid.value,
-        link_type_id: typeUuid.value,
-        name: props.link.name || linkedObjectName.value || 'Linked Object',
-        link_name: props.link.link_name || linkTypeName.value || 'Link'
-    };
-});
+// Создаем объект currentObject для компонента LinkDescription
+const currentObjectForPreview = computed(() => ({
+    thing_id: oneUuid.value,
+    name: oneObjectName.value || 'Current Object'
+}));
 
 // Имена объектов для отображения
-const currentObjectName = ref(props.currentObject?.name || '');
-const linkedObjectName = ref('');
-const linkTypeName = ref('');
+const oneObjectName = ref('');
+const otherObjectName = ref('');
+const typeName = ref('');
 
 // Загрузка имен объектов из кэша
 const loadObjectNames = async () => {
-    if (currentUuid.value) {
+    if (oneUuid.value) {
         try {
-            const obj = await store.getObject(currentUuid.value);
-            if (obj?.name) currentObjectName.value = obj.name;
-        } catch (e) {
-            console.warn('Failed to load current object name:', e);
-        }
+            const obj = await store.getObject(oneUuid.value);
+            if (obj?.name) oneObjectName.value = obj.name;
+        } catch (e) {}
     }
-
-    if (linkedUuid.value) {
+    if (otherUuid.value) {
         try {
-            const obj = await store.getObject(linkedUuid.value);
-            if (obj?.name) linkedObjectName.value = obj.name;
-        } catch (e) {
-            console.warn('Failed to load linked object name:', e);
-        }
+            const obj = await store.getObject(otherUuid.value);
+            if (obj?.name) otherObjectName.value = obj.name;
+        } catch (e) {}
     }
-
     if (typeUuid.value) {
         try {
             const obj = await store.getObject(typeUuid.value);
-            if (obj?.name) linkTypeName.value = obj.name;
-        } catch (e) {
-            console.warn('Failed to load link type name:', e);
-        }
+            if (obj?.name) typeName.value = obj.name;
+        } catch (e) {}
     }
 };
 
@@ -170,32 +153,25 @@ const loadObjectNames = async () => {
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
-        title: `Create new object linked to "${currentObjectName.value || 'current object'}"`,
-        params: {
-            type: THING_TYPE,
-        },
+        title: 'Create new object',
+        params: { type: THING_TYPE },
         callback: {
             type: 'link-created',
             requestId: requestId,
             targetComponent: 'linked-object',
             index: props.index,
             linkTypeUuid: typeUuid.value,
-            comment: manualTranslation.value
+            comment: description.value
         }
     };
     eventBus.emit('open-create-modal', payload);
 };
 
 // Переключение объектов
-const switchObjects = () => {
-    const temp = currentUuid.value;
-    currentUuid.value = linkedUuid.value;
-    linkedUuid.value = temp;
-
-    console.log('Switched objects:', {
-        newCurrent: currentUuid.value,
-        newLinked: linkedUuid.value
-    });
+const swapObjects = () => {
+    const temp = oneUuid.value;
+    oneUuid.value = otherUuid.value;
+    otherUuid.value = temp;
 };
 
 // Удаление компонента
@@ -206,55 +182,47 @@ const removeSelf = () => {
 // Обработчик создания объекта через модальное окно
 const handleLinkCreated = (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        console.log('Link created, updating linked object:', data);
-        linkedUuid.value = data.newObjectId;
-
-        if (data.linkTypeUuid) {
-            typeUuid.value = data.linkTypeUuid;
+        // Если otherUuid пустой, заполняем его
+        if (!otherUuid.value) {
+            otherUuid.value = data.newObjectId;
         }
-
-        if (data.comment !== undefined) {
-            manualTranslation.value = data.comment;
-        }
+        if (data.linkTypeUuid) typeUuid.value = data.linkTypeUuid;
+        if (data.comment !== undefined) description.value = data.comment;
     }
 };
 
 // Следим за изменениями и эмитим update
 watch(
-    [currentUuid, linkedUuid, typeUuid, manualTranslation],
+    [oneUuid, otherUuid, typeUuid, description],
     () => {
         emit('update', {
             index: props.index,
             data: {
-                currentObjectUuid: currentUuid.value,
-                linkedObjectUuid: linkedUuid.value,
-                linkTypeUuid: typeUuid.value,
-                translation: manualTranslation.value,
-                linkId: props.linkId,
+                one_thing_id: oneUuid.value,
+                other_thing_id: otherUuid.value,
+                link_type_id: typeUuid.value,
+                translation: description.value,
+                link_id: props.linkId,
             }
         });
-
-        // Загружаем имена при изменении UUID
         loadObjectNames();
     },
     { deep: true }
 );
 
 // Инициализация
-onMounted(async () => {
-    console.log('LinkedObject mounted with props:', {
-        currentObject: props.currentObject,
-        link: props.link,
-        currentUuid: currentUuid.value,
-        linkedUuid: props.linkedObjectUuid,
-        linkTypeUuid: props.linkTypeUuid
+onMounted(() => {
+    console.log('LinkedObject mounted with:', {
+        oneUuid: oneUuid.value,
+        otherUuid: otherUuid.value,
+        typeUuid: typeUuid.value,
+        description: description.value
     });
-    await loadObjectNames();
+    loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
 
 onUnmounted(() => {
-    console.log('LinkedObject unmounted');
     eventBus.off('link-created', handleLinkCreated);
 });
 </script>
