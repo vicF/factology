@@ -4,7 +4,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="one_thing"
-                v-model="oneUuid"
+                v-model="link.one_thing_id"
                 :isEditable="true"
                 name="First object"
                 :type="THING_TYPE"
@@ -15,7 +15,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="link_type"
-                v-model="typeUuid"
+                v-model="link.link_type_id"
                 :isEditable="true"
                 name="Link type"
                 :type="LINK_TYPE"
@@ -25,7 +25,7 @@
             <button
                 class="btn btn-primary flex-button"
                 @click="swapObjects"
-                :disabled="!oneUuid || !otherUuid"
+                :disabled="!link.one_thing_id || !link.other_thing_id"
             >
                 Swap
             </button>
@@ -34,7 +34,7 @@
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="other_thing"
-                v-model="otherUuid"
+                v-model="link.other_thing_id"
                 :isEditable="true"
                 name="Second object"
                 :type="THING_TYPE"
@@ -49,22 +49,22 @@
         <!-- Поле для ручного описания -->
         <div class="form-group">
             <textarea
-                v-model="description"
+                v-model="link.translation"
                 class="form-control"
                 placeholder="Enter description..."
                 rows="2"
             ></textarea>
         </div>
 
-        <!-- Автоматически сгенерированное описание через компонент LinkDescription -->
-        <div class="form-group" v-if="oneUuid && otherUuid && typeUuid">
+        <!-- Автоматически сгенерированное описание -->
+        <div class="form-group" v-if="link.one_thing_id && link.other_thing_id && link.link_type_id">
             <div class="generated-preview p-2 bg-light rounded border">
                 <small class="text-muted d-block mb-1">
                     <i class="bi bi-magic me-1"></i>
                     Auto-generated preview:
                 </small>
                 <LinkDescription
-                    :link="linkForGeneration"
+                    :link="link"
                     :object="currentObjectForPreview"
                     size="medium"
                 />
@@ -81,19 +81,12 @@
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
-import LinkDescription from './../LinkDescription.vue';  // Импортируем компонент
+import LinkDescription from './../LinkDescription.vue';
 import { LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
-    // Может быть полный объект ссылки
-    link: { type: Object, default: null },
-    // Или отдельные значения
-    oneUuid: { type: String, default: '' },
-    otherUuid: { type: String, default: '' },
-    typeUuid: { type: String, default: '' },
-    description: { type: String, default: '' },
-    linkId: { type: [String, Number, null], default: null },
+    link: { type: Object, required: true },
     index: { type: Number, required: true },
 });
 
@@ -101,25 +94,19 @@ const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Локальные состояния
-const oneUuid = ref(props.oneUuid || props.link?.one_thing_id || '');
-const otherUuid = ref(props.otherUuid || props.link?.other_thing_id || '');
-const typeUuid = ref(props.typeUuid || props.link?.link_type_id || '');
-const description = ref(props.description || props.link?.translation || '');
+// Используем сам переданный link напрямую
+const link = computed({
+    get: () => props.link,
+    set: (newValue) => {
+        // Можно добавить логику если нужно
+        console.log('Link updated:', newValue);
+    }
+});
 
-// Создаем объект link для компонента LinkDescription
-const linkForGeneration = computed(() => ({
-    one_thing_id: oneUuid.value,
-    other_thing_id: otherUuid.value,
-    link_type_id: typeUuid.value,
-    name: otherObjectName.value || 'Object',
-    link_name: typeName.value || 'Link'
-}));
-
-// Создаем объект currentObject для компонента LinkDescription
+// Объект для предпросмотра (текущий объект - первый)
 const currentObjectForPreview = computed(() => ({
-    thing_id: oneUuid.value,
-    name: oneObjectName.value || 'Current Object'
+    thing_id: link.value.one_thing_id,
+    name: oneObjectName.value || 'Object'
 }));
 
 // Имена объектов для отображения
@@ -129,21 +116,21 @@ const typeName = ref('');
 
 // Загрузка имен объектов из кэша
 const loadObjectNames = async () => {
-    if (oneUuid.value) {
+    if (link.value.one_thing_id) {
         try {
-            const obj = await store.getObject(oneUuid.value);
+            const obj = await store.getObject(link.value.one_thing_id);
             if (obj?.name) oneObjectName.value = obj.name;
         } catch (e) {}
     }
-    if (otherUuid.value) {
+    if (link.value.other_thing_id) {
         try {
-            const obj = await store.getObject(otherUuid.value);
+            const obj = await store.getObject(link.value.other_thing_id);
             if (obj?.name) otherObjectName.value = obj.name;
         } catch (e) {}
     }
-    if (typeUuid.value) {
+    if (link.value.link_type_id) {
         try {
-            const obj = await store.getObject(typeUuid.value);
+            const obj = await store.getObject(link.value.link_type_id);
             if (obj?.name) typeName.value = obj.name;
         } catch (e) {}
     }
@@ -160,8 +147,8 @@ const openCreateObjectModal = () => {
             requestId: requestId,
             targetComponent: 'linked-object',
             index: props.index,
-            linkTypeUuid: typeUuid.value,
-            comment: description.value
+            linkTypeUuid: link.value.link_type_id,
+            comment: link.value.translation
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -169,9 +156,15 @@ const openCreateObjectModal = () => {
 
 // Переключение объектов
 const swapObjects = () => {
-    const temp = oneUuid.value;
-    oneUuid.value = otherUuid.value;
-    otherUuid.value = temp;
+    const temp = link.value.one_thing_id;
+    link.value.one_thing_id = link.value.other_thing_id;
+    link.value.other_thing_id = temp;
+
+    // Явно вызываем обновление
+    emit('update', {
+        index: props.index,
+        data: { ...link.value }
+    });
 };
 
 // Удаление компонента
@@ -182,42 +175,36 @@ const removeSelf = () => {
 // Обработчик создания объекта через модальное окно
 const handleLinkCreated = (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        // Если otherUuid пустой, заполняем его
-        if (!otherUuid.value) {
-            otherUuid.value = data.newObjectId;
+        if (!link.value.other_thing_id) {
+            link.value.other_thing_id = data.newObjectId;
         }
-        if (data.linkTypeUuid) typeUuid.value = data.linkTypeUuid;
-        if (data.comment !== undefined) description.value = data.comment;
+        if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
+        if (data.comment !== undefined) link.value.translation = data.comment;
+
+        // Явно вызываем обновление
+        emit('update', {
+            index: props.index,
+            data: { ...link.value }
+        });
     }
 };
 
 // Следим за изменениями и эмитим update
 watch(
-    [oneUuid, otherUuid, typeUuid, description],
+    () => link.value,
     () => {
         emit('update', {
             index: props.index,
-            data: {
-                one_thing_id: oneUuid.value,
-                other_thing_id: otherUuid.value,
-                link_type_id: typeUuid.value,
-                translation: description.value,
-                link_id: props.linkId,
-            }
+            data: { ...link.value }
         });
         loadObjectNames();
     },
-    { deep: true }
+    { deep: true, immediate: true }
 );
 
 // Инициализация
 onMounted(() => {
-    console.log('LinkedObject mounted with:', {
-        oneUuid: oneUuid.value,
-        otherUuid: otherUuid.value,
-        typeUuid: typeUuid.value,
-        description: description.value
-    });
+    console.log('LinkedObject mounted with link:', link.value);
     loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
