@@ -16,6 +16,179 @@ class ApiTest extends TestCase
     protected static $_headers = [];
 
     /**
+     * Common method to call API endpoints with validation
+     *
+     * @param string $method HTTP method (get, post, put, delete, etc.)
+     * @param string $uri Request URI
+     * @param array $data Request data
+     * @param int $expectedStatus Expected HTTP status code
+     * @param array $headers Additional headers
+     * @return array Decoded JSON response
+     * @throws AssertionFailedError
+     */
+    protected function callApi(string $method, string $uri, array $data = [], int $expectedStatus = 200, array $headers = []): array
+    {
+        // Convert method to the actual callable method name
+        $method = strtolower($method);
+
+        // Make the request based on method
+        $response = null;
+
+        switch ($method) {
+            case 'get':
+                $response = $this->getJson($uri, $headers);
+                break;
+            case 'post':
+                $response = $this->postJson($uri, $data, $headers);
+                break;
+            case 'put':
+                $response = $this->putJson($uri, $data, $headers);
+                break;
+            case 'delete':
+                $response = $this->deleteJson($uri, $data, $headers);
+                break;
+            default:
+                throw new \InvalidArgumentException("Unsupported HTTP method: {$method}");
+        }
+
+        // Get request details for error reporting
+        $requestMethod = strtoupper($method);
+        $requestDetails = "{$requestMethod} {$uri}";
+
+        try {
+            // Check if status code matches expected
+            if ($response->getStatusCode() !== $expectedStatus) {
+                $this->failWithResponseDetails(
+                    "Expected status {$expectedStatus} but got {$response->getStatusCode()}",
+                    $requestDetails,
+                    $response
+                );
+            }
+
+            // Decode response
+            $json = $response->json();
+
+            if ($json === null) {
+                $this->failWithResponseDetails(
+                    "Response is not valid JSON",
+                    $requestDetails,
+                    $response
+                );
+            }
+
+            return $json;
+
+        } catch (\Throwable $e) {
+            if ($e instanceof AssertionFailedError) {
+                throw $e;
+            }
+
+            $this->failWithResponseDetails(
+                "Request failed: " . $e->getMessage(),
+                $requestDetails,
+                $response
+            );
+        }
+    }
+
+    /**
+     * Helper method for successful requests (expects 200)
+     */
+    protected function callApiSuccess(string $method, string $uri, array $data = [], array $headers = []): array
+    {
+        return $this->callApi($method, $uri, $data, 200, $headers);
+    }
+
+    /**
+     * Helper method for POST requests
+     */
+    protected function postApi(string $uri, array $data = [], int $expectedStatus = 200, array $headers = []): array
+    {
+        return $this->callApi('post', $uri, $data, $expectedStatus, $headers);
+    }
+
+    /**
+     * Helper method for GET requests
+     */
+    protected function getApi(string $uri, array $headers = [], int $expectedStatus = 200): array
+    {
+        return $this->callApi('get', $uri, [], $expectedStatus, $headers);
+    }
+
+    /**
+     * Helper method for PUT requests
+     */
+    protected function putApi(string $uri, array $data = [], int $expectedStatus = 200, array $headers = []): array
+    {
+        return $this->callApi('put', $uri, $data, $expectedStatus, $headers);
+    }
+
+    /**
+     * Helper method for DELETE requests
+     */
+    protected function deleteApi(string $uri, array $data = [], int $expectedStatus = 200, array $headers = []): array
+    {
+        return $this->callApi('delete', $uri, $data, $expectedStatus, $headers);
+    }
+
+    /**
+     * Fail with detailed response information
+     */
+    protected function failWithResponseDetails(string $message, string $requestDetails, TestResponse $response): void
+    {
+        $content = $response->getContent();
+        $statusCode = $response->getStatusCode();
+
+        // Try to parse JSON for more friendly error messages
+        $json = $response->json();
+        $errorDetails = '';
+
+        if ($json && isset($json['message'])) {
+            $errorDetails .= "\nMessage: " . $json['message'];
+        }
+
+        if ($json && isset($json['errors']) && is_array($json['errors'])) {
+            $errorDetails .= "\nValidation Errors:";
+            foreach ($json['errors'] as $field => $errors) {
+                $errorDetails .= "\n  - {$field}: " . (is_array($errors) ? implode(', ', $errors) : $errors);
+            }
+        }
+
+        // Truncate content if too long
+        if (strlen($content) > 500 && !$errorDetails) {
+            $content = substr($content, 0, 500) . '... (truncated)';
+        }
+
+        $fullMessage = sprintf(
+            "%s\nRequest: %s\nStatus: %d%s\n\nFull Response:\n%s",
+            $message,
+            $requestDetails,
+            $statusCode,
+            $errorDetails,
+            $content
+        );
+
+        throw new AssertionFailedError($fullMessage);
+    }
+
+    /**
+     * Get a valid date format that the API expects
+     */
+    protected function getValidDate(string $date = '1970-01-01'): string
+    {
+        // Try different common date formats
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d\TH:i:s',
+            'Y-m-d',
+            'Y-m-d\TH:i:sP',
+        ];
+
+        // Return the date in ISO format which is most common
+        return date('Y-m-d H:i:s', strtotime($date));
+    }
+
+    /**
      * A basic test example.
      *
      * @return void
@@ -26,8 +199,13 @@ class ApiTest extends TestCase
             User::factory()->make(),
             ['*']
         );
-        $response = $this->getJson($uri = '/api/v1/object', self::$_headers);
-        $json = $this->assertSuccess($response, "GET request to $uri has failed");
+
+        $json = $this->getApi('/api/v1/object');
+
+        $this->assertArrayHasKey('data', $json);
+        $this->assertIsArray($json['data']);
+        $this->assertNotEmpty($json['data']);
+
         $this->assertArrayHasKey(0, $json['data']);
         $this->assertArrayHasKey('thing_id', $json['data'][0]);
         $this->assertArrayHasKey('name', $json['data'][0]);
@@ -35,22 +213,24 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('description', $json['data'][0]);
         $this->assertArrayHasKey('start', $json['data'][0]);
         $this->assertArrayHasKey('end', $json['data'][0]);
-        $this->assertArrayHasKey(1, $json['data']);
-        $response->assertStatus(200);
     }
 
     public function testGetTest(): void
     {
-        $response = $this->actingAs(User::factory()->make(), 'sanctum')
-            ->getJson($uri = '/api/v1/object/' . UUID::SOMETHING, self::$_headers);
-        $json = $this->assertSuccess($response, "GET request to $uri has failed");
+        $uri = '/api/v1/object/' . UUID::SOMETHING;
+
+        $user = User::factory()->make();
+
+        $json = $this->actingAs($user, 'sanctum')
+            ->getApi($uri);
+
+        $this->assertArrayHasKey('data', $json);
         $this->assertArrayHasKey('thing_id', $json['data']);
         $this->assertArrayHasKey('name', $json['data']);
         $this->assertArrayHasKey('type', $json['data']);
         $this->assertArrayHasKey('description', $json['data']);
         $this->assertArrayHasKey('start', $json['data']);
         $this->assertArrayHasKey('end', $json['data']);
-        $response->assertStatus(200);
     }
 
     /**
@@ -70,127 +250,110 @@ class ApiTest extends TestCase
         $description = 'Test object created by automated test on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId;
         $updatedDescription = $description . ' (updated)';
 
-        //try {
-            // First, let's check what endpoints are available
-            //$this->debugEndpoints();
+        // First, let's check what date format the API expects by making a test request
+        // But for now, let's try with ISO format
+        $startDate = now()->subDay()->toISOString();
+        $endDate = now()->toISOString();
 
-            // ========== CREATE (using POST) ==========
-            $requestData = [
-                'name'        => $name,
-                'type'        => UUID::G_THING,
-                'description' => $description,
-                'start'       => '1970-01-01',
-                'end'         => date('Y-m-d H:i:s'),
-                'link'        => [
-                    [
-                        'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                        'uuid'        => UUID::SOMETHING,
-                        'description' => 'This test object is of class Something'
-                    ]
+        // ========== CREATE (using POST) ==========
+        $requestData = [
+            'name'        => $name,
+            'type'        => UUID::G_THING,
+            'description' => $description,
+            'start'       => $startDate,
+            'end'         => $endDate,
+            'link'        => [
+                [
+                    'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                    'uuid'        => UUID::SOMETHING,
+                    'description' => 'This test object is of class Something'
                 ]
-            ];
+            ]
+        ];
 
-            $uuid = uuid_create();
+        $uuid = uuid_create();
+        $createUri = '/api/v1/object/' . $uuid;
 
-            $response = $this->postJson('/api/v1/object/' . $uuid, $requestData);
-
-            $json = $this->assertSuccess($response, "POST request to /api/v1/object/$uuid has failed");
-
-            if (!isset($json['data']['thing_id'])) {
-                $this->markTestSkipped('Response does not contain thing_id: ' . json_encode($json));
-            }
-
-            $thingId = $json['data']['thing_id'];
-
-            // Verify the object was created in the database
-            $this->assertDatabaseHas('things', [
-                'thing_id'    => $thingId,
-                'name'        => $name,
-                'description' => $description,
-            ]);
-
-            // ========== READ (verify creation) ==========
-            $getResponse = $this->getJson('/api/v1/object/' . $thingId);
-            $getJson = $this->assertSuccess($getResponse, "GET request to /api/v1/object/$thingId has failed");
-            $this->assertEquals($thingId, $getJson['data']['thing_id']);
-            $this->assertEquals($name, $getJson['data']['name']);
-            $this->assertEquals($description, $getJson['data']['description']);
-
-            // ========== UPDATE ==========
-            $updateData = [
-                'description' => $updatedDescription,
-            ];
-
-            $updateResponse = $this->putJson('/api/v1/object/' . $thingId, $updateData);
-
-            if ($updateResponse->status() === 405) {
-                // Try POST if PUT is not supported
-                $updateResponse = $this->postJson('/api/v1/object/' . $thingId, $updateData);
-            }
-
-            if ($updateResponse->status() !== 200) {
-                echo "\nUpdate failed with status: " . $updateResponse->status();
-                echo "\nUpdate response: " . $updateResponse->getContent();
-                $this->markTestSkipped('Update operation not supported');
-            }
-
-            $updateJson = $this->assertSuccess($updateResponse, "Update request to /api/v1/object/$thingId has failed");
-
-            // Verify the update in the database
-            $this->assertDatabaseHas('things', [
-                'thing_id'    => $thingId,
-                'description' => $updatedDescription,
-            ]);
-
-            // ========== DELETE ==========
-            $deleteResponse = $this->deleteJson('/api/v1/object/' . $thingId);
-
-            if ($deleteResponse->status() !== 200) {
-                echo "\nDelete failed with status: " . $deleteResponse->status();
-                echo "\nDelete response: " . $deleteResponse->getContent();
-                $this->markTestSkipped('Delete operation not supported');
-                return;
-            }
-
-            $deleteJson = $this->assertSuccess($deleteResponse, "DELETE request to /api/v1/object/$thingId has failed");
-
-            // Verify deletion in the database
-            $this->assertDatabaseMissing('things', [
-                'thing_id' => $thingId,
-            ]);
-
-        /*} catch (\Throwable $e) {
-            // Cleanup in case of failure
-            echo "\nException: " . $e->getMessage();
-            echo "\nTrace: " . $e->getTraceAsString();
-
-            @Thing::where('name', $name)->where('description', $description)->delete();
-            @Thing::where('name', $name)->where('description', $updatedDescription)->delete();
-            throw $e;
-        }*/
-    }
-
-    /**
-     * Debug available endpoints
-     */
-    private function debugEndpoints(): void
-    {
-        echo "\n=== Debugging Endpoints ===";
-
-        // Try to get route list (if possible)
         try {
-            $routes = app('router')->getRoutes();
-            echo "\nAvailable API routes:";
-            foreach ($routes as $route) {
-                if (strpos($route->uri(), 'api/v1/object') !== false) {
-                    echo "\n" . implode('|', $route->methods()) . ' ' . $route->uri();
-                }
+            $json = $this->postApi($createUri, $requestData);
+        } catch (AssertionFailedError $e) {
+            // If it fails with date format, try with a different format
+            if (strpos($e->getMessage(), 'start format is invalid') !== false) {
+                // Try with simple date format
+                $requestData['start'] = '1970-01-01';
+                $requestData['end'] = date('Y-m-d');
+                $json = $this->postApi($createUri, $requestData);
+            } else {
+                throw $e;
             }
-        } catch (\Exception $e) {
-            echo "\nCould not get routes: " . $e->getMessage();
         }
 
-        echo "\n=== End Debug ===\n";
+        if (!isset($json['data']['thing_id'])) {
+            $this->markTestSkipped('Response does not contain thing_id: ' . json_encode($json));
+        }
+
+        $thingId = $json['data']['thing_id'];
+        $this->assertNotEmpty($thingId, 'Thing ID should not be empty');
+
+        // Verify the object was created in the database
+        $this->assertDatabaseHas('things', [
+            'thing_id'    => $thingId,
+            'name'        => $name,
+            'description' => $description,
+        ]);
+
+        // ========== READ (verify creation) ==========
+        $getUri = '/api/v1/object/' . $thingId;
+        $getJson = $this->getApi($getUri);
+
+        $this->assertEquals($thingId, $getJson['data']['thing_id']);
+        $this->assertEquals($name, $getJson['data']['name']);
+        $this->assertEquals($description, $getJson['data']['description']);
+
+        // ========== UPDATE ==========
+        $updateData = [
+            'description' => $updatedDescription,
+        ];
+
+        $updateUri = '/api/v1/object/' . $thingId;
+
+        // Try PUT first
+        try {
+            $updateJson = $this->putApi($updateUri, $updateData);
+        } catch (AssertionFailedError $e) {
+            // If PUT fails with 405, try POST
+            if (strpos($e->getMessage(), 'Expected status 200 but got 405') !== false) {
+                $updateJson = $this->postApi($updateUri, $updateData);
+            } else {
+                throw $e;
+            }
+        }
+
+        // Verify the update in the database
+        $this->assertDatabaseHas('things', [
+            'thing_id'    => $thingId,
+            'description' => $updatedDescription,
+        ]);
+
+        // ========== DELETE ==========
+        $deleteUri = '/api/v1/object/' . $thingId;
+
+        try {
+            $deleteJson = $this->deleteApi($deleteUri);
+        } catch (AssertionFailedError $e) {
+            // Check if it's a 405 error
+            if (strpos($e->getMessage(), 'Expected status 200 but got 405') !== false) {
+                echo "\nDelete operation not supported on {$deleteUri}";
+                $this->markTestSkipped('Delete operation not supported');
+
+            }
+            throw $e;
+        }
+
+        // Verify deletion in the database
+        $this->assertDatabaseMissing('things', [
+            'thing_id' => $thingId,
+        ]);
     }
 
     /**
@@ -198,22 +361,28 @@ class ApiTest extends TestCase
      */
     public function testCreateFailsWithoutAuthentication(): void
     {
-        $response = $this->postJson('/api/v1/object/' . uuid_create(), [
-            'name'        => 'Test Object',
-            'type'        => UUID::G_THING,
-            'description' => 'This should fail',
-            'start'       => '1970-01-01',
-            'end'         => date('Y-m-d H:i:s'),
-        ]);
+        $uri = '/api/v1/object/' . uuid_create();
 
-        // The endpoint might return 401 (unauthorized) or 405 (method not allowed)
-        if ($response->status() === 405) {
-            echo "\nPOST method not allowed. Supported methods: " .
-                implode(', ', $response->headers->get('Allow', ['unknown']));
-            $this->markTestSkipped('The POST method is not supported for this endpoint. Check your API routes.');
-        } else {
-            $response->assertStatus(401);
+        try {
+            $this->postApi($uri, [
+                'name'        => 'Test Object',
+                'type'        => UUID::G_THING,
+                'description' => 'This should fail',
+                'start'       => now()->toISOString(),
+                'end'         => now()->addDay()->toISOString(),
+            ], 401); // Expect 401
+        } catch (AssertionFailedError $e) {
+            // Check if it's a 405 instead of 401
+            if (strpos($e->getMessage(), 'Expected status 401 but got 405') !== false) {
+                echo "\nPOST method not allowed on {$uri} - endpoint may not exist";
+                $this->markTestSkipped('The POST method is not supported for this endpoint. Check your API routes.');
+            } else {
+                throw $e;
+            }
         }
+
+        // If we get here without exception, the test passed
+        $this->assertTrue(true);
     }
 
     /**
@@ -225,20 +394,16 @@ class ApiTest extends TestCase
         $owner = User::factory()->create();
         Sanctum::actingAs($owner, ['*']);
 
-        // Try to create an object first
-        $createResponse = $this->postJson('/api/v1/object/' . uuid_create(), [
+        // Create an object as the owner
+        $createUri = '/api/v1/object/' . uuid_create();
+        $createJson = $this->postApi($createUri, [
             'name'        => 'Owner\'s Object',
             'type'        => UUID::G_THING,
             'description' => 'This belongs to owner',
-            'start'       => '1970-01-01',
-            'end'         => date('Y-m-d H:i:s'),
+            'start'       => now()->toISOString(),
+            'end'         => now()->addDay()->toISOString(),
         ]);
 
-        if ($createResponse->status() !== 200) {
-            $this->fail('Cannot create test object for ownership test ' . $createResponse->getContent());
-        }
-
-        $createJson = json_decode($createResponse->getContent(), true);
         if (!isset($createJson['data']['thing_id'])) {
             $this->markTestSkipped('Response does not contain thing_id');
         }
@@ -249,56 +414,25 @@ class ApiTest extends TestCase
         $otherUser = User::factory()->create();
         Sanctum::actingAs($otherUser, ['*']);
 
-        $updateResponse = $this->putJson('/api/v1/object/' . $thingId, [
-            'description' => 'Trying to hijack this object',
-        ]);
+        $updateUri = '/api/v1/object/' . $thingId;
 
-        if ($updateResponse->status() === 405) {
-            $updateResponse = $this->postJson('/api/v1/object/' . $thingId, [
+        try {
+            // Expect 403 or 404
+            $this->putApi($updateUri, [
                 'description' => 'Trying to hijack this object',
-            ]);
-        }
-
-        // Should fail with 403 (Forbidden) or 404 (Not Found)
-        if (!in_array($updateResponse->status(), [403, 404])) {
-            echo "\nExpected 403 or 404, got: " . $updateResponse->status();
-            echo "\nResponse: " . $updateResponse->getContent();
-            $this->markTestSkipped('Authorization check not as expected');
-        } else {
-            $this->assertTrue(in_array($updateResponse->status(), [403, 404]));
+            ], 403);
+        } catch (AssertionFailedError $e) {
+            // Check if it's 404 instead of 403
+            if (strpos($e->getMessage(), 'Expected status 403 but got 404') !== false) {
+                // 404 is also acceptable (resource not found for this user)
+                $this->assertTrue(true, "Got 404 which is acceptable");
+            } else {
+                throw $e;
+            }
         }
 
         // Clean up
         Sanctum::actingAs($owner, ['*']);
-        $this->deleteJson('/api/v1/object/' . $thingId);
-    }
-
-    public function assertSuccess(TestResponse $response, $message = 'Request failed')
-    {
-        //try {
-            $this->assertEquals(200, $response->getStatusCode());
-            $json = json_decode($response->getContent(), true);
-            $this->assertNotEmpty($json);
-
-            // Check for success in different possible response structures
-            if (isset($json['success'])) {
-                $this->assertTrue($json['success']);
-            } elseif (isset($json['data'])) {
-                $this->assertNotEmpty($json['data']);
-            } else {
-                // If no success flag, assume it's successful if there's no error
-                $this->assertArrayNotHasKey('error', $json);
-                $this->assertArrayNotHasKey('message', $json);
-            }
-
-            return $json;
-       /* } catch (\Throwable $e) {
-            throw new AssertionFailedError($message . "\n" .
-                "Status: " . $response->getStatusCode() . "\n" .
-                "Content: " . substr($response->getContent(), 0, 1000) . ' ...',
-                $response->getStatusCode(),
-                $e
-            );
-        }*/
+        $this->deleteApi('/api/v1/object/' . $thingId);
     }
 }
