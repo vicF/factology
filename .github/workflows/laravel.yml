@@ -105,7 +105,7 @@ jobs:
           php artisan dusk
 
       - name: Upload test artifacts (if tests fail)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-screenshots
