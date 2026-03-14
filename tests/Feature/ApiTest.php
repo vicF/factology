@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Eloquent\Thing;
-use App\User;
+use App\Models\User; // Fix: Use correct namespace
 use App\Models\Classes\Anything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Testing\TestResponse;
@@ -14,6 +14,112 @@ use Tests\TestCase;
 class ApiTest extends TestCase
 {
     protected static $_headers = [];
+
+    /**
+     * Default data for creating/updating objects
+     */
+    protected function getDefaultObjectData(array $overrides = []): array
+    {
+        $uniqueId = uniqid();
+        $uuid = uuid_create();
+
+        $defaultData = [
+            'thing_id'    => $uuid,
+            'name'        => 'Test Object - ' . $uniqueId,
+            'type'        => UUID::G_THING,
+            'description' => 'Test object created on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId,
+            'start'       => date('Ymd', strtotime('-1 day')), // Yesterday in YYYYMMDD format
+            'end'         => date('Ymd'), // Today in YYYYMMDD format
+            'public'      => 1,
+            'link'        => [
+                [
+                    'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                    'uuid'        => UUID::SOMETHING,
+                    'description' => 'This test object is of class Something'
+                ]
+            ]
+        ];
+
+        return array_merge($defaultData, $overrides);
+    }
+
+    /**
+     * Get a minimal version of object data (for tests that don't need all fields)
+     */
+    protected function getMinimalObjectData(array $overrides = []): array
+    {
+        $uuid = uuid_create();
+
+        $minimalData = [
+            'thing_id'    => $uuid,
+            'name'        => 'Minimal Test Object',
+            'type'        => UUID::G_THING,
+            'description' => 'Minimal test object description',
+            'start'       => date('Ymd'),
+            'end'         => date('Ymd', strtotime('+1 day')),
+            'public'      => 1,
+        ];
+
+        return array_merge($minimalData, $overrides);
+    }
+
+    /**
+     * Create a test object and return its ID
+     */
+    protected function createTestObject(User $user, array $data = []): string
+    {
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $createUri = '/api/v1/object/' . $uuid;
+
+        $objectData = $this->getDefaultObjectData(array_merge(
+            ['thing_id' => $uuid],
+            $data
+        ));
+
+        $json = $this->postApi($createUri, $objectData);
+
+        if (!isset($json['data']['thing_id'])) {
+            $this->fail('Failed to create test object: ' . json_encode($json));
+        }
+
+        return $json['data']['thing_id'];
+    }
+
+    /**
+     * Get the full object data for updates (includes all required fields)
+     */
+    protected function getFullObjectDataForUpdate(string $thingId, array $overrides = []): array
+    {
+        // First, get the existing object data
+        $getUri = '/api/v1/object/' . $thingId;
+        $json = $this->getApi($getUri);
+
+        if (!isset($json['data'])) {
+            $this->fail('Could not retrieve object data for update: ' . json_encode($json));
+        }
+
+        $existingData = $json['data'];
+
+        // Prepare update data with all required fields
+        $updateData = [
+            'thing_id'    => $existingData['thing_id'] ?? $thingId,
+            'name'        => $existingData['name'] ?? 'Updated Name',
+            'type'        => $existingData['type'] ?? UUID::G_THING,
+            'description' => $existingData['description'] ?? 'Updated description',
+            'start'       => $existingData['start'] ?? date('Ymd'),
+            'end'         => $existingData['end'] ?? date('Ymd', strtotime('+1 day')),
+            'public'      => $existingData['public'] ?? 1,
+        ];
+
+        // Add link if it exists in original data
+        if (isset($existingData['link'])) {
+            $updateData['link'] = $existingData['link'];
+        }
+
+        return array_merge($updateData, $overrides);
+    }
 
     /**
      * Common method to call API endpoints with validation
@@ -172,23 +278,6 @@ class ApiTest extends TestCase
     }
 
     /**
-     * Get a valid date format that the API expects
-     */
-    protected function getValidDate(string $date = '1970-01-01'): string
-    {
-        // Try different common date formats
-        $formats = [
-            'Y-m-d H:i:s',
-            'Y-m-d\TH:i:s',
-            'Y-m-d',
-            'Y-m-d\TH:i:sP',
-        ];
-
-        // Return the date in ISO format which is most common
-        return date('Y-m-d H:i:s', strtotime($date));
-    }
-
-    /**
      * A basic test example.
      *
      * @return void
@@ -244,52 +333,26 @@ class ApiTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user, ['*']);
 
-        // Generate unique test data
+        // Generate unique test data using the default data helper
+        $uuid = uuid_create();
         $uniqueId = uniqid();
         $name = 'Test Object (delete me) - ' . $uniqueId;
         $description = 'Test object created by automated test on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId;
         $updatedDescription = $description . ' (updated)';
 
-        // First, let's check what date format the API expects by making a test request
-        // But for now, let's try with ISO format
-        $startDate = now()->subDay()->toISOString();
-        $endDate = now()->toISOString();
-
-        // ========== CREATE (using POST) ==========
-        $requestData = [
+        // Use default data with overrides
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'    => $uuid,
             'name'        => $name,
-            'type'        => UUID::G_THING,
             'description' => $description,
-            'start'       => $startDate,
-            'end'         => $endDate,
-            'link'        => [
-                [
-                    'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                    'uuid'        => UUID::SOMETHING,
-                    'description' => 'This test object is of class Something'
-                ]
-            ]
-        ];
+        ]);
 
-        $uuid = uuid_create();
+        // ========== CREATE ==========
         $createUri = '/api/v1/object/' . $uuid;
-
-        try {
-            $json = $this->postApi($createUri, $requestData);
-        } catch (AssertionFailedError $e) {
-            // If it fails with date format, try with a different format
-            if (strpos($e->getMessage(), 'start format is invalid') !== false) {
-                // Try with simple date format
-                $requestData['start'] = '1970-01-01';
-                $requestData['end'] = date('Y-m-d');
-                $json = $this->postApi($createUri, $requestData);
-            } else {
-                throw $e;
-            }
-        }
+        $json = $this->postApi($createUri, $requestData);
 
         if (!isset($json['data']['thing_id'])) {
-            $this->markTestSkipped('Response does not contain thing_id: ' . json_encode($json));
+            $this->fail('Response does not contain thing_id: ' . json_encode($json));
         }
 
         $thingId = $json['data']['thing_id'];
@@ -302,7 +365,7 @@ class ApiTest extends TestCase
             'description' => $description,
         ]);
 
-        // ========== READ (verify creation) ==========
+        // ========== READ ==========
         $getUri = '/api/v1/object/' . $thingId;
         $getJson = $this->getApi($getUri);
 
@@ -311,23 +374,13 @@ class ApiTest extends TestCase
         $this->assertEquals($description, $getJson['data']['description']);
 
         // ========== UPDATE ==========
-        $updateData = [
+        // Get full object data for update
+        $updateData = $this->getFullObjectDataForUpdate($thingId, [
             'description' => $updatedDescription,
-        ];
+        ]);
 
         $updateUri = '/api/v1/object/' . $thingId;
-
-        // Try PUT first
-        try {
-            $updateJson = $this->putApi($updateUri, $updateData);
-        } catch (AssertionFailedError $e) {
-            // If PUT fails with 405, try POST
-            if (strpos($e->getMessage(), 'Expected status 200 but got 405') !== false) {
-                $updateJson = $this->postApi($updateUri, $updateData);
-            } else {
-                throw $e;
-            }
-        }
+        $updateJson = $this->putApi($updateUri, $updateData);
 
         // Verify the update in the database
         $this->assertDatabaseHas('things', [
@@ -342,10 +395,9 @@ class ApiTest extends TestCase
             $deleteJson = $this->deleteApi($deleteUri);
         } catch (AssertionFailedError $e) {
             // Check if it's a 405 error
-            if (strpos($e->getMessage(), 'Expected status 200 but got 405') !== false) {
+            if (str_contains($e->getMessage(), 'Expected status 200 but got 405')) {
                 echo "\nDelete operation not supported on {$deleteUri}";
                 $this->markTestSkipped('Delete operation not supported');
-
             }
             throw $e;
         }
@@ -363,17 +415,14 @@ class ApiTest extends TestCase
     {
         $uri = '/api/v1/object/' . uuid_create();
 
+        // Use minimal data for the test
+        $testData = $this->getMinimalObjectData();
+
         try {
-            $this->postApi($uri, [
-                'name'        => 'Test Object',
-                'type'        => UUID::G_THING,
-                'description' => 'This should fail',
-                'start'       => now()->toISOString(),
-                'end'         => now()->addDay()->toISOString(),
-            ], 401); // Expect 401
+            $this->postApi($uri, $testData, 401); // Expect 401
         } catch (AssertionFailedError $e) {
             // Check if it's a 405 instead of 401
-            if (strpos($e->getMessage(), 'Expected status 401 but got 405') !== false) {
+            if (str_contains($e->getMessage(), 'Expected status 401 but got 405')) {
                 echo "\nPOST method not allowed on {$uri} - endpoint may not exist";
                 $this->markTestSkipped('The POST method is not supported for this endpoint. Check your API routes.');
             } else {
@@ -388,27 +437,23 @@ class ApiTest extends TestCase
     /**
      * Test that users cannot modify objects they don't own
      */
-    public function testUpdateFailsForUnauthorizedUser(): void
+    public function testUserCannotUpdateAnotherUsersObject(): void
     {
-        // Create a user and authenticate
+        // Create owner user
         $owner = User::factory()->create();
-        Sanctum::actingAs($owner, ['*']);
 
-        // Create an object as the owner
-        $createUri = '/api/v1/object/' . uuid_create();
-        $createJson = $this->postApi($createUri, [
-            'name'        => 'Owner\'s Object',
-            'type'        => UUID::G_THING,
+        // Create an object as the owner using the helper method
+        $thingId = $this->createTestObject($owner, [
+            'name' => 'Owner\'s Object',
             'description' => 'This belongs to owner',
-            'start'       => now()->toISOString(),
-            'end'         => now()->addDay()->toISOString(),
         ]);
 
-        if (!isset($createJson['data']['thing_id'])) {
-            $this->markTestSkipped('Response does not contain thing_id');
-        }
-
-        $thingId = $createJson['data']['thing_id'];
+        // Get the full object data for update (this will be used by the unauthorized user)
+        // We need to do this as the owner first to get the data
+        Sanctum::actingAs($owner, ['*']);
+        $fullObjectData = $this->getFullObjectDataForUpdate($thingId, [
+            'description' => 'Trying to hijack this object',
+        ]);
 
         // Try to update with a different user
         $otherUser = User::factory()->create();
@@ -417,13 +462,13 @@ class ApiTest extends TestCase
         $updateUri = '/api/v1/object/' . $thingId;
 
         try {
-            // Expect 403 or 404
-            $this->putApi($updateUri, [
-                'description' => 'Trying to hijack this object',
-            ], 403);
+            // Expect 403 (Forbidden) or 404 (Not Found)
+            $this->putApi($updateUri, $fullObjectData, 403);
+            // If we get here without exception, the test passed
+            $this->assertTrue(true, "Got 403 Forbidden as expected");
         } catch (AssertionFailedError $e) {
             // Check if it's 404 instead of 403
-            if (strpos($e->getMessage(), 'Expected status 403 but got 404') !== false) {
+            if (str_contains($e->getMessage(), 'Expected status 403 but got 404')) {
                 // 404 is also acceptable (resource not found for this user)
                 $this->assertTrue(true, "Got 404 which is acceptable");
             } else {
@@ -431,8 +476,34 @@ class ApiTest extends TestCase
             }
         }
 
-        // Clean up
+        // Clean up - authenticate as owner again to delete the object
         Sanctum::actingAs($owner, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Test creating an object with minimal required fields
+     */
+    public function testCreateWithMinimalFields(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $createUri = '/api/v1/object/' . $uuid;
+
+        // Use minimal data
+        $minimalData = $this->getMinimalObjectData([
+            'thing_id' => $uuid,
+        ]);
+
+        $json = $this->postApi($createUri, $minimalData);
+
+        $this->assertArrayHasKey('data', $json);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        // Clean up
+        $thingId = $json['data']['thing_id'];
         $this->deleteApi('/api/v1/object/' . $thingId);
     }
 }
