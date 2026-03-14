@@ -70,9 +70,9 @@ class ApiTest extends TestCase
         $description = 'Test object created by automated test on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId;
         $updatedDescription = $description . ' (updated)';
 
-        try {
+        //try {
             // First, let's check what endpoints are available
-            $this->debugEndpoints();
+            //$this->debugEndpoints();
 
             // ========== CREATE (using POST) ==========
             $requestData = [
@@ -90,32 +90,14 @@ class ApiTest extends TestCase
                 ]
             ];
 
-            $response = $this->postJson('/api/v1/object', $requestData);
+            $uuid = uuid_create();
 
-            // Debug the response
-            echo "\nResponse status: " . $response->status();
-            echo "\nResponse content: " . $response->getContent();
+            $response = $this->postJson('/api/v1/object/' . $uuid, $requestData);
 
-            if ($response->status() !== 200) {
-                // Try without the link field if that's causing issues
-                echo "\nTrying without link field...";
-                unset($requestData['link']);
-                $response = $this->postJson('/api/v1/object', $requestData);
-
-                echo "\nResponse status (without link): " . $response->status();
-                echo "\nResponse content (without link): " . $response->getContent();
-            }
-
-            if ($response->status() !== 200) {
-                $this->markTestSkipped('Cannot create test object: ' . $response->getContent());
-                return;
-            }
-
-            $json = $this->assertSuccess($response, 'POST request to /api/v1/object has failed');
+            $json = $this->assertSuccess($response, "POST request to /api/v1/object/$uuid has failed");
 
             if (!isset($json['data']['thing_id'])) {
                 $this->markTestSkipped('Response does not contain thing_id: ' . json_encode($json));
-                return;
             }
 
             $thingId = $json['data']['thing_id'];
@@ -150,7 +132,6 @@ class ApiTest extends TestCase
                 echo "\nUpdate failed with status: " . $updateResponse->status();
                 echo "\nUpdate response: " . $updateResponse->getContent();
                 $this->markTestSkipped('Update operation not supported');
-                return;
             }
 
             $updateJson = $this->assertSuccess($updateResponse, "Update request to /api/v1/object/$thingId has failed");
@@ -178,7 +159,7 @@ class ApiTest extends TestCase
                 'thing_id' => $thingId,
             ]);
 
-        } catch (\Throwable $e) {
+        /*} catch (\Throwable $e) {
             // Cleanup in case of failure
             echo "\nException: " . $e->getMessage();
             echo "\nTrace: " . $e->getTraceAsString();
@@ -186,7 +167,7 @@ class ApiTest extends TestCase
             @Thing::where('name', $name)->where('description', $description)->delete();
             @Thing::where('name', $name)->where('description', $updatedDescription)->delete();
             throw $e;
-        }
+        }*/
     }
 
     /**
@@ -217,7 +198,7 @@ class ApiTest extends TestCase
      */
     public function testCreateFailsWithoutAuthentication(): void
     {
-        $response = $this->postJson('/api/v1/object', [
+        $response = $this->postJson('/api/v1/object/' . uuid_create(), [
             'name'        => 'Test Object',
             'type'        => UUID::G_THING,
             'description' => 'This should fail',
@@ -245,7 +226,7 @@ class ApiTest extends TestCase
         Sanctum::actingAs($owner, ['*']);
 
         // Try to create an object first
-        $createResponse = $this->postJson('/api/v1/object', [
+        $createResponse = $this->postJson('/api/v1/object/' . uuid_create(), [
             'name'        => 'Owner\'s Object',
             'type'        => UUID::G_THING,
             'description' => 'This belongs to owner',
@@ -254,16 +235,12 @@ class ApiTest extends TestCase
         ]);
 
         if ($createResponse->status() !== 200) {
-            echo "\nCannot create test object: " . $createResponse->getContent();
-            $this->markTestSkipped('Cannot create test object for ownership test');
-            return;
+            $this->fail('Cannot create test object for ownership test ' . $createResponse->getContent());
         }
 
         $createJson = json_decode($createResponse->getContent(), true);
-
         if (!isset($createJson['data']['thing_id'])) {
             $this->markTestSkipped('Response does not contain thing_id');
-            return;
         }
 
         $thingId = $createJson['data']['thing_id'];
@@ -298,7 +275,7 @@ class ApiTest extends TestCase
 
     public function assertSuccess(TestResponse $response, $message = 'Request failed')
     {
-        try {
+        //try {
             $this->assertEquals(200, $response->getStatusCode());
             $json = json_decode($response->getContent(), true);
             $this->assertNotEmpty($json);
@@ -315,13 +292,13 @@ class ApiTest extends TestCase
             }
 
             return $json;
-        } catch (\Throwable $e) {
+       /* } catch (\Throwable $e) {
             throw new AssertionFailedError($message . "\n" .
                 "Status: " . $response->getStatusCode() . "\n" .
                 "Content: " . substr($response->getContent(), 0, 1000) . ' ...',
                 $response->getStatusCode(),
                 $e
             );
-        }
+        }*/
     }
 }
