@@ -14,14 +14,13 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ALLOW_EMPTY_PASSWORD: false
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: testing
+          MYSQL_DATABASE: testing  # Simple, standard database name
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
-      # For Codeception with WebDriver
+      # For Codeception with WebDriver (if still using it)
       selenium:
         image: selenium/standalone-chrome:latest
         ports:
@@ -45,8 +44,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Copy environment
-        run: cp .env.testing .env
+      - name: Copy environment for CI
+        run: cp .env.github .env
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist
@@ -83,20 +82,12 @@ jobs:
       - name: Build frontend assets
         run: npm run build
 
-      # If still using Codeception
-      - name: Run Codeception tests
-        if: false  # Disable once migrated to Dusk
-        env:
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-        run: vendor/bin/codecept run acceptance
-
-      # After migrating to Dusk
       - name: Run Dusk tests
         env:
           APP_URL: http://127.0.0.1:8000
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
+          DB_PORT: 3306
           DB_DATABASE: testing
           DB_USERNAME: root
           DB_PASSWORD: root
