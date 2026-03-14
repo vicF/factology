@@ -85,12 +85,17 @@
 
                         <div v-for="item in linkedObjects" :key="item.id" class="linked-object-form">
                             <LinkedObject
-                                :current-object-uuid="formData.thing_id"
-                                :current-object-name="formData.name"
-                                :linked-object-uuid="item.otherThingUuid"
-                                :link-type-uuid="item.linkTypeUuid"
-                                :comment="item.comment"
-                                :link-id="item.linkId"
+                                :link="{
+                                    one_thing_id: formData.thing_id,
+                                    other_thing_id: item.otherThingUuid,
+                                    link_type_id: item.linkTypeUuid,
+                                    translation: item.comment,
+                                    link_id: item.linkId
+                                }"
+                                :currentObject="{
+                                    thing_id: formData.thing_id,
+                                    name: formData.name
+                                }"
                                 :index="linkedObjects.indexOf(item)"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -161,6 +166,7 @@ const props = defineProps({
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
     parentObjectId: { type: String, default: null },
+    parentObject: { type: Object, default: null },
     parentLinkType: { type: String, default: '2da45f14-69c6-4d56-9f2f-809fda14abf5' },
     callback: { type: Object, default: null }
 });
@@ -228,28 +234,31 @@ const initializeData = () => {
             .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
             .map(item => ({
                 id: uuidv4(),
-                oneThingUuid: formData.value.thing_id,
                 otherThingUuid: item.other_thing_id || '',
                 linkTypeUuid: item.link_type_id || '',
                 comment: item.description || '',
                 linkId: item.link_id || null,
             }));
     } else {
-        // For new objects, also use initialLinkedObjects if provided
         if (props.initialLinkedObjects && props.initialLinkedObjects.length > 0) {
             linkedObjects.value = props.initialLinkedObjects.map(item => ({
                 id: uuidv4(),
-                oneThingUuid: formData.value.thing_id,
                 otherThingUuid: item.other_thing_id || item.otherThingUuid || '',
                 linkTypeUuid: item.link_type_id || item.linkTypeUuid || '',
                 comment: item.description || item.comment || '',
                 linkId: item.link_id || item.linkId || null,
             }));
-        } else if (props.parentObjectId) {
-            // Fallback to parentObjectId for backward compatibility
+        } else if (props.parentObject) {
             linkedObjects.value = [{
                 id: uuidv4(),
-                oneThingUuid: formData.value.thing_id,
+                otherThingUuid: props.parentObject.thing_id,
+                linkTypeUuid: props.parentLinkType,
+                comment: '',
+                linkId: null,
+            }];
+        } else if (props.parentObjectId) {
+            linkedObjects.value = [{
+                id: uuidv4(),
                 otherThingUuid: props.parentObjectId,
                 linkTypeUuid: props.parentLinkType,
                 comment: '',
@@ -260,19 +269,15 @@ const initializeData = () => {
         }
     }
 
-    // Store original state for unsaved changes detection
     originalFormData.value = JSON.parse(JSON.stringify(formData.value));
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
 };
 
-// Call initialize
 initializeData();
 
-// Methods
 const addNewLinkedObject = () => {
     linkedObjects.value.push({
         id: uuidv4(),
-        oneThingUuid: formData.value.thing_id,
         otherThingUuid: '',
         linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
         comment: '',
@@ -281,7 +286,13 @@ const addNewLinkedObject = () => {
 };
 
 const updateItem = ({ index, data }) => {
-    linkedObjects.value[index] = { ...linkedObjects.value[index], ...data };
+    linkedObjects.value[index] = {
+        ...linkedObjects.value[index],
+        otherThingUuid: data.other_thing_id,
+        linkTypeUuid: data.link_type_id,
+        comment: data.translation,
+        linkId: data.link_id,
+    };
 };
 
 const removeItem = (index) => {
@@ -291,27 +302,20 @@ const removeItem = (index) => {
 const confirmClose = () => {
     confirmModalInstance?.hide();
 
-    // Now force close the main modal
     const modalElement = document.getElementById(modalId);
     if (modalElement) {
-        // Temporarily remove the hide event listener to avoid recursion
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance?.hide();
-        // Re-attach the listener after a short delay
         setTimeout(() => {
             modalElement.addEventListener('hide.bs.modal', handleHideModal);
         }, 100);
     }
 };
 
-// Handle modal hide event (triggered by close buttons, Esc key, or backdrop click)
 const handleHideModal = (event) => {
     if (hasUnsavedChanges.value) {
-        // Prevent the modal from hiding
         event.preventDefault();
         event.stopPropagation();
-
-        // Show confirmation dialog
         confirmModalInstance?.show();
     }
 };
@@ -373,7 +377,6 @@ const submitForm = async () => {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
             if (props.callback && props.callback.type === 'link-created') {
-                // Emit event with the new object ID
                 eventBus.emit('link-created', {
                     requestId: props.callback.requestId,
                     newObjectId: formData.value.thing_id,
@@ -395,9 +398,7 @@ const submitForm = async () => {
     }
 };
 
-// Lifecycle hooks
 onMounted(async () => {
-    // Wait for next tick to ensure DOM is ready
     await nextTick();
 
     const modalElement = document.getElementById(modalId);
@@ -405,12 +406,8 @@ onMounted(async () => {
 
     if (modalElement) {
         modalInstance = new Modal(modalElement);
-
-        // Add hide event listener to intercept close attempts
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
-
-        // Small delay to ensure Bootstrap is ready
         setTimeout(() => {
             modalInstance.show();
         }, 100);
@@ -430,7 +427,6 @@ onUnmounted(() => {
     if (confirmModalInstance) confirmModalInstance.dispose();
 });
 
-// Watch for object changes to reset original state
 watch(() => props.object, (newObject) => {
     if (newObject) {
         formData.value = {

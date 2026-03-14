@@ -208,6 +208,7 @@
             v-if="showCreateLinkedModal"
             :object="null"
             :parentObjectId="object?.thing_id"
+            :parentObject="object"
             :initialLinkedObjects="[]"
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
@@ -234,6 +235,7 @@ import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
+import LinkDescription from './LinkDescription.vue';
 import { inject } from 'vue';
 
 // Просто инжектим функцию
@@ -256,7 +258,7 @@ const cacheStore = useObjectCacheStore();
 // State
 const object = ref(null);
 const loaded = ref(false);
-const serverError = ref(false); // New state for 500 errors
+const serverError = ref(false);
 
 // Глобальное состояние вкладки - читаем из localStorage при инициализации
 const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
@@ -280,7 +282,7 @@ const authenticated = computed(() => authStore?.authenticated || false);
 const getObject = async () => {
     try {
         loaded.value = false;
-        serverError.value = false; // Reset server error state
+        serverError.value = false;
         const response = await axios.get(`/object/${route.params.uid}`);
         object.value = response.data.data;
         if (object.value?.thing_id) {
@@ -290,29 +292,22 @@ const getObject = async () => {
         console.error('Get object error:', error);
 
         if (error.response?.status === 500) {
-            // Handle 500 - Internal Server Error
             serverError.value = true;
             object.value = null;
         } else if (error.response?.status === 404) {
-            // Object doesn't exist - set object to null and show not found message
             object.value = null;
         } else if (error.response?.status === 401) {
-            // Handle 401 - unauthorized
             const data = error.response?.data;
             if (data?.data?.public === 1) {
-                // Public object that requires authentication - show it
                 object.value = data.data;
             } else {
-                // Private object - show not found message
                 object.value = null;
-                // Only redirect if not authenticated and object is not public
                 if (!authenticated.value) {
                     localStorage.removeItem('authenticated');
                     router.push({ path: '/login', query: { redirect: route.fullPath } });
                 }
             }
         } else {
-            // Other errors - still set object to null to show not found message
             object.value = null;
         }
     } finally {
@@ -320,7 +315,6 @@ const getObject = async () => {
     }
 };
 
-// Retry loading after server error
 const retryLoading = () => {
     getObject();
 };
@@ -387,38 +381,29 @@ const handleLinkSave = async (result) => {
     showEditLinkModal.value = false;
 
     if (result.delete) {
-        // Удаление ссылки
         await deleteLink(result.linkId);
     } else {
-        // Обновление ссылки
         await updateLink(result.data);
     }
 };
 
 const updateLink = async (linkData) => {
     try {
-        // Подготавливаем данные для отправки
         const payload = {
             one_thing_id: linkData.one_thing_id,
             other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
             translation: linkData.translation,
-            // Сохраняем существующие даты
-            //start: linkData.start,
-            //end: linkData.end,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
-            link_id:linkData.link_id
+            link_id: linkData.link_id
         };
-        if(linkData.link_id) {
+        if (linkData.link_id) {
             await axios.put(`/link/${linkData.link_id}`, payload);
         } else {
             await axios.post(`/link`, payload);
         }
-
-        // Обновляем объект после успешного обновления ссылки
         await getObject();
-
     } catch (error) {
         console.error('Failed to update link:', error);
         alert(t('Failed to update link'));
@@ -458,44 +443,32 @@ const linkRecords = computed(() => {
     }));
 });
 
-// Lifecycle
 onMounted(() => {
-    // Если сохранена вкладка графа, инициализируем его
     if (activeTab.value === 'graph') {
         graphInitialized.value = true;
     }
-
     getObject();
 });
 
-// Watchers
 watch(() => route.params.uid, (newUid, oldUid) => {
     if (newUid && newUid !== oldUid) {
-        // Reset state when navigating to a new object
         object.value = null;
         loaded.value = false;
-        serverError.value = false; // Reset server error on navigation
-
-        // НЕ сбрасываем activeTab - сохраняем глобальное состояние
-
+        serverError.value = false;
         getObject();
     }
 });
 
-// Сохраняем глобальное состояние вкладки при изменении
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
     console.log('Saved global tab state:', newTab);
 
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
-            // First time opening graph tab - initialize
             console.log('First time opening graph tab, initializing...');
             graphInitialized.value = true;
         } else {
-            // Graph already exists, just refresh the view
             console.log('Refreshing existing graph view');
-            // Wait for next tick to ensure DOM is ready
             nextTick(() => {
                 if (graphComponentRef.value) {
                     graphComponentRef.value.refreshView();
@@ -505,13 +478,10 @@ watch(activeTab, (newTab) => {
     }
 }, { immediate: true });
 
-// Update graph when object changes (but don't recreate)
 watch(() => object.value, (newObject) => {
     if (graphInitialized.value && graphComponentRef.value && newObject) {
         console.log('Object changed, updating graph data');
         graphComponentRef.value.updateData(newObject);
-
-        // If graph tab is active, refresh view after update
         if (activeTab.value === 'graph') {
             setTimeout(() => {
                 if (graphComponentRef.value) {
@@ -521,7 +491,6 @@ watch(() => object.value, (newObject) => {
         }
     }
 }, { deep: true });
-
 </script>
 
 <style scoped>
@@ -533,28 +502,22 @@ watch(() => object.value, (newObject) => {
 .btn-success:hover {
     background-color: #218838;
 }
-
-/* Style for right-aligned tabs */
 .nav-tabs {
     border-bottom: 1px solid #dee2e6;
 }
-
 .nav-tabs .nav-link {
     color: #495057;
     cursor: pointer;
 }
-
 .nav-tabs .nav-link.active {
     color: #0d6efd;
     background-color: #fff;
     border-color: #dee2e6 #dee2e6 #fff;
 }
-
 .nav-tabs .nav-link:hover {
     border-color: #e9ecef #e9ecef #dee2e6;
     isolation: isolate;
 }
-
 .link-translation {
     font-style: italic;
     color: #6c757d;
