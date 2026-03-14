@@ -1,39 +1,79 @@
-/**
- * First we will load all of this project's JavaScript dependencies which
- * includes Vue and other libraries. It is a great starting point when
- * building robust, powerful web applications using Vue and Laravel.
- */
-
 import './bootstrap';
+import '../sass/app.scss';
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import { useAuthStore } from './stores/auth';
+import { dateFromDb } from './utils/dateUtils.js';
+const pinia = createPinia();
 
-/**
- * Next, we will create a fresh Vue application instance. You may then begin
- * registering components with the application instance so they are ready
- * to use in your application's views. An example is included for you.
- */
+import App from './components/App.vue';
+import router from './router';
+import i18n from './lang/i18n';
+import LinkDescription from './components/LinkDescription.vue';
 
-const app = createApp({});
 
-import ExampleComponent from './components/ExampleComponent.vue';
-app.component('example-component', ExampleComponent);
+const app = createApp(App);
+app.use(router);
+app.use(i18n);
+app.use(pinia);
+// Глобальная регистрация
+app.component('LinkDescription', LinkDescription);
 
-/**
- * The following block of code may be used to automatically register your
- * Vue components. It will recursively scan this directory for the Vue
- * components and automatically register them with their "basename".
- *
- * Eg. ./components/ExampleComponent.vue -> <example-component></example-component>
- */
+app.config.globalProperties.$truncateText = function(text, length) {
+    if (text.length <= length) {
+        return text;
+    }
+    let trimmed = text.substr(0, length);
+    return trimmed.substr(0, Math.min(trimmed.length, trimmed.lastIndexOf(" "))) + ' ...';
+};
 
-// Object.entries(import.meta.glob('./**/*.vue', { eager: true })).forEach(([path, definition]) => {
-//     app.component(path.split('/').pop().replace(/\.\w+$/, ''), definition.default);
-// });
+app.config.globalProperties.$navigateToObject = function(id) {
+    this.$router.push({ name: 'object', params: { uid: id } });
+};
 
-/**
- * Finally, we will attach the application instance to a HTML element with
- * an "id" attribute of "app". This element is included with the "auth"
- * scaffolding. Otherwise, you will need to add an element yourself.
- */
+import axios from 'axios';
+
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.baseURL = '/api/v1';
+axios.defaults.headers.common['Accept'] = 'application/json';
+
+// Automatically add Authorization header with Bearer token when available
+axios.interceptors.request.use(config => {
+    const authStore = useAuthStore(pinia);  // pass pinia instance to access store outside setup()
+    authStore.restoreAuth();
+    if (authStore.token) {
+        config.headers.Authorization = `Bearer ${authStore.token}`;
+    }
+    return config;
+});
+
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        const status = error.response?.status;
+
+        if (status === 401) {
+            if (error.config?.noAuthRedirect) {
+                return Promise.reject(error);
+            }
+
+            if (!router.currentRoute.value.fullPath.includes('/login') &&
+                !router.currentRoute.value.fullPath.includes('/register')) {
+                router.push({
+                    name: 'login',
+                    query: { redirect: router.currentRoute.value.fullPath || '/' }
+                });
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
+app.config.globalProperties.$dateFromDb = dateFromDb;
+
+const authStore = useAuthStore();
+await authStore.checkAuth();
+
 
 app.mount('#app');

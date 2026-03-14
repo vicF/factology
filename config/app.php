@@ -194,7 +194,8 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
-
+        App\Providers\TelescopeServiceProvider::class,
+        App\Providers\QueryBuilderMacroServiceProvider::class,
     ],
 
     /*
@@ -209,7 +210,7 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
-        // 'ExampleClass' => App\Example\ExampleClass::class,
+        //'DB' => Illuminate\Support\Facades\DB::class,
     ])->toArray(),
 
 ];

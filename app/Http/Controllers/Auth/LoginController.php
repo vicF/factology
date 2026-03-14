@@ -3,31 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Providers\RouteServiceProvider;
-use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\TransientToken;
 
 class LoginController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Login Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller handles authenticating users for the application and
-    | redirecting them to your home screen. The controller uses a trait
-    | to conveniently provide its functionality to your applications.
-    |
-    */
-
-    use AuthenticatesUsers;
-
-    /**
-     * Where to redirect users after login.
-     *
-     * @var string
-     */
-    protected $redirectTo = RouteServiceProvider::HOME;
-
     /**
      * Create a new controller instance.
      *
@@ -35,6 +18,108 @@ class LoginController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('guest')->except('logout');
+        $this->middleware('auth:sanctum')->only(['logout', 'user']);
+    }
+
+    /**
+     * Handle a login request to the application.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function login(Request $request)
+    {
+        \Log::info('Login attempt', [
+            'input' => $request->except('password'),
+            'headers' => $request->headers->all()
+        ]);
+
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        if (Auth::guard('web')->attempt($credentials)) {
+            $user = Auth::guard('web')->user();
+
+            $token = $user->createToken(
+                name: 'spa-token',
+                abilities: ['*'],
+                expiresAt: null
+            )->plainTextToken;
+
+            \Log::info('Login successful - token issued', [
+                'user_id' => $user->id,
+                'token_id' => explode('|', $token)[0] ?? null
+            ]);
+
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+                'message' => 'Login successful'
+            ], 200);
+        }
+
+        \Log::warning('Login failed: Invalid credentials', ['email' => $request->email]);
+        throw ValidationException::withMessages([
+            'email' => ['The provided credentials do not match our records.'],
+        ]);
+    }
+
+    /**
+     * Log the user out of the application.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if ($user) {
+                $currentToken = $user->currentAccessToken();
+
+                // Only delete if it's a real database token (not TransientToken)
+                if ($currentToken && !$currentToken instanceof \Laravel\Sanctum\TransientToken) {
+                    $currentToken->delete();
+                    \Log::info('Token revoked on logout', ['user_id' => $user->id]);
+                } else {
+                    \Log::info('No revocable token found (transient or none) - logout proceeded', ['user_id' => $user->id]);
+                }
+
+                // Force forget the user from the guard (important for immediate effect in tests & some requests)
+                auth()->guard('sanctum')->forgetUser();
+                // or more general: auth('sanctum')->forgetUser();
+            }
+
+            // Optional: keep for compatibility if any session is somehow active
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json(['message' => 'Logged out'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Logout error: ' . $e->getMessage());
+            return response()->json(['message' => 'Logged out'], 200);
+        }
+    }
+
+    /**
+     * Get the authenticated user.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function user(Request $request)
+    {
+        $user = Auth::user();
+        if ($user) {
+            \Log::info('User fetched', ['user_id' => $user->id]);
+            return response()->json($user);
+        }
+        \Log::warning('User fetch failed: Unauthenticated');
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
 }

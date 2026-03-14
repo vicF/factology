@@ -1,4 +1,10 @@
-import 'bootstrap';
+import lodash from 'lodash'
+window._ = lodash
+
+import * as Popper from '@popperjs/core'
+window.Popper = Popper
+
+import 'bootstrap'
 
 /**
  * We'll load the axios HTTP library which allows us to easily issue requests
@@ -9,7 +15,7 @@ import 'bootstrap';
 import axios from 'axios';
 window.axios = axios;
 
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
@@ -31,3 +37,17 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 //     forceTLS: (import.meta.env.VITE_PUSHER_SCHEME ?? 'https') === 'https',
 //     enabledTransports: ['ws', 'wss'],
 // });
+
+
+// Helper to make Bootstrap dropdowns more reliable in Codeception/WebDriver tests
+// Usage in test: $I->executeJS('triggerDropdown("#navbarDropdownMenuLink")');
+window.triggerDropdown = function(selector) {
+    const el = document.querySelector(selector);
+    if (el) {
+        el.scrollIntoView({ block: 'center' });
+        el.click();
+        // Force Bootstrap to show the dropdown (fallback if click doesn't work)
+        const dropdown = bootstrap.Dropdown.getInstance(el) || new bootstrap.Dropdown(el);
+        dropdown.show();
+    }
+};

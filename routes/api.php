@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\ApiController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -9,11 +12,41 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
+| routes are loaded by the RouteServiceProvider and all will be assigned
+| to the "api" middleware group + api/v1 prefix.
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::prefix('v1')->group(function () {
+
+    // Public authentication routes
+    Route::post('/login',    [LoginController::class, 'login'])->name('login');
+    Route::post('/register', [RegisterController::class, 'register'])->name('register');
+    Route::post('/logout',   [LoginController::class, 'logout'])->name('logout');
+
+    // Get current authenticated user
+    Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+        return $request->user();
+    })->name('user');
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    // Your existing API endpoints
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    Route::get('/object',     [ApiController::class, 'list']);
+    Route::post('/object',    [ApiController::class, 'search']);
+    Route::get('/object/{id}', [ApiController::class, 'get']);
+    Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
+        Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
+        Route::delete('/object/{id}',         [ApiController::class, 'delete']);
+        Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
+        Route::put('/link/{id}',              [ApiController::class, 'storeLink']);     // update
+        Route::delete('/link/{id}',           [ApiController::class, 'deleteLink']);
+        Route::post('/photos',                [ApiController::class, 'photos']);
+        Route::post('/check_photos',          [ApiController::class, 'checkPhotos']);
+        Route::post('/photos/thumbs_upload',  [ApiController::class, 'upload']);
+    });
 });

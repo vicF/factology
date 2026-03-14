@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Функция для обработки файлов в заданной директории
+process_directory() {
+  local dir="$1"
+  cd "$dir" || exit
+  pwd
+
+  # Проходим по всем файлам и поддиректориям
+  for item in *; do
+    if [ -d "$item" ]; then
+      echo "Переход в директорию $item"
+      # Рекурсивно обрабатываем поддиректории
+      (process_directory "$item")
+    elif [ -f "$item" ]; then
+      # Читаем содержимое файла
+      link_target=$(<"$item")
+      # Проверяем, является ли содержимое относительным путем
+      if [[ "$link_target" =~ ^(\.\./)+.*\.[a-zA-Z0-9]+$ ]]; then
+        echo "Файл: $item"
+        echo "Цель ссылки: $link_target"
+        # Удаляем файл
+        rm "$item"
+        # Создаем символическую ссылку
+        ln -s "$link_target" "$item"
+        echo "Преобразован файл $item в символическую ссылку на $link_target"
+      fi
+    fi
+  done
+}
+
+process_directory "./public/thumbs"

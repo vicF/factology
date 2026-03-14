@@ -1,0 +1,4 @@
+#!/bin/bash
+
+now=$(date +"%Y_%m_%d")
+docker exec factology-mysql /usr/bin/mysqldump -u root --password=securerootpassword factology > factology_$now.sql
