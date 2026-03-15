@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Eloquent\Thing;
-use App\Models\User; // Fix: Use correct namespace
+use App\Models\User;
 use App\Models\Classes\Anything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Testing\TestResponse;
@@ -67,6 +67,12 @@ class ApiTest extends TestCase
      */
     protected function createTestObject(User $user, array $data = []): string
     {
+        // Important: Set thing_id on the user before creating object
+        if (!isset($user->thing_id) || !$user->thing_id) {
+            $user->thing_id = uuid_create();
+            $user->save();
+        }
+
         Sanctum::actingAs($user, ['*']);
 
         $uuid = uuid_create();
@@ -283,10 +289,8 @@ class ApiTest extends TestCase
      */
     public function testListTest(): void
     {
-        Sanctum::actingAs(
-            User::factory()->make(),
-            ['*']
-        );
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['*']);
 
         $json = $this->getApi('/api/v1/object');
 
@@ -305,9 +309,8 @@ class ApiTest extends TestCase
 
     public function testGetTest(): void
     {
+        $user = User::factory()->create();
         $uri = '/api/v1/object/' . UUID::SOMETHING;
-
-        $user = User::factory()->make();
 
         $json = $this->actingAs($user, 'sanctum')
             ->getApi($uri);
@@ -330,6 +333,11 @@ class ApiTest extends TestCase
     {
         // Create a user and authenticate
         $user = User::factory()->create();
+
+        // Set thing_id on the user
+        $user->thing_id = uuid_create();
+        $user->save();
+
         Sanctum::actingAs($user, ['*']);
 
         // Generate unique test data using the default data helper
@@ -362,7 +370,6 @@ class ApiTest extends TestCase
             'name'        => $name,
             'description' => $description,
         ]);
-
 
         // ========== READ ==========
         $getUri = '/api/v1/object/' . $thingId;
@@ -438,42 +445,44 @@ class ApiTest extends TestCase
      */
     public function testUserCannotUpdateAnotherUsersObject(): void
     {
-        // Create owner user
+        // Create owner user with thing_id
         $owner = User::factory()->create();
+        $owner->thing_id = uuid_create();
+        $owner->save();
 
-        // Create an object as the owner using the helper method
+        // Create an object as the owner
         $thingId = $this->createTestObject($owner, [
             'name' => 'Owner\'s Object',
             'description' => 'This belongs to owner',
         ]);
 
-        // Get the full object data for update (this will be used by the unauthorized user)
-        // We need to do this as the owner first to get the data
+        // Create a different user with their own thing_id
+        $otherUser = User::factory()->create();
+        $otherUser->thing_id = uuid_create(); // Different thing_id
+        $otherUser->save();
+
+        // Get the full object data for update (as the owner)
         Sanctum::actingAs($owner, ['*']);
         $fullObjectData = $this->getFullObjectDataForUpdate($thingId, [
             'description' => 'Trying to hijack this object',
         ]);
 
-        // Try to update with a different user
-        $otherUser = User::factory()->create();
+        // Try to update with the other user
         Sanctum::actingAs($otherUser, ['*']);
-
         $updateUri = '/api/v1/object/' . $thingId;
 
-        try {
-            // Expect 403 (Forbidden) or 404 (Not Found)
-            $this->putApi($updateUri, $fullObjectData, 403);
-            // If we get here without exception, the test passed
-            $this->assertTrue(true, "Got 403 Forbidden as expected");
-        } catch (AssertionFailedError $e) {
-            // Check if it's 404 instead of 403
-            if (str_contains($e->getMessage(), 'Expected status 403 but got 404')) {
-                // 404 is also acceptable (resource not found for this user)
-                $this->assertTrue(true, "Got 404 which is acceptable");
-            } else {
-                throw $e;
-            }
-        }
+        // Expect 403 (Forbidden)
+        $response = $this->putJson($updateUri, $fullObjectData);
+
+        // Assert that the response status is 403
+        $this->assertEquals(403, $response->getStatusCode(),
+            "Expected 403 Forbidden when user tries to update another user's object");
+
+        // Verify the object was NOT updated in the database
+        $this->assertDatabaseHas('things', [
+            'thing_id' => $thingId,
+            'description' => 'This belongs to owner', // Original description unchanged
+        ]);
 
         // Clean up - authenticate as owner again to delete the object
         Sanctum::actingAs($owner, ['*']);
@@ -486,6 +495,11 @@ class ApiTest extends TestCase
     public function testCreateWithMinimalFields(): void
     {
         $user = User::factory()->create();
+
+        // Set thing_id on the user
+        $user->thing_id = uuid_create();
+        $user->save();
+
         Sanctum::actingAs($user, ['*']);
 
         $uuid = uuid_create();

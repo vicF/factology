@@ -85,6 +85,7 @@ class Anything
         'start_variety',
         'thing_id',
         'type',
+        'owner',
     ];
 
     public $params = [
@@ -515,9 +516,21 @@ class Anything
     }
 
     /**
+     * @throws \Exception
      */
     public function save()
     {
+        $existingRecord = DB::table('things')
+            ->where('thing_id', $this->thing_id)
+            ->first();
+
+        // Check ownership
+        if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
+            throw new \Exception('You do not have permission to update this record', 403);
+            // Or return response with 403 Forbidden status
+        } else {
+            $this->owner = auth()->user()->thing_id;
+        }
         $this->_validate();
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
@@ -539,6 +552,7 @@ class Anything
                 'start'          => $data['start'] ?? null,
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],
+                'owner'          => $data['owner'],
                 'record_updated' => now(),
             ];
 
