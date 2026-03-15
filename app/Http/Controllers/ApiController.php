@@ -149,7 +149,15 @@ class ApiController extends BaseController
         ]);
         return DB::transaction(static function () use ($request) {
             $model = new Anything($request->toArray());
-            $model->save();
+            try {
+                $model->save();
+            } catch(\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save the record',
+                    'errors' => $e->getMessage() ?? 'Unknown error occurred'
+                ], $e->getCode() ?:500);
+            }
             if ($request->parent_id) {
 
                 $model->setLink([UUID::LINK_TO_PARENT], $request->parent_id, 'Child of');

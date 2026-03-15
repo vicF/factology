@@ -20,14 +20,13 @@ class ApiTest extends TestCase
      */
     protected function getDefaultObjectData(array $overrides = []): array
     {
-        $uniqueId = uniqid();
         $uuid = uuid_create();
 
         $defaultData = [
             'thing_id'    => $uuid,
-            'name'        => 'Test Object - ' . $uniqueId,
+            'name'        => 'Test Object - ' . $uuid,
             'type'        => UUID::G_THING,
-            'description' => 'Test object created on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId,
+            'description' => 'Test object created on ' . date('Y-m-d H:i:s') . ' - ' . $uuid,
             'start'       => date('Ymd', strtotime('-1 day')), // Yesterday in YYYYMMDD format
             'end'         => date('Ymd'), // Today in YYYYMMDD format
             'public'      => 1,
@@ -334,21 +333,20 @@ class ApiTest extends TestCase
         Sanctum::actingAs($user, ['*']);
 
         // Generate unique test data using the default data helper
-        $uuid = uuid_create();
-        $uniqueId = uniqid();
+        $uniqueId = uuid_create();
         $name = 'Test Object (delete me) - ' . $uniqueId;
         $description = 'Test object created by automated test on ' . date('Y-m-d H:i:s') . ' - ' . $uniqueId;
         $updatedDescription = $description . ' (updated)';
 
         // Use default data with overrides
         $requestData = $this->getDefaultObjectData([
-            'thing_id'    => $uuid,
+            'thing_id'    => $uniqueId,
             'name'        => $name,
             'description' => $description,
         ]);
 
         // ========== CREATE ==========
-        $createUri = '/api/v1/object/' . $uuid;
+        $createUri = '/api/v1/object/' . $uniqueId;
         $json = $this->postApi($createUri, $requestData);
 
         if (!isset($json['data']['thing_id'])) {
@@ -364,6 +362,7 @@ class ApiTest extends TestCase
             'name'        => $name,
             'description' => $description,
         ]);
+
 
         // ========== READ ==========
         $getUri = '/api/v1/object/' . $thingId;
@@ -397,7 +396,7 @@ class ApiTest extends TestCase
             // Check if it's a 405 error
             if (str_contains($e->getMessage(), 'Expected status 200 but got 405')) {
                 echo "\nDelete operation not supported on {$deleteUri}";
-                $this->markTestSkipped('Delete operation not supported');
+                $this->fail('Delete operation not supported');
             }
             throw $e;
         }
