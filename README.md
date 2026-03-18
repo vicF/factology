@@ -1,6 +1,6 @@
-# Project Name
+# Factology
 
-[Краткое описание проекта на английском]
+Project target is to build web application that manages objects and links between them. 
 
 ## License
 
