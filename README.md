@@ -20,4 +20,4 @@ Interested in commercial use? Contact me: [victor.fokin@gmail.com]
 
 ## Support the project
 
-<a href="https://boosty.to/vfokin/donate"><img src="https://boosty.to/static/images/logo.svg" width="120"></a>
+<a href="https://boosty.to/vfokin/donate">Boosty</a>
