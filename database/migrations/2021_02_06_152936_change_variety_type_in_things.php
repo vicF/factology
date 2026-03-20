@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class ChangeVarietyTypeInThings extends Migration
 {
@@ -13,10 +14,9 @@ class ChangeVarietyTypeInThings extends Migration
      */
     public function up()
     {
-        Schema::table('things', function (Blueprint $table) {
-            $table->float('start_variety')->change();
-            $table->float('end_variety')->change();
-        });
+        // Use raw SQL to avoid Doctrine DBAL and handle NULLs gracefully
+        DB::statement('ALTER TABLE `things` MODIFY `start_variety` FLOAT NULL');
+        DB::statement('ALTER TABLE `things` MODIFY `end_variety` FLOAT NULL');
     }
 
     /**
@@ -26,9 +26,7 @@ class ChangeVarietyTypeInThings extends Migration
      */
     public function down()
     {
-        Schema::table('things', function (Blueprint $table) {
-            $table->decimal('start_variety', 10, 0)->change();
-            $table->decimal('end_variety', 10, 0)->change();
-        });
+        DB::statement('ALTER TABLE `things` MODIFY `start_variety` DECIMAL(10, 0) NULL');
+        DB::statement('ALTER TABLE `things` MODIFY `end_variety` DECIMAL(10, 0) NULL');
     }
 }

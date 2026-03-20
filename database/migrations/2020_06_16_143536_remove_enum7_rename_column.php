@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class RemoveEnum7RenameColumn extends Migration
 {
@@ -13,10 +14,12 @@ class RemoveEnum7RenameColumn extends Migration
      */
     public function up()
     {
-        DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
-        Schema::table('things', static function (Blueprint $table) {
-            $table->renameColumn('general_type', 'type');
-        });
+        // Check if both columns exist before renaming
+        if (Schema::hasColumn('things', 'general_type') && !Schema::hasColumn('things', 'type')) {
+            Schema::table('things', static function (Blueprint $table) {
+                $table->renameColumn('general_type', 'type');
+            });
+        }
     }
 
     /**
@@ -26,8 +29,11 @@ class RemoveEnum7RenameColumn extends Migration
      */
     public function down()
     {
-        Schema::table('things', static function (Blueprint $table) {
-            $table->renameColumn('type', 'general_type');
-        });
+        // Check if both columns exist before renaming back
+        if (Schema::hasColumn('things', 'type') && !Schema::hasColumn('things', 'general_type')) {
+            Schema::table('things', static function (Blueprint $table) {
+                $table->renameColumn('type', 'general_type');
+            });
+        }
     }
 }
