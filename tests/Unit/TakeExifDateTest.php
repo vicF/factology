@@ -7,14 +7,14 @@
 
 namespace Tests\Unit;
 
-
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 //require_once('filescanner/FileScanner.php');
 
 class TakeExifDateTest extends TestCase
 {
-    public function DataProvider(): array
+    public static function dataProvider(): array
     {
         $data = [
             [
@@ -81,21 +81,16 @@ class TakeExifDateTest extends TestCase
             ]
         ];
         $result = [];
-        foreach ($data as $date) {
-            foreach ($date['sources'] as $exif) {
-                $result[] = [$date['date'], $exif];
+        foreach ($data as $dateItem) {
+            foreach ($dateItem['sources'] as $exif) {
+                $result[] = [$dateItem['date'], $exif];
             }
         }
         return $result;
     }
 
-    /**
-     * @param $expected
-     * @param $exif
-     * @throws \Exception
-     * @dataProvider DataProvider
-     */
-    public function testGetDateFromExif($expected, $exif): void
+    #[DataProvider('dataProvider')]
+    public function testGetDateFromExif(?string $expected, array $exif): void
     {
         $this->markTestIncomplete();
         $date = \FileScanner::getDateFromExifUTC($exif, $err);

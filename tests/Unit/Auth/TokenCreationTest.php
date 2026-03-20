@@ -5,13 +5,14 @@ namespace Tests\Unit\Auth;
 use App\Models\User;
 use Tests\TestCase;
 use Tests\Traits\SafeRefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 
 class TokenCreationTest extends TestCase
 {
     use SafeRefreshDatabase;
 
-    /** @test */
-    public function user_can_create_personal_access_token()
+    #[Test]
+    public function user_can_create_personal_access_token(): void
     {
         $user = User::factory()->create();
 

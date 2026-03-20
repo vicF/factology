@@ -7,15 +7,15 @@
 
 namespace Tests\Unit;
 
-
 use App\Models\Classes\Anything;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 //require_once(__DIR__ . '/../../filescanner/FileScanner.php');
 
 class FileScannerTest extends TestCase
 {
-    public function fileToDateDataProvider()
+    public static function fileToDateDataProvider(): array
     {
         return [
             ['IMG_20200223_190915.jpg', '2020-02-23 19:09:15'],
@@ -26,19 +26,15 @@ class FileScannerTest extends TestCase
         ];
     }
 
-    /**
-     * @param $name
-     * @param $dateExpected
-     * @dataProvider fileToDateDataProvider
-     */
-    public function testFileToDate($name, $dateExpected)
+    #[DataProvider('fileToDateDataProvider')]
+    public function testFileToDate(string $name, string $dateExpected): void
     {
         $this->markTestIncomplete();
         $date = \FileScanner::getDateFromFileName($name);
         self::assertEquals($dateExpected, $date->format(Anything::TIME_FORMAT));
     }
 
-    public function getDateFromFileDataProvider()
+    public static function getDateFromFileDataProvider(): array
     {
         return [
             ['VID_20200220_230730.mp4', '20200220230730'],
@@ -47,11 +43,8 @@ class FileScannerTest extends TestCase
         ];
     }
 
-    /**
-     * @param $fileName
-     * @dataProvider getDateFromFileDataProvider
-     */
-    public function testGetDateFromFile($fileName, $expected): void
+    #[DataProvider('getDateFromFileDataProvider')]
+    public function testGetDateFromFile(string $fileName, string $expected): void
     {
         $this->markTestIncomplete();
         $file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $fileName;

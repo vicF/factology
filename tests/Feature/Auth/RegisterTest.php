@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Tests\TestCase;
 use Tests\Traits\SafeRefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 
 class RegisterTest extends TestCase
 {
@@ -12,8 +13,8 @@ class RegisterTest extends TestCase
 
     protected const API_PREFIX = '/api/v1';
 
-    /** @test */
-    public function user_can_register_with_valid_data_and_receive_token()
+    #[Test]
+    public function user_can_register_with_valid_data_and_receive_token(): void
     {
         $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
@@ -49,8 +50,8 @@ class RegisterTest extends TestCase
         $this->assertCount(1, $user->tokens);
     }
 
-    /** @test */
-    public function registration_fails_with_missing_name()
+    #[Test]
+    public function registration_fails_with_missing_name(): void
     {
         $response = $this->postJson(self::API_PREFIX . '/register', [
             'email'                 => 'testuser@example.com',
@@ -63,8 +64,8 @@ class RegisterTest extends TestCase
             ->assertJsonValidationErrors(['name']);
     }
 
-    /** @test */
-    public function registration_fails_with_invalid_email()
+    #[Test]
+    public function registration_fails_with_invalid_email(): void
     {
         $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
@@ -78,8 +79,8 @@ class RegisterTest extends TestCase
             ->assertJsonValidationErrors(['email']);
     }
 
-    /** @test */
-    public function registration_fails_when_passwords_do_not_match()
+    #[Test]
+    public function registration_fails_when_passwords_do_not_match(): void
     {
         $response = $this->postJson(self::API_PREFIX . '/register', [
             'name'                  => 'Test User',
@@ -93,8 +94,8 @@ class RegisterTest extends TestCase
             ->assertJsonValidationErrors(['password']);
     }
 
-    /** @test */
-    public function registration_fails_with_duplicate_email()
+    #[Test]
+    public function registration_fails_with_duplicate_email(): void
     {
         // Create existing user first
         User::factory()->create([
@@ -113,8 +114,8 @@ class RegisterTest extends TestCase
             ->assertJsonValidationErrors(['email']);
     }
 
-    /** @test */
-    public function registration_fails_when_already_authenticated()
+    #[Test]
+    public function registration_fails_when_already_authenticated(): void
     {
         $user = User::factory()->create();
 
@@ -133,8 +134,8 @@ class RegisterTest extends TestCase
     //   NEW TESTS: Login & Logout after registration
     // ────────────────────────────────────────────────
 
-    /** @test */
-    public function registered_user_can_login_and_receive_new_token()
+    #[Test]
+    public function registered_user_can_login_and_receive_new_token(): void
     {
         // First register the user
         $this->postJson(self::API_PREFIX . '/register', [
@@ -170,8 +171,8 @@ class RegisterTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $user->tokens()->count());
     }
 
-    /** @test */
-    public function registered_user_can_logout_and_token_is_revoked()
+    #[Test]
+    public function registered_user_can_logout_and_token_is_revoked(): void
     {
         // Register user
         $registerResponse = $this->postJson(self::API_PREFIX . '/register', [
@@ -225,8 +226,8 @@ class RegisterTest extends TestCase
         }
     }
 
-    /** @test */
-    public function logout_fails_without_authentication()
+    #[Test]
+    public function logout_fails_without_authentication(): void
     {
         $response = $this->postJson(self::API_PREFIX . '/logout');
 

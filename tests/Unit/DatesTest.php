@@ -7,15 +7,15 @@
 
 namespace Tests\Unit;
 
-
 use Carbon\Carbon;
 use App\Models\Classes\Anything;
 use ReflectionMethod;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class DatesTest extends TestCase
 {
-    public function dataProvider()
+    public static function dataProvider(): array
     {
         $msk = Carbon::now('Europe/Moscow')->offsetHours;
         $now = new \DateTime();
@@ -46,15 +46,10 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @param $date
-     * @param $number
-     * @param $timeZone
-     * @dataProvider dataProvider
-     */
-    public function testDates($date, $number, $timeZone)
+    #[DataProvider('dataProvider')]
+    public function testDates(string|int $date, string|int $number, string $timeZone): void
     {
-        self::assertEquals(Anything::dateToDb($date, $timeZone), $number);
+        self::assertEquals($number, Anything::dateToDb($date, $timeZone));
         if (($p = strpos($date, '.')) !== false) {
             $date = substr($date, 0, $p);  // Remove dot and milliseconds if present
         }
@@ -62,8 +57,7 @@ class DatesTest extends TestCase
         self::assertEquals(Anything::padDate($date), $dateFromDb);
     }
 
-
-    public function dateToNumberDataProvider()
+    public static function dateToNumberDataProvider(): array
     {
         return [
             ['1970-01-01 00:00:00'],
@@ -81,22 +75,15 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider dateToNumberDataProvider
-     * @param $date
-     */
-    public function testDatesToNumber($date): void
+    #[DataProvider('dateToNumberDataProvider')]
+    public function testDatesToNumber(string $date): void
     {
         $this->assertEquals($date, Anything::dateFromDb(Anything::dateToDb($date)));
     }
 
-    /**
-     * @dataProvider dateToNumberDataProvider
-     * @param $date
-     */
-    public function testDatesToNumberWithTimezone($date): void
+    #[DataProvider('dateToNumberDataProvider')]
+    public function testDatesToNumberWithTimezone(string $date): void
     {
-
         $this->assertEquals($date, Anything::dateFromDb(Anything::dateToDb($date, 'UTC'), 'UTC'));
     }
 
@@ -108,7 +95,7 @@ class DatesTest extends TestCase
         $this->assertEquals(30000, $dateUtc - $dateSpb);
     }
 
-    public function compareDatesDataProvider()
+    public static function compareDatesDataProvider(): array
     {
         return [
             // Left date is earlier than right
@@ -124,12 +111,8 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider compareDatesDataProvider
-     * @param $less
-     * @param $more
-     */
-    public function testCompareDates($less, $more)
+    #[DataProvider('compareDatesDataProvider')]
+    public function testCompareDates(string $less, string $more): void
     {
         $lessDb = Anything::dateToDb($less);
         $moreDb = Anything::dateToDb($more);
@@ -137,7 +120,7 @@ class DatesTest extends TestCase
             "Failed to assert that $lessDb as representation of date $less is less than $moreDb as representation of date $more");
     }
 
-    public function fourDigitsDataProvider()
+    public static function fourDigitsDataProvider(): array
     {
         return [
             // Left date is earlier than right
@@ -153,17 +136,13 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider fourDigitsDataProvider
-     * @param $date
-     * @param $result
-     */
-    public function testYearHas4Digits($date, $result)
+    #[DataProvider('fourDigitsDataProvider')]
+    public function testYearHas4Digits(string $date, bool $result): void
     {
         self::assertEquals($result, Anything::yearHasMoreThan4Digits($date));
     }
 
-    public function padDateDataProvider()
+    public static function padDateDataProvider(): array
     {
         return [
             ['9999', '9999-01-01 00:00:00'],
@@ -177,17 +156,13 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @param $date
-     * @param $expected
-     * @dataProvider padDateDataProvider
-     */
-    public function testPadDate($date, $expected)
+    #[DataProvider('padDateDataProvider')]
+    public function testPadDate(string $date, string $expected): void
     {
         self::assertEquals($expected, Anything::padDate($date));
     }
 
-    public function correctBeforeBCDataProvider()
+    public static function correctBeforeBCDataProvider(): array
     {
         return [
             ['-00010101000000', '-00010101235959'],
@@ -195,12 +170,8 @@ class DatesTest extends TestCase
         ];
     }
 
-    /**
-     * @param $input
-     * @param $expected
-     * @dataProvider correctBeforeBCDataProvider
-     */
-    public function testCorrectBeforeBC($input, $expected)
+    #[DataProvider('correctBeforeBCDataProvider')]
+    public function testCorrectBeforeBC(string $input, string $expected): void
     {
         $CorrectBeforeBCMethod = new ReflectionMethod(Anything::class, '_correctBeforeBC');
         $CorrectBeforeBCMethod->setAccessible(true);
