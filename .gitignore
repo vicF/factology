@@ -22,3 +22,4 @@ public/thumbs
 yarn-error.log
 .vite_cache/
 vite.config.js.timestamp*.mjs
+.env.testing
