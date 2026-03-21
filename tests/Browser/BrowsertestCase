@@ -1,0 +1,76 @@
+<?php
+
+namespace Tests\Browser;
+
+use Tests\TestCase;
+use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Facebook\WebDriver\Remote\DesiredCapabilities;
+use Facebook\WebDriver\Chrome\ChromeOptions;
+
+abstract class BrowserTestCase extends TestCase
+{
+    protected $driver;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->driver = $this->createWebDriver();
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->driver) {
+            $this->driver->quit();
+        }
+
+        parent::tearDown();
+    }
+
+    protected function createWebDriver()
+    {
+        // Determine which ChromeDriver to use
+        $useHostBrowser = env('BROWSER_ON_HOST', false);
+
+        if ($useHostBrowser) {
+            // Connect to ChromeDriver on Windows host
+            $host = 'http://host.docker.internal:9515';
+        } else {
+            // Use headless Chrome inside container
+            $host = 'http://localhost:9515';
+        }
+
+        $options = new ChromeOptions();
+
+        if (!$useHostBrowser) {
+            // Headless mode for container
+            $options->addArguments(['--headless', '--no-sandbox', '--disable-gpu']);
+        } else {
+            // Windowed mode for host
+            $options->addArguments(['--start-maximized']);
+        }
+
+        $capabilities = DesiredCapabilities::chrome();
+        $capabilities->setCapability(ChromeOptions::CAPABILITY, $options);
+
+        return RemoteWebDriver::create($host, $capabilities);
+    }
+
+    protected function visit($url)
+    {
+        $this->driver->get($url);
+        return $this;
+    }
+
+    protected function assertSee($text)
+    {
+        $this->assertStringContainsString($text, $this->driver->getPageSource());
+        return $this;
+    }
+
+    protected function assertSeeElement($selector)
+    {
+        $this->assertNotNull($this->driver->findElement($selector));
+        return $this;
+    }
+}

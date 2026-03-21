@@ -10,11 +10,13 @@
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
+/**
+ * Helper to get the base URL for browser tests
+ */
 
-uses(
-    Tests\TestCase::class,
-    // Illuminate\Foundation\Testing\RefreshDatabase::class,
-)->in('Feature');
+
+uses(Tests\TestCase::class)
+    ->in('Feature', 'Unit', 'Browser');
 
 /*
 |--------------------------------------------------------------------------
@@ -30,6 +32,13 @@ uses(
 expect()->extend('toBeOne', function () {
     return $this->toBe(1);
 });
+
+function appUrl(string $path = '/'): string
+{
+    $base = rtrim(env('APP_URL', 'http://localhost:8003'), '/');
+
+    return $base . '/' . ltrim($path, '/');
+}
 
 /*
 |--------------------------------------------------------------------------
