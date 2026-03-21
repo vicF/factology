@@ -1,38 +1,51 @@
-// register_login_test.js
+// tests-js/register_login_test.js
 Feature('User Registration and Login');
 
-const testUser = {
-    name: 'Tester',
-    email: `tester-${Date.now()}@test.com`,
-    password: 'qqqqqqqq'
-};
+let testUser = null;
 
-// Remove Before/After since cleanup endpoint doesn't exist
-// Just use unique email each time
+Before(async ({ I }) => {
+    // Check database status first
+    const status = await I.sendGetRequest('/api/test/status');
+    console.log('Database status:', status.data);
 
-Scenario('Complete registration and login flow', ({ I }) => {
-    // Registration
+    // Clean all test data
+    await I.sendPostRequest('/api/test/clean-all');
+});
+
+After(async ({ I }) => {
+    // Clean up after test
+    if (testUser && testUser.id) {
+        await I.sendDeleteRequest(`/api/test/users/${testUser.id}`);
+    }
+});
+
+Scenario('Complete registration and login flow', async ({ I }) => {
+    const userData = {
+        name: 'Tester',
+        email: `tester-${Date.now()}@test.com`,
+        password: 'qqqqqqqq'
+    };
+
+    // Register via UI
     I.amOnPage('/');
     I.click('User');
     I.click('Register');
 
-    I.fillField('Name', testUser.name);
-    I.fillField('Email', testUser.email);
-    I.fillField('Password', testUser.password);
-    I.fillField('Confirm Password', testUser.password);
+    I.fillField('Name', userData.name);
+    I.fillField('Email', userData.email);
+    I.fillField('Password', userData.password);
+    I.fillField('Confirm Password', userData.password);
     I.click('Register');
 
-    // FOR SPA: Wait for element that appears after successful registration
-    // Instead of waitForNavigation, wait for the user name to appear in navbar
-    I.waitForText(testUser.name, 15000);
-    I.see(testUser.name);
+    // Wait for successful registration
+    I.waitForText(userData.name, 15000);
 
-    // Now wait for the "Something" link to be ready
-    // Wait for loading indicator to disappear first
-    I.waitForInvisible('text=Loading...', 10000);
+    // Store for cleanup
+    testUser = userData;
 
-    // Wait for content to load via XHR
     I.waitForText('Something', 15000);
+    // Continue with test...
+    I.waitForInvisible('text=Loading...', 10000);
     I.click('Something');
 
     // Wait for the next page to load (wait for a known element)
@@ -69,8 +82,10 @@ Scenario('Complete registration and login flow', ({ I }) => {
     I.see('User');
 });
 
-After(async ({ I }) => {
-    // Clean up test user after test
-    await I.sendPostRequest('/api/test/cleanup', { email: testUser.email });
+// Optional: Test the reset functionality
+Scenario('Test database reset', async ({ I }) => {
+    // Reset entire database
+    const response = await I.sendPostRequest('/api/test/reset');
+    I.assertEqual(response.status, 200);
+    console.log('Database reset output:', response.data.output);
 });
-

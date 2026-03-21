@@ -50,3 +50,22 @@ Route::prefix('v1')->group(function () {
         Route::post('/photos/thumbs_upload',  [ApiController::class, 'upload']);
     });
 });
+
+// ============================================
+// TESTING ROUTES (only available in testing environment)
+// ============================================
+
+if (app()->environment('testing')) {
+    Route::prefix('test')->group(function () {
+        // Database management
+        Route::post('/cleanup',      [App\Http\Controllers\TestDatabaseController::class, 'cleanup']);
+        Route::post('/reset',        [App\Http\Controllers\TestDatabaseController::class, 'reset']);
+        Route::post('/refresh',      [App\Http\Controllers\TestDatabaseController::class, 'refresh']);
+        Route::post('/clean-all',    [App\Http\Controllers\TestDatabaseController::class, 'cleanAll']);
+        Route::get('/status',        [App\Http\Controllers\TestDatabaseController::class, 'status']);
+
+        // User management
+        Route::post('/create-user',  [App\Http\Controllers\TestDatabaseController::class, 'createUser']);
+        Route::delete('/users/{id}', [App\Http\Controllers\TestDatabaseController::class, 'deleteUser']);
+    });
+}
