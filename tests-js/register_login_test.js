@@ -5,19 +5,16 @@ let testUser = null;
 
 Before(async ({ I }) => {
     // Check database status first
-    const status = await I.sendGetRequest('/api/test/status');
+    const status = await I.sendGetRequest('/api/test/refresh');
     console.log('Database status:', status.data);
-
-    // Clean all test data
-    await I.sendPostRequest('/api/test/clean-all');
 });
 
-After(async ({ I }) => {
+/*After(async ({ I }) => {
     // Clean up after test
     if (testUser && testUser.id) {
         await I.sendDeleteRequest(`/api/test/users/${testUser.id}`);
     }
-});
+});*/
 
 Scenario('Complete registration and login flow', async ({ I }) => {
     const userData = {
@@ -86,6 +83,6 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 Scenario('Test database reset', async ({ I }) => {
     // Reset entire database
     const response = await I.sendPostRequest('/api/test/reset');
-    I.assertEqual(response.status, 200);
+    I.assertEquals(response.status, 200);
     console.log('Database reset output:', response.data.output);
 });

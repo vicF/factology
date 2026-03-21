@@ -3,15 +3,15 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use App\Traits\SafeDatabaseGuard;
 
 class TestDatabaseController extends Controller
 {
-    use SafeDatabaseGuard;
+    use SafeDatabaseGuard, RefreshDatabase;
 
     public function __construct()
     {
@@ -51,20 +51,24 @@ class TestDatabaseController extends Controller
     }
 
     /**
-     * Reset database using Laravel's migrate:fresh
-     * Uses the same protection as your tests
+     * Reset database
      */
     public function reset()
     {
-        // The guardAgainstUnsafeDatabase already ran in constructor
-        // Now we can safely run migrations
+        try {
+            // This is the exact same method your PHP tests use!
+            $this->refreshDatabase();
 
-        Artisan::call('migrate:fresh', ['--seed' => true]);
-
-        return response()->json([
-            'message' => 'Database reset completed',
-            'output' => Artisan::output()
-        ]);
+            return response()->json([
+                'message' => 'Database refreshed successfully',
+                'database' => \DB::getDatabaseName()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Database refresh failed',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
