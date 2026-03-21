@@ -103,10 +103,3 @@ Scenario('Complete registration and login flow', async ({ I }) => {
     I.see('User');
 });
 
-// Optional: Test the reset functionality
-Scenario('Test database reset', async ({ I }) => {
-    // Reset entire database
-    const response = await I.sendPostRequest('/api/test/reset');
-    I.assertEquals(response.status, 200);
-    console.log('Database reset output:', response.data.output);
-});
