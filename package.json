@@ -1,23 +1,28 @@
 {
     "private": true,
-    "type": "module",
     "scripts": {
         "dev": "vite --host=0.0.0.0 --port=5173 --clearScreen=false",
         "dev:debug": "vite --host=0.0.0.0 --port=5173 --debug",
         "dev:no-cache": "vite --host=0.0.0.0 --port=5173 --force",
         "build": "vite build --mode=production",
         "build:analyze": "vite build --mode=production --ssrManifest",
-        "preview": "vite preview --host=0.0.0.0 --port=4173"
+        "preview": "vite preview --host=0.0.0.0 --port=4173",
+        "test:php": "php artisan test",
+        "test:php:unit": "php artisan test --testsuite=Unit",
+        "test:js": "cd tests-js && npx codeceptjs run"
     },
     "devDependencies": {
+        "@codeceptjs/configure": "^1.0.6",
         "@popperjs/core": "^2.11.6",
         "@vitejs/plugin-vue": "^6.0.4",
         "axios": "^1.1.2",
         "bootstrap": "^5.3.7",
+        "codeceptjs": "^3.7.7",
         "jest": "^29.7.0",
         "laravel-vite-plugin": "^2.1.0",
         "lodash": "^4.17.19",
         "luxon": "^3.4.4",
+        "playwright": "^1.58.2",
         "postcss": "^8.1.14",
         "sass": "^1.97.3",
         "vite": "^7.3.1",
