@@ -1,7 +1,7 @@
 // tests-js/codecept.conf.js
 exports.config = {
     tests: './**/*_test.js',
-    output: './output',
+    output: './_output',
     helpers: {
         Playwright: {
             url: 'http://localhost:8005',
