@@ -9,7 +9,7 @@
         "preview": "vite preview --host=0.0.0.0 --port=4173",
         "test:php": "php artisan test",
         "test:php:unit": "php artisan test --testsuite=Unit",
-        "test:js": "cd js-tests && npx codeceptjs run"
+        "test:js": "cd tests-js && npx codeceptjs run"
     },
     "devDependencies": {
         "@codeceptjs/configure": "^1.0.6",

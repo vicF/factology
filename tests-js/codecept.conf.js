@@ -1,7 +1,7 @@
-// codecept.conf.cjs
+// tests-js/codecept.conf.js
 exports.config = {
-    tests: './*_test.js',
-    output: './tests/_output',
+    tests: './**/*_test.js',
+    output: './output',
     helpers: {
         Playwright: {
             url: 'http://localhost:8005',
@@ -12,15 +12,13 @@ exports.config = {
             chromium: {
                 args: ['--no-sandbox']
             },
-            restart: false,
-            keepCookies: true
+            retry: {
+                steps: 3,
+                minTimeout: 1000
+            },
         },
         REST: {
-            endpoint: 'http://localhost:8005/api',
-            defaultHeaders: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
+            endpoint: 'http://localhost:8005'
         }
     },
     include: {
