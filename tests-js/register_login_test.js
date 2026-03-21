@@ -4,9 +4,33 @@ Feature('User Registration and Login');
 let testUser = null;
 
 Before(async ({ I }) => {
-    // Check database status first
-    const status = await I.sendGetRequest('/api/test/refresh');
-    console.log('Database status:', status.data);
+    console.log('\n========== DATABASE SETUP ==========');
+
+    try {
+        // Check migration status first
+        console.log('\n📋 Current migration status:');
+        const statusResponse = await I.sendGetRequest('/api/test/migration-status');
+        console.log(statusResponse.data.output);
+
+        // Reset database with full output
+        console.log('\n🔄 Running database reset...');
+        const resetResponse = await I.sendPostRequest('/api/test/reset');
+
+        if (resetResponse.data.success) {
+            console.log('\n✅ Database reset successful!');
+            console.log('\n📊 Migration Output:');
+            console.log(resetResponse.data.output);
+        } else {
+            console.log('\n❌ Database reset failed:');
+            console.log(resetResponse.data.error);
+        }
+
+    } catch (err) {
+        console.log('\n❌ Error accessing test routes:', err.message);
+        console.log('Make sure your test container is running with APP_ENV=testing');
+    }
+
+    console.log('\n====================================\n');
 });
 
 /*After(async ({ I }) => {

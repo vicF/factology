@@ -58,14 +58,14 @@ Route::prefix('v1')->group(function () {
 if (app()->environment('testing')) {
     Route::prefix('test')->group(function () {
         // Database management
-        Route::post('/cleanup',      [App\Http\Controllers\TestDatabaseController::class, 'cleanup']);
-        Route::post('/reset',        [App\Http\Controllers\TestDatabaseController::class, 'reset']);
-        Route::post('/refresh',      [App\Http\Controllers\TestDatabaseController::class, 'refresh']);
-        Route::post('/clean-all',    [App\Http\Controllers\TestDatabaseController::class, 'cleanAll']);
-        Route::get('/status',        [App\Http\Controllers\TestDatabaseController::class, 'status']);
+        Route::post('/reset',          [TestDatabaseController::class, 'reset']);
+        Route::post('/migrate',        [TestDatabaseController::class, 'migrate']);
+        Route::get('/migration-status', [TestDatabaseController::class, 'migrationStatus']);
+        Route::post('/clean-all',      [TestDatabaseController::class, 'cleanAll']);
+        Route::get('/status',          [TestDatabaseController::class, 'status']);
 
         // User management
-        Route::post('/create-user',  [App\Http\Controllers\TestDatabaseController::class, 'createUser']);
-        Route::delete('/users/{id}', [App\Http\Controllers\TestDatabaseController::class, 'deleteUser']);
+        Route::post('/create-user',    [TestDatabaseController::class, 'createUser']);
+        Route::delete('/users/{id}',   [TestDatabaseController::class, 'deleteUser']);
     });
 }
