@@ -126,6 +126,6 @@ jobs:
         with:
           name: test-artifacts
           path: |
-            tests-js/output/
+            tests-js/_output/
             storage/logs/
             tests-js/screenshots/
