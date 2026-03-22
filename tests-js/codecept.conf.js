@@ -3,7 +3,7 @@ const isHeadless = process.env.CI === 'true' || process.env.HEADLESS === 'true';
 
 exports.config = {
     tests: './**/*_test.js',
-    output: './_output',
+    output: './output',
     helpers: {
         Playwright: {
             url: process.env.APP_URL || 'http://localhost:8005',
