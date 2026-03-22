@@ -39,54 +39,48 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Don't use cache here, we'll handle manually
-          cache: ''
 
-      - name: Cache Vue dependencies
-        uses: actions/cache@v3
-        id: cache-vue
-        with:
-          path: factology/node_modules
-          key: ${{ runner.os }}-vue-${{ hashFiles('factology/package-lock.json', 'factology/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-vue-
-
-      - name: Cache CodeceptJS dependencies
-        uses: actions/cache@v3
-        id: cache-codecept
-        with:
-          path: tests-js/node_modules
-          key: ${{ runner.os }}-codecept-${{ hashFiles('tests-js/package-lock.json', 'tests-js/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-codecept-
+      - name: List directory structure (debug)
+        run: |
+          pwd
+          ls -la
+          ls -la factology/ || echo "factology directory not found"
 
       - name: Copy environment for CI
         run: |
-          cp .env.github .env || cp .env.example .env
-          # Create .env for tests-js if needed
-          echo "APP_URL=http://localhost:8005" > tests-js/.env
+          cd factology
+          if [ -f .env.github ]; then
+            cp .env.github .env
+          elif [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            echo "No environment file found"
+            exit 1
+          fi
+          echo "APP_URL=http://localhost:8005" > ../tests-js/.env
 
       - name: Install PHP dependencies
+        working-directory: factology
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install Node dependencies (Vue)
+      - name: Install Vue dependencies
         working-directory: factology
-        if: steps.cache-vue.outputs.cache-hit != 'true'
-        run: npm ci || npm install
+        run: npm install
 
       - name: Install CodeceptJS dependencies
         working-directory: tests-js
-        if: steps.cache-codecept.outputs.cache-hit != 'true'
-        run: npm ci || npm install
+        run: npm install
 
       - name: Install Playwright browsers
         working-directory: tests-js
         run: npx playwright install chromium --with-deps
 
       - name: Generate application key
+        working-directory: factology
         run: php artisan key:generate
 
-      - name: Run database migrations with seed
+      - name: Run database migrations
+        working-directory: factology
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -96,11 +90,12 @@ jobs:
           DB_PASSWORD: securerootpassword
         run: php artisan migrate:fresh --seed --force
 
-      - name: Build frontend assets (for Vite)
+      - name: Build frontend assets
         working-directory: factology
         run: npm run build
 
       - name: Start Laravel development server
+        working-directory: factology
         env:
           APP_ENV: testing
           APP_URL: http://localhost:8005
@@ -115,6 +110,7 @@ jobs:
           sleep 5  # Wait for server to start
 
       - name: Run PHPUnit/Feature tests
+        working-directory: factology
         env:
           APP_ENV: testing
           DB_CONNECTION: mysql
@@ -139,6 +135,6 @@ jobs:
         with:
           name: test-artifacts
           path: |
-            tests-js/_output/
-            storage/logs/
+            tests-js/output/
+            factology/storage/logs/
             tests-js/screenshots/
