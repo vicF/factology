@@ -39,19 +39,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'factology/package-lock.json'
+          # Don't use cache here, we'll handle manually
+          cache: ''
 
-      - name: Setup Node - CodeceptJS Tests
-        uses: actions/setup-node@v4
+      - name: Cache Vue dependencies
+        uses: actions/cache@v3
+        id: cache-vue
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'tests-js/package-lock.json'
+          path: factology/node_modules
+          key: ${{ runner.os }}-vue-${{ hashFiles('factology/package-lock.json', 'factology/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vue-
+
+      - name: Cache CodeceptJS dependencies
+        uses: actions/cache@v3
+        id: cache-codecept
+        with:
+          path: tests-js/node_modules
+          key: ${{ runner.os }}-codecept-${{ hashFiles('tests-js/package-lock.json', 'tests-js/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-codecept-
 
       - name: Copy environment for CI
         run: |
-          cp .env.github .env
+          cp .env.github .env || cp .env.example .env
           # Create .env for tests-js if needed
           echo "APP_URL=http://localhost:8005" > tests-js/.env
 
@@ -60,11 +71,13 @@ jobs:
 
       - name: Install Node dependencies (Vue)
         working-directory: factology
-        run: npm ci
+        if: steps.cache-vue.outputs.cache-hit != 'true'
+        run: npm ci || npm install
 
       - name: Install CodeceptJS dependencies
         working-directory: tests-js
-        run: npm ci
+        if: steps.cache-codecept.outputs.cache-hit != 'true'
+        run: npm ci || npm install
 
       - name: Install Playwright browsers
         working-directory: tests-js
