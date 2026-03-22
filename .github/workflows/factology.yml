@@ -39,29 +39,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Copy environment for CI
+      - name: Create .env file
         run: |
-          if [ -f .env.github ]; then
-            cp .env.github .env
-          else
-            echo "APP_ENV=testing" > .env
-            echo "APP_KEY=" >> .env
-            echo "APP_URL=http://localhost:8005" >> .env
-            echo "DB_CONNECTION=mysql" >> .env
-            echo "DB_HOST=127.0.0.1" >> .env
-            echo "DB_PORT=3306" >> .env
-            echo "DB_DATABASE=factology_testing" >> .env
-            echo "DB_USERNAME=root" >> .env
-            echo "DB_PASSWORD=securerootpassword" >> .env
-          fi
+          cat > .env << 'EOF'
+          APP_ENV=testing
+          APP_KEY=
+          APP_DEBUG=true
+          APP_URL=http://localhost:8005
+          DB_CONNECTION=mysql
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_DATABASE=testing
+          DB_USERNAME=root
+          DB_PASSWORD=securerootpassword
+          EOF
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install Node dependencies (Vue + CodeceptJS)
-        run: npm ci
+      - name: Install Node dependencies
+        run: npm ci --omit=optional --no-audit --no-fund
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -71,30 +69,38 @@ jobs:
 
       - name: Run database migrations
         env:
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_tmp_test
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
+          APP_ENV: testing
         run: php artisan migrate:fresh --seed --force
 
-      - name: Build frontend assets (Vite)
+      - name: Build frontend assets
         run: npm run build
 
-      - name: Start Laravel development server
-        run: |
-          php artisan serve --host=0.0.0.0 --port=8005 &
-          sleep 5
+      - name: Start Laravel server
         env:
           APP_ENV: testing
+          APP_URL: http://localhost:8005
+        run: |
+          php artisan serve --host=0.0.0.0 --port=8005 &
+          sleep 10
+          echo "Verifying server is running..."
+          curl -f http://localhost:8005 || (echo "Server failed to start" && exit 1)
+          echo "Checking test routes..."
+          curl -f http://localhost:8005/api/test/status || echo "Test routes not available yet"
+
+      - name: Debug environment
+        run: |
+          echo "APP_ENV from .env:"
+          grep APP_ENV .env
+          echo ""
+          echo "Current environment from artisan:"
+          php artisan tinker --execute="echo app()->environment();"
 
       - name: Run PHPUnit tests
         env:
           APP_ENV: testing
         run: php artisan test --colors=always
 
-      - name: Run CodeceptJS E2E tests (headless)
+      - name: Run CodeceptJS tests
         working-directory: tests-js
         env:
           CI: true
