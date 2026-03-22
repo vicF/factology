@@ -14,18 +14,15 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: testing  # Simple, standard database name
+          MYSQL_ROOT_PASSWORD: securerootpassword
+          MYSQL_DATABASE: factology_testing
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
-
-      # For Codeception with WebDriver (if still using it)
-      selenium:
-        image: selenium/standalone-chrome:latest
-        ports:
-          - 4444:4444
-        options: --shm-size=2g
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
 
     steps:
       - name: Checkout code
@@ -35,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.3
-          extensions: pdo_mysql, mbstring, dom, fileinfo
+          extensions: pdo_mysql, mbstring, dom, fileinfo, bcmath, zip
           coverage: none
 
       - name: Setup Node
@@ -43,63 +40,85 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: factology/package-lock.json
 
       - name: Copy environment for CI
-        run: cp .env.github .env
+        run: |
+          cp .env.github .env
+          # Create .env for tests-js if needed
+          echo "APP_URL=http://localhost:8005" > tests-js/.env
 
       - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install Node dependencies
+      - name: Install Node dependencies (Vue)
+        working-directory: factology
         run: npm ci
 
-      - name: Generate key
+      - name: Install CodeceptJS dependencies
+        working-directory: tests-js
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: tests-js
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate application key
         run: php artisan key:generate
 
-      - name: Run database migrations
+      - name: Run database migrations with seed
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_DATABASE: testing
+          DB_DATABASE: factology_testing
           DB_USERNAME: root
-          DB_PASSWORD: root
-        run: php artisan migrate --seed
+          DB_PASSWORD: securerootpassword
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Build frontend assets (for Vite)
+        working-directory: factology
+        run: npm run build
+
+      - name: Start Laravel development server
+        env:
+          APP_ENV: testing
+          APP_URL: http://localhost:8005
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: factology_testing
+          DB_USERNAME: root
+          DB_PASSWORD: securerootpassword
+        run: |
+          php artisan serve --host=0.0.0.0 --port=8005 &
+          sleep 5  # Wait for server to start
 
       - name: Run PHPUnit/Feature tests
         env:
+          APP_ENV: testing
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_DATABASE: testing
+          DB_DATABASE: factology_testing
           DB_USERNAME: root
-          DB_PASSWORD: root
-        run: php artisan test
+          DB_PASSWORD: securerootpassword
+        run: php artisan test --colors=always
 
-      - name: Run Vue unit tests
-        run: npm run test:unit
-
-      - name: Build frontend assets
-        run: npm run build
-
-      - name: Run Dusk tests
+      - name: Run CodeceptJS E2E tests (headless)
+        working-directory: tests-js
         env:
-          APP_URL: http://127.0.0.1:8000
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: testing
-          DB_USERNAME: root
-          DB_PASSWORD: root
-        run: |
-          php artisan serve --env=testing --no-reload &
-          php artisan dusk
+          CI: true
+          HEADLESS: true
+          APP_URL: http://localhost:8005
+        run: npx codeceptjs run --steps --verbose
 
       - name: Upload test artifacts (if tests fail)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-screenshots
+          name: test-artifacts
           path: |
-            tests/Browser/screenshots
-            tests/_output
+            tests-js/output/
+            storage/logs/
+            tests/Browser/screenshots/
