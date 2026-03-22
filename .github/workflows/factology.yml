@@ -15,7 +15,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: securerootpassword
-          MYSQL_DATABASE: factology_testing
+          MYSQL_DATABASE: factology_tmp_test
         ports:
           - 3306:3306
         options: >-
@@ -74,7 +74,7 @@ jobs:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_DATABASE: factology_testing
+          DB_DATABASE: factology_tmp_test
           DB_USERNAME: root
           DB_PASSWORD: securerootpassword
         run: php artisan migrate:fresh --seed --force
