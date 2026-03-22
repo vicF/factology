@@ -40,34 +40,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            tests-js/package-lock.json
-
-      - name: Debug directory structure
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents:"
-          ls -la
-          echo ""
-          echo "Checking Laravel files:"
-          ls -la app/ || echo "app directory found"
-          ls -la artisan || echo "artisan found"
-          echo ""
-          echo "Checking tests directories:"
-          ls -la tests/ || echo "tests directory found"
-          ls -la tests-js/ || echo "tests-js directory found"
 
       - name: Copy environment for CI
         run: |
           if [ -f .env.github ]; then
             cp .env.github .env
-          elif [ -f .env.example ]; then
-            cp .env.example .env
           else
             echo "APP_ENV=testing" > .env
             echo "APP_KEY=" >> .env
-            echo "APP_DEBUG=true" >> .env
             echo "APP_URL=http://localhost:8005" >> .env
             echo "DB_CONNECTION=mysql" >> .env
             echo "DB_HOST=127.0.0.1" >> .env
@@ -77,27 +57,19 @@ jobs:
             echo "DB_PASSWORD=securerootpassword" >> .env
           fi
 
-          # Create .env for tests-js
-          echo "APP_URL=http://localhost:8005" > tests-js/.env
-
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install Node dependencies (Vue)
-        run: npm ci
-
-      - name: Install CodeceptJS dependencies
-        working-directory: tests-js
+      - name: Install Node dependencies (Vue + CodeceptJS)
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: tests-js
         run: npx playwright install chromium --with-deps
 
       - name: Generate application key
         run: php artisan key:generate
 
-      - name: Run database migrations with seed
+      - name: Run database migrations
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -111,32 +83,18 @@ jobs:
         run: npm run build
 
       - name: Start Laravel development server
-        env:
-          APP_ENV: testing
-          APP_URL: http://localhost:8005
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_testing
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
         run: |
           php artisan serve --host=0.0.0.0 --port=8005 &
           sleep 5
+        env:
+          APP_ENV: testing
 
       - name: Run PHPUnit tests
         env:
           APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_testing
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
         run: php artisan test --colors=always
 
       - name: Run CodeceptJS E2E tests (headless)
-        working-directory: tests-js
         env:
           CI: true
           HEADLESS: true
@@ -151,4 +109,3 @@ jobs:
           path: |
             tests-js/output/
             storage/logs/
-            tests-js/screenshots/
