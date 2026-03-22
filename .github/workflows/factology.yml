@@ -39,102 +39,119 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            tests-js/package-lock.json
 
-      - name: List directory structure (debug)
+      - name: Debug directory structure
         run: |
-          pwd
+          echo "Current directory: $(pwd)"
+          echo "Contents:"
           ls -la
-          ls -la factology/ || echo "factology directory not found"
+          echo ""
+          echo "Checking Laravel files:"
+          ls -la app/ || echo "app directory found"
+          ls -la artisan || echo "artisan found"
+          echo ""
+          echo "Checking tests directories:"
+          ls -la tests/ || echo "tests directory found"
+          ls -la tests-js/ || echo "tests-js directory found"
 
       - name: Copy environment for CI
         run: |
-          cd factology
           if [ -f .env.github ]; then
             cp .env.github .env
           elif [ -f .env.example ]; then
             cp .env.example .env
           else
-            echo "No environment file found"
-            exit 1
-          fi
-          echo "APP_URL=http://localhost:8005" > ../tests-js/.env
+            echo "Creating .env file"
+            cat > .env << EOF
+  APP_ENV=testing
+  APP_KEY=
+  APP_DEBUG=true
+  APP_URL=http://localhost:8005
+  DB_CONNECTION=mysql
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  DB_DATABASE=factology_testing
+  DB_USERNAME=root
+  DB_PASSWORD=securerootpassword
+  EOF
+  fi
 
-      - name: Install PHP dependencies
-        working-directory: factology
-        run: composer install --no-interaction --prefer-dist --no-progress
+  # Create .env for tests-js
+  echo "APP_URL=http://localhost:8005" > tests-js/.env
 
-      - name: Install Vue dependencies
-        working-directory: factology
-        run: npm install
+- name: Install PHP dependencies
+  run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Install CodeceptJS dependencies
-        working-directory: tests-js
-        run: npm install
+- name: Install Node dependencies (Vue)
+  run: npm ci
 
-      - name: Install Playwright browsers
-        working-directory: tests-js
-        run: npx playwright install chromium --with-deps
+- name: Install CodeceptJS dependencies
+  working-directory: tests-js
+  run: npm ci
 
-      - name: Generate application key
-        working-directory: factology
-        run: php artisan key:generate
+- name: Install Playwright browsers
+  working-directory: tests-js
+  run: npx playwright install chromium --with-deps
 
-      - name: Run database migrations
-        working-directory: factology
-        env:
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_testing
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
-        run: php artisan migrate:fresh --seed --force
+- name: Generate application key
+  run: php artisan key:generate
 
-      - name: Build frontend assets
-        working-directory: factology
-        run: npm run build
+- name: Run database migrations with seed
+  env:
+    DB_CONNECTION: mysql
+    DB_HOST: 127.0.0.1
+    DB_PORT: 3306
+    DB_DATABASE: factology_testing
+    DB_USERNAME: root
+    DB_PASSWORD: securerootpassword
+  run: php artisan migrate:fresh --seed --force
 
-      - name: Start Laravel development server
-        working-directory: factology
-        env:
-          APP_ENV: testing
-          APP_URL: http://localhost:8005
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_testing
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
-        run: |
-          php artisan serve --host=0.0.0.0 --port=8005 &
-          sleep 5  # Wait for server to start
+- name: Build frontend assets (Vite)
+  run: npm run build
 
-      - name: Run PHPUnit/Feature tests
-        working-directory: factology
-        env:
-          APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: factology_testing
-          DB_USERNAME: root
-          DB_PASSWORD: securerootpassword
-        run: php artisan test --colors=always
+- name: Start Laravel development server
+  env:
+    APP_ENV: testing
+    APP_URL: http://localhost:8005
+    DB_CONNECTION: mysql
+    DB_HOST: 127.0.0.1
+    DB_PORT: 3306
+    DB_DATABASE: factology_testing
+    DB_USERNAME: root
+    DB_PASSWORD: securerootpassword
+  run: |
+    php artisan serve --host=0.0.0.0 --port=8005 &
+    sleep 5
 
-      - name: Run CodeceptJS E2E tests (headless)
-        working-directory: tests-js
-        env:
-          CI: true
-          HEADLESS: true
-          APP_URL: http://localhost:8005
-        run: npx codeceptjs run --steps --verbose
+- name: Run PHPUnit tests
+  env:
+    APP_ENV: testing
+    DB_CONNECTION: mysql
+    DB_HOST: 127.0.0.1
+    DB_PORT: 3306
+    DB_DATABASE: factology_testing
+    DB_USERNAME: root
+    DB_PASSWORD: securerootpassword
+  run: php artisan test --colors=always
 
-      - name: Upload test artifacts (if tests fail)
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-artifacts
-          path: |
-            tests-js/output/
-            factology/storage/logs/
-            tests-js/screenshots/
+- name: Run CodeceptJS E2E tests (headless)
+  working-directory: tests-js
+  env:
+    CI: true
+    HEADLESS: true
+    APP_URL: http://localhost:8005
+  run: npx codeceptjs run --steps --verbose
+
+- name: Upload test artifacts
+  uses: actions/upload-artifact@v4
+  if: failure()
+  with:
+    name: test-artifacts
+    path: |
+      tests-js/output/
+      storage/logs/
+      tests-js/screenshots/
