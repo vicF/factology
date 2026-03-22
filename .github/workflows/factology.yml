@@ -35,12 +35,19 @@ jobs:
           extensions: pdo_mysql, mbstring, dom, fileinfo, bcmath, zip
           coverage: none
 
-      - name: Setup Node
+      - name: Setup Node - Frontend (Vue)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: factology/package-lock.json
+          cache-dependency-path: 'factology/package-lock.json'
+
+      - name: Setup Node - CodeceptJS Tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'tests-js/package-lock.json'
 
       - name: Copy environment for CI
         run: |
@@ -121,4 +128,4 @@ jobs:
           path: |
             tests-js/output/
             storage/logs/
-            tests/Browser/screenshots/
+            tests-js/screenshots/
