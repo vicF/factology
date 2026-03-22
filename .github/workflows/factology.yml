@@ -95,6 +95,7 @@ jobs:
         run: php artisan test --colors=always
 
       - name: Run CodeceptJS E2E tests (headless)
+        working-directory: tests-js
         env:
           CI: true
           HEADLESS: true
