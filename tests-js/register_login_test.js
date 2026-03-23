@@ -59,18 +59,18 @@ Scenario('Complete registration and login flow', async ({ I }) => {
     I.click('Register');
 
     // Wait for successful registration
-    I.waitForText(userData.name, 15000);
+    I.waitForText(userData.name, 15);
 
     // Store for cleanup
     testUser = userData;
 
-    I.waitForText('Something', 15000);
+    I.waitForText('Something', 15);
     // Continue with test...
-    I.waitForInvisible('text=Loading...', 10000);
+    I.waitForInvisible('text=Loading...', 10);
     I.click('Something');
 
     // Wait for the next page to load (wait for a known element)
-    I.waitForText('Create', 15000);
+    I.waitForText('Create', 15);
 
     // Test dialog interactions
     I.click('Edit this object');
