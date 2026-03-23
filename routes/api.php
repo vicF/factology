@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\TestDatabaseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
