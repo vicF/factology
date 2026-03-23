@@ -26,7 +26,9 @@
         "postcss": "^8.1.14",
         "sass": "^1.97.3",
         "vite": "^7.3.1",
-        "vue": "^3.2.36"
+        "vue": "^3.2.36",
+        "rollup": "^4.0.0",
+        "@rollup/rollup-linux-x64-gnu": "^4.0.0"
     },
     "dependencies": {
         "mitt": "^3.0.1",
