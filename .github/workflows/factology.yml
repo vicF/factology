@@ -93,20 +93,30 @@ jobs:
           APP_ENV: testing
           APP_DEBUG: true
         run: |
-          php artisan serve --host=0.0.0.0 --port=8005 &
+          mkdir -p storage/logs
+          php artisan serve --host=0.0.0.0 --port=8005 > server.log 2>&1 &
           sleep 10
 
-          # Test the endpoint that's failing
-          curl -s http://localhost:8005/api/test/status || true
-          sleep 2
+          echo "=== Testing API status ==="
+          curl -s http://localhost:8005/api/test/status || echo "API test failed"
+
+          echo "=== Testing registration endpoint ==="
+          curl -v -X POST http://localhost:8005/register \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Test","email":"test@test.com","password":"password","password_confirmation":"password"}' \
+            2>&1 || true
+
+          echo "=== Laravel log ==="
+          cat storage/logs/laravel.log 2>/dev/null || echo "No laravel log yet"
 
       - name: Upload logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: logs
+          name: debug-logs
           path: |
             storage/logs/
+            server.log
             .env
 
       - name: Run CodeceptJS tests
@@ -125,3 +135,4 @@ jobs:
           path: |
             tests-js/output/
             storage/logs/
+            server.log
