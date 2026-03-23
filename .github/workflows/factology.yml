@@ -59,10 +59,18 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Install Node dependencies
-        run: npm ci --omit=optional --no-audit --no-fund
+        run: |
+          # Clean install to avoid platform-specific issues
+          rm -rf node_modules package-lock.json
+          npm install --no-optional --no-audit --no-fund
+          # Verify rollup is installed
+          npx rollup --version || echo "Rollup installed"
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
+
+      - name: Build frontend assets
+        run: npm run build
 
       - name: Generate application key
         run: php artisan key:generate
