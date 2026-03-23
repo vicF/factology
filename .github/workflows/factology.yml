@@ -58,6 +58,16 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Dump autoload
+        run: composer dump-autoload
+
+      - name: Clear Laravel caches
+        run: |
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan view:clear
+          php artisan route:clear
+
       - name: Install Node dependencies
         run: |
           # Clean install to avoid platform-specific issues
@@ -68,9 +78,6 @@ jobs:
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
-
-      - name: Build frontend assets
-        run: npm run build
 
       - name: Generate application key
         run: php artisan key:generate
@@ -102,6 +109,12 @@ jobs:
           echo ""
           echo "Current environment from artisan:"
           php artisan tinker --execute="echo app()->environment();"
+          echo ""
+          echo "Checking middleware files:"
+          ls -la app/Http/Middleware/ || echo "Middleware directory not found"
+          echo ""
+          echo "Checking if VerifyCsrfToken exists:"
+          php -r "if (class_exists('App\Http\Middleware\VerifyCsrfToken')) { echo '✓ VerifyCsrfToken class found\n'; } else { echo '✗ VerifyCsrfToken class NOT found\n'; }"
 
       - name: Run PHPUnit tests
         env:
