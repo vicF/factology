@@ -53,6 +53,7 @@ jobs:
           DB_DATABASE=factology_tmp_test
           DB_USERNAME=root
           DB_PASSWORD=securerootpassword
+          LOG_CHANNEL=single
           EOF
 
       - name: Install PHP dependencies
@@ -68,130 +69,59 @@ jobs:
           php artisan view:clear
           php artisan route:clear
 
-      - name: Create missing middleware for CI (does not affect local)
+      - name: Install Node dependencies
         run: |
-          # Create VerifyCsrfToken middleware if it doesn't exist
-          if [ ! -f app/Http/Middleware/VerifyCsrfToken.php ]; then
-            mkdir -p app/Http/Middleware
-            cat > app/Http/Middleware/VerifyCsrfToken.php << 'MIDDLEWARE'
-  <?php
+          rm -rf node_modules package-lock.json
+          npm install --no-optional --no-audit --no-fund
 
-  namespace App\Http\Middleware;
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
 
-  use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+      - name: Generate application key
+        run: php artisan key:generate
 
-  class VerifyCsrfToken extends Middleware
-  {
-    protected $except = [
-    'api/*',
-  ];
-  }
-  MIDDLEWARE
-  echo "Created VerifyCsrfToken middleware for CI"
-  else
-  echo "VerifyCsrfToken middleware already exists"
-  fi
+      - name: Run database migrations
+        env:
+          APP_ENV: testing
+        run: php artisan migrate:fresh --seed --force
 
-- name: Install Node dependencies
-  run: |
-    # Clean install to avoid platform-specific issues
-    rm -rf node_modules package-lock.json
-    npm install --no-optional --no-audit --no-fund
-    # Verify rollup is installed
-    npx rollup --version || echo "Rollup installed"
+      - name: Build frontend assets
+        run: npm run build
 
-- name: Install Playwright browsers
-  run: npx playwright install chromium --with-deps
+      - name: Start Laravel server and capture logs
+        env:
+          APP_ENV: testing
+          APP_DEBUG: true
+        run: |
+          php artisan serve --host=0.0.0.0 --port=8005 &
+          sleep 10
 
-- name: Generate application key
-  run: php artisan key:generate
+          # Test the endpoint that's failing
+          curl -s http://localhost:8005/api/test/status || true
+          sleep 2
 
-- name: Run database migrations
-  env:
-    APP_ENV: testing
-  run: php artisan migrate:fresh --seed --force
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs
+          path: |
+            storage/logs/
+            .env
 
-- name: Build frontend assets
-  run: npm run build
+      - name: Run CodeceptJS tests
+        working-directory: tests-js
+        env:
+          CI: true
+          HEADLESS: true
+          APP_URL: http://localhost:8005
+        run: npx codeceptjs run --steps --verbose
 
-- name: Start Laravel server with detailed logging
-  env:
-    APP_ENV: testing
-    APP_DEBUG: true
-    APP_URL: http://localhost:8005
-    LOG_CHANNEL: single
-  run: |
-    # Enable query logging and error logging
-    php artisan serve --host=0.0.0.0 --port=8005 > server.log 2>&1 &
-    sleep 10
-    echo "Server started"
-    echo "=== Checking server status ==="
-    curl -v http://localhost:8005 2>&1 | head -30
-
-- name: Test API endpoint with detailed error
-  run: |
-    echo "=== Testing /api/test/status ==="
-    curl -v http://localhost:8005/api/test/status 2>&1
-    echo ""
-    echo "=== Testing homepage ==="
-    curl -v http://localhost:8005 2>&1 | head -50
-    echo ""
-    echo "=== Checking Laravel logs ==="
-    cat storage/logs/laravel.log 2>/dev/null || echo "No log file yet"
-
-- name: Debug environment
-  run: |
-    echo "APP_ENV from .env:"
-    grep APP_ENV .env
-    echo ""
-    echo "Current environment from artisan:"
-    php artisan tinker --execute="echo app()->environment();"
-    echo ""
-    echo "Checking middleware files:"
-    ls -la app/Http/Middleware/ || echo "Middleware directory not found"
-    echo ""
-    echo "Checking if VerifyCsrfToken exists:"
-    php -r "if (class_exists('App\Http\Middleware\VerifyCsrfToken')) { echo '✓ VerifyCsrfToken class found\n'; } else { echo '✗ VerifyCsrfToken class NOT found\n'; }"
-    echo ""
-    echo "Checking route list for test routes:"
-    php artisan route:list | grep test || echo "No test routes found"
-
-- name: Run PHPUnit tests
-  env:
-    APP_ENV: testing
-  run: php artisan test --colors=always
-
-- name: Run CodeceptJS tests with debug output
-  working-directory: tests-js
-  env:
-    CI: true
-    HEADLESS: true
-    APP_URL: http://localhost:8005
-  run: |
-    echo "=== Running CodeceptJS tests ==="
-    npx codeceptjs run --steps --verbose --debug 2>&1 | tee test-output.log
-    echo ""
-    echo "=== Checking server logs after tests ==="
-    cat ../storage/logs/laravel.log 2>/dev/null | tail -100 || echo "No logs"
-
-- name: Upload test artifacts
-  uses: actions/upload-artifact@v4
-  if: always()
-  with:
-    name: test-artifacts
-    path: |
-      tests-js/output/
-      storage/logs/
-      server.log
-      tests-js/test-output.log
-
-- name: Upload full debug logs
-  uses: actions/upload-artifact@v4
-  if: failure()
-  with:
-    name: debug-logs
-    path: |
-      storage/logs/laravel.log
-      server.log
-      .env
-      tests-js/test-output.log
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-artifacts
+          path: |
+            tests-js/output/
+            storage/logs/
