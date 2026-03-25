@@ -10,6 +10,7 @@ namespace App\Models\Classes;
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
 use Fokin\Facts\Data\UUID;
+use http\Exception\InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -347,7 +348,7 @@ class Anything
      * @param null $class
      * @return static
      */
-    public static function CreateFromData(array $ObjectData, $class = null)
+    public static function CreateFromData(array $ObjectData, $class = null): static
     {
         //$className = self::getClassById($ObjectData->thing_id);
         $className = self::getPhpClassFromInput($ObjectData);
@@ -528,7 +529,7 @@ class Anything
         if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
             throw new \Exception('You do not have permission to update this record', 403);
             // Or return response with 403 Forbidden status
-        } else {
+        } elseif (empty($this->owner)) {
             $this->owner = auth()->user()->thing_id;
         }
         $this->_validate();
@@ -619,8 +620,22 @@ class Anything
             }
             $classLink['translation'] = "{$this->name} is of class $className";
         }
+        $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
         return $this->setLink($classLink);
+    }
 
+    public function setParent(array $classLink): bool
+    {
+        if (empty($classLink['translation'])) {
+            try {
+                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
+            } catch (\ErrorException $e) {
+                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
+            }
+            $classLink['translation'] = "{$this->name} is a child of $className";
+        }
+        $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
+        return $this->setLink($classLink);
     }
 
     protected function setLinkTranslation(array &$link)
@@ -669,10 +684,18 @@ class Anything
     public function addLink(array $link): bool
     {
         $this->setLinkTranslation($link);
+        // Ensure that both ids are in place
+        if(empty($link['one_thing_id']) && empty($link['other_thing_id'])) {
+            throw new InvalidArgumentException('Link object ids (one_thing_id, other_thing_id) are empty ');
+        } elseif(empty($link['one_thing_id']) && $link['other_thing_id'] != $this->thing_id) {
+            $link['one_thing_id'] = $this->thing_id;
+        } elseif (empty($link['other_thing_id']) && $link['one_thing_id'] != $this->thing_id) {
+            $link['other_thing_id'] = $this->thing_id;
+        }
 
         return DB::table('links')->updateOrInsert(
             [
-                'one_thing_id'   => $this->thing_id,
+                'one_thing_id'   => $link['one_thing_id'],
                 'link_type_id'   => $link['link_type_id'],
                 'other_thing_id' => $link['other_thing_id'],
             ],

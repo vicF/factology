@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 class DatesTest extends TestCase
 {
-    public function dataProvider()
+    public static function dataProvider(): array
     {
         $msk = Carbon::now('Europe/Moscow')->offsetHours;
         $now = new \DateTime();
@@ -63,7 +63,7 @@ class DatesTest extends TestCase
     }
 
 
-    public function dateToNumberDataProvider()
+    public static function dateToNumberDataProvider()
     {
         return [
             ['1970-01-01 00:00:00'],
@@ -108,7 +108,7 @@ class DatesTest extends TestCase
         $this->assertEquals(30000, $dateUtc - $dateSpb);
     }
 
-    public function compareDatesDataProvider()
+    public static function compareDatesDataProvider()
     {
         return [
             // Left date is earlier than right
@@ -137,7 +137,7 @@ class DatesTest extends TestCase
             "Failed to assert that $lessDb as representation of date $less is less than $moreDb as representation of date $more");
     }
 
-    public function fourDigitsDataProvider()
+    public static function fourDigitsDataProvider()
     {
         return [
             // Left date is earlier than right
@@ -163,7 +163,7 @@ class DatesTest extends TestCase
         self::assertEquals($result, Anything::yearHasMoreThan4Digits($date));
     }
 
-    public function padDateDataProvider()
+    public static function padDateDataProvider()
     {
         return [
             ['9999', '9999-01-01 00:00:00'],
@@ -187,7 +187,7 @@ class DatesTest extends TestCase
         self::assertEquals($expected, Anything::padDate($date));
     }
 
-    public function correctBeforeBCDataProvider()
+    public static function correctBeforeBCDataProvider()
     {
         return [
             ['-00010101000000', '-00010101235959'],
