@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Classes\UserClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Auth\Events\Registered;
+use Tests\Traits\CreatesTestUsers;
 
 class RegisterController extends Controller
 {
@@ -25,9 +26,9 @@ class RegisterController extends Controller
     /**
      * Handle a registration request for the application.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\JsonResponse
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws \Exception
      */
     public function register(Request $request)
     {
@@ -39,11 +40,24 @@ class RegisterController extends Controller
             'password'              => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = User::create([
+
+        $UserObject = new UserClass(
+            [
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'thing_id' => uuid_create(),
+            ]
+        );
+        $UserObject->save();
+
+        $user = $UserObject->getUser();
+        /*User::create([
             'name'     => $validated['name'],
             'email'    => $validated['email'],
             'password' => Hash::make($validated['password']),
-        ]);
+            'thing_id' => uuid_create(),
+        ]);*/
 
         event(new Registered($user));
 
