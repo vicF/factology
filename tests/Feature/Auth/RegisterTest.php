@@ -4,11 +4,12 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Tests\TestCase;
+use Tests\Traits\CreatesTestUsers;
 use Tests\Traits\SafeRefreshDatabase;
 
 class RegisterTest extends TestCase
 {
-    use SafeRefreshDatabase;
+    use SafeRefreshDatabase, CreatesTestUsers;
 
     protected const API_PREFIX = '/api/v1';
 
@@ -97,7 +98,7 @@ class RegisterTest extends TestCase
     public function registration_fails_with_duplicate_email()
     {
         // Create existing user first
-        User::factory()->create([
+        $this->createTestUser([
             'email' => 'alreadyexists@example.com',
         ]);
 
@@ -116,7 +117,7 @@ class RegisterTest extends TestCase
     /** @test */
     public function registration_fails_when_already_authenticated()
     {
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson(self::API_PREFIX . '/register', [

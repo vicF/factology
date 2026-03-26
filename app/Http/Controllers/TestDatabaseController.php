@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Classes\UserClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -154,11 +155,11 @@ class TestDatabaseController extends Controller
     public function createUser(Request $request)
     {
         try {
-            $user = \App\Models\User::create([
+            $user = (new UserClass([
                 'name' => $request->input('name', 'Test User'),
                 'email' => $request->input('email', 'test-' . time() . '@example.com'),
                 'password' => bcrypt($request->input('password', 'password123')),
-            ]);
+            ]))->save()->getUser();
 
             return response()->json([
                 'success' => true,

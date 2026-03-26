@@ -10,9 +10,11 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\AssertionFailedError;
 use Tests\TestCase;
+use Tests\Traits\CreatesTestUsers;
 
 class ApiTest extends TestCase
 {
+    use CreatesTestUsers;
     protected static $_headers = [];
 
     /**
@@ -289,7 +291,7 @@ class ApiTest extends TestCase
      */
     public function testListTest(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
         Sanctum::actingAs($user, ['*']);
 
         $json = $this->getApi('/api/v1/object');
@@ -309,7 +311,7 @@ class ApiTest extends TestCase
 
     public function testGetTest(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
         $uri = '/api/v1/object/' . UUID::SOMETHING;
 
         $json = $this->actingAs($user, 'sanctum')
@@ -332,7 +334,7 @@ class ApiTest extends TestCase
     public function testCreateModifyDelete(): void
     {
         // Create a user and authenticate
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
 
         // Set thing_id on the user
         $user->thing_id = uuid_create();
@@ -446,7 +448,7 @@ class ApiTest extends TestCase
     public function testUserCannotUpdateAnotherUsersObject(): void
     {
         // Create owner user with thing_id
-        $owner = User::factory()->create();
+        $owner = $this->createTestUser()->getUser();
         $owner->thing_id = uuid_create();
         $owner->save();
 
@@ -457,7 +459,7 @@ class ApiTest extends TestCase
         ]);
 
         // Create a different user with their own thing_id
-        $otherUser = User::factory()->create();
+        $otherUser = $this->createTestUser()->getUser();
         $otherUser->thing_id = uuid_create(); // Different thing_id
         $otherUser->save();
 
@@ -494,7 +496,7 @@ class ApiTest extends TestCase
      */
     public function testCreateWithMinimalFields(): void
     {
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
 
         // Set thing_id on the user
         $user->thing_id = uuid_create();

@@ -46,7 +46,7 @@ class UserClass extends Anything
             $this->setClass([
                 'other_thing_id' => UUID::USER,
             ]);
-            User::create([
+            $this->user = User::create([
                 'name'     => $this->name,
                 'email'    => $this->email,
                 'password' => $this->password,
