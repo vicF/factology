@@ -69,14 +69,23 @@
                                 :label="$t('End')"
                             />
                         </div>
-                        <div class="mb-3">
-                            <RadioGroupField
-                                fieldName="visibility"
-                                v-model="formData.public"
-                                :options="{ 0: $t('Private'), 1: $t('Public') }"
-                                :isEditable="true"
-                                :label="$t('Access')"
-                            />
+                        <div v-if="formData.type == 1" class="mb-3">
+                            General
+                        </div>
+                        <div v-if="formData.type == 2" class="mb-3">
+                            Class
+                        </div>
+                        <div v-else-if="formData.type == 3" class="mb-3">
+                            Thing
+                        </div>
+                        <div v-else-if="formData.type == 4" class="mb-3">
+                            Link
+                        </div>
+                        <div v-else-if="formData.type == 5" class="mb-3">
+                            External
+                        </div>
+                        <div v-else class="mb-3">
+                            !Unknown type!
                         </div>
 
                         <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">

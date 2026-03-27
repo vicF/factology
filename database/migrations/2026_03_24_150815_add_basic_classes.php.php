@@ -63,7 +63,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        foreach([] as $uuid) {
+        foreach([UUID::SYSTEM, UUID::USER] as $uuid) {
             DB::table('things')->where('thing_id', $uuid)->delete();
             DB::table('links')
                 ->where('one_thing_id', $uuid)
