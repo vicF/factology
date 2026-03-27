@@ -1,6 +1,7 @@
 <template>
-    <div class="graph-wrapper" ref="graphWrapperRef">
-        <div ref="containerRef" class="graph-container">
+    <div>
+        <!-- The size of the parent element determines the size of the graph -->
+        <div style="height:calc(100vh - 60px);">
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
@@ -26,7 +27,7 @@
 
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
-import { inject, nextTick, onMounted, ref, watch, onUnmounted } from 'vue'
+import { inject, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Image from './Image.vue'
@@ -43,65 +44,15 @@ const props = defineProps({
 const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
-const containerRef = ref(null)
-const graphWrapperRef = ref(null)
 
-// Функция для расчета высоты графа до низа страницы
-const setGraphHeightToBottom = () => {
-    if (!graphWrapperRef.value) return
-
-    const rect = graphWrapperRef.value.getBoundingClientRect()
-    const viewportHeight = window.innerHeight
-
-    // Высота от текущей позиции до низа страницы минус небольшой отступ
-    const heightToBottom = viewportHeight - rect.top - 20
-
-    console.log('Setting graph height:', {
-        top: rect.top,
-        viewportHeight,
-        heightToBottom
-    })
-
-    // Устанавливаем высоту не меньше 500px
-    if (heightToBottom > 500) {
-        graphWrapperRef.value.style.height = `${heightToBottom}px`
-
-        // Обновляем размер графа
-        if (graphRef.value) {
-            const instance = graphRef.value.getInstance()
-            if (instance && typeof instance.resize === 'function') {
-                setTimeout(() => {
-                    instance.resize()
-                    // После изменения размера центрируем
-                    instance.moveToCenter()
-                }, 100)
-            }
-        }
-    }
-}
-
+// Minimal graph options - exactly as in the simple example
 const graphOptions = {
+    debug: false,
     defaultJunctionPoint: 'border',
-    defaultLineColor: '#99b3ff',
     defaultNodeColor: '#4a6bff',
-    defaultNodeBorderColor: '#1e3b8a',
-    defaultNodeFontColor: '#ffffff',
-    defaultNodeShape: 1,
-    defaultLineShape: 1,
-    defaultLineTextColor: '#666666',
-    defaultNodeWidth: 120,
-    defaultNodeHeight: 100,
-    allowShowDownloadButton: false,
-    allowShowFullscreenButton: false,
-    moveToCenterWhenChange: true,
-    zoomToFitWhenChange: false,
+    defaultLineColor: '#99b3ff',
     layout: {
-        layoutName: 'force',
-        maxLevel: 3,
-        distance_coefficient: 1,
-        from: 'top',
-        force_node_repulsion: 1,
-        force_line_elastic: 1
+        layoutName: 'center'
     }
 }
 
@@ -130,6 +81,7 @@ const getNodeStyle = (node) => {
         height: '100%',
         boxSizing: 'border-box',
         cursor: 'pointer',
+        borderRadius: '8px',
         transition: 'transform 0.2s, box-shadow 0.2s'
     }
 }
@@ -218,7 +170,7 @@ const buildGraphData = (object) => {
     return {nodes, lines}
 }
 
-const updateGraph = async () => {
+const showGraph = async () => {
     if (!graphRef.value || !props.object) return
 
     const graphData = buildGraphData(props.object)
@@ -227,19 +179,19 @@ const updateGraph = async () => {
 
     console.log('Updating graph with data:', graphData)
 
+    // Exactly as in the simple example
     await graphRef.value.setJsonData({
         rootId: props.object.thing_id,
         nodes: graphData.nodes,
         lines: graphData.lines
-    }, async (instance) => {
-        console.log('Graph loaded, centering')
-        await instance.moveToCenter()
-        console.log('Graph centered')
+    }, (graphInstance) => {
+        // Called when the relation-graph is completed
+        console.log('Graph completed')
     })
 }
 
 defineExpose({
-    updateData: updateGraph,
+    updateData: showGraph,
     refreshView: () => {
         if (graphRef.value) {
             const instance = graphRef.value.getInstance()
@@ -252,56 +204,18 @@ defineExpose({
 
 watch(() => props.object, async (newObject) => {
     if (newObject) {
-        await nextTick()
-        updateGraph()
-        // После обновления данных пересчитываем высоту
-        setTimeout(setGraphHeightToBottom, 200)
+        await showGraph()
     }
 }, {immediate: true, deep: true})
 
 onMounted(async () => {
-    await nextTick()
-
-    // Устанавливаем высоту при монтировании
-    setGraphHeightToBottom()
-
     if (props.object) {
-        updateGraph()
+        await showGraph()
     }
-
-    // Следим за изменением размеров окна
-    window.addEventListener('resize', setGraphHeightToBottom)
-
-    // Также следим за скроллом, потому что позиция может меняться
-    window.addEventListener('scroll', setGraphHeightToBottom)
-})
-
-onUnmounted(() => {
-    window.removeEventListener('resize', setGraphHeightToBottom)
-    window.removeEventListener('scroll', setGraphHeightToBottom)
 })
 </script>
 
 <style scoped>
-.graph-wrapper {
-    width: 100%;
-    position: relative;
-    transition: height 0.2s ease;
-    min-height: 600px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    overflow: hidden;
-    margin: 10px 0;
-    height: auto;
-    /* Важно: граф будет позиционироваться относительно своего места */
-}
-
-.graph-container {
-    width: 100%;
-    height: 100%;
-    background-color: #f8f9fa;
-}
-
 /* Стили для узлов */
 .custom-node {
     display: flex;
