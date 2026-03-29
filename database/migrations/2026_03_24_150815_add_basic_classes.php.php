@@ -51,7 +51,7 @@ return new class extends Migration
         $links->insert(
             [
                 'one_thing_id'         => UUID::USER,   // PARENT is subclass of LINK
-                'translation'    => '"UserClass" is subclass of "System"',
+                'translation'    => '"User" is subclass of "System"',
                 Link::TYPE       => UUID::LINK_TO_PARENT,
                 'other_thing_id' => UUID::SYSTEM
             ]
