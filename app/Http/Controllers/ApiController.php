@@ -444,19 +444,15 @@ class ApiController extends BaseController
         $linkToParent = UUID::LINK_TO_PARENT;
         $something = UUID::SOMETHING;
         $rawSql =
-            "with recursive descendants
-                (name, level, id, parent_id, description, translation)  as (
-                    select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
-                    from things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
-                    where c.type=2 and c.thing_id = '$something'
-                    union distinct
-                    select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
-                    from descendants d, things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
-                    where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
-                )
-                select * from descendants ORDER BY level;";
+            "with recursive descendants (name, level, id, parent_id, description, translation)
+            as ( select c.name, 1 as level, c.thing_id, l.one_thing_id, c.description, l.translation
+            from things c
+            left join links l on l.other_thing_id = c.thing_id AND link_type_id = '$linkToParent'
+            where c.type=2 and c.thing_id = '$something'
+            union distinct select c.name, d.level+1, c.thing_id, l.one_thing_id, c.description, l.translation
+            from descendants d, things c left join links l on l.other_thing_id = c.thing_id AND link_type_id = '$linkToParent'
+            where c.type=2 AND d.id = l.one_thing_id AND d.level < 10 )
+            select * from descendants ORDER BY level;";
         $results = $this->buildTree((array)DB::select($rawSql));
         return response()->json([
             'things' => $results,
