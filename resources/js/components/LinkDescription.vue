@@ -32,9 +32,10 @@ const generateLinkDescription = (link, object) => {
     if (!link) return ''
 
     const parts = []
+
     // Link always contains linked object name, not the one that it is linked to
-    const oneLink = `<a href="/object/${link.one_thing_id}">${(object.thing_id === link.one_thing_id) ?object.name:link.name}</a>`
-    const otherLink = `<a href="/object/${link.other_thing_id}">${(object.thing_id === link.one_thing_id)?link.name:object.name}</a>`
+    const oneLink = `<a href="/object/${link.one_thing_id}">${(object.thing_id === link.one_thing_id) ?object.name:link.name} (one)</a>`
+    const otherLink = `<a href="/object/${link.other_thing_id}">${(object.thing_id === link.one_thing_id)?link.name:object.name} (other)</a>`
 
     parts.push(oneLink)
     parts.push(' → ')
