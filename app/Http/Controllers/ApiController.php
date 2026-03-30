@@ -161,7 +161,7 @@ class ApiController extends BaseController
             if ($request->parent_id) {
 
                 $model->setParent([
-                    'other_thing_id' => $request->parent_id,
+                    'one_thing_id' => $request->parent_id,
                 ]);
             }
             if ($request->class) {

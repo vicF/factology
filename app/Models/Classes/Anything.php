@@ -628,7 +628,7 @@ class Anything
     {
         if (empty($classLink['translation'])) {
             try {
-                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
+                $className = $this->getObjectNameByUid($classLink['one_thing_id'])->name;
             } catch (\ErrorException $e) {
                 throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
             }
