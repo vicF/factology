@@ -210,6 +210,7 @@ const formData = ref({
 const linkedObjects = ref([]);
 let modalInstance = null;
 let confirmModalInstance = null;
+let isClosing = false;
 
 // Unsaved changes tracking
 const originalFormData = ref({});
@@ -316,17 +317,41 @@ const confirmClose = () => {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance?.hide();
         setTimeout(() => {
-            modalElement.addEventListener('hide.bs.modal', handleHideModal);
+            if (modalElement) {
+                modalElement.addEventListener('hide.bs.modal', handleHideModal);
+            }
         }, 100);
     }
 };
 
 const handleHideModal = (event) => {
-    if (hasUnsavedChanges.value) {
+    if (hasUnsavedChanges.value && !isClosing) {
         event.preventDefault();
         event.stopPropagation();
         confirmModalInstance?.show();
     }
+};
+
+const cleanupModals = () => {
+    isClosing = true;
+
+    if (modalInstance) {
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) {
+            modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+        }
+        modalInstance.dispose();
+        modalInstance = null;
+    }
+
+    if (confirmModalInstance) {
+        confirmModalInstance.dispose();
+        confirmModalInstance = null;
+    }
+
+    setTimeout(() => {
+        isClosing = false;
+    }, 100);
 };
 
 const submitForm = async () => {
@@ -382,25 +407,60 @@ const submitForm = async () => {
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
+
+            // Hide modal first, then emit event
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+
+            // Wait for modal to close before emitting event
+            setTimeout(async () => {
+                if (formData.value.type === 2) {
+                    eventBus.emit('class-updated', {
+                        classId: formData.value.thing_id,
+                        className: formData.value.name,
+                        parentId: formData.value.parent_id
+                    });
+                }
+                cleanupModals();
+            }, 300);
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
-            if (props.callback && props.callback.type === 'link-created') {
-                eventBus.emit('link-created', {
-                    requestId: props.callback.requestId,
-                    newObjectId: formData.value.thing_id,
-                    newObjectName: formData.value.name,
-                    index: props.callback.index,
-                    linkTypeUuid: props.callback.linkTypeUuid,
-                    comment: props.callback.comment
-                });
-            }
-            if (props.parentObjectId) {
-                router.push({ name: 'object', params: { id: props.parentObjectId } });
-            }
-        }
 
-        modalInstance?.hide();
+            // Hide modal first, then emit event
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+
+            // Wait for modal to close before emitting event
+            setTimeout(async () => {
+                if (formData.value.type === 2) {
+                    eventBus.emit('class-created', {
+                        classId: formData.value.thing_id,
+                        className: formData.value.name,
+                        parentId: formData.value.parent_id
+                    });
+                }
+
+                if (props.callback && props.callback.type === 'link-created') {
+                    eventBus.emit('link-created', {
+                        requestId: props.callback.requestId,
+                        newObjectId: formData.value.thing_id,
+                        newObjectName: formData.value.name,
+                        index: props.callback.index,
+                        linkTypeUuid: props.callback.linkTypeUuid,
+                        comment: props.callback.comment
+                    });
+                }
+
+                cleanupModals();
+
+                if (props.parentObjectId) {
+                    router.push({ name: 'object', params: { id: props.parentObjectId } });
+                }
+            }, 300);
+        }
     } catch (error) {
         console.error('Submit error:', error.response || error);
         alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
@@ -418,7 +478,9 @@ onMounted(async () => {
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
         setTimeout(() => {
-            modalInstance.show();
+            if (modalInstance && modalElement) {
+                modalInstance.show();
+            }
         }, 100);
     }
 
@@ -428,12 +490,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-    const modalElement = document.getElementById(modalId);
-    if (modalElement) {
-        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-    }
-    if (modalInstance) modalInstance.dispose();
-    if (confirmModalInstance) confirmModalInstance.dispose();
+    cleanupModals();
 });
 
 watch(() => props.object, (newObject) => {
