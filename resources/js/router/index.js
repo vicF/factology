@@ -71,5 +71,12 @@ const router = createRouter({
     }
 })
 
+// Solution: Reset body overflow after every route change
+router.afterEach(() => {
+    // Force the body to be scrollable again
+    document.body.style.overflow = 'auto';
+    // Remove any inline styles that might have been left on HTML
+    document.documentElement.style.overflow = 'auto';
+});
 
 export default router
