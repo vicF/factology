@@ -163,10 +163,12 @@ import { useI18n } from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
-import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT} from "../constants.js";
 import {eventBus} from "../eventBus.js";
+import { useObjectsStore } from '@/stores/objects';
+
+const objectsStore = useObjectsStore();
 
 // Props definition
 const props = defineProps({
@@ -316,12 +318,12 @@ const confirmClose = () => {
     if (confirmModalInstance) {
         confirmModalInstance.hide();
         // Don't dispose immediately, let Bootstrap finish
-        setTimeout(() => {
+        /*setTimeout(() => {
             if (confirmModalInstance) {
                 confirmModalInstance.dispose();
                 confirmModalInstance = null;
             }
-        }, 300);
+        }, 300);*/
     }
 
     const modalElement = document.getElementById(modalId);
@@ -329,12 +331,12 @@ const confirmClose = () => {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance.hide();
         // Don't dispose immediately, let Bootstrap finish
-        setTimeout(() => {
+        /*setTimeout(() => {
             if (modalInstance) {
                 modalInstance.dispose();
                 modalInstance = null;
             }
-        }, 300);
+        }, 300);*/
     }
 
     emit('close');
@@ -359,27 +361,6 @@ const handleHideModal = (event) => {
     }
 };
 
-const cleanupModals = () => {
-    isClosing = true;
-
-    if (modalInstance) {
-        const modalElement = document.getElementById(modalId);
-        if (modalElement) {
-            modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-        }
-        modalInstance.dispose();
-        modalInstance = null;
-    }
-
-    if (confirmModalInstance) {
-        confirmModalInstance.dispose();
-        confirmModalInstance = null;
-    }
-
-    setTimeout(() => {
-        isClosing = false;
-    }, 100);
-};
 
 const submitForm = async () => {
     if (isSubmitting) return;
@@ -439,100 +420,54 @@ const submitForm = async () => {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
 
-            // For class updates
+            // Update class in store directly if it's a class
             if (formData.value.type === 2) {
-                // Remove event listener before hiding to prevent recursion
-                const modalElement = document.getElementById(modalId);
-                if (modalElement) {
-                    modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-                }
-
-                if (modalInstance) {
-                    modalInstance.hide();
-                    // Don't dispose immediately, let Bootstrap finish
-                    setTimeout(() => {
-                        if (modalInstance) {
-                            modalInstance.dispose();
-                            modalInstance = null;
-                        }
-                        eventBus.emit('class-updated', {
-                            classId: formData.value.thing_id,
-                            className: formData.value.name,
-                            parentId: formData.value.parent_id
-                        });
-                        cleanupModals();
-                        emit('close');
-                        isSubmitting = false;
-                    }, 400);
-                }
-            } else {
-                // Non-class objects
-                if (modalInstance) {
-                    modalInstance.hide();
-                    setTimeout(() => {
-                        cleanupModals();
-                        emit('close');
-                        isSubmitting = false;
-                    }, 300);
-                }
+                objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
             }
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
 
-            // For class creation
+            // Add class to store directly if it's a class
             if (formData.value.type === 2) {
-                // Remove event listener before hiding to prevent recursion
-                const modalElement = document.getElementById(modalId);
-                if (modalElement) {
-                    modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-                }
+                objectsStore.addClassToTree(
+                    formData.value.thing_id,
+                    formData.value.name,
+                    formData.value.parent_id
+                );
+            }
 
-                if (modalInstance) {
-                    modalInstance.hide();
-                    // Don't dispose immediately, let Bootstrap finish
-                    setTimeout(() => {
-                        if (modalInstance) {
-                            modalInstance.dispose();
-                            modalInstance = null;
-                        }
-                        eventBus.emit('class-created', {
-                            classId: formData.value.thing_id,
-                            className: formData.value.name,
-                            parentId: formData.value.parent_id
-                        });
-                        cleanupModals();
-                        emit('close');
-                        isSubmitting = false;
-                    }, 400);
-                }
-            } else {
-                // Non-class objects
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
+            if (props.callback && props.callback.type === 'link-created') {
+                eventBus.emit('link-created', {
+                    requestId: props.callback.requestId,
+                    newObjectId: formData.value.thing_id,
+                    newObjectName: formData.value.name,
+                    index: props.callback.index,
+                    linkTypeUuid: props.callback.linkTypeUuid,
+                    comment: props.callback.comment
+                });
+            }
 
-                setTimeout(() => {
-                    if (props.callback && props.callback.type === 'link-created') {
-                        eventBus.emit('link-created', {
-                            requestId: props.callback.requestId,
-                            newObjectId: formData.value.thing_id,
-                            newObjectName: formData.value.name,
-                            index: props.callback.index,
-                            linkTypeUuid: props.callback.linkTypeUuid,
-                            comment: props.callback.comment
-                        });
-                    }
-                    cleanupModals();
-                    emit('close');
-                    isSubmitting = false;
-
-                    if (props.parentObjectId) {
-                        router.push({ name: 'object', params: { id: props.parentObjectId } });
-                    }
-                }, 300);
+            if (props.parentObjectId) {
+                router.push({ name: 'object', params: { id: props.parentObjectId } });
             }
         }
+
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) {
+            modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+        }
+        // Simply hide modal, don't dispose immediately
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
+        // Close after Bootstrap animation completes
+        setTimeout(() => {
+            emit('close');
+            isSubmitting = false;
+        }, 300);
+
     } catch (error) {
         console.error('Submit error:', error.response || error);
         alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
@@ -564,10 +499,6 @@ onMounted(async () => {
     if (confirmModalElement) {
         confirmModalInstance = new Modal(confirmModalElement);
     }
-});
-
-onUnmounted(() => {
-    cleanupModals();
 });
 
 watch(() => props.object, (newObject) => {
