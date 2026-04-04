@@ -1,4 +1,4 @@
-<!-- Dialog to create new or edit existing object, including it's name, dates etc. -->
+<!-- Dialog to create new or edit existing object -->
 <template>
     <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
         <div class="modal-dialog">
@@ -16,8 +16,9 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
+                        <!-- Parent field for Class type (type 2) -->
                         <div class="mb-3" v-if="formData.type === 2">
-                            <TextField
+                            <ObjectField
                                 fieldName="parent_id"
                                 v-model="formData.parent_id"
                                 :isEditable="true"
@@ -25,6 +26,8 @@
                                 required
                             />
                         </div>
+
+                        <!-- Class field for Thing type (type 3) -->
                         <div class="mb-3" v-if="formData.type === 3">
                             <ObjectField
                                 fieldName="class_id"
@@ -36,6 +39,7 @@
                                 required
                             />
                         </div>
+
                         <div class="mb-3">
                             <TextField
                                 fieldName="name"
@@ -69,30 +73,21 @@
                                 :label="$t('End')"
                             />
                         </div>
-                        <div v-if="formData.type == 1" class="mb-3">
-                            General
-                        </div>
-                        <div v-if="formData.type == 2" class="mb-3">
-                            Class
-                        </div>
-                        <div v-else-if="formData.type == 3" class="mb-3">
-                            Thing
-                        </div>
-                        <div v-else-if="formData.type == 4" class="mb-3">
-                            Link
-                        </div>
-                        <div v-else-if="formData.type == 5" class="mb-3">
-                            External
-                        </div>
-                        <div v-else class="mb-3">
-                            !Unknown type!
-                        </div>
+
+                        <!-- Object type indicator -->
+                        <div v-if="formData.type == 1" class="mb-3">General</div>
+                        <div v-if="formData.type == 2" class="mb-3">Class</div>
+                        <div v-else-if="formData.type == 3" class="mb-3">Thing</div>
+                        <div v-else-if="formData.type == 4" class="mb-3">Link</div>
+                        <div v-else-if="formData.type == 5" class="mb-3">External</div>
+                        <div v-else class="mb-3">!Unknown type!</div>
 
                         <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
                             {{ $t('Add Link') }}
                         </button>
 
-                        <div v-for="item in linkedObjects" :key="item.id" class="linked-object-form">
+                        <!-- Display regular links (not special ones) -->
+                        <div v-for="item in regularLinks" :key="item.id" class="linked-object-form">
                             <LinkedObject
                                 :link="{
                                     one_thing_id: formData.thing_id,
@@ -176,9 +171,6 @@ const props = defineProps({
     params: { type: Object, default: () => ({}) },
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
-    parentObjectId: { type: String, default: null },
-    parentObject: { type: Object, default: null },
-    parentLinkType: { type: String, default: '2da45f14-69c6-4d56-9f2f-809fda14abf5' },
     callback: { type: Object, default: null }
 });
 
@@ -222,18 +214,29 @@ const originalLinkedObjects = ref([]);
 const hasUnsavedChanges = computed(() => {
     if (isSubmitting) return false;
 
-    // Check form data changes
     const formChanged = Object.keys(originalFormData.value).some(key => {
-        // Handle null/undefined/empty string equality
         const original = originalFormData.value[key] || '';
         const current = formData.value[key] || '';
         return original !== current;
     });
 
-    // Check linked objects changes
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
-
     return formChanged || linksChanged;
+});
+
+// Separate special links from regular ones
+const regularLinks = computed(() => {
+    return linkedObjects.value.filter(item => {
+        // For Class type (type 2), filter out LINK_TO_PARENT links
+        if (formData.value.type === 2 && item.linkTypeUuid === LINK_TO_PARENT) {
+            return false;
+        }
+        // For Thing type (type 3), filter out LINK_TO_CLASS links
+        if (formData.value.type === 3 && item.linkTypeUuid === LINK_TO_CLASS) {
+            return false;
+        }
+        return true;
+    });
 });
 
 // Modal IDs
@@ -243,44 +246,66 @@ const confirmModalId = `confirmModal-${formData.value.thing_id}`;
 
 // Initialize data and store original state
 const initializeData = () => {
-    // Initialize linked objects
-    if (isEditMode.value) {
-        linkedObjects.value = props.initialLinkedObjects
-            .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
-            .map(item => ({
-                id: uuidv4(),
-                otherThingUuid: item.other_thing_id || '',
-                linkTypeUuid: item.link_type_id || '',
-                comment: item.description || '',
-                linkId: item.link_id || null,
-            }));
-    } else {
-        if (props.initialLinkedObjects && props.initialLinkedObjects.length > 0) {
-            linkedObjects.value = props.initialLinkedObjects.map(item => ({
-                id: uuidv4(),
-                otherThingUuid: item.other_thing_id || item.otherThingUuid || '',
-                linkTypeUuid: item.link_type_id || item.linkTypeUuid || '',
-                comment: item.description || item.comment || '',
-                linkId: item.link_id || item.linkId || null,
-            }));
-        } else if (props.parentObject) {
-            linkedObjects.value = [{
-                id: uuidv4(),
-                otherThingUuid: props.parentObject.thing_id,
-                linkTypeUuid: props.parentLinkType,
-                comment: '',
-                linkId: null,
-            }];
-        } else if (props.parentObjectId) {
-            linkedObjects.value = [{
-                id: uuidv4(),
-                otherThingUuid: props.parentObjectId,
-                linkTypeUuid: props.parentLinkType,
-                comment: '',
-                linkId: null,
-            }];
-        } else {
-            linkedObjects.value = [];
+    // Reset linked objects
+    linkedObjects.value = [];
+
+    // Reset special fields
+    if (formData.value.type === 2) {
+        formData.value.parent_id = null;
+    } else if (formData.value.type === 3) {
+        formData.value.class_id = null;
+        formData.value.class_name = '';
+    }
+
+    // Process initialLinkedObjects
+    props.initialLinkedObjects.forEach(item => {
+        const linkItem = {
+            id: uuidv4(),
+            otherThingUuid: item.other_thing_id || '',
+            linkTypeUuid: item.link_type_id || '',
+            comment: item.description || item.comment || '',
+            linkId: item.linkId || null,
+        };
+
+        // Handle LINK_TO_CLASS for Thing type
+        if (formData.value.type === 3 && item.link_type_id === LINK_TO_CLASS) {
+            formData.value.class_id = item.other_thing_id;
+            formData.value.class_name = item.class_name || '';
+            return; // Don't add to linkedObjects
+        }
+
+        // Handle LINK_TO_PARENT for Class type
+        if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
+            formData.value.parent_id = item.other_thing_id;
+            return; // Don't add to linkedObjects
+        }
+
+        // For edit mode, also check existing class/parent links
+        if (isEditMode.value) {
+            // Skip LINK_TO_CLASS for Thing type in edit mode
+            if (formData.value.type === 3 && item.link_type_id === LINK_TO_CLASS) {
+                return;
+            }
+            // Skip LINK_TO_PARENT for Class type in edit mode
+            if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
+                return;
+            }
+        }
+
+        linkedObjects.value.push(linkItem);
+    });
+
+    // For edit mode, also process existing links from the object
+    if (isEditMode.value && props.object) {
+        // Process class link for Thing type
+        if (formData.value.type === 3 && props.object.class?.thing_id && !formData.value.class_id) {
+            formData.value.class_id = props.object.class.thing_id;
+            formData.value.class_name = props.object.class.name;
+        }
+
+        // Process parent link for Class type
+        if (formData.value.type === 2 && props.object.parent_id && !formData.value.parent_id) {
+            formData.value.parent_id = props.object.parent_id;
         }
     }
 
@@ -288,6 +313,7 @@ const initializeData = () => {
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
 };
 
+// Call initialize
 initializeData();
 
 const addNewLinkedObject = () => {
@@ -317,36 +343,20 @@ const removeItem = (index) => {
 const confirmClose = () => {
     if (confirmModalInstance) {
         confirmModalInstance.hide();
-        // Don't dispose immediately, let Bootstrap finish
-        /*setTimeout(() => {
-            if (confirmModalInstance) {
-                confirmModalInstance.dispose();
-                confirmModalInstance = null;
-            }
-        }, 300);*/
     }
 
     const modalElement = document.getElementById(modalId);
     if (modalElement && modalInstance) {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance.hide();
-        // Don't dispose immediately, let Bootstrap finish
-        /*setTimeout(() => {
-            if (modalInstance) {
-                modalInstance.dispose();
-                modalInstance = null;
-            }
-        }, 300);*/
     }
 
     emit('close');
 };
 
 const handleHideModal = (event) => {
-    // Check if the modal element still exists in DOM and modal instance exists
     const modalElement = document.getElementById(modalId);
     if (!modalElement || !modalInstance) {
-        // Modal already removed from DOM or destroyed, ignore the event
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -361,14 +371,13 @@ const handleHideModal = (event) => {
     }
 };
 
-
 const submitForm = async () => {
     if (isSubmitting) return;
 
     try {
         isSubmitting = true;
 
-        const linksToAdd = linkedObjects.value
+        const linksToAdd = regularLinks.value
             .filter(item => item.otherThingUuid?.trim() && !item.linkId)
             .map(item => ({
                 one_thing_id: formData.value.thing_id,
@@ -389,7 +398,8 @@ const submitForm = async () => {
             type: formData.value.type,
         };
 
-        if (formData.value.class_id) {
+        // Add class link for Thing type
+        if (formData.value.type === 3 && formData.value.class_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_CLASS,
@@ -400,7 +410,8 @@ const submitForm = async () => {
             };
         }
 
-        if (formData.value.parent_id) {
+        // Add parent link for Class type
+        if (formData.value.type === 2 && formData.value.parent_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_PARENT,
@@ -415,12 +426,36 @@ const submitForm = async () => {
             payload.links_to_add = linksToAdd;
         }
 
+        // Handle link updates/deletions for edit mode
+        if (isEditMode.value) {
+            const linksToUpdate = regularLinks.value
+                .filter(item => item.linkId && item.otherThingUuid?.trim())
+                .map(item => ({
+                    link_id: item.linkId,
+                    one_thing_id: formData.value.thing_id,
+                    other_thing_id: item.otherThingUuid,
+                    link_type_id: item.linkTypeUuid,
+                    translation: item.comment,
+                }));
+
+            if (linksToUpdate.length > 0) {
+                payload.links_to_update = linksToUpdate;
+            }
+
+            const linksToDelete = originalLinkedObjects.value
+                .filter(orig => orig.linkId && !regularLinks.value.find(curr => curr.linkId === orig.linkId))
+                .map(orig => orig.linkId);
+
+            if (linksToDelete.length > 0) {
+                payload.links_to_delete = linksToDelete;
+            }
+        }
+
         let response;
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
 
-            // Update class in store directly if it's a class
             if (formData.value.type === 2) {
                 objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
             }
@@ -428,7 +463,6 @@ const submitForm = async () => {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
 
-            // Add class to store directly if it's a class
             if (formData.value.type === 2) {
                 objectsStore.addClassToTree(
                     formData.value.thing_id,
@@ -447,22 +481,16 @@ const submitForm = async () => {
                     comment: props.callback.comment
                 });
             }
-
-            if (props.parentObjectId) {
-                router.push({ name: 'object', params: { id: props.parentObjectId } });
-            }
         }
 
         const modalElement = document.getElementById(modalId);
         if (modalElement) {
             modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         }
-        // Simply hide modal, don't dispose immediately
         if (modalInstance) {
             modalInstance.hide();
         }
 
-        // Close after Bootstrap animation completes
         setTimeout(() => {
             emit('close');
             isSubmitting = false;
@@ -498,6 +526,21 @@ onMounted(async () => {
 
     if (confirmModalElement) {
         confirmModalInstance = new Modal(confirmModalElement);
+    }
+});
+
+onUnmounted(() => {
+    const modalElement = document.getElementById(modalId);
+    if (modalElement) {
+        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+    }
+    if (modalInstance) {
+        modalInstance.dispose();
+        modalInstance = null;
+    }
+    if (confirmModalInstance) {
+        confirmModalInstance.dispose();
+        confirmModalInstance = null;
     }
 });
 

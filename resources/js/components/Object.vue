@@ -207,9 +207,8 @@
         <EditObject
             v-if="showCreateLinkedModal"
             :object="null"
-            :parentObjectId="object?.thing_id"
-            :parentObject="object"
-            :initialLinkedObjects="[]"
+            :initialLinkedObjects="defaultLinkedObjects"
+            :params="createLinkedParams"
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
         />
@@ -237,6 +236,7 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { inject } from 'vue';
+import { LINK_TO_CLASS } from '../constants.js';
 
 // Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
@@ -275,6 +275,27 @@ const treeModalParams = ref({});
 const editingLink = ref(null);
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
+
+// Default linked objects for creating a new linked object
+const defaultLinkedObjects = computed(() => {
+    const links = [];
+
+    // Add link to current object
+    if (object.value) {
+        links.push({
+            other_thing_id: object.value.thing_id,
+            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5', // links to
+            description: `Linked to ${object.value.name}`,
+        });
+    }
+
+    return links;
+});
+
+// Parameters for creating a linked object
+const createLinkedParams = computed(() => ({
+    type: 3, // THING_TYPE
+}));
 
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
