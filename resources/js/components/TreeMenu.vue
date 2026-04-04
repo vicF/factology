@@ -39,6 +39,7 @@
 import { ref, computed } from 'vue';
 import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
+import {LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT} from '../constants.js';
 
 // Props definition
 const props = defineProps({
@@ -103,36 +104,76 @@ const onCheckboxChange = () => {
     eventBus.emit('trigger-search');
 };
 
+// Create a subclass (Class type)
 const openCreateSubclassModal = () => {
-    console.log('TreeMenu.vue - openCreateSubclassModal triggered');
-    console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
-    if (!props.id) {
-        console.warn('TreeMenu.vue - Warning: props.id is undefined for subclass creation');
+    console.log('TreeMenu.vue - Creating subclass of:', props.name);
+
+    // Create initial linked objects for the new class
+    const initialLinkedObjects = [];
+
+    // Link to parent class
+    if (props.id) {
+        initialLinkedObjects.push({
+            other_thing_id: props.id,
+            link_type_id: LINK_TO_PARENT, // Use the constant from constants.js
+            description: `Subclass of ${props.name}`,
+        });
     }
+
     const payload = {
-        title: `Subclass of ${props.name || 'Unnamed'}`,
-        params: { parentId: props.id, type: 2 }
+        title: `Create Subclass of "${props.name}"`,
+        params: {
+            type: CLASS_TYPE, // 2 - Class type
+        },
+        initialLinkedObjects: initialLinkedObjects,
+        callback: {
+            type: 'class-created',
+            parentId: props.id,
+            parentName: props.name
+        }
     };
+
     console.log('TreeMenu.vue - Emitting open-create-modal for subclass:', payload);
     eventBus.emit('open-create-modal', payload);
 };
 
+// Create an object of this class (Thing type)
 const openCreateObjectModal = () => {
-    console.log('TreeMenu.vue - openCreateObjectModal triggered');
-    console.log('TreeMenu.vue - Props:', { id: props.id, name: props.name });
-    if (!props.id) {
-        console.warn('TreeMenu.vue - Warning: props.id is undefined for object creation');
+    console.log('TreeMenu.vue - Creating object of class:', props.name);
+
+    // Create initial linked objects for the new object
+    const initialLinkedObjects = [];
+
+    // Link to the class
+    if (props.id) {
+        initialLinkedObjects.push({
+            other_thing_id: props.id,
+            link_type_id: LINK_TO_CLASS, // Link to class relationship
+            description: `Object of class ${props.name}`,
+        });
     }
+
     const payload = {
-        title: `Object of ${props.name || 'Unnamed'}`,
-        params: { classId: props.id, className: props.name, type: 3 }
+        title: `Create Object of Class "${props.name}"`,
+        params: {
+            type: THING_TYPE, // 3 - Thing type
+            classId: props.id,
+            className: props.name,
+        },
+        initialLinkedObjects: initialLinkedObjects,
+        callback: {
+            type: 'object-created',
+            classId: props.id,
+            className: props.name
+        }
     };
+
     console.log('TreeMenu.vue - Emitting open-create-modal for object:', payload);
     eventBus.emit('open-create-modal', payload);
 };
 
+// Handle checked update from child components
 const handleCheckedUpdate = (checkedItems) => {
-    // This is just passing through the event from child components
     emit('update-checked', checkedItems);
 };
 </script>
@@ -141,7 +182,7 @@ const handleCheckedUpdate = (checkedItems) => {
 .tree-menu {
     position: relative;
     margin-left: 0;
-    padding-left: 0; /* Ensure no internal padding */
+    padding-left: 0;
 }
 
 .tree-node {
@@ -203,6 +244,6 @@ input[type="checkbox"] {
 }
 
 .children {
-    padding-left: 0; /* No extra padding for children */
+    padding-left: 0;
 }
 </style>
