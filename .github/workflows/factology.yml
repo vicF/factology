@@ -39,6 +39,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Create .env file
         run: |
@@ -72,7 +73,10 @@ jobs:
       - name: Install Node dependencies
         run: |
           rm -rf node_modules package-lock.json
-          npm install --no-optional --no-audit --no-fund
+          npm cache clean --force
+          npm config set registry https://registry.npmjs.org/
+          npm config set prefer-offline false
+          npm install --no-optional --no-audit --no-fund --prefer-offline=false
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
