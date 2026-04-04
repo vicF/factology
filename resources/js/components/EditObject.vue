@@ -535,12 +535,10 @@ onUnmounted(() => {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
     }
     if (modalInstance) {
-        modalInstance.dispose();
-        modalInstance = null;
+        modalInstance.hide();
     }
     if (confirmModalInstance) {
-        confirmModalInstance.dispose();
-        confirmModalInstance = null;
+        confirmModalInstance.hide();
     }
 });
 

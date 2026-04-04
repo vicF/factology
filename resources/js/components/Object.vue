@@ -236,7 +236,7 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { inject } from 'vue';
-import { LINK_TO_CLASS } from '../constants.js';
+import { useObjectsStore } from '../stores/objects';
 
 // Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
@@ -254,6 +254,7 @@ const route = useRoute();
 const { t } = useI18n();
 const authStore = useAuthStore();
 const cacheStore = useObjectCacheStore();
+const objectsStore = useObjectsStore();
 
 // State
 const object = ref(null);
@@ -378,6 +379,12 @@ const deleteObject = async () => {
 
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
+
+        // If this is a class (type 2), update the class tree store
+        if (object.value.type === 2) {
+            objectsStore.removeClassFromTree(object.value.thing_id);
+        }
+
         router.push('/');
     } catch (error) {
         console.error('Failed to delete object:', error);
