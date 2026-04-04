@@ -39,7 +39,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Create .env file
         run: |
@@ -72,21 +71,8 @@ jobs:
 
       - name: Install Node dependencies
         run: |
-          # Restore package-lock.json if it was deleted
-          git checkout package-lock.json 2>/dev/null || true
-
-          # Clear npm state completely
-          npm cache clean --force
-          rm -rf ~/.npm
-          rm -rf node_modules
-
-          # Reset npm configuration to avoid cache issues
-          npm config delete prefer-offline
-          npm config delete cache
-          npm config set registry https://registry.npmjs.org/
-
-          # Install using npm ci with no cache
-          npm ci --no-optional --no-audit --no-fund --prefer-offline=false --cache /tmp/empty-cache
+          rm -rf node_modules package-lock.json
+          npm ci --no-optional --no-audit --no-fund
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
