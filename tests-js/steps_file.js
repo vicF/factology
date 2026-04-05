@@ -20,22 +20,29 @@ module.exports = function() {
     });
 };
 
-
-// steps_file.js
 module.exports = function() {
     return actor({
-        // Hover over a node and click its add child button
-        async addChildTo(nodeName) {
+        // Add child class to a node
+        addChildTo(nodeName) {
             this.moveCursorTo(`a:has-text("${nodeName}")`);
             this.waitForElement('.add-subclass', 5);
             this.click('.add-subclass');
         },
 
-        // Hover over a node and click its add object button (📦)
-        async addObjectTo(nodeName) {
+        // Add object of a class
+        addObjectTo(nodeName) {
             this.moveCursorTo(`a:has-text("${nodeName}")`);
             this.waitForElement('.add-object', 5);
             this.click('.add-object');
+        },
+
+        // Create a new class with name and description
+        async createClass(name, description) {
+            this.waitForElement('input[name="name"]', 10);
+            this.fillField('input[name="name"]', name);
+            this.fillField('input[name="description"]', description);
+            this.click('Save');
+            this.waitForText(name, 15);
         }
     });
 };
