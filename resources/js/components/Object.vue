@@ -462,12 +462,15 @@ const handleLinkedObjectCreated = async () => {
 
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
-    return object.value.links.map(l => ({
-        link_id: l.link_id,
-        link_type_id: l.link_type_id,
-        other_thing_id: l.thing_id,
-        translation: l.translation || '',
-        public: l.public ?? 0,
+
+    // Convert links to the format expected by EditObject's initialLinkedObjects
+    return object.value.links.map(link => ({
+        other_thing_id: link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id,
+        link_type_id: link.link_type_id,
+        description: link.translation || '',
+        link_id: link.link_id,
+        // Also include the original one_thing_id for reference
+        one_thing_id: link.one_thing_id,
     }));
 });
 
