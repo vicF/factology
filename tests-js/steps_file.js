@@ -19,3 +19,23 @@ module.exports = function() {
         }
     });
 };
+
+
+// steps_file.js
+module.exports = function() {
+    return actor({
+        // Hover over a node and click its add child button
+        async addChildTo(nodeName) {
+            this.moveCursorTo(`a:has-text("${nodeName}")`);
+            this.waitForElement('.add-subclass', 5);
+            this.click('.add-subclass');
+        },
+
+        // Hover over a node and click its add object button (📦)
+        async addObjectTo(nodeName) {
+            this.moveCursorTo(`a:has-text("${nodeName}")`);
+            this.waitForElement('.add-object', 5);
+            this.click('.add-object');
+        }
+    });
+};
