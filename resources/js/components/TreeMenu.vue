@@ -14,7 +14,7 @@
             <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
             <div class="node-content">
                 <span class="node-name"><router-link class="dropdown-item" :to="`/object/${id}`">{{ name }}</router-link></span>
-                <span class="action-icons" :class="{ 'visible': showIcons }">
+                <span  class="action-icons" :class="{ 'visible': authenticated && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
                     <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${name}&quot;`">📦</span>
                 </span>
@@ -40,7 +40,10 @@ import { ref, computed } from 'vue';
 import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
 import {LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT} from '../constants.js';
+import {useAuthStore} from "../stores/auth";
 
+const authStore    = useAuthStore()
+const authenticated = computed(() => authStore.authenticated)
 // Props definition
 const props = defineProps({
     id: {
