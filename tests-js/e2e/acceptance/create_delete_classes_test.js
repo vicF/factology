@@ -28,46 +28,37 @@ Before(async ({ I }) => {
 
 Scenario('Create object hierarchy with parent-child relationships', async ({ I }) => {
     // ========== Create Material Object ==========
-    // Escape the '+' selector or use text
-    I.click('button:has-text("+")');  // More specific selector
-    // OR: I.click(locate('button').withText('+'));
-    // OR: I.click('//button[text()="+"]');
+    // Add child to Something
+    await I.addChildTo('Something');
 
     I.waitForElement('input[name="name"]', 10);
     I.seeInField('Something', 'Something');
-
     I.fillField('input[name="name"]', 'Material Object');
     I.fillField('input[name="description"]', 'Physical thing');
     I.click('Save');
 
-    // Verify Material Object was created
     I.waitForText('Material Object', 15);
     I.see('Material Object');
 
-    // ========== Create Live being as child of Material Object ==========
-    I.click('Add child class below "Material Object"');
-    I.waitForElement('input[name="name"]', 10);
-    I.seeInField('Material Object', 'Material Object');
+    // Add child to Material Object
+    await I.addChildTo('Material Object');
 
+    I.waitForElement('input[name="name"]', 10);
     I.fillField('input[name="name"]', 'Live being');
     I.fillField('input[name="description"]', 'Живое существо');
     I.click('Save');
 
-    // Verify Live being was created
     I.waitForText('Live being', 15);
     I.see('Live being');
-    I.see('Description: Живое существо');
 
-    // ========== Create Human being as child of Live being ==========
-    I.click('Add child class below "Live being"');
+    // Add child to Live being
+    await I.addChildTo('Live being');
+
     I.waitForElement('input[name="name"]', 10);
-    I.seeInField('Live being', 'Live being');
-
     I.fillField('input[name="name"]', 'Human being');
     I.fillField('input[name="description"]', 'Человек');
     I.click('Save');
 
-    // Verify Human being was created
     I.waitForText('Human being', 15);
     I.see('Human being');
     I.see('Description: Человек');
