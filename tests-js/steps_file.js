@@ -43,6 +43,16 @@ module.exports = function() {
             this.fillField('input[name="description"]', description);
             this.click('Save');
             this.waitForText(name, 15);
+        },
+
+        async createClassSimple(name, description) {
+            this.waitForElement('input[name="name"]', 10);
+            this.fillField('input[name="name"]', name);
+            this.fillField('input[name="description"]', description);
+            this.click('Save');
+            this.wait(2); // Wait for save to complete
         }
     });
+
+
 };

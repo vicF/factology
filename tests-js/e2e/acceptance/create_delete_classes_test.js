@@ -109,7 +109,11 @@ Scenario('Create object hierarchy with parent-child relationships', async ({ I }
 Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
     // Create a temporary object
     await I.addChildTo('Something');
-    await I.createClass('Temp Object To Delete', 'This will be deleted');
+    await I.createClassSimple('Temp Object To Delete', 'This will be deleted');
+
+    // Go to Something page to see the new object
+    I.click('Something');
+    I.waitForText('Temp Object To Delete', 15);
     I.see('Temp Object To Delete');
 
     // Verify description on object page
@@ -121,7 +125,7 @@ Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
     // Delete the object
     I.click('Temp Object To Delete');
     I.waitForText('Temp Object To Delete', 10);
-    I.click('Delete this object');
+    I.click('Delete');
     I.acceptPopup();
 
     I.waitForText('Link', 15);
