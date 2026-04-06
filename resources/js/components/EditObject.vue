@@ -23,7 +23,8 @@
                                 v-model="formData.parent_id"
                                 :isEditable="true"
                                 :label="$t('Parent')"
-                                :type=CLASS_TYPE
+                                :type="CLASS_TYPE"
+                                :excludeUuid="formData.thing_id"
                                 required
                             />
                         </div>

@@ -30,6 +30,10 @@ const props = defineProps({
     dropdownMinWidth: {
         type: String,
         default: '360px'
+    },
+    excludeUuid: {
+        type: String,
+        default: null
     }
 })
 
@@ -66,19 +70,28 @@ const displayValue = computed(() => {
 const hasSelection = computed(() => !!props.modelValue)
 
 const filteredObjects = computed(() => {
+    let results = [];
+
     // If we have search results from server, show them
     if (searchResults.value && searchResults.value.length > 0) {
-        return searchResults.value;
+        results = searchResults.value;
     }
-
     // If no search text, show recent objects
-    if (!searchText.value.trim()) {
-        return cacheStore.getRecent(props.type, props.maxResults) || []
+    else if (!searchText.value.trim()) {
+        results = cacheStore.getRecent(props.type, props.maxResults) || [];
+    }
+    // Otherwise search in cache
+    else {
+        const term = searchText.value.toLowerCase().trim()
+        results = cacheStore.searchCached('object', term, props.maxResults) || [];
     }
 
-    // Otherwise search in cache
-    const term = searchText.value.toLowerCase().trim()
-    return cacheStore.searchCached('object', term, props.maxResults) || []
+    // Filter out the excluded UUID if provided
+    if (props.excludeUuid && results.length > 0) {
+        results = results.filter(obj => obj.thing_id !== props.excludeUuid);
+    }
+
+    return results;
 })
 
 // ── Custom click outside handler for teleported dropdown ─────
@@ -431,20 +444,20 @@ const handleDropdownMouseDown = (e) => {
                                     type="button"
                                     class="dropdown-item"
                                     @click="selectObject(obj)"
-                                    @mousedown.prevent="" <!-- Prevent mousedown from closing -->
+                                    @mousedown.prevent=""
                                 >
-                                <i class="bi bi-box flex-shrink-0"></i>
+                                    <i class="bi bi-box flex-shrink-0"></i>
 
-                                <div class="flex-grow-1 text-truncate text-start">
-                                    <div>{{ obj.name || 'Unnamed' }}</div>
-                                    <small v-if="obj.description" class="text-muted d-block text-truncate">
-                                        {{ obj.description }}
+                                    <div class="flex-grow-1 text-truncate text-start">
+                                        <div>{{ obj.name || 'Unnamed' }}</div>
+                                        <small v-if="obj.description" class="text-muted d-block text-truncate">
+                                            {{ obj.description }}
+                                        </small>
+                                    </div>
+
+                                    <small class="text-muted ms-auto font-monospace">
+                                        {{ (obj.thing_id || '').substring(0, 6) }}…
                                     </small>
-                                </div>
-
-                                <small class="text-muted ms-auto font-monospace">
-                                    {{ (obj.thing_id || '').substring(0, 6) }}…
-                                </small>
                                 </button>
                             </div>
                         </template>
