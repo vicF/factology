@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia'
 import axios from 'axios';
 import { SOMETHING } from "../constants.js";
+import { eventBus } from "../eventBus.js"; // Add this import
 
 // @TODO this is in fact classes tree store. Need to rename or maybe merge with objectCache somehow
 export const useObjectsStore = defineStore('objects', {
@@ -121,6 +122,8 @@ export const useObjectsStore = defineStore('objects', {
             // Trigger reactivity by assigning new object
             this.classes = newClasses;
             console.log('Class added successfully', this.classes);
+            eventBus.emit('tree-updated', this.classes);
+            eventBus.emit('trigger-search');
         },
 
         // Update an existing class in the tree
@@ -159,8 +162,89 @@ export const useObjectsStore = defineStore('objects', {
             if (updated) {
                 this.classes = newClasses;
                 console.log('Class updated successfully');
+                eventBus.emit('tree-updated', this.classes);
+                eventBus.emit('trigger-search');
             } else {
                 console.warn('Class not found with id:', classId);
+            }
+        },
+
+        // Move a class to a new parent
+        moveClassInTree(classId, newParentId) {
+            console.log('Moving class in tree:', { classId, newParentId });
+
+            // First, find and remove the class from its current location
+            let movedNode = null;
+
+            const findAndRemove = (nodes) => {
+                if (!nodes) return false;
+
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === classId) {
+                        movedNode = nodes[i];
+                        nodes.splice(i, 1);
+                        return true;
+                    }
+                    if (nodes[i].nodes && findAndRemove(nodes[i].nodes)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            const newClasses = JSON.parse(JSON.stringify(this.classes));
+            let removed = false;
+
+            if (newClasses.id === classId) {
+                console.warn('Cannot move root node');
+                return;
+            }
+
+            removed = findAndRemove(newClasses.nodes);
+
+            if (removed && movedNode) {
+                // Now add it to the new parent
+                if (!newParentId || newParentId === newClasses.id) {
+                    // Add to root
+                    if (!newClasses.nodes) {
+                        newClasses.nodes = [];
+                    }
+                    newClasses.nodes.push(movedNode);
+                } else {
+                    // Find parent and add
+                    const findParentAndAdd = (nodes) => {
+                        if (!nodes) return false;
+
+                        for (let i = 0; i < nodes.length; i++) {
+                            if (nodes[i].id === newParentId) {
+                                if (!nodes[i].nodes) {
+                                    nodes[i].nodes = [];
+                                }
+                                nodes[i].nodes.push(movedNode);
+                                return true;
+                            }
+                            if (nodes[i].nodes && findParentAndAdd(nodes[i].nodes)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    };
+
+                    const found = findParentAndAdd(newClasses.nodes);
+                    if (!found) {
+                        // Add to root as fallback
+                        if (!newClasses.nodes) {
+                            newClasses.nodes = [];
+                        }
+                        newClasses.nodes.push(movedNode);
+                        console.warn('New parent not found, added to root');
+                    }
+                }
+
+                this.classes = newClasses;
+                console.log('Class moved successfully');
+                eventBus.emit('tree-updated', this.classes);
+                eventBus.emit('trigger-search');
             }
         },
 
@@ -199,7 +283,9 @@ export const useObjectsStore = defineStore('objects', {
             if (removed) {
                 this.classes = newClasses;
                 console.log('Class removed successfully');
+                eventBus.emit('tree-updated', this.classes);
+                eventBus.emit('trigger-search');
             }
-        }
+        },
     },
 });

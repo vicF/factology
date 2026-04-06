@@ -229,11 +229,12 @@ const hasUnsavedChanges = computed(() => {
 // Separate special links from regular ones
 const regularLinks = computed(() => {
     return linkedObjects.value.filter(item => {
-        // For Class type (type 2), filter out LINK_TO_PARENT links
-        if (formData.value.type === 2 && item.linkTypeUuid === LINK_TO_PARENT) {
-            return false;
+        // For Class type (type 2), filter out LINK_TO_PARENT and LINK_TO_CLASS
+        if (formData.value.type === 2) {
+            if (item.linkTypeUuid === LINK_TO_PARENT) return false;
+            if (item.linkTypeUuid === LINK_TO_CLASS) return false;
         }
-        // For Thing type (type 3), filter out LINK_TO_CLASS links
+        // For Thing type (type 3), filter out LINK_TO_CLASS
         if (formData.value.type === 3 && item.linkTypeUuid === LINK_TO_CLASS) {
             return false;
         }
@@ -269,17 +270,22 @@ const initializeData = () => {
             linkId: item.linkId || null,
         };
 
-        // Handle LINK_TO_CLASS for Thing type
+        // Handle LINK_TO_CLASS only for Thing type (type 3)
         if (formData.value.type === 3 && item.link_type_id === LINK_TO_CLASS) {
             formData.value.class_id = item.other_thing_id;
             formData.value.class_name = item.class_name || '';
             return; // Don't add to linkedObjects
         }
 
-        // Handle LINK_TO_PARENT for Class type
+        // Handle LINK_TO_PARENT for Class type (type 2)
         if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
             formData.value.parent_id = item.other_thing_id;
             return; // Don't add to linkedObjects
+        }
+
+        // For Class type (type 2), skip LINK_TO_CLASS completely
+        if (formData.value.type === 2 && item.link_type_id === LINK_TO_CLASS) {
+            return; // Just ignore - don't add to linkedObjects
         }
 
         // For edit mode, also check existing class/parent links
@@ -292,6 +298,10 @@ const initializeData = () => {
             if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
                 return;
             }
+            // For Class type, also skip any LINK_TO_CLASS
+            if (formData.value.type === 2 && item.link_type_id === LINK_TO_CLASS) {
+                return;
+            }
         }
 
         linkedObjects.value.push(linkItem);
@@ -299,15 +309,38 @@ const initializeData = () => {
 
     // For edit mode, also process existing links from the object
     if (isEditMode.value && props.object) {
-        // Process class link for Thing type
+        // Process class link ONLY for Thing type (type 3)
         if (formData.value.type === 3 && props.object.class?.thing_id && !formData.value.class_id) {
             formData.value.class_id = props.object.class.thing_id;
             formData.value.class_name = props.object.class.name;
         }
 
-        // Process parent link for Class type
-        if (formData.value.type === 2 && props.object.parent_id && !formData.value.parent_id) {
-            formData.value.parent_id = props.object.parent_id;
+        // Process parent link for Class type (type 2)
+        if (formData.value.type === 2) {
+            // First check if parent_id exists in the object
+            if (props.object.parent_id && !formData.value.parent_id) {
+                formData.value.parent_id = props.object.parent_id;
+            }
+            // Also check initialLinkedObjects for parent link
+            const parentLink = props.initialLinkedObjects.find(
+                item => item.link_type_id === LINK_TO_PARENT
+            );
+            if (parentLink && !formData.value.parent_id) {
+                formData.value.parent_id = parentLink.other_thing_id;
+            }
+            // Check the links array in the object
+            if (props.object.links && Array.isArray(props.object.links)) {
+                const parentLinkFromLinks = props.object.links.find(
+                    link => link.link_type_id === LINK_TO_PARENT
+                );
+                if (parentLinkFromLinks && !formData.value.parent_id) {
+                    if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
+                        formData.value.parent_id = parentLinkFromLinks.other_thing_id;
+                    } else {
+                        formData.value.parent_id = parentLinkFromLinks.one_thing_id;
+                    }
+                }
+            }
         }
     }
 
@@ -410,7 +443,7 @@ const submitForm = async () => {
             type: formData.value.type,
         };
 
-        // Add class link for Thing type
+        // Add class link ONLY for Thing type (type 3)
         if (formData.value.type === 3 && formData.value.class_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
@@ -422,14 +455,13 @@ const submitForm = async () => {
             };
         }
 
-        // Add parent link for Class type
+        // Add parent link for Class type (type 2)
         if (formData.value.type === 2 && formData.value.parent_id) {
-            payload.class = {
+            payload.parent = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_PARENT,
                 other_thing_id: formData.value.parent_id,
                 description: '',
-                link_id: formData.value.link_id || undefined,
                 public: 1,
             };
         }
@@ -469,6 +501,16 @@ const submitForm = async () => {
             emit('object-updated', response.data);
 
             if (formData.value.type === 2) {
+                // Check if parent changed
+                const oldParentId = props.object?.parent_id;
+                const newParentId = formData.value.parent_id;
+
+                if (oldParentId !== newParentId) {
+                    // Move the class in the tree
+                    objectsStore.moveClassInTree(formData.value.thing_id, newParentId);
+                }
+
+                // Update the class name
                 objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
             }
         } else {
