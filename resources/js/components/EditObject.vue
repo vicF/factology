@@ -23,6 +23,7 @@
                                 v-model="formData.parent_id"
                                 :isEditable="true"
                                 :label="$t('Parent')"
+                                :type=CLASS_TYPE
                                 required
                             />
                         </div>
@@ -341,6 +342,11 @@ const removeItem = (index) => {
 };
 
 const confirmClose = () => {
+    // Blur any focused element before closing
+    if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+    }
+
     if (confirmModalInstance) {
         confirmModalInstance.hide();
     }
@@ -355,6 +361,11 @@ const confirmClose = () => {
 };
 
 const handleHideModal = (event) => {
+    // Blur any focused element before checking
+    if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+    }
+
     const modalElement = document.getElementById(modalId);
     if (!modalElement || !modalInstance) {
         event.preventDefault();
@@ -481,6 +492,11 @@ const submitForm = async () => {
                     comment: props.callback.comment
                 });
             }
+        }
+
+        // Blur any focused button before hiding
+        if (document.activeElement && document.activeElement.blur) {
+            document.activeElement.blur();
         }
 
         const modalElement = document.getElementById(modalId);
