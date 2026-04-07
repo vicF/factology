@@ -21,63 +21,21 @@ module.exports = function() {
 
         // ========== Custom Fill Method ==========
 
-        // Universal fill method using JavaScript with verification
+        // Reliable fill method for Vue components
         async fillFieldReliable(selector, value) {
-            // Use executeScript as the primary method - it works with any character set
-            await this.executeScript((sel, val) => {
+            // Standard CodeceptJS fillField - this should work with Vue
+            await this.waitForElement(selector, 10);
+            await this.fillField(selector, value);
+
+            // Trigger blur to ensure Vue's v-model updates
+            await this.executeScript((sel) => {
                 const input = document.querySelector(sel);
                 if (input) {
-                    // Clear the input first
-                    input.value = '';
-
-                    // Set the new value
-                    input.value = val;
-
-                    // Trigger all possible Vue events
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
                     input.dispatchEvent(new Event('blur', { bubbles: true }));
-
-                    // For Vue 3 with v-model
-                    if (input._vnode) {
-                        const componentInstance = input._vnode.component;
-                        if (componentInstance && componentInstance.props) {
-                            componentInstance.props['onUpdate:modelValue']?.(val);
-                        }
-                    }
-
-                    // Also trigger focus events
-                    input.focus();
-                    input.dispatchEvent(new Event('focus', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-            }, selector, value);
+            }, selector);
 
-            // Wait for Vue to react to the change
-            await this.wait(0.3);
-
-            // Verify the value was set correctly
-            const currentValue = await this.grabValueFrom(selector);
-
-            if (currentValue !== value) {
-                console.log(`Value mismatch: expected "${value}", got "${currentValue}". Retrying with character-by-character...`);
-
-                // Fallback: clear and try character-by-character using pressKey
-                await this.click(selector);
-                await this.pressKey(['Control', 'a']);
-                await this.pressKey('Backspace');
-
-                // Use type method which handles Unicode better
-                await this.type(value);
-                await this.wait(0.2);
-            }
-        },
-
-        // Alternative fill method using type (works with Unicode)
-        async fillFieldWithType(selector, value) {
-            await this.click(selector);
-            await this.pressKey(['Control', 'a']);
-            await this.pressKey('Backspace');
-            await this.type(value);
             await this.wait(0.2);
         },
 
