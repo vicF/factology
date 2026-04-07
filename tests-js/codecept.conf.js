@@ -19,6 +19,15 @@ exports.config = {
                     '--disable-dev-shm-usage',
                     '--disable-gpu'
                 ] : []
+            },
+            recordConsole: true,
+            on: {
+                console: (msg) => {
+                    console.log(`[BROWSER] ${msg.type()}: ${msg.text()}`);
+                },
+                pageerror: (error) => {
+                    console.log(`[BROWSER ERROR]: ${error.message}`);
+                }
             }
         },
         REST: {
