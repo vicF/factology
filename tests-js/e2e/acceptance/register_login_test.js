@@ -1,44 +1,20 @@
 // tests-js/register_login_test.js
+const DB_HELPER = require('../../helpers/dbHelper');
+
 Feature('User Registration and Login');
 
 let testUser = null;
+let createdUserId = null;
 
 Before(async ({ I }) => {
-    console.log('\n========== DATABASE SETUP ==========');
-
-    try {
-        // Check migration status first
-        console.log('\n📋 Current migration status:');
-        const statusResponse = await I.sendGetRequest('/api/test/migration-status');
-        console.log(statusResponse.data.output);
-
-        // Reset database with full output
-        console.log('\n🔄 Running database reset...');
-        const resetResponse = await I.sendPostRequest('/api/test/reset');
-
-        if (resetResponse.data.success) {
-            console.log('\n✅ Database reset successful!');
-            console.log('\n📊 Migration Output:');
-            console.log(resetResponse.data.output);
-        } else {
-            console.log('\n❌ Database reset failed:');
-            console.log(resetResponse.data.error);
-        }
-
-    } catch (err) {
-        console.log('\n❌ Error accessing test routes:', err.message);
-        console.log('Make sure your test container is running with APP_ENV=testing');
-    }
-
-    console.log('\n====================================\n');
+    await DB_HELPER.resetDatabase(I, { showOutput: false });
 });
 
-/*After(async ({ I }) => {
-    // Clean up after test
-    if (testUser && testUser.id) {
-        await I.sendDeleteRequest(`/api/test/users/${testUser.id}`);
+After(async ({ I }) => {
+    if (createdUserId) {
+        await DB_HELPER.deleteTestUser(I, createdUserId);
     }
-});*/
+});
 
 Scenario('Complete registration and login flow', async ({ I }) => {
     const userData = {
@@ -63,13 +39,13 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 
     // Store for cleanup
     testUser = userData;
+    createdUserId = testUser.id;
 
     I.waitForText('Something', 15);
-    // Continue with test...
     I.waitForInvisible('text=Loading...', 10);
     I.click('Something');
 
-    // Wait for the next page to load (wait for a known element)
+    // Wait for the next page to load
     I.waitForText('Create', 15);
 
     // Test dialog interactions
@@ -82,11 +58,9 @@ Scenario('Complete registration and login flow', async ({ I }) => {
     I.click('Close');
 
     // Logout
-    I.click(testUser.name);
-    I.click('Logout');
-    I.see('User');
+    await DB_HELPER.logout(I, testUser.name);
 
-    // Login
+    // Login with same user
     I.click('User');
     I.click('Log in');
     I.fillField('Email', testUser.email);
@@ -97,9 +71,5 @@ Scenario('Complete registration and login flow', async ({ I }) => {
     I.see(testUser.name);
 
     // Final logout
-    I.click(testUser.name);
-    I.click('Logout');
-    I.see('guest');
-    I.see('User');
+    await DB_HELPER.logout(I, testUser.name);
 });
-

@@ -1,4 +1,6 @@
 // tests-js/e2e/acceptance/create_delete_classes_test.js
+const DB_HELPER = require('../../helpers/dbHelper');
+
 Feature('Object Hierarchy Management');
 
 const TEST_USER = {
@@ -7,41 +9,20 @@ const TEST_USER = {
     password: 'qqqqqqqq'
 };
 
-// Reset database before all tests
+// Reset database before all tests (silent mode)
 BeforeSuite(async ({ I }) => {
-    console.log('\n========== DATABASE SETUP ==========');
-
-    try {
-        console.log('\n🔄 Running database reset...');
-        const resetResponse = await I.sendPostRequest('/api/test/reset');
-
-        if (resetResponse.data.success) {
-            console.log('✅ Database reset successful!');
-        } else {
-            console.log('❌ Database reset failed:', resetResponse.data.error);
-        }
-
-    } catch (err) {
-        console.log('\n❌ Error accessing test routes:', err.message);
-    }
-
-    console.log('\n====================================\n');
+    await DB_HELPER.resetDatabase(I, { silent: true, showOutput: false });
 });
 
 // Login before each test
 Before(async ({ I }) => {
-    I.amOnPage('/');
-    I.seeElement('a:has-text("Home")');
+    await DB_HELPER.login(I, TEST_USER);
+});
 
-    I.click('User');
-    I.click('Log in');
-    I.see('Log in');
-
-    I.fillField('Email', TEST_USER.email);
-    I.fillField('Password', TEST_USER.password);
-    I.click('Log in');
-
-    I.waitForText(TEST_USER.name, 15);
+// Logout after each test (optional)
+After(async ({ I }) => {
+    I.click(TEST_USER.name);
+    I.click('Logout');
 });
 
 Scenario('Create object hierarchy with parent-child relationships', async ({ I }) => {
@@ -49,16 +30,14 @@ Scenario('Create object hierarchy with parent-child relationships', async ({ I }
     await I.addChildTo('Something');
     await I.createClass('Material Object', 'Physical thing');
 
-    // The name might be truncated to "Ma" in the tree view
-    // So check for partial text or the link itself
     I.seeElement('a:has-text("Material Object")');
-    I.see('Material Object'); // This might fail if truncated
+    I.see('Material Object');
 
-    // Alternative: Check that the object was created by clicking on it
+    // Verify on detail page
     I.click('Material Object');
     I.waitForText('Physical thing', 10);
     I.see('Physical thing');
-    I.see('Material Object'); // Full name should be on the detail page
+    I.see('Material Object');
     I.click('Something');
 
     // Create Live being as child of Material Object
