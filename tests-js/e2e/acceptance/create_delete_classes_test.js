@@ -19,12 +19,6 @@ Before(async ({ I }) => {
     await DB_HELPER.login(I, TEST_USER);
 });
 
-// Logout after each test (optional)
-After(async ({ I }) => {
-    I.click(TEST_USER.name);
-    I.click('Logout');
-});
-
 Scenario('Create object hierarchy with parent-child relationships', async ({ I }) => {
     // Create Material Object
     await I.addChildTo('Something');
@@ -97,8 +91,8 @@ Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
     await I.addChildTo('Something');
 
     I.waitForElement('input[name="name"]', 10);
-    I.fillField('input[name="name"]', 'Temp Object To Delete');
-    I.fillField('input[name="description"]', 'This will be deleted');
+    await I.fillFieldWithRetry('input[name="name"]', 'Temp Object To Delete');
+    await I.fillFieldWithRetry('input[name="description"]', 'This will be deleted');
     I.click('Save');
     I.wait(2);
 

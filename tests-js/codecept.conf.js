@@ -39,6 +39,7 @@ exports.config = {
     },
     plugins: {
         screenshotOnFail: { enabled: true },
+        pauseOnFail: { enabled: false },
     },
     name: 'factology'
 };
