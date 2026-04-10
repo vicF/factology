@@ -321,6 +321,7 @@ class Anything
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
+            ->where('links.deleted', '!=', 1)
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
@@ -328,6 +329,7 @@ class Anything
 
         $second = DB::table('links') // other way links
         ->where('links.other_thing_id', $thing['thing_id'])
+            ->where('links.deleted', '!=', 1)
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
