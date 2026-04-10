@@ -57,36 +57,14 @@ module.exports = function() {
 
         async createClass(name, description) {
             this.waitForElement('input[name="name"]', 10);
-            await this.fillFieldReliable('input[name="name"]', name);
-            await this.fillFieldReliable('input[name="description"]', description);
-
-            // Add a small delay before clicking save
-            this.wait(0.5);
+            await this.fillFieldWithRetry('input[name="name"]', name);
+            await this.fillFieldWithRetry('input[name="description"]', description);
+            this.waitForClickable('button:has-text("Save")', 10);
             this.click('Save');
-
-            // Wait for save to complete and verify
-            this.wait(2);
-
-            // Try to find the created object
-            try {
-                this.waitForText(name, 15);
-            } catch (err) {
-                // If not found, maybe it's truncated - try clicking on it anyway
-                console.log(`Text "${name}" not found, trying to click on it...`);
-                this.click(name);
-                this.waitForText(description, 10);
-                this.click('Something');
-                this.waitForText(name, 15);
-            }
-        },
-
-        async createClassSimple(name, description) {
-            this.waitForElement('input[name="name"]', 10);
-            await this.fillFieldReliable('input[name="name"]', name);
-            await this.fillFieldReliable('input[name="description"]', description);
-            this.wait(0.5);
-            this.click('Save');
-            this.wait(2);
+            this.waitForInvisible('.modal', 10);
+            //this.click('Something');
+            this.waitForText(name, 15);
+            this.scrollTo(`a:has-text("${name}")`);
         },
 
         // ========== Delete Actions ==========
@@ -96,6 +74,25 @@ module.exports = function() {
             this.waitForClickable('button:has-text("Delete")', 10);
             this.click('Delete');
             this.acceptPopup();
+        },
+
+        async fillFieldWithRetry(selector, expectedValue, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                // Clear and fill
+                this.click(selector);
+                await this.fillField(selector, expectedValue);
+                // Wait a moment for Vue to react
+                this.wait(0.2);
+                // Read back the value
+                const actualValue = await this.grabValueFrom(selector);
+                if (actualValue === expectedValue) {
+                    return; // success
+                }
+                console.log(`Retry ${i+1}: expected "${expectedValue}", got "${actualValue}"`);
+            }
+            throw new Error(`Failed to fill "${expectedValue}" after ${maxRetries} retries`);
         }
     });
+
+
 };

@@ -6,9 +6,9 @@ Feature('User Registration and Login');
 let testUser = null;
 let createdUserId = null;
 
-Before(async ({ I }) => {
+/*Before(async ({ I }) => {
     await DB_HELPER.resetDatabase(I, { showOutput: false });
-});
+});*/
 
 After(async ({ I }) => {
     if (createdUserId) {
