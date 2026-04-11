@@ -1,6 +1,9 @@
 <!-- Edit link between two objects -->
 <template>
+    <template v-if="!singleField">
     <div class="linked-object">
+        <!-- Normal mode (full editor) -->
+
         <div class="form-group flex-group">
             <ObjectField
                 fieldName="one_thing"
@@ -45,8 +48,7 @@
                 Create
             </button>
         </div>
-
-        <!-- Поле для ручного описания -->
+        <!-- Common: description field -->
         <div class="form-group">
             <textarea
                 v-model="link.translation"
@@ -56,8 +58,9 @@
             ></textarea>
         </div>
 
-        <!-- Автоматически сгенерированное описание -->
-        <div class="form-group" v-if="link.one_thing_id && link.other_thing_id && link.link_type_id">
+        <!-- Auto‑generated preview (if currentObject is provided) -->
+        <div class="form-group"
+             v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
             <div class="generated-preview p-2 bg-light rounded border">
                 <small class="text-muted d-block mb-1">
                     <i class="bi bi-magic me-1"></i>
@@ -72,9 +75,25 @@
         </div>
 
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-danger" @click="removeSelf">Удалить</button>
+            <button class="btn btn-danger" @click="removeSelf">Delete</button>
         </div>
     </div>
+    </template>
+    <!-- Single‑field mode (only target object) -->
+    <template v-else>
+        <div class="form-group flex-group">
+            <ObjectField
+                fieldName="other_thing"
+                v-model="link.other_thing_id"
+                :isEditable="true"
+                :label="targetLabel"
+                :type="CLASS_TYPE"
+                required
+                class="flex-field"
+            />
+        </div>
+    </template>
+
 </template>
 
 <script setup>
@@ -82,39 +101,52 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
-import { LINK_TYPE, THING_TYPE } from "../../constants.js";
+import {CLASS_TYPE, LINK_TYPE, THING_TYPE} from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
-    // Объект ссылки со всеми полями
     link: { type: Object, required: true },
-    // Текущий объект (для предпросмотра)
-    currentObject: { type: Object, required: true },
+    currentObject: {type: Object, default: null},
     index: { type: Number, required: true },
+    // New props for single-field mode
+    singleField: {type: Boolean, default: false},
+    fixedLinkTypeUuid: {type: String, default: null},
+    targetLabel: {type: String, default: 'Target object'},
 });
 
 const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Используем переданные объекты напрямую
-const link = computed({
-    get: () => props.link,
-    set: (newValue) => {
-        // Обновляем через emit, так как props нельзя менять напрямую
-        emit('update', {
-            index: props.index,
-            data: newValue
-        });
-    }
-});
+// Work on a local copy to avoid mutating the prop directly
+const link = ref({...props.link});
 
-// Имена объектов для отображения (из кэша)
+// In single-field mode, enforce the fixed link type UUID
+if (props.singleField && props.fixedLinkTypeUuid) {
+    link.value.link_type_id = props.fixedLinkTypeUuid;
+}
+
+// Watch for changes to the prop (if the parent updates the link object)
+watch(() => props.link, (newLink) => {
+    link.value = {...newLink};
+    if (props.singleField && props.fixedLinkTypeUuid) {
+        link.value.link_type_id = props.fixedLinkTypeUuid;
+    }
+}, {deep: true});
+
+// Emit updates whenever the link changes
+watch(link, () => {
+    emit('update', {
+        index: props.index,
+        data: {...link.value}
+    });
+}, {deep: true});
+
+// Load names for display (optional)
 const oneObjectName = ref('');
 const otherObjectName = ref('');
 const typeName = ref('');
 
-// Загрузка имен объектов из кэша
 const loadObjectNames = async () => {
     if (link.value.one_thing_id) {
         try {
@@ -136,7 +168,6 @@ const loadObjectNames = async () => {
     }
 };
 
-// Открытие модального окна создания объекта
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
@@ -154,53 +185,27 @@ const openCreateObjectModal = () => {
     eventBus.emit('open-create-modal', payload);
 };
 
-// Переключение объектов
 const swapObjects = () => {
     const temp = link.value.one_thing_id;
-    link.value = {
-        ...link.value,
-        one_thing_id: link.value.other_thing_id,
-        other_thing_id: temp
-    };
+    link.value.one_thing_id = link.value.other_thing_id;
+    link.value.other_thing_id = temp;
 };
 
-// Удаление компонента
 const removeSelf = () => {
     emit('remove', props.index);
 };
 
-// Обработчик создания объекта через модальное окно
 const handleLinkCreated = (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        const updates = {};
-
         if (!link.value.other_thing_id) {
-            updates.other_thing_id = data.newObjectId;
+            link.value.other_thing_id = data.newObjectId;
         }
-        if (data.linkTypeUuid) {
-            updates.link_type_id = data.linkTypeUuid;
-        }
-        if (data.comment !== undefined) {
-            updates.translation = data.comment;
-        }
-
-        if (Object.keys(updates).length > 0) {
-            link.value = { ...link.value, ...updates };
-        }
+        if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
+        if (data.comment !== undefined) link.value.translation = data.comment;
     }
 };
 
-// Следим за изменениями в link
-watch(() => link.value, () => {
-    loadObjectNames();
-}, { deep: true, immediate: true });
-
-// Инициализация
 onMounted(() => {
-    console.log('LinkedObject mounted with:', {
-        link: link.value,
-        currentObject: props.currentObject
-    });
     loadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
