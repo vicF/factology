@@ -16,29 +16,31 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
-                        <!-- Parent field for Class type (type 2) -->
-                        <div class="mb-3" v-if="formData.type === 2">
-                            <ObjectField
-                                fieldName="parent_id"
-                                v-model="formData.parent_id"
-                                :isEditable="true"
-                                :label="$t('Parent')"
-                                :type="CLASS_TYPE"
-                                :excludeUuid="formData.thing_id"
-                                required
+                        <!-- Class field for Thing type (type 3) -->
+                        <div class="mb-3" v-if="formData.type === 3">
+                            <LinkedObject
+                                :link="classLink"
+                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                :index="0"
+                                :singleField="true"
+                                :fixedLinkTypeUuid="LINK_TO_CLASS"
+                                :targetLabel="$t('Class')"
+                                @update="handleClassLinkUpdate"
+                                @remove="handleClassLinkRemove"
                             />
                         </div>
 
-                        <!-- Class field for Thing type (type 3) -->
-                        <div class="mb-3" v-if="formData.type === 3">
-                            <ObjectField
-                                fieldName="class_id"
-                                v-model="formData.class_id"
-                                :isEditable="true"
-                                :label="$t('Class')"
-                                :name="formData.class_name"
-                                :type="CLASS_TYPE"
-                                required
+                        <!-- Parent field for Class type (type 2) -->
+                        <div class="mb-3" v-if="formData.type === 2">
+                            <LinkedObject
+                                :link="parentLink"
+                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                :index="0"
+                                :singleField="true"
+                                :fixedLinkTypeUuid="LINK_TO_PARENT"
+                                :targetLabel="$t('Parent')"
+                                @update="handleParentLinkUpdate"
+                                @remove="handleParentLinkRemove"
                             />
                         </div>
 
@@ -151,7 +153,7 @@
 </template>
 
 <script setup>
-import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
@@ -161,8 +163,8 @@ import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, THING_TYPE} from "../constants.js";
-import {eventBus} from "../eventBus.js";
+import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, THING_TYPE } from "../constants.js";
+import { eventBus } from "../eventBus.js";
 import { useObjectsStore } from '@/stores/objects';
 
 const objectsStore = useObjectsStore();
@@ -197,10 +199,11 @@ const formData = ref({
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? props.object.public || 0 : 0,
     parent_id: props.params.parentId || null,
-    class_id: props.params.classId || props.object?.class?.thing_id || null,
-    class_name: props.params.className || props.object?.class?.name || null,
+    parent_link_id: null,                 // store link ID for parent link
+    class_id: props.params.classId || null,
+    class_name: props.params.className || null,
+    link_id: null,                        // store link ID for class link
     type: props.params.type || 3,
-    link_id: props.object?.class?.link_id || null,
 });
 
 const linkedObjects = ref([]);
@@ -226,21 +229,63 @@ const hasUnsavedChanges = computed(() => {
     return formChanged || linksChanged;
 });
 
-// Separate special links from regular ones
+// Regular links (exclude special class/parent links)
 const regularLinks = computed(() => {
     return linkedObjects.value.filter(item => {
-        // For Class type (type 2), filter out LINK_TO_PARENT and LINK_TO_CLASS
-        if (formData.value.type === 2) {
-            if (item.linkTypeUuid === LINK_TO_PARENT) return false;
-            if (item.linkTypeUuid === LINK_TO_CLASS) return false;
-        }
-        // For Thing type (type 3), filter out LINK_TO_CLASS
-        if (formData.value.type === 3 && item.linkTypeUuid === LINK_TO_CLASS) {
-            return false;
-        }
+        if (formData.value.type === 3 && item.linkTypeUuid === LINK_TO_CLASS) return false;
+        if (formData.value.type === 2 && item.linkTypeUuid === LINK_TO_PARENT) return false;
         return true;
     });
 });
+
+// Helper to find a link by type in linkedObjects (used for initialization)
+const findLinkByType = (typeUuid) => {
+    return linkedObjects.value.find(l => l.linkTypeUuid === typeUuid);
+};
+
+// ---- Class link (for Thing type) ----
+const classLink = computed({
+    get: () => ({
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: formData.value.class_id || '',
+        link_type_id: LINK_TO_CLASS,
+        translation: '',
+        link_id: formData.value.link_id || null,
+    }),
+    set: () => {} // read-only, updates go via handleClassLinkUpdate
+});
+
+const handleClassLinkUpdate = ({ data }) => {
+    formData.value.class_id = data.other_thing_id;
+    formData.value.link_id = data.link_id;
+};
+
+const handleClassLinkRemove = () => {
+    formData.value.class_id = null;
+    formData.value.link_id = null;
+};
+
+// ---- Parent link (for Class type) ----
+const parentLink = computed({
+    get: () => ({
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: formData.value.parent_id || '',
+        link_type_id: LINK_TO_PARENT,
+        translation: '',
+        link_id: formData.value.parent_link_id || null,
+    }),
+    set: () => {}
+});
+
+const handleParentLinkUpdate = ({ data }) => {
+    formData.value.parent_id = data.other_thing_id;
+    formData.value.parent_link_id = data.link_id;
+};
+
+const handleParentLinkRemove = () => {
+    formData.value.parent_id = null;
+    formData.value.parent_link_id = null;
+};
 
 // Modal IDs
 const modalId = `editObjectModal-${formData.value.thing_id}`;
@@ -255,9 +300,10 @@ const initializeData = () => {
     // Reset special fields
     if (formData.value.type === 2) {
         formData.value.parent_id = null;
+        formData.value.parent_link_id = null;
     } else if (formData.value.type === 3) {
         formData.value.class_id = null;
-        formData.value.class_name = '';
+        formData.value.link_id = null;
     }
 
     // Process initialLinkedObjects
@@ -270,79 +316,39 @@ const initializeData = () => {
             linkId: item.linkId || null,
         };
 
-        // Handle LINK_TO_CLASS only for Thing type (type 3)
+        // Handle LINK_TO_CLASS for Thing type
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
             formData.value.class_id = item.other_thing_id;
-            formData.value.class_name = item.class_name || '';
-            formData.value.link_to_class = linkItem;
-            return; // Don't add to linkedObjects
+            formData.value.link_id = item.linkId || null;
+            return; // do not add to linkedObjects
         }
 
-        // Handle LINK_TO_PARENT for Class type (type 2)
+        // Handle LINK_TO_PARENT for Class type
         if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
             formData.value.parent_id = item.other_thing_id;
-            formData.value.link_to_parent = linkItem;
-            return; // Don't add to linkedObjects
+            formData.value.parent_link_id = item.linkId || null;
+            return; // do not add to linkedObjects
         }
 
-        // For Class type (type 2), skip LINK_TO_CLASS completely
-        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) {
-            return; // Just ignore - don't add to linkedObjects
-        }
-
-        // For edit mode, also check existing class/parent links
-        if (isEditMode.value) {
-            // Skip LINK_TO_CLASS for Thing type in edit mode
-            if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
-                return;
-            }
-            // Skip LINK_TO_PARENT for Class type in edit mode
-            if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
-                return;
-            }
-            // For Class type, also skip any LINK_TO_CLASS
-            if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) {
-                return;
-            }
-        }
+        // Skip any other special links that might appear
+        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) return;
+        if (isEditMode.value && (
+            (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) ||
+            (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT)
+        )) return;
 
         linkedObjects.value.push(linkItem);
     });
 
-    // For edit mode, also process existing links from the object
+    // For edit mode, also process existing links from the object (if not already set)
     if (isEditMode.value && props.object) {
-        // Process class link ONLY for Thing type (type 3)
         if (formData.value.type === 3 && props.object.class?.thing_id && !formData.value.class_id) {
             formData.value.class_id = props.object.class.thing_id;
-            formData.value.class_name = props.object.class.name;
+            formData.value.link_id = props.object.class?.link_id || null;
         }
-
-        // Process parent link for Class type (type 2)
-        if (formData.value.type === 2) {
-            // First check if parent_id exists in the object
-            if (props.object.parent_id && !formData.value.parent_id) {
-                formData.value.parent_id = props.object.parent_id;
-            }
-            // Also check initialLinkedObjects for parent link
-            const parentLink = props.initialLinkedObjects.find(
-                item => item.link_type_id === LINK_TO_PARENT
-            );
-            if (parentLink && !formData.value.parent_id) {
-                formData.value.parent_id = parentLink.other_thing_id;
-            }
-            // Check the links array in the object
-            if (props.object.links && Array.isArray(props.object.links)) {
-                const parentLinkFromLinks = props.object.links.find(
-                    link => link.link_type_id === LINK_TO_PARENT
-                );
-                if (parentLinkFromLinks && !formData.value.parent_id) {
-                    if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
-                        formData.value.parent_id = parentLinkFromLinks.other_thing_id;
-                    } else {
-                        formData.value.parent_id = parentLinkFromLinks.one_thing_id;
-                    }
-                }
-            }
+        if (formData.value.type === 2 && props.object.parent_id && !formData.value.parent_id) {
+            formData.value.parent_id = props.object.parent_id;
+            formData.value.parent_link_id = props.object.parent_link_id || null;
         }
     }
 
@@ -350,7 +356,6 @@ const initializeData = () => {
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
 };
 
-// Call initialize
 initializeData();
 
 const addNewLinkedObject = () => {
@@ -378,52 +383,39 @@ const removeItem = (index) => {
 };
 
 const confirmClose = () => {
-    // Blur any focused element before closing
     if (document.activeElement && document.activeElement.blur) {
         document.activeElement.blur();
     }
-
-    if (confirmModalInstance) {
-        confirmModalInstance.hide();
-    }
-
+    if (confirmModalInstance) confirmModalInstance.hide();
     const modalElement = document.getElementById(modalId);
     if (modalElement && modalInstance) {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         modalInstance.hide();
     }
-
     emit('close');
 };
 
 const handleHideModal = (event) => {
-    // Blur any focused element before checking
-    if (document.activeElement && document.activeElement.blur) {
-        document.activeElement.blur();
-    }
-
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     const modalElement = document.getElementById(modalId);
     if (!modalElement || !modalInstance) {
         event.preventDefault();
         event.stopPropagation();
         return;
     }
-
     if (hasUnsavedChanges.value && !isClosing && !isSubmitting) {
         event.preventDefault();
         event.stopPropagation();
-        if (confirmModalInstance) {
-            confirmModalInstance.show();
-        }
+        if (confirmModalInstance) confirmModalInstance.show();
     }
 };
 
 const submitForm = async () => {
     if (isSubmitting) return;
-
     try {
         isSubmitting = true;
 
+        // Prepare links to add (only those without linkId)
         const linksToAdd = regularLinks.value
             .filter(item => item.otherThingUuid?.trim() && !item.linkId)
             .map(item => ({
@@ -445,7 +437,7 @@ const submitForm = async () => {
             type: formData.value.type,
         };
 
-        // Add class link ONLY for Thing type (type 3)
+        // Add class link for Thing type (using the stored link_id if any)
         if (formData.value.type === 3 && formData.value.class_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
@@ -457,22 +449,21 @@ const submitForm = async () => {
             };
         }
 
-        // Add parent link for Class type (type 2)
+        // Add parent link for Class type
         if (formData.value.type === 2 && formData.value.parent_id) {
             payload.parent = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_PARENT,
                 other_thing_id: formData.value.parent_id,
                 description: '',
+                link_id: formData.value.parent_link_id || undefined,
                 public: 1,
             };
         }
 
-        if (linksToAdd.length > 0) {
-            payload.links_to_add = linksToAdd;
-        }
+        if (linksToAdd.length > 0) payload.links_to_add = linksToAdd;
 
-        // Handle link updates/deletions for edit mode
+        // Handle updates/deletions for regular links
         if (isEditMode.value) {
             const linksToUpdate = regularLinks.value
                 .filter(item => item.linkId && item.otherThingUuid?.trim())
@@ -483,50 +474,32 @@ const submitForm = async () => {
                     link_type_id: item.linkTypeUuid,
                     translation: item.comment,
                 }));
-
-            if (linksToUpdate.length > 0) {
-                payload.links_to_update = linksToUpdate;
-            }
+            if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
 
             const linksToDelete = originalLinkedObjects.value
                 .filter(orig => orig.linkId && !regularLinks.value.find(curr => curr.linkId === orig.linkId))
                 .map(orig => orig.linkId);
-
-            if (linksToDelete.length > 0) {
-                payload.links_to_delete = linksToDelete;
-            }
+            if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
         }
 
         let response;
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
-
             if (formData.value.type === 2) {
-                // Check if parent changed
                 const oldParentId = props.object?.parent_id;
                 const newParentId = formData.value.parent_id;
-
                 if (oldParentId !== newParentId) {
-                    // Move the class in the tree
                     objectsStore.moveClassInTree(formData.value.thing_id, newParentId);
                 }
-
-                // Update the class name
                 objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
             }
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
-
             if (formData.value.type === 2) {
-                objectsStore.addClassToTree(
-                    formData.value.thing_id,
-                    formData.value.name,
-                    formData.value.parent_id
-                );
+                objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, formData.value.parent_id);
             }
-
             if (props.callback && props.callback.type === 'link-created') {
                 eventBus.emit('link-created', {
                     requestId: props.callback.requestId,
@@ -539,24 +512,14 @@ const submitForm = async () => {
             }
         }
 
-        // Blur any focused button before hiding
-        if (document.activeElement && document.activeElement.blur) {
-            document.activeElement.blur();
-        }
-
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         const modalElement = document.getElementById(modalId);
-        if (modalElement) {
-            modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-        }
-        if (modalInstance) {
-            modalInstance.hide();
-        }
-
+        if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+        if (modalInstance) modalInstance.hide();
         setTimeout(() => {
             emit('close');
             isSubmitting = false;
         }, 300);
-
     } catch (error) {
         console.error('Submit error:', error.response || error);
         alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
@@ -566,41 +529,26 @@ const submitForm = async () => {
 
 onMounted(async () => {
     await nextTick();
-
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
-
     if (modalElement) {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => {
-            if (!isSubmitting) {
-                emit('close');
-            }
+            if (!isSubmitting) emit('close');
         });
         setTimeout(() => {
-            if (modalInstance && modalElement) {
-                modalInstance.show();
-            }
+            if (modalInstance && modalElement) modalInstance.show();
         }, 100);
     }
-
-    if (confirmModalElement) {
-        confirmModalInstance = new Modal(confirmModalElement);
-    }
+    if (confirmModalElement) confirmModalInstance = new Modal(confirmModalElement);
 });
 
 onUnmounted(() => {
     const modalElement = document.getElementById(modalId);
-    if (modalElement) {
-        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-    }
-    if (modalInstance) {
-        modalInstance.hide();
-    }
-    if (confirmModalInstance) {
-        confirmModalInstance.hide();
-    }
+    if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+    if (modalInstance) modalInstance.hide();
+    if (confirmModalInstance) confirmModalInstance.hide();
 });
 
 watch(() => props.object, (newObject) => {
@@ -613,10 +561,11 @@ watch(() => props.object, (newObject) => {
             end: newObject.end || '',
             public: newObject.public || 0,
             parent_id: props.params.parentId || null,
-            class_id: props.params.classId || newObject.class?.thing_id || null,
-            class_name: props.params.className || newObject.class?.name || null,
-            type: props.params.type || 3,
+            parent_link_id: newObject.parent_link_id || null,
+            class_id: props.params.classId || (newObject.class?.thing_id || null),
+            class_name: props.params.className || (newObject.class?.name || null),
             link_id: newObject.class?.link_id || null,
+            type: props.params.type || 3,
         };
         initializeData();
     }
