@@ -161,7 +161,7 @@ import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT} from "../constants.js";
+import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, THING_TYPE} from "../constants.js";
 import {eventBus} from "../eventBus.js";
 import { useObjectsStore } from '@/stores/objects';
 
@@ -271,35 +271,37 @@ const initializeData = () => {
         };
 
         // Handle LINK_TO_CLASS only for Thing type (type 3)
-        if (formData.value.type === 3 && item.link_type_id === LINK_TO_CLASS) {
+        if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
             formData.value.class_id = item.other_thing_id;
             formData.value.class_name = item.class_name || '';
+            formData.value.link_to_class = linkItem;
             return; // Don't add to linkedObjects
         }
 
         // Handle LINK_TO_PARENT for Class type (type 2)
-        if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
+        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
             formData.value.parent_id = item.other_thing_id;
+            formData.value.link_to_parent = linkItem;
             return; // Don't add to linkedObjects
         }
 
         // For Class type (type 2), skip LINK_TO_CLASS completely
-        if (formData.value.type === 2 && item.link_type_id === LINK_TO_CLASS) {
+        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) {
             return; // Just ignore - don't add to linkedObjects
         }
 
         // For edit mode, also check existing class/parent links
         if (isEditMode.value) {
             // Skip LINK_TO_CLASS for Thing type in edit mode
-            if (formData.value.type === 3 && item.link_type_id === LINK_TO_CLASS) {
+            if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
                 return;
             }
             // Skip LINK_TO_PARENT for Class type in edit mode
-            if (formData.value.type === 2 && item.link_type_id === LINK_TO_PARENT) {
+            if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
                 return;
             }
             // For Class type, also skip any LINK_TO_CLASS
-            if (formData.value.type === 2 && item.link_type_id === LINK_TO_CLASS) {
+            if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) {
                 return;
             }
         }
