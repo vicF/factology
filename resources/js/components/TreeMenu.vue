@@ -117,7 +117,7 @@ const openCreateSubclassModal = () => {
     // Link to parent class
     if (props.id) {
         initialLinkedObjects.push({
-            other_thing_id: props.id,
+            one_thing_id: props.id,
             link_type_id: LINK_TO_PARENT, // Use the constant from constants.js
             description: `Subclass of ${props.name}`,
         });
