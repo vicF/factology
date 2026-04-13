@@ -76,7 +76,7 @@ const DB_HELPER = {
     async logout(I, userName) {
         I.click(userName);
         I.click('Logout');
-        I.see('guest');
+        I.waitForText('guest', 10);
         I.see('User');
     },
 

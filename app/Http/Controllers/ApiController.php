@@ -158,11 +158,14 @@ class ApiController extends BaseController
                     'errors' => $e->getMessage() ?? 'Unknown error occurred'
                 ], $e->getCode() ?:500);
             }
-            if ($request->parent_id) {
+            /*if ($request->parent_id) {
 
                 $model->setParent([
                     'one_thing_id' => $request->parent_id,
                 ]);
+            }*/
+            if ($request->parent) {
+                $model->setParent($request->parent);
             }
             if ($request->class) {
                 $model->setClass($request->class);
