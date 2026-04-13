@@ -44,6 +44,7 @@
                             />
                         </div>
 
+                        <!-- rest of the form (name, description, dates, etc.) -->
                         <div class="mb-3">
                             <TextField
                                 fieldName="name"
@@ -190,9 +191,7 @@ const isEditMode = computed(() => !!props.object);
 
 // Refs
 const formData = ref({
-    thing_id: isEditMode.value
-        ? (props.object.thing_id || props.object.id || uuidv4())
-        : uuidv4(),
+    thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
     name: isEditMode.value ? props.object.name || '' : '',
     description: isEditMode.value ? props.object.description || '' : '',
     start: isEditMode.value ? props.object.start || '' : '',
@@ -250,7 +249,7 @@ const hasUnsavedChanges = computed(() => {
 // Regular links (all links except class and parent)
 const regularLinks = computed(() => linkedObjects.value);
 
-// ---- Event handlers for class link ----
+// Event handlers
 const handleClassLinkUpdate = ({ data }) => {
     classLinkData.value = { ...classLinkData.value, ...data };
 };
@@ -259,25 +258,20 @@ const handleClassLinkRemove = () => {
     classLinkData.value.other_thing_id = '';
     classLinkData.value.link_id = null;
 };
-
-// ---- Event handlers for parent link ----
 const handleParentLinkUpdate = ({ data }) => {
     parentLinkData.value = { ...parentLinkData.value, ...data };
 };
-
 const handleParentLinkRemove = () => {
     parentLinkData.value.other_thing_id = '';
     parentLinkData.value.link_id = null;
 };
 
-// Modal IDs
 const modalId = `editObjectModal-${formData.value.thing_id}`;
 const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
 const confirmModalId = `confirmModal-${formData.value.thing_id}`;
 
-// Initialize data and store original state
+// Initialize data
 const initializeData = () => {
-    // Reset linked objects
     linkedObjects.value = [];
 
     // Reset special links
@@ -306,35 +300,35 @@ const initializeData = () => {
             link_id: item.linkId || null,
         };
 
-        // Handle LINK_TO_CLASS for Thing type
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
             classLinkData.value = { ...classLinkData.value, ...linkItem };
             return;
         }
 
-        // Handle LINK_TO_PARENT for Class type
         if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
-            parentLinkData.value = { ...parentLinkData.value, ...linkItem };
+            // The parent ID can be in either field; prefer one_thing_id as it's the source.
+            const parentId = linkItem.one_thing_id || linkItem.other_thing_id;
+            if (parentId) {
+                parentLinkData.value.other_thing_id = parentId;
+                parentLinkData.value.link_id = linkItem.link_id;
+                parentLinkData.value.translation = linkItem.translation;
+            }
+            console.log('[EditObject] parentLinkData set to:', JSON.parse(JSON.stringify(parentLinkData.value)));
             return;
         }
 
-        // For any other link, add to regular list
         linkedObjects.value.push(linkItem);
     });
 
-    // For edit mode, also process existing links from the object (if not already set)
+    // For edit mode, also read from existing object
     if (isEditMode.value && props.object) {
-        // Process class link for Thing type
         if (formData.value.type === THING_TYPE && props.object.class?.thing_id && !classLinkData.value.other_thing_id) {
             classLinkData.value.other_thing_id = props.object.class.thing_id;
             classLinkData.value.link_id = props.object.class?.link_id || null;
         }
-
-        // Process parent link for Class type
         if (formData.value.type === CLASS_TYPE && props.object.links) {
             const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
             if (parentLinkFromLinks && !parentLinkData.value.other_thing_id) {
-                // Determine which side is the parent (the one that is not the current object)
                 if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
                     parentLinkData.value.other_thing_id = parentLinkFromLinks.other_thing_id;
                 } else {
@@ -346,7 +340,7 @@ const initializeData = () => {
         }
     }
 
-    // Store original state for unsaved changes detection
+    // Store original state
     originalFormData.value = JSON.parse(JSON.stringify(formData.value));
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
     originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
@@ -355,6 +349,7 @@ const initializeData = () => {
 
 initializeData();
 
+// Helper methods
 const addNewLinkedObject = () => {
     linkedObjects.value.push({
         id: uuidv4(),
@@ -367,10 +362,7 @@ const addNewLinkedObject = () => {
 };
 
 const updateItem = ({ index, data }) => {
-    linkedObjects.value[index] = {
-        ...linkedObjects.value[index],
-        ...data,
-    };
+    linkedObjects.value[index] = { ...linkedObjects.value[index], ...data };
 };
 
 const removeItem = (index) => {
@@ -378,7 +370,7 @@ const removeItem = (index) => {
 };
 
 const confirmClose = () => {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (document.activeElement?.blur) document.activeElement.blur();
     if (confirmModalInstance) confirmModalInstance.hide();
     const modalElement = document.getElementById(modalId);
     if (modalElement && modalInstance) {
@@ -389,7 +381,7 @@ const confirmClose = () => {
 };
 
 const handleHideModal = (event) => {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (document.activeElement?.blur) document.activeElement.blur();
     const modalElement = document.getElementById(modalId);
     if (!modalElement || !modalInstance) {
         event.preventDefault();
@@ -408,7 +400,6 @@ const submitForm = async () => {
     try {
         isSubmitting = true;
 
-        // Prepare links to add (regular links without link_id)
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
@@ -429,7 +420,6 @@ const submitForm = async () => {
             type: formData.value.type,
         };
 
-        // Add class link for Thing type
         if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
@@ -441,12 +431,11 @@ const submitForm = async () => {
             };
         }
 
-        // Add parent link for Class type
         if (formData.value.type === CLASS_TYPE && parentLinkData.value.other_thing_id) {
             payload.parent = {
-                one_thing_id: formData.value.thing_id,
+                one_thing_id: parentLinkData.value.other_thing_id, // parent as source
                 link_type_id: LINK_TO_PARENT,
-                other_thing_id: parentLinkData.value.other_thing_id,
+                other_thing_id: formData.value.thing_id,           // child (new class) as target
                 description: parentLinkData.value.translation || '',
                 link_id: parentLinkData.value.link_id || undefined,
                 public: 1,
@@ -455,7 +444,6 @@ const submitForm = async () => {
 
         if (linksToAdd.length > 0) payload.links_to_add = linksToAdd;
 
-        // Handle updates/deletions for regular links
         if (isEditMode.value) {
             const linksToUpdate = regularLinks.value
                 .filter(item => item.link_id && item.other_thing_id?.trim())
@@ -473,6 +461,8 @@ const submitForm = async () => {
                 .map(orig => orig.link_id);
             if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
         }
+
+        console.log('[EditObject] Final payload:', JSON.parse(JSON.stringify(payload)));
 
         let response;
         if (isEditMode.value) {
@@ -504,7 +494,7 @@ const submitForm = async () => {
             }
         }
 
-        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        if (document.activeElement?.blur) document.activeElement.blur();
         const modalElement = document.getElementById(modalId);
         if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
         if (modalInstance) modalInstance.hide();
