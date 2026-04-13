@@ -19,7 +19,7 @@
                         <!-- Class field for Thing type (type 3) -->
                         <div class="mb-3" v-if="formData.type === 3">
                             <LinkedObject
-                                :link="classLink"
+                                :link="classLinkData"
                                 :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
                                 :index="0"
                                 :singleField="true"
@@ -33,7 +33,7 @@
                         <!-- Parent field for Class type (type 2) -->
                         <div class="mb-3" v-if="formData.type === 2">
                             <LinkedObject
-                                :link="parentLink"
+                                :link="parentLinkData"
                                 :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
                                 :index="0"
                                 :singleField="true"
@@ -95,10 +95,10 @@
                             <LinkedObject
                                 :link="{
                                     one_thing_id: formData.thing_id,
-                                    other_thing_id: item.otherThingUuid,
-                                    link_type_id: item.linkTypeUuid,
-                                    translation: item.comment,
-                                    link_id: item.linkId
+                                    other_thing_id: item.other_thing_id,
+                                    link_type_id: item.link_type_id,
+                                    translation: item.translation,
+                                    link_id: item.link_id
                                 }"
                                 :currentObject="{
                                     thing_id: formData.thing_id,
@@ -198,15 +198,28 @@ const formData = ref({
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? props.object.public || 0 : 0,
-    parent_id: props.params.parentId || null,
-    parent_link_id: null,                 // store link ID for parent link
-    class_id: props.params.classId || null,
-    class_name: props.params.className || null,
-    link_id: null,                        // store link ID for class link
     type: props.params.type || 3,
 });
 
-const linkedObjects = ref([]);
+// Special links as full objects (same shape as regular links)
+const classLinkData = ref({
+    one_thing_id: formData.value.thing_id,
+    other_thing_id: '',
+    link_type_id: LINK_TO_CLASS,
+    translation: '',
+    link_id: null,
+});
+
+const parentLinkData = ref({
+    one_thing_id: formData.value.thing_id,
+    other_thing_id: '',
+    link_type_id: LINK_TO_PARENT,
+    translation: '',
+    link_id: null,
+});
+
+const linkedObjects = ref([]); // regular links (excluding class and parent)
+
 let modalInstance = null;
 let confirmModalInstance = null;
 let isClosing = false;
@@ -215,6 +228,8 @@ let isSubmitting = false;
 // Unsaved changes tracking
 const originalFormData = ref({});
 const originalLinkedObjects = ref([]);
+const originalClassLink = ref(null);
+const originalParentLink = ref(null);
 
 const hasUnsavedChanges = computed(() => {
     if (isSubmitting) return false;
@@ -226,65 +241,33 @@ const hasUnsavedChanges = computed(() => {
     });
 
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
-    return formChanged || linksChanged;
+    const classLinkChanged = JSON.stringify(originalClassLink.value) !== JSON.stringify(classLinkData.value);
+    const parentLinkChanged = JSON.stringify(originalParentLink.value) !== JSON.stringify(parentLinkData.value);
+
+    return formChanged || linksChanged || classLinkChanged || parentLinkChanged;
 });
 
-// Regular links (exclude special class/parent links)
-const regularLinks = computed(() => {
-    return linkedObjects.value.filter(item => {
-        if (formData.value.type === 3 && item.linkTypeUuid === LINK_TO_CLASS) return false;
-        if (formData.value.type === 2 && item.linkTypeUuid === LINK_TO_PARENT) return false;
-        return true;
-    });
-});
+// Regular links (all links except class and parent)
+const regularLinks = computed(() => linkedObjects.value);
 
-// Helper to find a link by type in linkedObjects (used for initialization)
-const findLinkByType = (typeUuid) => {
-    return linkedObjects.value.find(l => l.linkTypeUuid === typeUuid);
-};
-
-// ---- Class link (for Thing type) ----
-const classLink = computed({
-    get: () => ({
-        one_thing_id: formData.value.thing_id,
-        other_thing_id: formData.value.class_id || '',
-        link_type_id: LINK_TO_CLASS,
-        translation: '',
-        link_id: formData.value.link_id || null,
-    }),
-    set: () => {} // read-only, updates go via handleClassLinkUpdate
-});
-
+// ---- Event handlers for class link ----
 const handleClassLinkUpdate = ({ data }) => {
-    formData.value.class_id = data.other_thing_id;
-    formData.value.link_id = data.link_id;
+    classLinkData.value = { ...classLinkData.value, ...data };
 };
 
 const handleClassLinkRemove = () => {
-    formData.value.class_id = null;
-    formData.value.link_id = null;
+    classLinkData.value.other_thing_id = '';
+    classLinkData.value.link_id = null;
 };
 
-// ---- Parent link (for Class type) ----
-const parentLink = computed({
-    get: () => ({
-        one_thing_id: formData.value.thing_id,
-        other_thing_id: formData.value.parent_id || '',
-        link_type_id: LINK_TO_PARENT,
-        translation: '',
-        link_id: formData.value.parent_link_id || null,
-    }),
-    set: () => {}
-});
-
+// ---- Event handlers for parent link ----
 const handleParentLinkUpdate = ({ data }) => {
-    formData.value.parent_id = data.other_thing_id;
-    formData.value.parent_link_id = data.link_id;
+    parentLinkData.value = { ...parentLinkData.value, ...data };
 };
 
 const handleParentLinkRemove = () => {
-    formData.value.parent_id = null;
-    formData.value.parent_link_id = null;
+    parentLinkData.value.other_thing_id = '';
+    parentLinkData.value.link_id = null;
 };
 
 // Modal IDs
@@ -297,63 +280,77 @@ const initializeData = () => {
     // Reset linked objects
     linkedObjects.value = [];
 
-    // Reset special fields
-    if (formData.value.type === 2) {
-        formData.value.parent_id = null;
-        formData.value.parent_link_id = null;
-    } else if (formData.value.type === 3) {
-        formData.value.class_id = null;
-        formData.value.link_id = null;
-    }
+    // Reset special links
+    classLinkData.value = {
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: LINK_TO_CLASS,
+        translation: '',
+        link_id: null,
+    };
+    parentLinkData.value = {
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: LINK_TO_PARENT,
+        translation: '',
+        link_id: null,
+    };
 
     // Process initialLinkedObjects
     props.initialLinkedObjects.forEach(item => {
         const linkItem = {
-            id: uuidv4(),
-            otherThingUuid: item.other_thing_id || '',
-            linkTypeUuid: item.link_type_id || '',
-            comment: item.description || item.comment || '',
-            linkId: item.linkId || null,
+            one_thing_id: item.one_thing_id || '',
+            other_thing_id: item.other_thing_id || '',
+            link_type_id: item.link_type_id || '',
+            translation: item.description || item.translation || '',
+            link_id: item.linkId || null,
         };
 
         // Handle LINK_TO_CLASS for Thing type
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
-            formData.value.class_id = item.other_thing_id;
-            formData.value.link_id = item.linkId || null;
-            return; // do not add to linkedObjects
+            classLinkData.value = { ...classLinkData.value, ...linkItem };
+            return;
         }
 
         // Handle LINK_TO_PARENT for Class type
         if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
-            formData.value.parent_id = item.other_thing_id;
-            formData.value.parent_link_id = item.linkId || null;
-            return; // do not add to linkedObjects
+            parentLinkData.value = { ...parentLinkData.value, ...linkItem };
+            return;
         }
 
-        // Skip any other special links that might appear
-        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_CLASS) return;
-        if (isEditMode.value && (
-            (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) ||
-            (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT)
-        )) return;
-
+        // For any other link, add to regular list
         linkedObjects.value.push(linkItem);
     });
 
     // For edit mode, also process existing links from the object (if not already set)
     if (isEditMode.value && props.object) {
-        if (formData.value.type === 3 && props.object.class?.thing_id && !formData.value.class_id) {
-            formData.value.class_id = props.object.class.thing_id;
-            formData.value.link_id = props.object.class?.link_id || null;
+        // Process class link for Thing type
+        if (formData.value.type === THING_TYPE && props.object.class?.thing_id && !classLinkData.value.other_thing_id) {
+            classLinkData.value.other_thing_id = props.object.class.thing_id;
+            classLinkData.value.link_id = props.object.class?.link_id || null;
         }
-        if (formData.value.type === 2 && props.object.parent_id && !formData.value.parent_id) {
-            formData.value.parent_id = props.object.parent_id;
-            formData.value.parent_link_id = props.object.parent_link_id || null;
+
+        // Process parent link for Class type
+        if (formData.value.type === CLASS_TYPE && props.object.links) {
+            const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
+            if (parentLinkFromLinks && !parentLinkData.value.other_thing_id) {
+                // Determine which side is the parent (the one that is not the current object)
+                if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
+                    parentLinkData.value.other_thing_id = parentLinkFromLinks.other_thing_id;
+                } else {
+                    parentLinkData.value.other_thing_id = parentLinkFromLinks.one_thing_id;
+                }
+                parentLinkData.value.link_id = parentLinkFromLinks.link_id;
+                parentLinkData.value.translation = parentLinkFromLinks.translation || '';
+            }
         }
     }
 
+    // Store original state for unsaved changes detection
     originalFormData.value = JSON.parse(JSON.stringify(formData.value));
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
+    originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
+    originalParentLink.value = JSON.parse(JSON.stringify(parentLinkData.value));
 };
 
 initializeData();
@@ -361,20 +358,18 @@ initializeData();
 const addNewLinkedObject = () => {
     linkedObjects.value.push({
         id: uuidv4(),
-        otherThingUuid: '',
-        linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
-        comment: '',
-        linkId: null,
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+        translation: '',
+        link_id: null,
     });
 };
 
 const updateItem = ({ index, data }) => {
     linkedObjects.value[index] = {
         ...linkedObjects.value[index],
-        otherThingUuid: data.other_thing_id,
-        linkTypeUuid: data.link_type_id,
-        comment: data.translation,
-        linkId: data.link_id,
+        ...data,
     };
 };
 
@@ -383,9 +378,7 @@ const removeItem = (index) => {
 };
 
 const confirmClose = () => {
-    if (document.activeElement && document.activeElement.blur) {
-        document.activeElement.blur();
-    }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (confirmModalInstance) confirmModalInstance.hide();
     const modalElement = document.getElementById(modalId);
     if (modalElement && modalInstance) {
@@ -415,14 +408,14 @@ const submitForm = async () => {
     try {
         isSubmitting = true;
 
-        // Prepare links to add (only those without linkId)
+        // Prepare links to add (regular links without link_id)
         const linksToAdd = regularLinks.value
-            .filter(item => item.otherThingUuid?.trim() && !item.linkId)
+            .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
                 one_thing_id: formData.value.thing_id,
-                link_type_id: item.linkTypeUuid,
-                other_thing_id: item.otherThingUuid,
-                description: item.comment || '',
+                link_type_id: item.link_type_id,
+                other_thing_id: item.other_thing_id,
+                description: item.translation || '',
                 public: 0,
             }));
 
@@ -433,30 +426,29 @@ const submitForm = async () => {
             start: formData.value.start || null,
             end: formData.value.end || null,
             public: formData.value.public,
-            parent_id: formData.value.parent_id,
             type: formData.value.type,
         };
 
-        // Add class link for Thing type (using the stored link_id if any)
-        if (formData.value.type === 3 && formData.value.class_id) {
+        // Add class link for Thing type
+        if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_CLASS,
-                other_thing_id: formData.value.class_id,
-                description: '',
-                link_id: formData.value.link_id || undefined,
+                other_thing_id: classLinkData.value.other_thing_id,
+                description: classLinkData.value.translation || '',
+                link_id: classLinkData.value.link_id || undefined,
                 public: 1,
             };
         }
 
         // Add parent link for Class type
-        if (formData.value.type === 2 && formData.value.parent_id) {
+        if (formData.value.type === CLASS_TYPE && parentLinkData.value.other_thing_id) {
             payload.parent = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_PARENT,
-                other_thing_id: formData.value.parent_id,
-                description: '',
-                link_id: formData.value.parent_link_id || undefined,
+                other_thing_id: parentLinkData.value.other_thing_id,
+                description: parentLinkData.value.translation || '',
+                link_id: parentLinkData.value.link_id || undefined,
                 public: 1,
             };
         }
@@ -466,19 +458,19 @@ const submitForm = async () => {
         // Handle updates/deletions for regular links
         if (isEditMode.value) {
             const linksToUpdate = regularLinks.value
-                .filter(item => item.linkId && item.otherThingUuid?.trim())
+                .filter(item => item.link_id && item.other_thing_id?.trim())
                 .map(item => ({
-                    link_id: item.linkId,
+                    link_id: item.link_id,
                     one_thing_id: formData.value.thing_id,
-                    other_thing_id: item.otherThingUuid,
-                    link_type_id: item.linkTypeUuid,
-                    translation: item.comment,
+                    other_thing_id: item.other_thing_id,
+                    link_type_id: item.link_type_id,
+                    translation: item.translation,
                 }));
             if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
 
             const linksToDelete = originalLinkedObjects.value
-                .filter(orig => orig.linkId && !regularLinks.value.find(curr => curr.linkId === orig.linkId))
-                .map(orig => orig.linkId);
+                .filter(orig => orig.link_id && !regularLinks.value.find(curr => curr.link_id === orig.link_id))
+                .map(orig => orig.link_id);
             if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
         }
 
@@ -486,9 +478,9 @@ const submitForm = async () => {
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
-            if (formData.value.type === 2) {
+            if (formData.value.type === CLASS_TYPE) {
                 const oldParentId = props.object?.parent_id;
-                const newParentId = formData.value.parent_id;
+                const newParentId = parentLinkData.value.other_thing_id;
                 if (oldParentId !== newParentId) {
                     objectsStore.moveClassInTree(formData.value.thing_id, newParentId);
                 }
@@ -497,8 +489,8 @@ const submitForm = async () => {
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
-            if (formData.value.type === 2) {
-                objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, formData.value.parent_id);
+            if (formData.value.type === CLASS_TYPE) {
+                objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, parentLinkData.value.other_thing_id);
             }
             if (props.callback && props.callback.type === 'link-created') {
                 eventBus.emit('link-created', {
@@ -560,11 +552,6 @@ watch(() => props.object, (newObject) => {
             start: newObject.start || '',
             end: newObject.end || '',
             public: newObject.public || 0,
-            parent_id: props.params.parentId || null,
-            parent_link_id: newObject.parent_link_id || null,
-            class_id: props.params.classId || (newObject.class?.thing_id || null),
-            class_name: props.params.className || (newObject.class?.name || null),
-            link_id: newObject.class?.link_id || null,
             type: props.params.type || 3,
         };
         initializeData();
