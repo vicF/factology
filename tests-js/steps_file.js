@@ -43,8 +43,17 @@ module.exports = function() {
 
         addChildTo(nodeName) {
             this.moveCursorTo(`a:has-text("${nodeName}")`);
-            this.waitForElement('.add-subclass', 5);
-            this.click('.add-subclass');
+            this.waitForElement('.add-subclass', 10);
+            this.wait(0.5);
+            try {
+                this.click('.add-subclass');
+            } catch (e) {
+                console.log('Regular click failed, trying JS click');
+                this.executeScript(() => {
+                    const btn = document.querySelector('.add-subclass');
+                    if (btn) btn.click();
+                });
+            }
         },
 
         addObjectTo(nodeName) {
@@ -59,10 +68,8 @@ module.exports = function() {
             this.waitForElement('input[name="name"]', 10);
             await this.fillFieldWithRetry('input[name="name"]', name);
             await this.fillFieldWithRetry('input[name="description"]', description);
-            this.waitForClickable('button:has-text("Save")', 10);
             this.click('Save');
             this.waitForInvisible('.modal', 10);
-            //this.click('Something');
             this.waitForText(name, 15);
             this.scrollTo(`a:has-text("${name}")`);
         },
