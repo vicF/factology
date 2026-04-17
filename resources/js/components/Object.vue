@@ -446,12 +446,11 @@ const handleObjectCreated = (newObject) => {
     }
 };
 
-const handleObjectUpdated = (updatedObject) => {
+const handleObjectUpdated = async (updatedObject) => {
     console.log('Object.vue - Object updated:', updatedObject);
-    if (updatedObject?.data && object.value) {
-        object.value = { ...object.value, ...updatedObject.data };
-    }
     showEditModal.value = false;
+    // Fully reload the object to get fresh links
+    await getObject();
 };
 
 const handleLinkedObjectCreated = async () => {
