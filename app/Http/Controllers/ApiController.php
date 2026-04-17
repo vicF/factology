@@ -298,7 +298,7 @@ class ApiController extends BaseController
         try {
             $deleted = DB::table('links')
                 ->where('link_id', $id)
-                ->update(['deleted' => 1]);
+                ->delete();
 
             if ($deleted) {
                 return response()->json(['message' => 'Link deleted successfully'], 200);
@@ -387,7 +387,6 @@ class ApiController extends BaseController
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
-                $join->where('links.deleted', '=', 0);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
         }
@@ -421,11 +420,9 @@ class ApiController extends BaseController
             ->orWhere('other_thing_id', $ids)
             ->leftJoin('things', function ($join) {
                 $join->on('links.other_thing_id', '=', 'things.thing_id');
-                $join->where('links.deleted', '=', 0);
             })
             ->leftJoin('things as link_types', function ($join) {
                 $join->on('links.link_type_id', '=', 'link_types.thing_id');
-                $join->where('links.deleted', '=', 0);
             })
             ->get()->toArray();
 
@@ -452,13 +449,11 @@ class ApiController extends BaseController
             from things c
             left join links l on l.other_thing_id = c.thing_id
                 AND link_type_id = '$linkToParent'
-                AND l.deleted != 1
             where c.type=2 and c.thing_id = '$something'
             union distinct select c.name, d.level+1, c.thing_id, l.one_thing_id, c.description, l.translation
             from descendants d, things c
             left join links l on l.other_thing_id = c.thing_id
                 AND link_type_id = '$linkToParent'
-                AND l.deleted != 1
             where c.type=2 AND d.id = l.one_thing_id AND d.level < 10 )
             select * from descendants ORDER BY level;";
         $results = $this->buildTree((array)DB::select($rawSql));
