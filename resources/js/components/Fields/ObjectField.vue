@@ -3,7 +3,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useClickOutside } from '@/composables/useClickOutside.js'
-import { THING_TYPE } from "../../constants.js";
+import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
 import axios from 'axios';
 
 const props = defineProps({
@@ -68,6 +68,13 @@ const displayValue = computed(() => {
 })
 
 const hasSelection = computed(() => !!props.modelValue)
+
+// Default icon based on object type
+const defaultIcon = computed(() => {
+    if (props.type === CLASS_TYPE) return 'bi bi-diagram-3'   // class icon
+    if (props.type === THING_TYPE) return 'bi bi-box'         // thing icon
+    return 'bi bi-link-45deg'                                 // fallback (link, external, etc.)
+})
 
 const filteredObjects = computed(() => {
     let results = [];
@@ -380,7 +387,7 @@ const handleDropdownMouseDown = (e) => {
                             :is="selectedObject.icon"
                             style="width: 1.3em; height: 1.3em;"
                         />
-                        <i v-else class="bi bi-link-45deg"></i>
+                        <i v-else :class="defaultIcon"></i>
                     </span>
 
                     <input

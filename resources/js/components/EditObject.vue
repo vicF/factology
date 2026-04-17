@@ -81,9 +81,9 @@
 
                         <!-- Object type indicator -->
                         <div v-if="formData.type == 1" class="mb-3">General</div>
-                        <div v-if="formData.type == 2" class="mb-3">Class</div>
-                        <div v-else-if="formData.type == 3" class="mb-3">Thing</div>
-                        <div v-else-if="formData.type == 4" class="mb-3">Link</div>
+                        <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
+                        <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
+                        <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
                         <div v-else-if="formData.type == 5" class="mb-3">External</div>
                         <div v-else class="mb-3">!Unknown type!</div>
 
@@ -106,6 +106,7 @@
                                     name: formData.name
                                 }"
                                 :index="linkedObjects.indexOf(item)"
+                                :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
                                 @update="updateItem"
                                 @remove="removeItem"
                             />
@@ -164,7 +165,7 @@ import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, THING_TYPE } from "../constants.js";
+import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE} from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import { useObjectsStore } from '@/stores/objects';
 
@@ -270,8 +271,15 @@ const modalId = `editObjectModal-${formData.value.thing_id}`;
 const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
 const confirmModalId = `confirmModal-${formData.value.thing_id}`;
 
+// Guards for recursive initialization
+const isInitializing = ref(false);
+const lastInitializedId = ref(null);
+
 // Initialize data
 const initializeData = () => {
+    if (isInitializing.value) return;
+    isInitializing.value = true;
+
     linkedObjects.value = [];
 
     // Reset special links
@@ -350,6 +358,8 @@ const initializeData = () => {
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
     originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
     originalParentLink.value = JSON.parse(JSON.stringify(parentLinkData.value));
+
+    isInitializing.value = false;
 };
 
 initializeData();
@@ -538,20 +548,25 @@ onUnmounted(() => {
     if (confirmModalInstance) confirmModalInstance.hide();
 });
 
-watch(() => props.object, (newObject) => {
-    if (newObject) {
-        formData.value = {
-            thing_id: newObject.thing_id || newObject.id || uuidv4(),
-            name: newObject.name || '',
-            description: newObject.description || '',
-            start: newObject.start || '',
-            end: newObject.end || '',
-            public: newObject.public || 0,
-            type: props.params.type || 3,
-        };
-        initializeData();
-    }
-}, { deep: true });
+// Fixed watch to prevent recursion
+watch(() => props.object, (newObject, oldObject) => {
+    if (!newObject) return;
+    const newId = newObject.thing_id || newObject.id;
+    const oldId = oldObject?.thing_id || oldObject?.id;
+    if (newId === oldId && lastInitializedId.value === newId) return;
+    lastInitializedId.value = newId;
+
+    formData.value = {
+        thing_id: newObject.thing_id || newObject.id || uuidv4(),
+        name: newObject.name || '',
+        description: newObject.description || '',
+        start: newObject.start || '',
+        end: newObject.end || '',
+        public: newObject.public || 0,
+        type: props.params.type || 3,
+    };
+    initializeData();
+}, { deep: false }); // shallow watch – only triggers when the object reference changes
 </script>
 
 <style scoped>

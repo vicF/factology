@@ -1,84 +1,85 @@
 <!-- Edit link between two objects -->
 <template>
     <template v-if="!singleField">
-    <div class="linked-object">
-        <!-- Normal mode (full editor) -->
+        <div class="linked-object">
+            <!-- Normal mode (full editor) -->
 
-        <div class="form-group flex-group">
-            <ObjectField
-                fieldName="one_thing"
-                v-model="link.one_thing_id"
-                :isEditable="true"
-                name="First object"
-                :type="THING_TYPE"
-                required
-            />
-        </div>
-
-        <div class="form-group flex-group">
-            <ObjectField
-                fieldName="link_type"
-                v-model="link.link_type_id"
-                :isEditable="true"
-                name="Link type"
-                :type="LINK_TYPE"
-                required
-                class="flex-field"
-            />
-            <button
-                class="btn btn-primary flex-button"
-                @click="swapObjects"
-                :disabled="!link.one_thing_id || !link.other_thing_id"
-            >
-                Swap
-            </button>
-        </div>
-
-        <div class="form-group flex-group">
-            <ObjectField
-                fieldName="other_thing"
-                v-model="link.other_thing_id"
-                :isEditable="true"
-                name="Second object"
-                :type="THING_TYPE"
-                required
-                class="flex-field"
-            />
-            <button class="btn btn-primary flex-button" @click="openCreateObjectModal">
-                Create
-            </button>
-        </div>
-        <!-- Common: description field -->
-        <div class="form-group">
-            <textarea
-                v-model="link.translation"
-                class="form-control"
-                placeholder="Enter description..."
-                rows="2"
-            ></textarea>
-        </div>
-
-        <!-- Auto‑generated preview (if currentObject is provided) -->
-        <div class="form-group"
-             v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
-            <div class="generated-preview p-2 bg-light rounded border">
-                <small class="text-muted d-block mb-1">
-                    <i class="bi bi-magic me-1"></i>
-                    Auto-generated preview:
-                </small>
-                <LinkDescription
-                    :link="link"
-                    :object="currentObject"
-                    size="medium"
+            <div class="form-group flex-group">
+                <ObjectField
+                    fieldName="one_thing"
+                    v-model="link.one_thing_id"
+                    :isEditable="true"
+                    name="First object"
+                    :type="objectType"
+                    required
                 />
             </div>
-        </div>
 
-        <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-danger" @click="removeSelf">Delete</button>
+            <div class="form-group flex-group">
+                <ObjectField
+                    fieldName="link_type"
+                    v-model="link.link_type_id"
+                    :isEditable="true"
+                    name="Link type"
+                    :type="LINK_TYPE"
+                    required
+                    class="flex-field"
+                />
+                <button
+                    class="btn btn-primary flex-button"
+                    @click="swapObjects"
+                    :disabled="!link.one_thing_id || !link.other_thing_id"
+                >
+                    Swap
+                </button>
+            </div>
+
+            <div class="form-group flex-group">
+                <ObjectField
+                    fieldName="other_thing"
+                    v-model="link.other_thing_id"
+                    :isEditable="true"
+                    name="Second object"
+                    :type="objectType"
+                    required
+                    class="flex-field"
+                />
+                <button class="btn btn-primary flex-button" @click="openCreateObjectModal">
+                    Create
+                </button>
+            </div>
+
+            <div class="form-group">
+                <textarea
+                    v-model="link.translation"
+                    class="form-control"
+                    placeholder="Enter description..."
+                    rows="2"
+                ></textarea>
+            </div>
+
+        <!-- Auto‑generated preview (if currentObject is provided) -->
+            <div class="form-group"
+                 v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
+                <div class="generated-preview p-2 bg-light rounded border">
+                    <small class="text-muted d-block mb-1">
+                        <i class="bi bi-magic me-1"></i>
+                        Auto-generated preview:
+                    </small>
+                    <LinkDescription
+                        :link="link"
+                        :object="currentObject"
+                        size="medium"
+                    />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-danger" @click="removeSelf">Delete</button>
+            </div>
         </div>
-    </div>
     </template>
+
     <!-- Single‑field mode (only target object) -->
     <template v-else>
         <div class="form-group flex-group">
@@ -93,25 +94,25 @@
             />
         </div>
     </template>
-
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
-import {CLASS_TYPE, LINK_TYPE, THING_TYPE} from "../../constants.js";
+import { CLASS_TYPE, LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
 const props = defineProps({
     link: { type: Object, required: true },
-    currentObject: {type: Object, default: null},
+    currentObject: { type: Object, default: null },
     index: { type: Number, required: true },
-    // New props for single-field mode
-    singleField: {type: Boolean, default: false},
-    fixedLinkTypeUuid: {type: String, default: null},
-    targetLabel: {type: String, default: 'Target object'},
+    singleField: { type: Boolean, default: false },
+    fixedLinkTypeUuid: { type: String, default: null },
+    targetLabel: { type: String, default: 'Target object' },
+    // NEW: type of objects that can be linked (THING_TYPE or CLASS_TYPE)
+    objectType: { type: Number, default: THING_TYPE },
 });
 
 const emit = defineEmits(['update', 'remove']);
@@ -119,7 +120,7 @@ const emit = defineEmits(['update', 'remove']);
 const store = useObjectCacheStore();
 
 // Work on a local copy to avoid mutating the prop directly
-const link = ref({...props.link});
+const link = ref({ ...props.link });
 
 // In single-field mode, enforce the fixed link type UUID
 if (props.singleField && props.fixedLinkTypeUuid) {
@@ -128,19 +129,19 @@ if (props.singleField && props.fixedLinkTypeUuid) {
 
 // Watch for changes to the prop (if the parent updates the link object)
 watch(() => props.link, (newLink) => {
-    link.value = {...newLink};
+    link.value = { ...newLink };
     if (props.singleField && props.fixedLinkTypeUuid) {
         link.value.link_type_id = props.fixedLinkTypeUuid;
     }
-}, {deep: true});
+}, { deep: true });
 
 // Emit updates whenever the link changes
 watch(link, () => {
     emit('update', {
         index: props.index,
-        data: {...link.value}
+        data: { ...link.value }
     });
-}, {deep: true});
+}, { deep: true });
 
 // Load names for display (optional)
 const oneObjectName = ref('');
@@ -172,7 +173,7 @@ const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
         title: 'Create new object',
-        params: { type: THING_TYPE },
+        params: { type: props.objectType }, // use the same type as the linked object
         callback: {
             type: 'link-created',
             requestId: requestId,
