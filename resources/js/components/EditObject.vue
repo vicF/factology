@@ -326,16 +326,21 @@ const initializeData = () => {
             classLinkData.value.other_thing_id = props.object.class.thing_id;
             classLinkData.value.link_id = props.object.class?.link_id || null;
         }
+        // FIX: Always update parentLinkData from existing links, even if other_thing_id already set
         if (formData.value.type === CLASS_TYPE && props.object.links) {
             const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
-            if (parentLinkFromLinks && !parentLinkData.value.other_thing_id) {
+            if (parentLinkFromLinks) {
+                // Determine which side is the parent (the one that is not the current object)
+                let parentId;
                 if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
-                    parentLinkData.value.other_thing_id = parentLinkFromLinks.other_thing_id;
+                    parentId = parentLinkFromLinks.other_thing_id;
                 } else {
-                    parentLinkData.value.other_thing_id = parentLinkFromLinks.one_thing_id;
+                    parentId = parentLinkFromLinks.one_thing_id;
                 }
+                parentLinkData.value.other_thing_id = parentId;
                 parentLinkData.value.link_id = parentLinkFromLinks.link_id;
                 parentLinkData.value.translation = parentLinkFromLinks.translation || '';
+                console.log('[EditObject] parentLinkData updated from existing links:', JSON.parse(JSON.stringify(parentLinkData.value)));
             }
         }
     }
