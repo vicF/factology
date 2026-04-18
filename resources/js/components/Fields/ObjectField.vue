@@ -69,11 +69,16 @@ const displayValue = computed(() => {
 
 const hasSelection = computed(() => !!props.modelValue)
 
-// Default icon based on object type
+// Icon based on the selected object's type (if any), otherwise fallback to the prop type
 const defaultIcon = computed(() => {
-    if (props.type === CLASS_TYPE) return 'bi bi-diagram-3'   // class icon
-    if (props.type === THING_TYPE) return 'bi bi-box'         // thing icon
-    return 'bi bi-link-45deg'                                 // fallback (link, external, etc.)
+    // First, try the selected object's type
+    if (selectedObject.value?.type === CLASS_TYPE) return 'bi bi-diagram-3'
+    if (selectedObject.value?.type === THING_TYPE) return 'bi bi-box'
+    if (selectedObject.value?.type === LINK_TYPE) return 'bi bi-link-45deg'
+    // Fallback to the prop type (for empty fields)
+    if (props.type === CLASS_TYPE) return 'bi bi-diagram-3'
+    if (props.type === THING_TYPE) return 'bi bi-box'
+    return 'bi bi-link-45deg'
 })
 
 const filteredObjects = computed(() => {
