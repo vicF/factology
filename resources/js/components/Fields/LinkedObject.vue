@@ -1,8 +1,8 @@
 <!-- Edit link between two objects -->
 <template>
     <template v-if="!singleField">
-        <div class="linked-object">
-            <!-- Normal mode (full editor) -->
+    <div class="linked-object">
+        <!-- Normal mode (full editor) -->
 
             <div class="form-group flex-group">
                 <ObjectField
@@ -10,7 +10,7 @@
                     v-model="link.one_thing_id"
                     :isEditable="true"
                     name="First object"
-                    :type="objectType"
+                    :type="effectiveObjectType"
                     required
                 />
             </div>
@@ -40,7 +40,7 @@
                     v-model="link.other_thing_id"
                     :isEditable="true"
                     name="Second object"
-                    :type="objectType"
+                    :type="effectiveObjectType"
                     required
                     class="flex-field"
                 />
@@ -78,26 +78,26 @@
                 <button class="btn btn-danger" @click="removeSelf">Delete</button>
             </div>
         </div>
-    </template>
+        </template>
 
-    <!-- Single‑field mode (only target object) -->
-    <template v-else>
-        <div class="form-group flex-group">
-            <ObjectField
-                fieldName="other_thing"
-                v-model="link.other_thing_id"
-                :isEditable="true"
-                :label="targetLabel"
-                :type="CLASS_TYPE"
-                required
-                class="flex-field"
-            />
-        </div>
-    </template>
+        <!-- Single‑field mode (only target object) -->
+        <template v-else>
+            <div class="form-group flex-group">
+                <ObjectField
+                    fieldName="other_thing"
+                    v-model="link.other_thing_id"
+                    :isEditable="true"
+                    :label="targetLabel"
+                    :type="CLASS_TYPE"
+                    required
+                    class="flex-field"
+                />
+            </div>
+        </template>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
@@ -111,13 +111,22 @@ const props = defineProps({
     singleField: { type: Boolean, default: false },
     fixedLinkTypeUuid: { type: String, default: null },
     targetLabel: { type: String, default: 'Target object' },
-    // NEW: type of objects that can be linked (THING_TYPE or CLASS_TYPE)
-    objectType: { type: Number, default: THING_TYPE },
+    // Optional override for the type of objects that can be linked
+    objectType: { type: Number, default: null },
 });
 
 const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
+
+// Determine the type for the two object fields:
+// - If objectType prop is provided, use it (for asymmetric relations).
+// - Otherwise derive from currentObject.type (assuming both sides are the same).
+const effectiveObjectType = computed(() => {
+    if (props.objectType !== null) return props.objectType;
+    if (props.currentObject?.type === CLASS_TYPE) return CLASS_TYPE;
+    return THING_TYPE;
+});
 
 // Work on a local copy to avoid mutating the prop directly
 const link = ref({ ...props.link });
@@ -173,7 +182,7 @@ const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const payload = {
         title: 'Create new object',
-        params: { type: props.objectType }, // use the same type as the linked object
+        params: { type: effectiveObjectType.value },
         callback: {
             type: 'link-created',
             requestId: requestId,
