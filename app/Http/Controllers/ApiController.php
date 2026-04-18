@@ -443,18 +443,19 @@ class ApiController extends BaseController
         $requestBody = json_decode(file_get_contents('php://input'), true);
         $linkToParent = UUID::LINK_TO_PARENT;
         $something = UUID::SOMETHING;
+        $anything = UUID::ANYTHING;
         $rawSql =
             "with recursive descendants (name, level, id, parent_id, description, translation)
             as ( select c.name, 1 as level, c.thing_id, l.one_thing_id, c.description, l.translation
             from things c
             left join links l on l.other_thing_id = c.thing_id
                 AND link_type_id = '$linkToParent'
-            where c.type=2 and c.thing_id = '$something'
+            where c.thing_id = '$anything'
             union distinct select c.name, d.level+1, c.thing_id, l.one_thing_id, c.description, l.translation
             from descendants d, things c
             left join links l on l.other_thing_id = c.thing_id
                 AND link_type_id = '$linkToParent'
-            where c.type=2 AND d.id = l.one_thing_id AND d.level < 10 )
+            where (c.type=2 OR c.type=4) AND d.id = l.one_thing_id AND d.level < 10 )
             select * from descendants ORDER BY level;";
         $results = $this->buildTree((array)DB::select($rawSql));
         return response()->json([
