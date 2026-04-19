@@ -440,10 +440,6 @@ class ApiController extends BaseController
      */
     public function searchTree()
     {
-        $requestBody = json_decode(file_get_contents('php://input'), true);
-        $linkToParent = UUID::LINK_TO_PARENT;
-        $something = UUID::SOMETHING;      // not used in this query
-        $anything = UUID::ANYTHING;
 
         $rawSql = "
         WITH RECURSIVE descendants (name, level, id, parent_id, description, translation) AS (
@@ -481,20 +477,27 @@ class ApiController extends BaseController
     protected function buildTree($items)
     {
         $indexed = [];
-        foreach ($items as $item) {
-            $indexed[$item->id] = $item;
-            $item->nodes = [];
+        $roots = [];
+
+        // First pass: index by ID (as string) and initialize nodes
+        foreach ($items as &$item) {
+            $item->nodes = [];                       // ensure nodes property exists
+            $indexed[(string) $item->id] = &$item;
         }
 
-        $roots = [];
-        foreach ($items as $item) {
-            $parentId = $item->parent_id ?? UUID::ANYTHING;
-            if ($parentId === UUID::ANYTHING || !isset($indexed[$parentId])) {
-                $roots[] = $item;
+        // Second pass: attach each node to its parent (or to roots)
+        unset($item);
+        foreach ($items as &$item) {
+            $parentId = $item->parent_id !== null ? (string) $item->parent_id : null;
+            if ($parentId === null || !isset($indexed[$parentId])) {
+                // No parent -> root node
+                $roots[] = &$item;
             } else {
-                $indexed[$parentId]->nodes[] = $item;
+                // Attach this node to its parent's nodes array
+                $indexed[$parentId]->nodes[] = &$item;
             }
         }
+
         return $roots;
     }
 
