@@ -442,41 +442,60 @@ class ApiController extends BaseController
     {
         $requestBody = json_decode(file_get_contents('php://input'), true);
         $linkToParent = UUID::LINK_TO_PARENT;
-        $something = UUID::SOMETHING;
+        $something = UUID::SOMETHING;      // not used in this query
         $anything = UUID::ANYTHING;
-        $rawSql =
-            "with recursive descendants (name, level, id, parent_id, description, translation)
-            as ( select c.name, 1 as level, c.thing_id, l.one_thing_id, c.description, l.translation
-            from things c
-            left join links l on l.other_thing_id = c.thing_id
-                AND link_type_id = '$linkToParent'
-            where c.thing_id = '$anything'
-            union distinct select c.name, d.level+1, c.thing_id, l.one_thing_id, c.description, l.translation
-            from descendants d, things c
-            left join links l on l.other_thing_id = c.thing_id
-                AND link_type_id = '$linkToParent'
-            where (c.type=2 OR c.type=4) AND d.id = l.one_thing_id AND d.level < 10 )
-            select * from descendants ORDER BY level;";
-        $results = $this->buildTree((array)DB::select($rawSql));
+
+        $rawSql = "
+        WITH RECURSIVE descendants (name, level, id, parent_id, description, translation) AS (
+            SELECT c.name, 1 AS level, c.thing_id, l.one_thing_id, c.description, l.translation
+            FROM things c
+            LEFT JOIN links l ON l.other_thing_id = c.thing_id AND l.link_type_id = ?
+            WHERE c.thing_id = ?
+
+            UNION ALL
+
+            SELECT c.name, d.level + 1, c.thing_id, l.one_thing_id, c.description, l.translation
+            FROM descendants d
+            JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
+            JOIN things c ON l.other_thing_id = c.thing_id
+            WHERE (c.type = ? OR c.type = ?) AND d.level < 10
+        )
+        SELECT * FROM descendants ORDER BY level;
+    ";
+
+        // Bind parameters in order: link_type_id (anchor), thing_id (anchor), link_type_id (recursive)
+        $results = $this->buildTree(
+            (array) DB::select($rawSql, [
+                UUID::LINK_TO_PARENT,
+                UUID::ANYTHING,
+                UUID::LINK_TO_PARENT,
+                UUID::G_CLASS,
+                UUID::G_LINK])
+        );
+
         return response()->json([
             'things' => $results,
         ]);
     }
 
-    protected function buildTree($items, $parentId = UUID::ANYTHING)
+    protected function buildTree($items)
     {
-        $tree = [];
+        $indexed = [];
         foreach ($items as $item) {
-            if ($item->parent_id === $parentId) {
-                $children = $this->buildTree($items, $item->id);
+            $indexed[$item->id] = $item;
+            $item->nodes = [];
+        }
 
-                if ($children) {
-                    $item->nodes = $children;
-                }
-                $tree[] = $item;
+        $roots = [];
+        foreach ($items as $item) {
+            $parentId = $item->parent_id ?? UUID::ANYTHING;
+            if ($parentId === UUID::ANYTHING || !isset($indexed[$parentId])) {
+                $roots[] = $item;
+            } else {
+                $indexed[$parentId]->nodes[] = $item;
             }
         }
-        return $tree;
+        return $roots;
     }
 
     public function classes()
