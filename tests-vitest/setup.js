@@ -1,3 +1,5 @@
+// tests-vitest/setup.js
+import { vi } from 'vitest'
 import { config } from '@vue/test-utils'
 
 // Mock the object cache store completely
@@ -11,6 +13,19 @@ vi.mock('@/stores/objectCache', () => ({
     })),
 }))
 
-vi.mock('axios', () => ({ default: { post: vi.fn() } }))
-vi.mock('@/composables/useClickOutside', () => ({ useClickOutside: vi.fn() }))
-vi.mock('@/eventBus', () => ({ eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }))
+vi.mock('axios', () => ({
+    default: {
+        post: vi.fn(),
+        get: vi.fn(),
+        delete: vi.fn(),
+        put: vi.fn()
+    }
+}))
+
+vi.mock('@/composables/useClickOutside', () => ({
+    useClickOutside: vi.fn()
+}))
+
+vi.mock('@/eventBus', () => ({
+    eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() }
+}))

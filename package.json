@@ -10,7 +10,7 @@
         "test:php": "php artisan test",
         "test:php:unit": "php artisan test --testsuite=Unit",
         "test:js": "cd tests-js && npx codeceptjs run",
-        "test:vitest": "vitest run",
+        "test:vitest": "vitest run --config vitest.config.js",
         "test:vitest:watch": "vitest"
     },
     "devDependencies": {
