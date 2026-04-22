@@ -1,117 +1,75 @@
+// tests-js/register_login_test.js
 const DB_HELPER = require('../../helpers/dbHelper');
 
-Feature('Object Hierarchy Management');
+Feature('User Registration and Login');
 
-const TEST_USER = {
-    name: 'Test User',
-    email: 'test@test.com',
-    password: 'qqqqqqqq'
-};
+let testUser = null;
+let createdUserId = null;
 
-// Reset database before all tests
-BeforeSuite(async ({ I }) => {
-    await DB_HELPER.resetDatabase(I, { silent: true, showOutput: false });
+/*Before(async ({ I }) => {
+    await DB_HELPER.resetDatabase(I, { showOutput: false });
+});*/
+
+After(async ({ I }) => {
+    if (createdUserId) {
+        await DB_HELPER.deleteTestUser(I, createdUserId);
+    }
 });
 
-// Login before each test
-Before(async ({ I }) => {
-    await DB_HELPER.login(I, TEST_USER);
-});
+Scenario('Complete registration and login flow', async ({ I }) => {
+    const userData = {
+        name: 'Tester',
+        email: `tester-${Date.now()}@test.com`,
+        password: 'qqqqqqqq'
+    };
 
-Scenario('Create object hierarchy with parent-child relationships', async ({ I }) => {
-    // 1. Create Material Object
-    await I.addChildTo('Something');
-    await I.createClass('Material Object', 'Physical thing');
+    // Register via UI
+    I.amOnPage('/');
+    I.click('User');
+    I.click('Register');
 
-    I.waitForElement('a:has-text("Material Object")', 15);
-    I.see('Material Object');
+    I.fillField('Name', userData.name);
+    I.fillField('Email', userData.email);
+    I.fillField('Password', userData.password);
+    I.fillField('Confirm Password', userData.password);
+    I.click('Register');
 
-    // 2. Verify on detail page
-    I.click('Material Object');
-    I.waitForText('Physical thing', 20);
-    I.see('Physical thing');
+    // Wait for successful registration
+    I.waitForText(userData.name, 15);
 
+    // Store for cleanup
+    testUser = userData;
+    createdUserId = testUser.id;
+
+    I.waitForText('Something', 15);
+    I.waitForInvisible('text=Loading...', 10);
     I.click('Something');
-    I.waitForElement('a:has-text("Material Object")', 15);
 
-    // 3. Create Live being as child of Material Object
-    await I.addChildTo('Material Object');
-    await I.createClass('Live being', 'Живое существо');
-    I.waitForElement('a:has-text("Live being")', 15);
+    // Wait for the next page to load
+    I.waitForText('Create', 15);
 
-    I.click('Live being');
-    I.waitForText('Живое существо', 20);
+    // Test dialog interactions
+    I.click('Edit this object');
+    I.waitForElement('.modal', 5);
+    I.click('Close');
 
-    I.click('Something');
-    I.waitForElement('a:has-text("Live being")', 15);
+    I.click('Create');
+    I.waitForElement('.modal', 5);
+    I.click('Close');
 
-    // 4. Create Human being as child of Live being
-    await I.addChildTo('Live being');
-    await I.createClass('Human being', 'Человек');
-    I.waitForElement('a:has-text("Human being")', 15);
+    // Logout
+    await DB_HELPER.logout(I, testUser.name);
 
-    // 5. DELETE: Human being (The "Bulletproof" Sequence)
-    I.click('Human being');
-    I.waitForText('Human being', 20);
-    I.waitForElement('button:has-text("Delete")', 15);
+    // Login with same user
+    I.click('User');
+    I.click('Log in');
+    I.fillField('Email', testUser.email);
+    I.fillField('Password', testUser.password);
+    I.click('Log in');
 
-    // Crucial: Tell Playwright to handle the browser alert BEFORE the click
-    I.amAcceptingPopups();
-    I.click('button:has-text("Delete")');
+    // Verify login success
+    I.see(testUser.name);
 
-    // Wait for the specific element to be purged from the DOM
-    I.waitForDetached('a:has-text("Human being")', 20);
-    I.dontSee('Human being');
-
-    // 6. DELETE: Live being
-    I.click('Live being');
-    I.waitForText('Live being', 20);
-    I.waitForElement('button:has-text("Delete")', 15);
-
-    I.amAcceptingPopups();
-    I.click('button:has-text("Delete")');
-
-    I.waitForDetached('a:has-text("Live being")', 20);
-    I.see('Material Object');
-
-    // 7. DELETE: Material Object
-    I.click('Material Object');
-    I.waitForText('Material Object', 20);
-    I.waitForElement('button:has-text("Delete")', 15);
-
-    I.amAcceptingPopups();
-    I.click('button:has-text("Delete")');
-
-    I.waitForDetached('a:has-text("Material Object")', 20);
-    I.waitForText('Something', 20);
-});
-
-Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
-    // Create a temporary object
-    await I.addChildTo('Something');
-
-    I.waitForElement('input[name="name"]', 10);
-    await I.fillFieldWithRetry('input[name="name"]', 'Temp Object To Delete');
-    await I.fillFieldWithRetry('input[name="description"]', 'This will be deleted');
-
-    I.click('Save');
-
-    // Wait for modal and backdrop to vanish
-    I.waitForInvisible('.modal', 10);
-    I.waitForInvisible('.modal-backdrop', 10);
-
-    I.click('Something');
-    I.waitForElement('a:has-text("Temp Object To Delete")', 20);
-
-    I.click('Temp Object To Delete');
-    I.waitForText('Temp Object To Delete', 20);
-    I.waitForElement('button:has-text("Delete")', 15);
-
-    // The "Bulletproof" Delete sequence
-    I.amAcceptingPopups();
-    I.click('button:has-text("Delete")');
-
-    // Wait for the tree node to vanish
-    I.waitForDetached('a:has-text("Temp Object To Delete")', 20);
-    I.dontSee('Temp Object To Delete');
+    // Final logout
+    await DB_HELPER.logout(I, testUser.name);
 });
