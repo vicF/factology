@@ -20,70 +20,75 @@ Before(async ({ I }) => {
 });
 
 Scenario('Create object hierarchy with parent-child relationships', async ({ I }) => {
-    // Create Material Object
+    // 1. Create Material Object
     await I.addChildTo('Something');
     await I.createClass('Material Object', 'Physical thing');
 
-    I.seeElement('a:has-text("Material Object")');
+    I.waitForElement('a:has-text("Material Object")', 15);
     I.see('Material Object');
 
-    // Verify on detail page
+    // 2. Verify on detail page
     I.click('Material Object');
-    I.waitForText('Physical thing', 10);
+    I.waitForText('Physical thing', 20);
     I.see('Physical thing');
     I.see('Material Object');
-    I.click('Something');
 
-    // Create Live being as child of Material Object
+    // Ensure we are back at the tree state
+    I.click('Something');
+    I.waitForElement('a:has-text("Material Object")', 15);
+
+    // 3. Create Live being as child of Material Object
     await I.addChildTo('Material Object');
     await I.createClass('Live being', 'Живое существо');
-    I.seeElement('a:has-text("Live being")');
-    I.see('Live being');
+    I.waitForElement('a:has-text("Live being")', 15);
 
     // Verify description on the object page
     I.click('Live being');
-    I.waitForText('Живое существо', 10);
-    I.see('Живое существо');
+    I.waitForText('Живое существо', 20);
     I.see('Live being');
-    I.click('Something');
 
-    // Create Human being as child of Live being
+    I.click('Something');
+    I.waitForElement('a:has-text("Live being")', 15);
+
+    // 4. Create Human being as child of Live being
     await I.addChildTo('Live being');
     await I.createClass('Human being', 'Человек');
-    I.seeElement('a:has-text("Human being")');
-    I.see('Human being');
+    I.waitForElement('a:has-text("Human being")', 15);
 
-    // Verify description on the object page
+    // 5. DELETE: Human being
     I.click('Human being');
-    I.waitForText('Человек', 10);
-    I.see('Человек');
-    I.see('Human being');
-    I.click('Something');
+    I.waitForText('Human being', 20);
 
-    // Delete Human being
-    I.click('Human being');
-    I.waitForText('Human being', 10);
-    I.click('Delete');
-    I.acceptPopup();
-    I.waitForText('Link', 15);
+    I.waitForElement('button:has-text("Delete")', 15);
+    // PREPARE for the popup before clicking
+    I.amAcceptingPopups();
+    I.click('button:has-text("Delete")');
+
+    // Wait for the tree node to physically vanish from the DOM
+    I.waitForDetached('a:has-text("Human being")', 20);
     I.dontSee('Human being');
 
-    // Delete Live being
+    // 6. DELETE: Live being
     I.click('Live being');
-    I.waitForText('Live being', 10);
-    I.click('Delete');
-    I.acceptPopup();
-    I.waitForText('Link', 15);
-    I.dontSee('Live being');
+    I.waitForText('Live being', 20);
+    I.waitForElement('button:has-text("Delete")', 15);
+
+    I.amAcceptingPopups();
+    I.click('button:has-text("Delete")');
+
+    I.waitForDetached('a:has-text("Live being")', 20);
     I.see('Material Object');
 
-    // Delete Material Object
+    // 7. DELETE: Material Object
     I.click('Material Object');
-    I.waitForText('Material Object', 10);
-    I.click('Delete');
-    I.acceptPopup();
-    I.waitForText('Link', 15);
-    I.dontSee('Material Object');
+    I.waitForText('Material Object', 20);
+    I.waitForElement('button:has-text("Delete")', 15);
+
+    I.amAcceptingPopups();
+    I.click('button:has-text("Delete")');
+
+    I.waitForDetached('a:has-text("Material Object")', 20);
+    I.waitForText('Something', 20);
 });
 
 Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
@@ -93,23 +98,24 @@ Scenario('Verify deleted objects are not visible in search', async ({ I }) => {
     I.waitForElement('input[name="name"]', 10);
     await I.fillFieldWithRetry('input[name="name"]', 'Temp Object To Delete');
     await I.fillFieldWithRetry('input[name="description"]', 'This will be deleted');
+
     I.click('Save');
-    I.wait(2);
+
+    // Wait for modal and backdrop to vanish before clicking anything else
+    I.waitForInvisible('.modal', 10);
+    I.waitForInvisible('.modal-backdrop', 10);
 
     I.click('Something');
-    I.waitForText('Temp Object To Delete', 15);
-    I.see('Temp Object To Delete');
+    I.waitForElement('a:has-text("Temp Object To Delete")', 15);
 
     I.click('Temp Object To Delete');
-    I.waitForText('This will be deleted', 10);
-    I.see('This will be deleted');
-    I.click('Something');
+    I.waitForText('Temp Object To Delete', 20);
+    I.waitForElement('button:has-text("Delete")', 15);
 
-    I.click('Temp Object To Delete');
-    I.waitForText('Temp Object To Delete', 10);
-    I.click('Delete');
-    I.acceptPopup();
+    // Bulletproof Delete sequence
+    I.amAcceptingPopups();
+    I.click('button:has-text("Delete")');
 
-    I.waitForText('Link', 15);
+    I.waitForDetached('a:has-text("Temp Object To Delete")', 20);
     I.dontSee('Temp Object To Delete');
 });

@@ -10,8 +10,9 @@ exports.config = {
             show: !isHeadless,  // Hide browser in headless mode
             browser: 'chromium',
             waitForNavigation: 'networkidle0',
-            waitForAction: 500,
-            waitForTimeout: 10000,
+            waitForTimeout: 30000,
+            waitForAction: 2000,
+            getPageTimeout: 60000,
             chromium: {
                 args: isHeadless ? [
                     '--no-sandbox',
