@@ -14,8 +14,8 @@
 </template>
 
 <script setup>
-import {ref, computed, watch, inject} from 'vue'
-import * as jdenticon from 'jdenticon' // Import the library
+import { ref, computed, watch, inject } from 'vue'
+import * as jdenticon from 'jdenticon'
 
 const props = defineProps({
     nodeId: {
@@ -35,18 +35,15 @@ const props = defineProps({
 const getThumbUrl = inject('getThumbUrl');
 const imageError = ref(false)
 
-// Reset error state when nodeId changes
 watch(() => props.nodeId, () => {
     imageError.value = false
-}, {immediate: true})
+}, { immediate: true })
 
 const handleImageError = () => {
     imageError.value = true
 }
 
-// Generate the SVG string using Jdenticon
 const identiconSvg = computed(() => {
-    // We use a size of 100, but it will scale to 100% of the container
     return jdenticon.toSvg(props.nodeId, 100);
 })
 
@@ -54,7 +51,8 @@ const wrapperStyle = computed(() => ({
     width: props.width,
     height: 'auto',
     display: 'inline-flex',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    cursor: 'pointer' // Explicitly set pointer for the link context
 }))
 
 const placeholderStyle = computed(() => {
@@ -66,7 +64,7 @@ const placeholderStyle = computed(() => {
         justifyContent: 'center',
         overflow: 'hidden',
         borderRadius: '4px',
-        backgroundColor: '#f8f9fa' // Light neutral background for the icon
+        backgroundColor: '#f8f9fa'
     }
 })
 </script>
@@ -76,12 +74,19 @@ const placeholderStyle = computed(() => {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    user-select: none; /* Prevents text-style highlighting on click */
 }
 
 .real-image {
     width: 100%;
     height: auto;
     display: block;
+    cursor: pointer;
+    -webkit-user-drag: none; /* Prevents dragging the ghost image */
+}
+
+.placeholder {
+    cursor: pointer;
 }
 
 /* Ensure the generated SVG fills the placeholder container */
