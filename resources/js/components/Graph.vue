@@ -1,6 +1,5 @@
 <template>
     <div>
-        <!-- The size of the parent element determines the size of the graph -->
         <div style="height:calc(100vh - 60px);">
             <RelationGraph
                 ref="graphRef"
@@ -8,7 +7,6 @@
                 :on-node-click="onNodeClick"
                 :on-line-click="onLineClick"
             >
-                <!-- Кастомный слот для узлов -->
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
                         <div class="node-image-area">
@@ -45,9 +43,10 @@ const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
 
-// Minimal graph options - exactly as in the simple example
+// Updated options to force rectangular shapes
 const graphOptions = {
     debug: false,
+    defaultNodeShape: 1, // 1 = Rectangle (fixes the oval issue)
     defaultJunctionPoint: 'border',
     defaultNodeColor: '#4a6bff',
     defaultLineColor: '#99b3ff',
@@ -81,7 +80,7 @@ const getNodeStyle = (node) => {
         height: '100%',
         boxSizing: 'border-box',
         cursor: 'pointer',
-        borderRadius: '8px',
+        borderRadius: '4px', // Slightly rounded corners for the rectangle
         transition: 'transform 0.2s, box-shadow 0.2s'
     }
 }
@@ -102,6 +101,7 @@ const buildGraphData = (object) => {
         fontColor: '#ffffff',
         width: 150,
         height: 100,
+        nodeShape: 1, // Explicitly set to rectangle
         data: object
     })
     nodeIds.add(object.thing_id)
@@ -117,6 +117,7 @@ const buildGraphData = (object) => {
                 fontColor: '#ffffff',
                 width: 130,
                 height: 90,
+                nodeShape: 1,
                 data: object.class
             })
             nodeIds.add(object.class.thing_id)
@@ -141,6 +142,7 @@ const buildGraphData = (object) => {
                     color: '#6c757d',
                     borderColor: '#495057',
                     fontColor: '#ffffff',
+                    nodeShape: 1,
                     data: object.class
                 })
                 nodeIds.add(link.one_thing_id)
@@ -152,6 +154,7 @@ const buildGraphData = (object) => {
                     color: '#28a745',
                     borderColor: '#1e7e34',
                     fontColor: '#ffffff',
+                    nodeShape: 1,
                     data: link
                 })
                 nodeIds.add(link.other_thing_id)
@@ -179,13 +182,11 @@ const showGraph = async () => {
 
     console.log('Updating graph with data:', graphData)
 
-    // Exactly as in the simple example
     await graphRef.value.setJsonData({
         rootId: props.object.thing_id,
         nodes: graphData.nodes,
         lines: graphData.lines
     }, (graphInstance) => {
-        // Called when the relation-graph is completed
         console.log('Graph completed')
     })
 }
@@ -216,7 +217,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Стили для узлов */
 .custom-node {
     display: flex;
     flex-direction: column;
