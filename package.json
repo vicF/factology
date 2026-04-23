@@ -36,6 +36,7 @@
         "vue": "^3.2.36"
     },
     "dependencies": {
+        "jdenticon": "^3.3.0",
         "mitt": "^3.0.1",
         "pinia": "^2.0.34",
         "relation-graph-vue3": "^2.2.11",

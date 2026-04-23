@@ -8,14 +8,14 @@
                 class="real-image"
             />
         </template>
-        <div v-else class="placeholder" :style="placeholderStyle">
-            <span class="placeholder-letter">Ф</span>
+        <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg">
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import {ref, computed, watch, inject} from 'vue'
+import * as jdenticon from 'jdenticon' // Import the library
 
 const props = defineProps({
     nodeId: {
@@ -35,38 +35,38 @@ const props = defineProps({
 const getThumbUrl = inject('getThumbUrl');
 const imageError = ref(false)
 
+// Reset error state when nodeId changes
 watch(() => props.nodeId, () => {
     imageError.value = false
-}, { immediate: true })
+}, {immediate: true})
 
 const handleImageError = () => {
     imageError.value = true
 }
 
-const backgroundColor = computed(() => {
-    if (!props.nodeId) return '#e0e0e0'
-    const hash = props.nodeId.split('').reduce((acc, char) => {
-        return char.charCodeAt(0) + ((acc << 5) - acc)
-    }, 0)
-    const hue = Math.abs(hash % 360)
-    return `hsl(${hue}, 25%, 85%)`
+// Generate the SVG string using Jdenticon
+const identiconSvg = computed(() => {
+    // We use a size of 100, but it will scale to 100% of the container
+    return jdenticon.toSvg(props.nodeId, 100);
 })
 
 const wrapperStyle = computed(() => ({
     width: props.width,
-    height: 'auto', // Grows based on content proportions
-    display: 'inline-flex', // Allows side-by-side placement without overlap
-    verticalAlign: 'top' // Fixes the invisible gap at the bottom of images
+    height: 'auto',
+    display: 'inline-flex',
+    verticalAlign: 'top'
 }))
 
 const placeholderStyle = computed(() => {
     return {
-        backgroundColor: backgroundColor.value,
         width: '100%',
-        aspectRatio: '1 / 1', // Placeholders are square by default since they have no ratio
+        aspectRatio: '1 / 1',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderRadius: '4px',
+        backgroundColor: '#f8f9fa' // Light neutral background for the icon
     }
 })
 </script>
@@ -80,18 +80,14 @@ const placeholderStyle = computed(() => {
 
 .real-image {
     width: 100%;
-    height: auto; /* This is the key to respecting proportions */
+    height: auto;
     display: block;
 }
 
-.placeholder {
-    border-radius: 4px;
-}
-
-.placeholder-letter {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #666666;
-    opacity: 0.7;
+/* Ensure the generated SVG fills the placeholder container */
+.placeholder :deep(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 </style>
