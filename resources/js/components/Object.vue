@@ -83,7 +83,9 @@
                         <div class="row rounded border p-3 rounded-4">
                             <div class="col-md-2" style="font-size: x-small">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                    <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
+                                    <Image
+                                        :node-id="object.thing_id"
+                                    />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -100,10 +102,16 @@
                         <div class="row p-3" v-if="object.class">
                             <div class="col-md-2">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                    <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
+                                    <Image
+                                        :node-id="object.class.thing_id"
+                                        width="50px"
+                                    />
                                 </RouterLink>
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
-                                    <img :src="getThumbUrl(object.class.link_type_id)" width="50"/>
+                                    <Image
+                                        :node-id="object.class.link_type_id"
+                                        width="50px"
+                                    />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -124,10 +132,17 @@
                             <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
                                 <div class="col-md-2">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                        <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                        <Image
+                                            :node-id="link.thing_id"
+                                            width="50px"
+                                        />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                        <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                        <Image
+                                            :node-id="link.link_type_id"
+                                            :alt="link.description"
+                                            width="50px"
+                                        />
                                     </RouterLink>
                                 </div>
                                 <div class="col-md-10">
@@ -237,6 +252,7 @@ import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { inject } from 'vue';
 import { useObjectsStore } from '../stores/objects';
+import Image from "./Image.vue";
 
 // Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
