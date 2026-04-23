@@ -12,7 +12,11 @@
                 {{ showToggle ? (showChildren ? '−' : '+') : ' ' }}
             </span>
             <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
-            <div class="node-content">
+            <Image
+                :node-id="id"
+                width="18px"
+                style="padding-right: 4px"
+            /><div class="node-content">
                 <span class="node-name"><router-link class="dropdown-item" :to="`/object/${id}`">{{ name }}</router-link></span>
                 <span  class="action-icons" :class="{ 'visible': authenticated && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
@@ -41,6 +45,7 @@ import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
 import {LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT} from '../constants.js';
 import {useAuthStore} from "../stores/auth";
+import Image from "./Image.vue";
 
 const authStore    = useAuthStore()
 const authenticated = computed(() => authStore.authenticated)
