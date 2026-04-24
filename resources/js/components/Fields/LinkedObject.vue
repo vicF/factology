@@ -1,9 +1,7 @@
 <!-- Edit link between two objects -->
 <template>
     <template v-if="!singleField">
-    <div class="linked-object">
-        <!-- Normal mode (full editor) -->
-
+        <div class="linked-object">
             <div class="form-group flex-group">
                 <ObjectField
                     fieldName="one_thing"
@@ -58,7 +56,6 @@
                 ></textarea>
             </div>
 
-        <!-- Auto‑generated preview (if currentObject is provided) -->
             <div class="form-group"
                  v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
                 <div class="generated-preview p-2 bg-light rounded border">
@@ -78,22 +75,21 @@
                 <button class="btn btn-danger" @click="removeSelf">Delete</button>
             </div>
         </div>
-        </template>
+    </template>
 
-        <!-- Single‑field mode (only target object) -->
-        <template v-else>
-            <div class="form-group flex-group">
-                <ObjectField
-                    fieldName="other_thing"
-                    v-model="link.other_thing_id"
-                    :isEditable="true"
-                    :label="targetLabel"
-                    :type="CLASS_TYPE"
-                    required
-                    class="flex-field"
-                />
-            </div>
-        </template>
+    <template v-else>
+        <div class="form-group flex-group">
+            <ObjectField
+                fieldName="other_thing"
+                v-model="link.other_thing_id"
+                :isEditable="true"
+                :label="targetLabel"
+                :type="CLASS_TYPE"
+                required
+                class="flex-field"
+            />
+        </div>
+    </template>
 </template>
 
 <script setup>
@@ -111,7 +107,6 @@ const props = defineProps({
     singleField: { type: Boolean, default: false },
     fixedLinkTypeUuid: { type: String, default: null },
     targetLabel: { type: String, default: 'Target object' },
-    // Optional override for the type of objects that can be linked
     objectType: { type: Number, default: null },
 });
 
@@ -119,40 +114,44 @@ const emit = defineEmits(['update', 'remove']);
 
 const store = useObjectCacheStore();
 
-// Determine the type for the two object fields:
-// - If objectType prop is provided, use it (for asymmetric relations).
-// - Otherwise derive from currentObject.type (assuming both sides are the same).
 const effectiveObjectType = computed(() => {
     if (props.objectType !== null) return props.objectType;
     if (props.currentObject?.type === CLASS_TYPE) return CLASS_TYPE;
     return THING_TYPE;
 });
 
-// Work on a local copy to avoid mutating the prop directly
 const link = ref({ ...props.link });
-
-// In single-field mode, enforce the fixed link type UUID
 if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
 
-// Watch for changes to the prop (if the parent updates the link object)
+// Flag to prevent recursive emits
+let isUpdatingFromParent = false;
+
+// Watch for changes from parent – update internal copy without emitting back
 watch(() => props.link, (newLink) => {
-    link.value = { ...newLink };
+    const newCopy = { ...newLink };
     if (props.singleField && props.fixedLinkTypeUuid) {
-        link.value.link_type_id = props.fixedLinkTypeUuid;
+        newCopy.link_type_id = props.fixedLinkTypeUuid;
     }
+    isUpdatingFromParent = true;
+    link.value = newCopy;
+    isUpdatingFromParent = false;
 }, { deep: true });
 
-// Emit updates whenever the link changes
+// Watch internal changes – emit only if they originated from user interaction
+let previousEmitted = JSON.stringify(link.value);
 watch(link, () => {
+    if (isUpdatingFromParent) return; // ignore updates that came from parent
+    const newSerialized = JSON.stringify(link.value);
+    if (newSerialized === previousEmitted) return; // no real change
+    previousEmitted = newSerialized;
     emit('update', {
         index: props.index,
         data: { ...link.value }
     });
 }, { deep: true });
 
-// Load names for display (optional)
 const oneObjectName = ref('');
 const otherObjectName = ref('');
 const typeName = ref('');
@@ -226,41 +225,28 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ... (no changes to styles) ... */
 .linked-object {
     border: 1px solid #ddd;
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 4px;
 }
-
-.form-group {
-    margin-bottom: 15px;
-}
-
+.form-group { margin-bottom: 15px; }
 .form-label {
     display: block;
     margin-bottom: 5px;
     font-weight: 500;
     font-size: 0.9rem;
 }
-
-.form-label small {
-    font-weight: normal;
-    font-size: 0.8rem;
-}
-
+.form-label small { font-weight: normal; font-size: 0.8rem; }
 .flex-group {
     display: flex;
     align-items: stretch;
     gap: 8px;
     margin-bottom: 10px;
 }
-
-.flex-field {
-    flex: 1;
-    min-width: 0;
-}
-
+.flex-field { flex: 1; min-width: 0; }
 .flex-button {
     flex-shrink: 0;
     height: auto;
@@ -273,7 +259,6 @@ onUnmounted(() => {
     font-size: 14px;
     line-height: 1;
 }
-
 .form-control {
     width: 100%;
     padding: 8px;
@@ -281,13 +266,11 @@ onUnmounted(() => {
     border-radius: 4px;
     font-family: inherit;
 }
-
 .form-control:focus {
     border-color: #007bff;
     outline: none;
     box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
-
 .generated-preview {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -297,7 +280,6 @@ onUnmounted(() => {
     padding: 8px;
     border-radius: 4px;
 }
-
 .btn-danger {
     background-color: #dc3545;
     color: white;
@@ -306,11 +288,7 @@ onUnmounted(() => {
     border-radius: 4px;
     cursor: pointer;
 }
-
-.btn-danger:hover {
-    background-color: #c82333;
-}
-
+.btn-danger:hover { background-color: #c82333; }
 .btn-primary {
     background-color: #007bff;
     color: white;
@@ -319,12 +297,6 @@ onUnmounted(() => {
     border-radius: 4px;
     cursor: pointer;
 }
-
-.btn-primary:hover {
-    background-color: #0069d9;
-}
-
-.bi {
-    font-size: 0.9rem;
-}
+.btn-primary:hover { background-color: #0069d9; }
+.bi { font-size: 0.9rem; }
 </style>
