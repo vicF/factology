@@ -1,5 +1,5 @@
 <template>
-    <div class="image-wrapper" :style="wrapperStyle">
+    <div v-if="nodeId" class="image-wrapper" :style="wrapperStyle">
         <template v-if="!imageError">
             <img
                 :src="getThumbUrl(nodeId)"
@@ -8,19 +8,19 @@
                 class="real-image"
             />
         </template>
-        <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg">
-        </div>
+        <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg"/>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import {ref, computed, watch, inject} from 'vue'
 import * as jdenticon from 'jdenticon'
 
 const props = defineProps({
     nodeId: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     alt: {
         type: String,
@@ -37,13 +37,14 @@ const imageError = ref(false)
 
 watch(() => props.nodeId, () => {
     imageError.value = false
-}, { immediate: true })
+}, {immediate: true})
 
 const handleImageError = () => {
     imageError.value = true
 }
 
 const identiconSvg = computed(() => {
+    // This will only be called when nodeId is truthy because of v-if
     return jdenticon.toSvg(props.nodeId, 100);
 })
 
@@ -55,18 +56,16 @@ const wrapperStyle = computed(() => ({
     cursor: 'pointer' // Explicitly set pointer for the link context
 }))
 
-const placeholderStyle = computed(() => {
-    return {
-        width: '100%',
-        aspectRatio: '1 / 1',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderRadius: '4px',
-        backgroundColor: '#f8f9fa'
-    }
-})
+const placeholderStyle = computed(() => ({
+    width: '100%',
+    aspectRatio: '1 / 1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: '4px',
+    backgroundColor: '#f8f9fa'
+}))
 </script>
 
 <style scoped>
