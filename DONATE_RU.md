@@ -13,3 +13,7 @@
 
 **4. Акцепт**
 Факт перечисления денежных средств является полным и безоговорочным акцептом условий настоящей оферты.
+
+<a href="https://www.tinkoff.ru/rm/r_fPtwscPFTi.wknzsiAmtj/CDuUx63638">Перевод на Т-банк</a>
+
+<a href="https://boosty.to/vfokin/donate">Boosty</a>
