@@ -1,19 +1,29 @@
 # Factology
 
-Project target is to build web application that manages objects and links between them. 
+**A flexible system for describing and visualizing relationships between any entities.**
 
-## License
+The project enables modeling knowledge, events, concepts, objects, and their interconnections as a directed graph. Each relationship can have its own type, and entities can carry arbitrary attributes. The system is designed as a browser-based server application, with plans for mobile platforms.
 
-This project is distributed under the **PolyForm Noncommercial License 1.0.0**.
+## Key features
 
-- The source code is publicly available.
-- You may view, modify, and use it for **non-commercial purposes** (personal, educational, hobby, non-profit, research, etc.).
-- Any **commercial use** (SaaS, embedding in paid products, selling, providing as a service, etc.) requires a separate commercial license from the author.
+- **Any type of entity**: people, places, events, abstract ideas, files – anything you want.
+- **Custom link types** – define your own relationships (e.g., "includes", "is parent of", "manufactures", "causes").
+- **Directed edges** – the arrow expresses the semantics of the relation.
+- **Grouping via binary edges** – "element → belongs to → set".
+- **Data exchange between applications** – export/import in standard formats (JSON, XML, with GEDCOM planned).
+- **Backend**: PHP. Provides an API for client applications.
+- **Standard client**: Vue 3.
 
-→ Full license text: [LICENSE](./LICENSE)
+## Repository status
 
-This is **not** an Open Source license according to the Open Source Initiative (OSI).
+> **Status**: MVP (Minimum Viable Product) – basic entity and link management works, minimal graph visualization is available.
 
+## Immediate plans
+
+- Data export and import
+- Support for a wide range of dates (historical, future, fuzzy)
+- Image handling
+- Adaptation for mobile applications
 ## Commercial licensing
 
 Interested in commercial use? Contact me: [victor.fokin@gmail.com]
