@@ -2,7 +2,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
-import { useClickOutside } from '@/composables/useClickOutside.js'
 import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
 import axios from 'axios';
 
@@ -54,28 +53,24 @@ const searchResults = ref([])
 const dropdownStyles = ref({})
 const isClickingDropdown = ref(false)
 
+// Debounce timer
+let debounceTimer = null
+
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
     if (!props.modelValue) return ''
 
     const cached = cacheStore.getCachedObject(props.modelValue)
-
-    if (cached) {
-        return cached.name
-    }
-
+    if (cached) return cached.name
     return props.name || props.modelValue
 })
 
 const hasSelection = computed(() => !!props.modelValue)
 
-// Icon based on the selected object's type (if any), otherwise fallback to the prop type
 const defaultIcon = computed(() => {
-    // First, try the selected object's type
     if (selectedObject.value?.type === CLASS_TYPE) return 'bi bi-diagram-3'
     if (selectedObject.value?.type === THING_TYPE) return 'bi bi-box'
     if (selectedObject.value?.type === LINK_TYPE) return 'bi bi-link-45deg'
-    // Fallback to the prop type (for empty fields)
     if (props.type === CLASS_TYPE) return 'bi bi-diagram-3'
     if (props.type === THING_TYPE) return 'bi bi-box'
     return 'bi bi-link-45deg'
@@ -83,53 +78,26 @@ const defaultIcon = computed(() => {
 
 const filteredObjects = computed(() => {
     let results = [];
-
-    // If we have search results from server, show them
-    if (searchResults.value && searchResults.value.length > 0) {
+    if (searchResults.value.length > 0) {
         results = searchResults.value;
-    }
-    // If no search text, show recent objects
-    else if (!searchText.value.trim()) {
+    } else if (!searchText.value.trim()) {
         results = cacheStore.getRecent(props.type, props.maxResults) || [];
-    }
-    // Otherwise search in cache
-    else {
+    } else {
         const term = searchText.value.toLowerCase().trim()
         results = cacheStore.searchCached('object', term, props.maxResults) || [];
     }
-
-    // Filter out the excluded UUID if provided
-    if (props.excludeUuid && results.length > 0) {
+    if (props.excludeUuid && results.length) {
         results = results.filter(obj => obj.thing_id !== props.excludeUuid);
     }
-
     return results;
 })
 
-// ── Custom click outside handler for teleported dropdown ─────
-const handleClickOutside = (event) => {
-    if (!isOpen.value) return
-
-    // Check if click is on wrapper or its children
-    const isClickOnWrapper = wrapperRef.value?.contains(event.target)
-
-    // Check if click is on dropdown or its children
-    const isClickOnDropdown = dropdownRef.value?.contains(event.target)
-
-    // If click is outside both wrapper and dropdown, close it
-    if (!isClickOnWrapper && !isClickOnDropdown) {
-        closeDropdown()
-    }
-}
-
-// ── Dropdown visibility control ────────────────────────────────
+// ── Dropdown positioning ──────────────────────────────────────
 const calculateDropdownPosition = () => {
     if (!wrapperRef.value) return
-
     const rect = wrapperRef.value.getBoundingClientRect()
     const scrollY = window.scrollY || window.pageYOffset
     const scrollX = window.scrollX || window.pageXOffset
-
     dropdownStyles.value = {
         position: 'absolute',
         top: `${rect.bottom + scrollY + 4}px`,
@@ -145,28 +113,19 @@ const calculateDropdownPosition = () => {
         borderRadius: '0.375rem',
         boxShadow: '0 0.5rem 1rem rgba(0,0,0,0.175)',
         padding: '0.5rem 0',
-        margin: 0,
-        fontSize: '0.875rem',
-        textAlign: 'left',
-        listStyle: 'none',
-        backgroundClip: 'padding-box',
-        boxSizing: 'border-box'
+        fontSize: '0.875rem'
     }
 }
 
 const updateDropdownPosition = () => {
-    if (isOpen.value) {
-        calculateDropdownPosition()
-    }
+    if (isOpen.value) calculateDropdownPosition()
 }
 
 const openDropdown = async () => {
     if (!props.isEditable) return
-
     previousDisplay.value = displayValue.value || ''
     isOpen.value = true
     searchText.value = ''
-
     await nextTick()
     calculateDropdownPosition()
     inputRef.value?.focus()
@@ -175,63 +134,62 @@ const openDropdown = async () => {
 
 const closeDropdown = () => {
     isOpen.value = false
-
+    // Do NOT clear searchText if we have a selection – restore display
     if (!props.modelValue && previousDisplay.value) {
         searchText.value = previousDisplay.value
     } else {
         searchText.value = ''
     }
-
     error.value = null
     searchResults.value = []
+    // Clear any pending debounce
+    if (debounceTimer) clearTimeout(debounceTimer)
 }
 
-// ── Global click handler ─────────────────────────────────────
-const handleGlobalClick = (event) => {
-    handleClickOutside(event)
+// ── Global click / escape handlers ────────────────────────────
+const handleClickOutside = (event) => {
+    if (!isOpen.value) return
+    const isClickOnWrapper = wrapperRef.value?.contains(event.target)
+    const isClickOnDropdown = dropdownRef.value?.contains(event.target)
+    if (!isClickOnWrapper && !isClickOnDropdown) {
+        closeDropdown()
+    }
 }
 
-// ── Global Esc key handler ─────────────────────────────────────
 const handleGlobalKeyDown = (e) => {
     if (e.key === 'Escape' && isOpen.value) {
-        e.stopPropagation()
         e.preventDefault()
         closeDropdown()
     }
 }
 
-// ── Load selected object if value exists on mount ──────────────
+// ── Lifecycle ─────────────────────────────────────────────────
 onMounted(async () => {
     if (props.modelValue && !cacheStore.hasCachedObject(props.modelValue)) {
         await loadObjectByUuid(props.modelValue)
     } else if (props.modelValue) {
         selectedObject.value = cacheStore.getCachedObject(props.modelValue)
     }
-
-    // Add event listeners
     window.addEventListener('scroll', updateDropdownPosition, true)
     window.addEventListener('resize', updateDropdownPosition)
     window.addEventListener('keydown', handleGlobalKeyDown, true)
-
-    // Use mousedown for better responsiveness
-    document.addEventListener('mousedown', handleGlobalClick)
+    document.addEventListener('mousedown', handleClickOutside)
 })
 
 onUnmounted(() => {
-    // Clean up event listeners
     window.removeEventListener('scroll', updateDropdownPosition, true)
     window.removeEventListener('resize', updateDropdownPosition)
     window.removeEventListener('keydown', handleGlobalKeyDown, true)
-    document.removeEventListener('mousedown', handleGlobalClick)
+    document.removeEventListener('mousedown', handleClickOutside)
+    if (debounceTimer) clearTimeout(debounceTimer)
 })
 
-// ── Watch modelValue changes ───────────────────────────────────
+// ── Watch modelValue ──────────────────────────────────────────
 watch(() => props.modelValue, async (newUuid) => {
     if (!newUuid) {
         selectedObject.value = null
         return
     }
-
     if (cacheStore.hasCachedObject(newUuid)) {
         selectedObject.value = cacheStore.getCachedObject(newUuid)
     } else {
@@ -239,29 +197,19 @@ watch(() => props.modelValue, async (newUuid) => {
     }
 }, { immediate: true })
 
-// ── Watch isOpen to recalculate position ───────────────────────
 watch(isOpen, (newVal) => {
-    if (newVal) {
-        nextTick(() => {
-            calculateDropdownPosition()
-        })
-    }
+    if (newVal) nextTick(() => calculateDropdownPosition())
 })
 
-// ── Core logic ─────────────────────────────────────────────────
+// ── Core functions ────────────────────────────────────────────
 async function loadObjectByUuid(uuid) {
     if (!uuid || uuid.length < 20) return
-
     loading.value = true
     error.value = null
-
     try {
         const obj = await cacheStore.fetchOrGetObject(uuid)
-        if (obj) {
-            selectedObject.value = obj
-        } else {
-            error.value = 'Object not found'
-        }
+        if (obj) selectedObject.value = obj
+        else error.value = 'Object not found'
     } catch (err) {
         console.warn('Failed to load object', uuid, err)
         error.value = 'Cannot load object'
@@ -270,21 +218,13 @@ async function loadObjectByUuid(uuid) {
     }
 }
 
-async function selectObject(obj) {
+function selectObject(obj) {
     if (!obj?.thing_id) return
-
-    // Prevent any click outside handlers from interfering
     isClickingDropdown.value = true
-
-    console.debug('Selected object ', obj.thing_id);
     selectedObject.value = obj
     emit('update:modelValue', obj.thing_id)
     closeDropdown()
-
-    // Reset after a short delay
-    setTimeout(() => {
-        isClickingDropdown.value = false
-    }, 100)
+    setTimeout(() => { isClickingDropdown.value = false }, 100)
 }
 
 function clearSelection() {
@@ -293,70 +233,54 @@ function clearSelection() {
     searchText.value = ''
 }
 
-async function onInput(e) {
-    const val = e.target.value.trim()
-    searchText.value = val
-
-    // Check if it's a UUID
-    if (val.length > 30 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
-        searchResults.value = []
-        emit('update:modelValue', val)
-        closeDropdown()
-    } else if (val.length >= 2) {
-        try {
-            loading.value = true
-
-            let type = [];
-            if (props.type === 3) type.push(3);
-            if (props.type === 2) type.push(2);
-
-            const response = await axios.post('/object', {
-                search: val,
-                type: type,
-                classes: []
-            });
-
-            // Parse response and convert things object to array
-            if (typeof response.data === 'string') {
-                const parsed = JSON.parse(response.data);
-                if (parsed.things && typeof parsed.things === 'object') {
-                    searchResults.value = Object.values(parsed.things);
+// Debounced search
+function performSearch(val) {
+    if (val.length >= 2) {
+        loading.value = true
+        const searchTerm = val // preserve spaces
+        let type = []
+        if (props.type === 3) type.push(3)
+        if (props.type === 2) type.push(2)
+        axios.post('/object', { search: searchTerm, type, classes: [] })
+            .then(response => {
+                let results = []
+                if (typeof response.data === 'string') {
+                    const parsed = JSON.parse(response.data)
+                    if (parsed.things && typeof parsed.things === 'object') results = Object.values(parsed.things)
+                    else results = parsed.things || []
                 } else {
-                    searchResults.value = parsed.things || [];
+                    if (response.data.things && typeof response.data.things === 'object') results = Object.values(response.data.things)
+                    else if (Array.isArray(response.data.things)) results = response.data.things
+                    else if (Array.isArray(response.data)) results = response.data
                 }
-            } else {
-                if (response.data.things && typeof response.data.things === 'object') {
-                    searchResults.value = Object.values(response.data.things);
-                } else if (Array.isArray(response.data.things)) {
-                    searchResults.value = response.data.things;
-                } else if (Array.isArray(response.data)) {
-                    searchResults.value = response.data;
-                } else {
-                    searchResults.value = [];
+                // Only apply if search term still matches current input
+                if (searchText.value === searchTerm) {
+                    searchResults.value = results
+                    nextTick(() => calculateDropdownPosition())
                 }
-            }
-
-            error.value = null;
-
-            // Recalculate dropdown position after results load
-            nextTick(() => {
-                calculateDropdownPosition()
+                error.value = null
             })
-        } catch (err) {
-            console.error('Search failed:', err);
-            error.value = 'Search failed';
-            searchResults.value = [];
-        } finally {
-            loading.value = false;
-        }
+            .catch(err => {
+                console.error('Search failed:', err)
+                error.value = 'Search failed'
+                searchResults.value = []
+            })
+            .finally(() => { loading.value = false })
     } else {
-        searchResults.value = [];
+        searchResults.value = []
     }
 }
 
-// Handle mousedown on dropdown to prevent blur
-const handleDropdownMouseDown = (e) => {
-    e.preventDefault() // Prevent input blur
+function onInput(e) {
+    const raw = e.target.value
+    // Keep spaces exactly as typed
+    searchText.value = raw
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => performSearch(raw), 300)
+}
+
+function handleDropdownMouseDown(e) {
+    e.preventDefault()
 }
 </script>
 
@@ -367,7 +291,6 @@ const handleDropdownMouseDown = (e) => {
             <small v-if="name">({{ name }})</small>
         </label>
 
-        <!-- Readonly mode -->
         <div v-if="!isEditable" class="form-control-plaintext d-flex align-items-center gap-2 py-1">
             <component
                 v-if="selectedObject?.icon"
@@ -382,7 +305,6 @@ const handleDropdownMouseDown = (e) => {
             </small>
         </div>
 
-        <!-- Editable mode -->
         <template v-else>
             <div ref="wrapperRef" class="position-relative w-100">
                 <div class="input-group input-group-sm w-100" :class="{ 'is-invalid': error }">
@@ -418,7 +340,6 @@ const handleDropdownMouseDown = (e) => {
                     </button>
                 </div>
 
-                <!-- Teleported dropdown -->
                 <Teleport to="body">
                     <div
                         v-if="isOpen"
@@ -427,28 +348,20 @@ const handleDropdownMouseDown = (e) => {
                         :style="dropdownStyles"
                         @mousedown="handleDropdownMouseDown"
                     >
-                        <!-- Loading state -->
                         <div v-if="loading" class="text-center py-4 text-muted">
                             <div class="spinner-border spinner-border-sm" role="status"></div>
                             <div class="mt-2">Loading...</div>
                         </div>
-
-                        <!-- Error state -->
                         <div v-else-if="error" class="alert alert-danger m-2 py-2 small">
                             {{ error }}
                         </div>
-
-                        <!-- Results -->
                         <template v-else>
-                            <!-- No results -->
                             <div
                                 v-if="filteredObjects.length === 0"
                                 class="text-center py-4 text-muted small"
                             >
                                 {{ searchText ? 'No matching objects found' : 'Start typing or paste UUID' }}
                             </div>
-
-                            <!-- Results list -->
                             <div v-else class="dropdown-items-container">
                                 <button
                                     v-for="(obj, index) in filteredObjects"
@@ -456,17 +369,15 @@ const handleDropdownMouseDown = (e) => {
                                     type="button"
                                     class="dropdown-item"
                                     @click="selectObject(obj)"
-                                    @mousedown.prevent=""
+                                    @mousedown.prevent
                                 >
                                     <i class="bi bi-box flex-shrink-0"></i>
-
                                     <div class="flex-grow-1 text-truncate text-start">
                                         <div>{{ obj.name || 'Unnamed' }}</div>
                                         <small v-if="obj.description" class="text-muted d-block text-truncate">
                                             {{ obj.description }}
                                         </small>
                                     </div>
-
                                     <small class="text-muted ms-auto font-monospace">
                                         {{ (obj.thing_id || '').substring(0, 6) }}…
                                     </small>
@@ -491,34 +402,22 @@ const handleDropdownMouseDown = (e) => {
     position: relative;
     width: 100%;
 }
-
 .object-field .position-relative {
     position: relative;
     overflow: visible !important;
     width: 100%;
 }
-
-.input-group {
-    width: 100%;
-}
-
+.input-group { width: 100%; }
 .input-group-sm .form-control,
-.input-group-sm .btn {
-    font-size: 0.875rem;
-}
-
+.input-group-sm .btn { font-size: 0.875rem; }
 .form-control-plaintext {
     min-height: calc(1.8125rem + 2px);
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
 }
-
-.w-100 {
-    width: 100% !important;
-}
+.w-100 { width: 100% !important; }
 </style>
 
-<!-- Global styles -->
 <style>
 .object-field-dropdown {
     position: absolute;
@@ -536,7 +435,6 @@ const handleDropdownMouseDown = (e) => {
     background-clip: padding-box;
     box-sizing: border-box;
 }
-
 .object-field-dropdown .dropdown-item {
     display: flex;
     align-items: center;
@@ -553,40 +451,16 @@ const handleDropdownMouseDown = (e) => {
     gap: 0.75rem;
     box-sizing: border-box;
 }
-
-.object-field-dropdown .dropdown-item:last-child {
-    border-bottom: none;
-}
-
-.object-field-dropdown .dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.object-field-dropdown .dropdown-item .bi {
-    opacity: 0.75;
-    flex-shrink: 0;
-}
-
-.object-field-dropdown .text-muted {
-    color: #6c757d !important;
-}
-
+.object-field-dropdown .dropdown-item:last-child { border-bottom: none; }
+.object-field-dropdown .dropdown-item:hover { background-color: #f8f9fa; }
+.object-field-dropdown .dropdown-item .bi { opacity: 0.75; flex-shrink: 0; }
+.object-field-dropdown .text-muted { color: #6c757d !important; }
 .object-field-dropdown .font-monospace {
     font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-size: 0.75rem;
 }
-
-.object-field-dropdown .alert {
-    margin-bottom: 0;
-}
-
-/* Ensure dropdown is above everything */
-.object-field-dropdown {
-    z-index: 99999 !important;
-}
-
+.object-field-dropdown .alert { margin-bottom: 0; }
+.object-field-dropdown { z-index: 99999 !important; }
 .object-field-dropdown,
-.object-field-dropdown * {
-    box-sizing: border-box;
-}
+.object-field-dropdown * { box-sizing: border-box; }
 </style>
