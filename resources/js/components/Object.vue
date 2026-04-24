@@ -55,7 +55,8 @@
                     <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal" title="Edit this object">
                         {{ $t('Edit') }}
                     </button>
-                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openEditLinkModal" title="Link this object to another">
+                    <!-- "Link" button now uses its own modal for creation -->
+                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkModal" title="Link this object to another">
                         {{ $t('Link') }}
                     </button>
                     <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject" title="Delete this object">
@@ -63,7 +64,7 @@
                     </button>
                 </h1>
 
-                <!-- Bootstrap Tabs with right alignment -->
+                <!-- Bootstrap Tabs -->
                 <ul class="nav nav-tabs justify-content-end mb-3">
                     <li class="nav-item">
                         <a class="nav-link" :class="{ active: activeTab === 'details' }" @click="activeTab = 'details'" href="#">
@@ -83,9 +84,7 @@
                         <div class="row rounded border p-3 rounded-4">
                             <div class="col-md-2" style="font-size: x-small">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                    <Image
-                                        :node-id="object.thing_id"
-                                    />
+                                    <Image :node-id="object.thing_id" />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -102,16 +101,10 @@
                         <div class="row p-3" v-if="object.class">
                             <div class="col-md-2">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                    <Image
-                                        :node-id="object.class.thing_id"
-                                        width="50px"
-                                    />
+                                    <Image :node-id="object.class.thing_id" width="50px" />
                                 </RouterLink>
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
-                                    <Image
-                                        :node-id="object.class.link_type_id"
-                                        width="50px"
-                                    />
+                                    <Image :node-id="object.class.link_type_id" width="50px" />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -132,17 +125,10 @@
                             <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
                                 <div class="col-md-2">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                        <Image
-                                            :node-id="link.thing_id"
-                                            width="50px"
-                                        />
+                                        <Image :node-id="link.thing_id" width="50px" />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                        <Image
-                                            :node-id="link.link_type_id"
-                                            :alt="link.description"
-                                            width="50px"
-                                        />
+                                        <Image :node-id="link.link_type_id" :alt="link.description" width="50px" />
                                     </RouterLink>
                                 </div>
                                 <div class="col-md-10">
@@ -159,16 +145,10 @@
                                         {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
                                     </div>
 
-                                    <!-- Используем сгенерированный перевод из композабла -->
                                     <div class="link-description mt-1">
-                                        <LinkDescription
-                                            :link="link"
-                                            :object="object"
-                                            size="small"
-                                        />
+                                        <LinkDescription :link="link" :object="object" size="small" />
                                     </div>
 
-                                    <!-- Ручной перевод с сервера (если есть) -->
                                     <div v-if="link.translation" class="mt-1">
                                         <small>{{ link.translation }}</small>
                                     </div>
@@ -177,6 +157,7 @@
                                         <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
                                             {{ $t('Delete') }}
                                         </button>
+                                        <!-- Edit existing link -->
                                         <button v-if="authenticated" class="btn btn-primary btn-sm ms-2" @click="openEditLinkModal(link)">
                                             {{ $t('Edit') }}
                                         </button>
@@ -189,11 +170,7 @@
 
                 <!-- Graph Tab Content -->
                 <div v-show="activeTab === 'graph'" class="tab-content">
-                    <Graph
-                        v-if="graphInitialized"
-                        ref="graphComponentRef"
-                        :object="object"
-                    />
+                    <Graph v-if="graphInitialized" ref="graphComponentRef" :object="object" />
                 </div>
             </div>
         </div>
@@ -228,13 +205,22 @@
             @close="showCreateLinkedModal = false"
         />
 
-        <!-- === МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ССЫЛКИ === -->
+        <!-- === МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ССЫЛКИ (для существующих ссылок) === -->
         <EditLinkModal
             v-if="showEditLinkModal"
             :link="editingLink"
             :currentObject="object"
             @save="handleLinkSave"
             @close="showEditLinkModal = false"
+        />
+
+        <!-- === МОДАЛЬНОЕ ОКНО СОЗДАНИЯ НОВОЙ ССЫЛКИ === -->
+        <EditLinkModal
+            v-if="showCreateLinkModal"
+            :link="newLinkData"
+            :currentObject="object"
+            @save="handleNewLinkSave"
+            @close="showCreateLinkModal = false"
         />
     </div>
 </template>
@@ -254,17 +240,14 @@ import { inject } from 'vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
 
-// Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
 
-// Props definition
 const props = defineProps({
     searchText: String,
     typeThing: String,
     typeClass: String
 });
 
-// Composables
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
@@ -272,49 +255,43 @@ const authStore = useAuthStore();
 const cacheStore = useObjectCacheStore();
 const objectsStore = useObjectsStore();
 
-// State
 const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
 
-// Глобальное состояние вкладки - читаем из localStorage при инициализации
 const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
 
-// Modals
 const showEditModal = ref(false);
 const showTreeModal = ref(false);
 const showCreateLinkedModal = ref(false);
 const showEditLinkModal = ref(false);
+const showCreateLinkModal = ref(false); // for the "Link" button
 
 const editObject = ref(null);
 const modalParams = ref({});
 const treeModalParams = ref({});
 const editingLink = ref(null);
+const newLinkData = ref(null); // holds data for a new link
+
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
 
-// Default linked objects for creating a new linked object
 const defaultLinkedObjects = computed(() => {
     const links = [];
-
-    // Add link to current object
     if (object.value) {
         links.push({
             other_thing_id: object.value.thing_id,
-            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5', // links to
+            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
             description: `Linked to ${object.value.name}`,
         });
     }
-
     return links;
 });
 
-// Parameters for creating a linked object
 const createLinkedParams = computed(() => ({
-    type: 3, // THING_TYPE
+    type: 3,
 }));
 
-// Computed
 const authenticated = computed(() => authStore?.authenticated || false);
 
 const getObject = async () => {
@@ -328,7 +305,6 @@ const getObject = async () => {
         }
     } catch (error) {
         console.error('Get object error:', error);
-
         if (error.response?.status === 500) {
             serverError.value = true;
             object.value = null;
@@ -359,7 +335,6 @@ const retryLoading = () => {
 
 const openCreateModal = (type) => {
     if (!object.value) return;
-
     modalParams.value = {
         classId: object.value.class?.thing_id,
         type: type === 'Class' ? 2 : 3
@@ -369,7 +344,6 @@ const openCreateModal = (type) => {
 
 const openEditModal = () => {
     if (!object.value) return;
-
     editObject.value = { ...object.value };
     modalParams.value = {
         classId: object.value.class?.thing_id,
@@ -389,18 +363,30 @@ const openEditLinkModal = (link) => {
     showEditLinkModal.value = true;
 };
 
+const openCreateLinkModal = () => {
+    if (!object.value) return;
+    // Prepare a new link with the current object as one side.
+    // The other side will be selected by the user in the modal.
+    newLinkData.value = {
+        one_thing_id: object.value.thing_id,
+        other_thing_id: null,
+        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+        translation: '',
+        link_id: null,
+        link_start: null,
+        link_end: null,
+    };
+    showCreateLinkModal.value = true;
+};
+
 const deleteObject = async () => {
     if (!object.value) return;
     if (!confirm(t('Are you sure you want to delete this object?'))) return;
-
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
-
-        // If this is a class (type 2), update the class tree store
         if (object.value.type === 2) {
             objectsStore.removeClassFromTree(object.value.thing_id);
         }
-
         router.push('/');
     } catch (error) {
         console.error('Failed to delete object:', error);
@@ -411,7 +397,6 @@ const deleteObject = async () => {
 const deleteLink = async (link_id) => {
     if (!link_id) return;
     if (!confirm(t('Are you sure you want to delete this link?'))) return;
-
     try {
         await axios.delete(`/link/${link_id}`);
         await getObject();
@@ -423,12 +408,20 @@ const deleteLink = async (link_id) => {
 
 const handleLinkSave = async (result) => {
     showEditLinkModal.value = false;
-
     if (result.delete) {
         await deleteLink(result.linkId);
     } else {
         await updateLink(result.data);
     }
+};
+
+const handleNewLinkSave = async (result) => {
+    showCreateLinkModal.value = false;
+    if (result.delete) {
+        // Not applicable for new link
+        return;
+    }
+    await createLink(result.data);
 };
 
 const updateLink = async (linkData) => {
@@ -454,6 +447,24 @@ const updateLink = async (linkData) => {
     }
 };
 
+const createLink = async (linkData) => {
+    try {
+        const payload = {
+            one_thing_id: linkData.one_thing_id,
+            other_thing_id: linkData.other_thing_id,
+            link_type_id: linkData.link_type_id,
+            translation: linkData.translation,
+            link_start: linkData.link_start,
+            link_end: linkData.link_end,
+        };
+        await axios.post(`/link`, payload);
+        await getObject();
+    } catch (error) {
+        console.error('Failed to create link:', error);
+        alert(t('Failed to create link'));
+    }
+};
+
 const handleObjectCreated = (newObject) => {
     console.log('Object.vue - Created via tree:', newObject);
     showTreeModal.value = false;
@@ -465,7 +476,6 @@ const handleObjectCreated = (newObject) => {
 const handleObjectUpdated = async (updatedObject) => {
     console.log('Object.vue - Object updated:', updatedObject);
     showEditModal.value = false;
-    // Fully reload the object to get fresh links
     await getObject();
 };
 
@@ -477,14 +487,11 @@ const handleLinkedObjectCreated = async () => {
 
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
-
-    // Convert links to the format expected by EditObject's initialLinkedObjects
     return object.value.links.map(link => ({
         other_thing_id: link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id,
         link_type_id: link.link_type_id,
         description: link.translation || '',
         link_id: link.link_id,
-        // Also include the original one_thing_id for reference
         one_thing_id: link.one_thing_id,
     }));
 });
@@ -508,7 +515,6 @@ watch(() => route.params.uid, (newUid, oldUid) => {
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
     console.log('Saved global tab state:', newTab);
-
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
             console.log('First time opening graph tab, initializing...');
