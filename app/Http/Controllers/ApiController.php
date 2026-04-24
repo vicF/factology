@@ -149,10 +149,23 @@ class ApiController extends BaseController
         ]);
         return DB::transaction(static function () use ($request) {
             $model = new Anything($request->toArray());
-            $model->save();
-            if ($request->parent_id) {
+            try {
+                $model->save();
+            } catch(\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to save the record',
+                    'errors' => $e->getMessage() ?? 'Unknown error occurred'
+                ], $e->getCode() ?:500);
+            }
+            /*if ($request->parent_id) {
 
-                $model->setLink([UUID::LINK_TO_PARENT], $request->parent_id, 'Child of');
+                $model->setParent([
+                    'one_thing_id' => $request->parent_id,
+                ]);
+            }*/
+            if ($request->parent) {
+                $model->setParent($request->parent);
             }
             if ($request->class) {
                 $model->setClass($request->class);
@@ -280,12 +293,12 @@ class ApiController extends BaseController
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function deleteLink(Request $request, $id)
+    public function deleteLink(Request $request, $id): \Illuminate\Http\JsonResponse
     {
         try {
             $deleted = DB::table('links')
                 ->where('link_id', $id)
-                ->update(['deleted' => 1]);
+                ->delete();
 
             if ($deleted) {
                 return response()->json(['message' => 'Link deleted successfully'], 200);
@@ -374,7 +387,6 @@ class ApiController extends BaseController
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
-                $join->where('links.deleted', '=', 0);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
         }
@@ -408,11 +420,9 @@ class ApiController extends BaseController
             ->orWhere('other_thing_id', $ids)
             ->leftJoin('things', function ($join) {
                 $join->on('links.other_thing_id', '=', 'things.thing_id');
-                $join->where('links.deleted', '=', 0);
             })
             ->leftJoin('things as link_types', function ($join) {
                 $join->on('links.link_type_id', '=', 'link_types.thing_id');
-                $join->where('links.deleted', '=', 0);
             })
             ->get()->toArray();
 
@@ -430,43 +440,65 @@ class ApiController extends BaseController
      */
     public function searchTree()
     {
-        $requestBody = json_decode(file_get_contents('php://input'), true);
-        $linkToParent = UUID::LINK_TO_PARENT;
-        $something = UUID::SOMETHING;
-        $rawSql =
-            "with recursive descendants
-                (name, level, id, parent_id, description, translation)  as (
-                    select c.name, 1 as level, c.thing_id, l.other_thing_id, c.description, l.translation
-                    from things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
-                    where c.type=2 and c.thing_id = '$something'
-                    union distinct
-                    select c.name, d.level+1, c.thing_id, l.other_thing_id, c.description, l.translation
-                    from descendants d, things c
-                    left join links l on l.one_thing_id = c.thing_id AND link_type_id = '$linkToParent'
-                    where c.type=2 AND d.id = l.other_thing_id AND d.level < 10
-                )
-                select * from descendants ORDER BY level;";
-        $results = $this->buildTree((array)DB::select($rawSql));
+
+        $rawSql = "
+        WITH RECURSIVE descendants (name, level, id, parent_id, description, translation) AS (
+            SELECT c.name, 1 AS level, c.thing_id, l.one_thing_id, c.description, l.translation
+            FROM things c
+            LEFT JOIN links l ON l.other_thing_id = c.thing_id AND l.link_type_id = ?
+            WHERE c.thing_id = ?
+
+            UNION ALL
+
+            SELECT c.name, d.level + 1, c.thing_id, l.one_thing_id, c.description, l.translation
+            FROM descendants d
+            JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
+            JOIN things c ON l.other_thing_id = c.thing_id
+            WHERE (c.type = ? OR c.type = ?) AND d.level < 10
+        )
+        SELECT * FROM descendants ORDER BY level;
+    ";
+
+        // Bind parameters in order: link_type_id (anchor), thing_id (anchor), link_type_id (recursive)
+        $results = $this->buildTree(
+            (array) DB::select($rawSql, [
+                UUID::LINK_TO_PARENT,
+                UUID::ANYTHING,
+                UUID::LINK_TO_PARENT,
+                UUID::G_CLASS,
+                UUID::G_LINK])
+        );
+
         return response()->json([
             'things' => $results,
         ]);
     }
 
-    protected function buildTree($items, $parentId = UUID::ANYTHING)
+    protected function buildTree($items)
     {
-        $tree = [];
-        foreach ($items as $item) {
-            if ($item->parent_id === $parentId) {
-                $children = $this->buildTree($items, $item->id);
+        $indexed = [];
+        $roots = [];
 
-                if ($children) {
-                    $item->nodes = $children;
-                }
-                $tree[] = $item;
+        // First pass: index by ID (as string) and initialize nodes
+        foreach ($items as &$item) {
+            $item->nodes = [];                       // ensure nodes property exists
+            $indexed[(string) $item->id] = &$item;
+        }
+
+        // Second pass: attach each node to its parent (or to roots)
+        unset($item);
+        foreach ($items as &$item) {
+            $parentId = $item->parent_id !== null ? (string) $item->parent_id : null;
+            if ($parentId === null || !isset($indexed[$parentId])) {
+                // No parent -> root node
+                $roots[] = &$item;
+            } else {
+                // Attach this node to its parent's nodes array
+                $indexed[$parentId]->nodes[] = &$item;
             }
         }
-        return $tree;
+
+        return $roots;
     }
 
     public function classes()

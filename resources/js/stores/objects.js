@@ -1,87 +1,204 @@
-import {defineStore} from 'pinia'
-import { SOMETHING } from "../constants.js";
-// @TODO this is in fact classes tree store. Need to rename or maybe merge with objectCache somehow
-// You can name the return value of `defineStore()` anything you want,
-// but it's best to use the name of the store and surround it with `use`
-// and `Store` (e.g. `useUserStore`, `useCartStore`, `useProductStore`)
-// the first argument is a unique id of the store across your application
+import { defineStore } from 'pinia'
+import axios from 'axios'
+import { SOMETHING } from "../constants.js"
+import { eventBus } from "../eventBus.js"
+
 export const useObjectsStore = defineStore('objects', {
     state: () => ({
-        classes: {
-            id: '939cd822-9e23-450c-8c5e-c23f67cca792',
-            name: 'Anything',
-            nodes: [
-                {
-                    name: 'item1',
-                    nodes: [
-                        {
-                            name: 'item1.1'
-                        },
-                        {
-                            name: 'item1.2',
-                            nodes: [
-                                {
-                                    name: 'item1.2.1'
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    name: 'item2'
-                }
-            ]
-        },
-        objects:[
-
-        ],
-
+        rootNodes: [],        // array of top-level nodes (Something, link, system, ...)
+        objects: [],
         loading: false,
+        searchText: '',
+        processing: false,
+        validationErrors: {}
     }),
-    getters: {
 
-        //doubleCount: (state) => state.count * 2,
-    },
+    getters: {},
+
     actions: {
-
-        increment() {
-            this.count++
-        },
         async loadClassTree(thing_id, levels) {
             this.loading = true
-            await axios.post('/object', JSON.stringify({
-                "tree": true,
-                "search": this.searchText,
-                "type": [2]
-            })).then(response => {
+            try {
+                const response = await axios.post('/object', JSON.stringify({
+                    tree: true,
+                    search: this.searchText,
+                    type: [2]
+                }))
                 this.validationErrors = {}
-                console.log('response', response.data.things);
-                //this.classes = response.data.things
-                for (let i in response.data.things) {
-                    if(response.data.things[i].id == SOMETHING) {
-                        // First root node
-                        this.classes = response.data.things[i];
-                        //this.classes.nodes = [];
-                    } else {
-                        this.classes.nodes.push(response.data.things[i]);
-                    }
+                console.log('response', response.data.things)
 
-                }
-                this.classes.name = response.data.things[0].name
-                console.log('this.classes', this.classes)
-
-            }).catch(response => {
-                console.log('catch', response)
-                if (response.status === 422) {
-                    //this.validationErrors = response.data.errors
+                // The API returns an array of top-level things.
+                // We want all of them as root nodes.
+                this.rootNodes = response.data.things || []
+                console.log('rootNodes', this.rootNodes)
+            } catch (error) {
+                console.log('catch', error)
+                if (error.response?.status === 422) {
+                    // handle validation errors
                 } else {
                     this.validationErrors = {}
-                    alert(response.data.message)
+                    alert(error.response?.data?.message || 'Error loading class tree')
                 }
-            }).finally(() => {
+            } finally {
                 this.loading = false
                 this.processing = false
-            })
+            }
         },
-    },
+
+        // Helper: find a node by id across all roots
+        findNodeById(id, nodes = this.rootNodes) {
+            for (const node of nodes) {
+                if (node.id === id) return node
+                if (node.nodes && node.nodes.length) {
+                    const found = this.findNodeById(id, node.nodes)
+                    if (found) return found
+                }
+            }
+            return null
+        },
+
+        // Add a new class – parentId = null adds to root level
+        addClassToTree(classId, className, parentId = null) {
+            console.log('Adding class:', { classId, className, parentId })
+            const newNode = { id: classId, name: className, nodes: [] }
+            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
+
+            if (!parentId) {
+                // Add as new root
+                newRoots.push(newNode)
+            } else {
+                // Find parent and add as child
+                const addToParent = (nodes) => {
+                    for (const node of nodes) {
+                        if (node.id === parentId) {
+                            if (!node.nodes) node.nodes = []
+                            node.nodes.push(newNode)
+                            return true
+                        }
+                        if (node.nodes && addToParent(node.nodes)) return true
+                    }
+                    return false
+                }
+                const found = addToParent(newRoots)
+                if (!found) {
+                    console.warn('Parent not found, adding as root')
+                    newRoots.push(newNode)
+                }
+            }
+
+            this.rootNodes = newRoots
+            eventBus.emit('tree-updated', this.rootNodes)
+            eventBus.emit('trigger-search')
+        },
+
+        updateClassInTree(classId, newClassName) {
+            const updateNode = (nodes) => {
+                for (const node of nodes) {
+                    if (node.id === classId) {
+                        node.name = newClassName
+                        return true
+                    }
+                    if (node.nodes && updateNode(node.nodes)) return true
+                }
+                return false
+            }
+            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
+            const updated = updateNode(newRoots)
+            if (updated) {
+                this.rootNodes = newRoots
+                eventBus.emit('tree-updated', this.rootNodes)
+                eventBus.emit('trigger-search')
+            } else {
+                console.warn('Class not found:', classId)
+            }
+        },
+
+        moveClassInTree(classId, newParentId) {
+            let movedNode = null
+            const findAndRemove = (nodes) => {
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === classId) {
+                        movedNode = nodes[i]
+                        nodes.splice(i, 1)
+                        return true
+                    }
+                    if (nodes[i].nodes && findAndRemove(nodes[i].nodes)) return true
+                }
+                return false
+            }
+
+            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
+            let removed = false
+            for (let i = 0; i < newRoots.length; i++) {
+                if (newRoots[i].id === classId) {
+                    movedNode = newRoots[i]
+                    newRoots.splice(i, 1)
+                    removed = true
+                    break
+                }
+                if (newRoots[i].nodes && findAndRemove(newRoots[i].nodes)) {
+                    removed = true
+                    break
+                }
+            }
+
+            if (removed && movedNode) {
+                if (!newParentId) {
+                    // Move to root level
+                    newRoots.push(movedNode)
+                } else {
+                    const addToParent = (nodes) => {
+                        for (const node of nodes) {
+                            if (node.id === newParentId) {
+                                if (!node.nodes) node.nodes = []
+                                node.nodes.push(movedNode)
+                                return true
+                            }
+                            if (node.nodes && addToParent(node.nodes)) return true
+                        }
+                        return false
+                    }
+                    const found = addToParent(newRoots)
+                    if (!found) {
+                        console.warn('New parent not found, moving to root')
+                        newRoots.push(movedNode)
+                    }
+                }
+                this.rootNodes = newRoots
+                eventBus.emit('tree-updated', this.rootNodes)
+                eventBus.emit('trigger-search')
+            }
+        },
+
+        removeClassFromTree(classId) {
+            const findAndRemove = (nodes) => {
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === classId) {
+                        nodes.splice(i, 1)
+                        return true
+                    }
+                    if (nodes[i].nodes && findAndRemove(nodes[i].nodes)) return true
+                }
+                return false
+            }
+            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
+            let removed = false
+            for (let i = 0; i < newRoots.length; i++) {
+                if (newRoots[i].id === classId) {
+                    newRoots.splice(i, 1)
+                    removed = true
+                    break
+                }
+                if (newRoots[i].nodes && findAndRemove(newRoots[i].nodes)) {
+                    removed = true
+                    break
+                }
+            }
+            if (removed) {
+                this.rootNodes = newRoots
+                eventBus.emit('tree-updated', this.rootNodes)
+                eventBus.emit('trigger-search')
+            }
+        }
+    }
 })

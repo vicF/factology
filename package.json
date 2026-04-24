@@ -1,13 +1,17 @@
 {
     "private": true,
-    "type": "module",
     "scripts": {
         "dev": "vite --host=0.0.0.0 --port=5173 --clearScreen=false",
         "dev:debug": "vite --host=0.0.0.0 --port=5173 --debug",
         "dev:no-cache": "vite --host=0.0.0.0 --port=5173 --force",
         "build": "vite build --mode=production",
         "build:analyze": "vite build --mode=production --ssrManifest",
-        "preview": "vite preview --host=0.0.0.0 --port=4173"
+        "preview": "vite preview --host=0.0.0.0 --port=4173",
+        "test:php": "php artisan test",
+        "test:php:unit": "php artisan test --testsuite=Unit",
+        "test:js": "cd tests-js && npx codeceptjs run",
+        "test:vitest": "vitest run --config vitest.config.js",
+        "test:vitest:watch": "vitest"
     },
     "devDependencies": {
         "@codeceptjs/configure": "^1.0.6",

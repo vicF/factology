@@ -60,7 +60,7 @@ class CreateObjectsTable extends Migration
             $things->insert(
                 [
                     Thing::ID     => UUID::LINK_TO_PARENT,
-                    'name'        => 'Parent',
+                    'name'        => 'is a parent of',
                     'description' => 'Type of parent link whatever it can mean'
                 ]
             );
@@ -68,7 +68,7 @@ class CreateObjectsTable extends Migration
             $things->insert(
                 [
                     Thing::ID     => UUID::LINK_TO_CLASS,
-                    'name'        => 'Class of',
+                    'name'        => 'is of class',
                     'description' => 'Link to a class of an object'
                 ]
             );

@@ -83,7 +83,9 @@
                         <div class="row rounded border p-3 rounded-4">
                             <div class="col-md-2" style="font-size: x-small">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                    <img :src="getThumbUrl(object.thing_id)" class="img-fluid" />
+                                    <Image
+                                        :node-id="object.thing_id"
+                                    />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -100,10 +102,16 @@
                         <div class="row p-3" v-if="object.class">
                             <div class="col-md-2">
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                    <img :src="getThumbUrl(object.class.thing_id)" width="50"/>
+                                    <Image
+                                        :node-id="object.class.thing_id"
+                                        width="50px"
+                                    />
                                 </RouterLink>
                                 <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
-                                    <img :src="getThumbUrl(object.class.link_type_id)" width="50"/>
+                                    <Image
+                                        :node-id="object.class.link_type_id"
+                                        width="50px"
+                                    />
                                 </RouterLink>
                             </div>
                             <div class="col-md-10">
@@ -124,10 +132,17 @@
                             <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
                                 <div class="col-md-2">
                                     <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                        <img :src="getThumbUrl(link.thing_id)" width="50"/>
+                                        <Image
+                                            :node-id="link.thing_id"
+                                            width="50px"
+                                        />
                                     </RouterLink>
                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                        <img :src="getThumbUrl(link.link_type_id)" width="50"/>
+                                        <Image
+                                            :node-id="link.link_type_id"
+                                            :alt="link.description"
+                                            width="50px"
+                                        />
                                     </RouterLink>
                                 </div>
                                 <div class="col-md-10">
@@ -207,9 +222,8 @@
         <EditObject
             v-if="showCreateLinkedModal"
             :object="null"
-            :parentObjectId="object?.thing_id"
-            :parentObject="object"
-            :initialLinkedObjects="[]"
+            :initialLinkedObjects="defaultLinkedObjects"
+            :params="createLinkedParams"
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
         />
@@ -237,6 +251,8 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { inject } from 'vue';
+import { useObjectsStore } from '../stores/objects';
+import Image from "./Image.vue";
 
 // Просто инжектим функцию
 const getThumbUrl = inject('getThumbUrl');
@@ -254,6 +270,7 @@ const route = useRoute();
 const { t } = useI18n();
 const authStore = useAuthStore();
 const cacheStore = useObjectCacheStore();
+const objectsStore = useObjectsStore();
 
 // State
 const object = ref(null);
@@ -275,6 +292,27 @@ const treeModalParams = ref({});
 const editingLink = ref(null);
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
+
+// Default linked objects for creating a new linked object
+const defaultLinkedObjects = computed(() => {
+    const links = [];
+
+    // Add link to current object
+    if (object.value) {
+        links.push({
+            other_thing_id: object.value.thing_id,
+            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5', // links to
+            description: `Linked to ${object.value.name}`,
+        });
+    }
+
+    return links;
+});
+
+// Parameters for creating a linked object
+const createLinkedParams = computed(() => ({
+    type: 3, // THING_TYPE
+}));
 
 // Computed
 const authenticated = computed(() => authStore?.authenticated || false);
@@ -357,6 +395,12 @@ const deleteObject = async () => {
 
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
+
+        // If this is a class (type 2), update the class tree store
+        if (object.value.type === 2) {
+            objectsStore.removeClassFromTree(object.value.thing_id);
+        }
+
         router.push('/');
     } catch (error) {
         console.error('Failed to delete object:', error);
@@ -418,12 +462,11 @@ const handleObjectCreated = (newObject) => {
     }
 };
 
-const handleObjectUpdated = (updatedObject) => {
+const handleObjectUpdated = async (updatedObject) => {
     console.log('Object.vue - Object updated:', updatedObject);
-    if (updatedObject?.data && object.value) {
-        object.value = { ...object.value, ...updatedObject.data };
-    }
     showEditModal.value = false;
+    // Fully reload the object to get fresh links
+    await getObject();
 };
 
 const handleLinkedObjectCreated = async () => {
@@ -434,12 +477,15 @@ const handleLinkedObjectCreated = async () => {
 
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
-    return object.value.links.map(l => ({
-        link_id: l.link_id,
-        link_type_id: l.link_type_id,
-        other_thing_id: l.thing_id,
-        translation: l.translation || '',
-        public: l.public ?? 0,
+
+    // Convert links to the format expected by EditObject's initialLinkedObjects
+    return object.value.links.map(link => ({
+        other_thing_id: link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id,
+        link_type_id: link.link_type_id,
+        description: link.translation || '',
+        link_id: link.link_id,
+        // Also include the original one_thing_id for reference
+        one_thing_id: link.one_thing_id,
     }));
 });
 

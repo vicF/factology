@@ -1,4 +1,3 @@
-// vite.config.js (ВРЕМЕННЫЙ МИНИМАЛЬНЫЙ КОНФИГ ДЛЯ ТЕСТА)
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
@@ -7,7 +6,7 @@ export default defineConfig({
     plugins: [
         laravel({
             input: ['resources/js/app.js'],
-            refresh: true, // Оставляем базовый рефреш
+            refresh: true,
         }),
         vue(),
     ],
@@ -19,12 +18,23 @@ export default defineConfig({
             host: 'localhost',
         },
         watch: {
-            usePolling: true,          // Критически важно
-            interval: 1000,             // Проверка раз в секунду
+            usePolling: true,
+            interval: 1000,
+            // This prevents "Double-Reloads" which often cause the
+            // infinite loading spinner on Windows mounts
             awaitWriteFinish: {
-                stabilityThreshold: 500,  // Увеличим до 500мс
+                stabilityThreshold: 500,
                 pollInterval: 100
-            }
+            },
+            // Ignore heavy directories to save CPU cycles
+            ignored: ['**/node_modules/**', '**/vendor/**', '**/storage/**']
+        },
+    },
+    css: {
+        preprocessorOptions: {
+            scss: {
+                quietDeps: true, // This silences warnings from node_modules (Bootstrap)
+            },
         },
     },
 });

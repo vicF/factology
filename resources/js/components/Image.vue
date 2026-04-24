@@ -1,6 +1,5 @@
 <template>
-    <div class="image-wrapper">
-        <!-- Пытаемся загрузить реальную картинку -->
+    <div class="image-wrapper" :style="wrapperStyle">
         <template v-if="!imageError">
             <img
                 :src="getThumbUrl(nodeId)"
@@ -9,15 +8,14 @@
                 class="real-image"
             />
         </template>
-        <!-- Показываем плейсхолдер только при ошибке -->
-        <div v-else class="placeholder" :style="placeholderStyle">
-            <span class="placeholder-letter">Ф</span>
+        <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg">
         </div>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
+import * as jdenticon from 'jdenticon'
 
 const props = defineProps({
     nodeId: {
@@ -27,6 +25,10 @@ const props = defineProps({
     alt: {
         type: String,
         default: ''
+    },
+    width: {
+        type: String,
+        default: '100%'
     }
 })
 
@@ -39,61 +41,58 @@ watch(() => props.nodeId, () => {
 
 const handleImageError = () => {
     imageError.value = true
-    console.log(`Image failed to load for node ${props.nodeId}`)
 }
 
-// Генерация цвета на основе nodeId
-const backgroundColor = computed(() => {
-    if (!props.nodeId) return '#e0e0e0'
-
-    const hash = props.nodeId.split('').reduce((acc, char) => {
-        return char.charCodeAt(0) + ((acc << 5) - acc)
-    }, 0)
-
-    const hue = Math.abs(hash % 360)
-    return `hsl(${hue}, 25%, 85%)`
+const identiconSvg = computed(() => {
+    return jdenticon.toSvg(props.nodeId, 100);
 })
+
+const wrapperStyle = computed(() => ({
+    width: props.width,
+    height: 'auto',
+    display: 'inline-flex',
+    verticalAlign: 'top',
+    cursor: 'pointer' // Explicitly set pointer for the link context
+}))
 
 const placeholderStyle = computed(() => {
     return {
-        backgroundColor: backgroundColor.value,
         width: '100%',
-        height: '100%',
+        aspectRatio: '1 / 1',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        overflow: 'hidden',
+        borderRadius: '4px',
+        backgroundColor: '#f8f9fa'
     }
 })
 </script>
 
 <style scoped>
 .image-wrapper {
-    width: 100%;
-    height: 100%;
-    display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    user-select: none; /* Prevents text-style highlighting on click */
 }
 
 .real-image {
     width: 100%;
-    height: 100%;
-    object-fit: contain; /* Важно: contain сохраняет пропорции */
+    height: auto;
     display: block;
+    cursor: pointer;
+    -webkit-user-drag: none; /* Prevents dragging the ghost image */
 }
 
 .placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    cursor: pointer;
 }
 
-.placeholder-letter {
-    font-size: 20px;
-    font-weight: bold;
-    color: #666666;
-    opacity: 0.7;
+/* Ensure the generated SVG fills the placeholder container */
+.placeholder :deep(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 </style>

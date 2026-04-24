@@ -1,5 +1,5 @@
 params:
-  - tests/.env
+  - .env.testing
 namespace: Tests
 support_namespace: Support
 paths:

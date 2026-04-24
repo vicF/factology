@@ -15,7 +15,7 @@ class DatabaseTest extends TestCase
     {
         try {
             $res = DB::table('photo_files')->limit(1)->get()->toArray();
-        } catch (\Doctrine\DBAL\Driver\PDO\Exception $e) {
+        } catch (\Exception $e) { //\Doctrine\DBAL\Driver\PDO\Exception $e) {
             $base = Config::get('database.default');
             $this->fail('Failed to connect to database ' . print_r(Config::get('database.connections')[$base], 1) . "\n" . $e);
         }

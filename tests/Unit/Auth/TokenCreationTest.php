@@ -2,18 +2,21 @@
 
 namespace Tests\Unit\Auth;
 
+use App\Models\Classes\UserClass;
 use App\Models\User;
 use Tests\TestCase;
+use Tests\Traits\CreatesTestUsers;
 use Tests\Traits\SafeRefreshDatabase;
 
 class TokenCreationTest extends TestCase
 {
     use SafeRefreshDatabase;
+    use CreatesTestUsers;
 
     /** @test */
     public function user_can_create_personal_access_token()
     {
-        $user = User::factory()->create();
+        $user = $this->createTestUser()->getUser();
 
         $tokenRecord = $user->createToken(
             name: 'test-device',
