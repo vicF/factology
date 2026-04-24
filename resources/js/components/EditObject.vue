@@ -1,4 +1,4 @@
-<!-- Dialog to create new or edit existing object, including it's name, dates etc. -->
+<!-- Dialog to create new or edit existing object -->
 <template>
     <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
         <div class="modal-dialog">
@@ -16,26 +16,35 @@
                 </div>
                 <div class="modal-body">
                     <form @submit.prevent="submitForm">
-                        <div class="mb-3" v-if="formData.type === 2">
-                            <TextField
-                                fieldName="parent_id"
-                                v-model="formData.parent_id"
-                                :isEditable="true"
-                                :label="$t('Parent')"
-                                required
-                            />
-                        </div>
+                        <!-- Class field for Thing type (type 3) -->
                         <div class="mb-3" v-if="formData.type === 3">
-                            <ObjectField
-                                fieldName="class_id"
-                                v-model="formData.class_id"
-                                :isEditable="true"
-                                :label="$t('Class')"
-                                :name="formData.class_name"
-                                :type="CLASS_TYPE"
-                                required
+                            <LinkedObject
+                                :link="classLinkData"
+                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                :index="0"
+                                :singleField="true"
+                                :fixedLinkTypeUuid="LINK_TO_CLASS"
+                                :targetLabel="$t('Class')"
+                                @update="handleClassLinkUpdate"
+                                @remove="handleClassLinkRemove"
                             />
                         </div>
+
+                        <!-- Parent field for Class type (type 2) -->
+                        <div class="mb-3" v-if="formData.type === 2">
+                            <LinkedObject
+                                :link="parentLinkData"
+                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                :index="0"
+                                :singleField="true"
+                                :fixedLinkTypeUuid="LINK_TO_PARENT"
+                                :targetLabel="$t('Parent')"
+                                @update="handleParentLinkUpdate"
+                                @remove="handleParentLinkRemove"
+                            />
+                        </div>
+
+                        <!-- rest of the form (name, description, dates, etc.) -->
                         <div class="mb-3">
                             <TextField
                                 fieldName="name"
@@ -69,34 +78,35 @@
                                 :label="$t('End')"
                             />
                         </div>
-                        <div class="mb-3">
-                            <RadioGroupField
-                                fieldName="visibility"
-                                v-model="formData.public"
-                                :options="{ 0: $t('Private'), 1: $t('Public') }"
-                                :isEditable="true"
-                                :label="$t('Access')"
-                            />
-                        </div>
+
+                        <!-- Object type indicator -->
+                        <div v-if="formData.type == 1" class="mb-3">General</div>
+                        <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
+                        <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
+                        <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
+                        <div v-else-if="formData.type == 5" class="mb-3">External</div>
+                        <div v-else class="mb-3">!Unknown type!</div>
 
                         <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
                             {{ $t('Add Link') }}
                         </button>
 
-                        <div v-for="item in linkedObjects" :key="item.id" class="linked-object-form">
+                        <!-- Display regular links (not special ones) -->
+                        <div v-for="item in regularLinks" :key="item.id" class="linked-object-form">
                             <LinkedObject
                                 :link="{
                                     one_thing_id: formData.thing_id,
-                                    other_thing_id: item.otherThingUuid,
-                                    link_type_id: item.linkTypeUuid,
-                                    translation: item.comment,
-                                    link_id: item.linkId
+                                    other_thing_id: item.other_thing_id,
+                                    link_type_id: item.link_type_id,
+                                    translation: item.translation,
+                                    link_id: item.link_id
                                 }"
                                 :currentObject="{
                                     thing_id: formData.thing_id,
                                     name: formData.name
                                 }"
                                 :index="linkedObjects.indexOf(item)"
+                                :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
                                 @update="updateItem"
                                 @remove="removeItem"
                             />
@@ -145,7 +155,7 @@
 </template>
 
 <script setup>
-import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { Modal } from 'bootstrap';
@@ -154,10 +164,12 @@ import { useI18n } from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
-import RadioGroupField from './Fields/RadioGroupField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT} from "../constants.js";
-import {eventBus} from "../eventBus.js";
+import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE} from "../constants.js";
+import { eventBus } from "../eventBus.js";
+import { useObjectsStore } from '@/stores/objects';
+
+const objectsStore = useObjectsStore();
 
 // Props definition
 const props = defineProps({
@@ -165,9 +177,6 @@ const props = defineProps({
     params: { type: Object, default: () => ({}) },
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
-    parentObjectId: { type: String, default: null },
-    parentObject: { type: Object, default: null },
-    parentLinkType: { type: String, default: '2da45f14-69c6-4d56-9f2f-809fda14abf5' },
     callback: { type: Object, default: null }
 });
 
@@ -183,116 +192,192 @@ const isEditMode = computed(() => !!props.object);
 
 // Refs
 const formData = ref({
-    thing_id: isEditMode.value
-        ? (props.object.thing_id || props.object.id || uuidv4())
-        : uuidv4(),
+    thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
     name: isEditMode.value ? props.object.name || '' : '',
     description: isEditMode.value ? props.object.description || '' : '',
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? props.object.public || 0 : 0,
-    parent_id: props.params.parentId || null,
-    class_id: props.params.classId || props.object?.class?.thing_id || null,
-    class_name: props.params.className || props.object?.class?.name || null,
     type: props.params.type || 3,
-    link_id: props.object?.class?.link_id || null,
 });
 
-const linkedObjects = ref([]);
+// Special links as full objects (same shape as regular links)
+const classLinkData = ref({
+    one_thing_id: formData.value.thing_id,
+    other_thing_id: '',
+    link_type_id: LINK_TO_CLASS,
+    translation: '',
+    link_id: null,
+});
+
+const parentLinkData = ref({
+    one_thing_id: formData.value.thing_id,
+    other_thing_id: '',
+    link_type_id: LINK_TO_PARENT,
+    translation: '',
+    link_id: null,
+});
+
+const linkedObjects = ref([]); // regular links (excluding class and parent)
+
 let modalInstance = null;
 let confirmModalInstance = null;
+let isClosing = false;
+let isSubmitting = false;
 
 // Unsaved changes tracking
 const originalFormData = ref({});
 const originalLinkedObjects = ref([]);
+const originalClassLink = ref(null);
+const originalParentLink = ref(null);
 
 const hasUnsavedChanges = computed(() => {
-    // Check form data changes
+    if (isSubmitting) return false;
+
     const formChanged = Object.keys(originalFormData.value).some(key => {
-        // Handle null/undefined/empty string equality
         const original = originalFormData.value[key] || '';
         const current = formData.value[key] || '';
         return original !== current;
     });
 
-    // Check linked objects changes
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
+    const classLinkChanged = JSON.stringify(originalClassLink.value) !== JSON.stringify(classLinkData.value);
+    const parentLinkChanged = JSON.stringify(originalParentLink.value) !== JSON.stringify(parentLinkData.value);
 
-    return formChanged || linksChanged;
+    return formChanged || linksChanged || classLinkChanged || parentLinkChanged;
 });
 
-// Modal IDs
+// Regular links (all links except class and parent)
+const regularLinks = computed(() => linkedObjects.value);
+
+// Event handlers
+const handleClassLinkUpdate = ({ data }) => {
+    classLinkData.value = { ...classLinkData.value, ...data };
+};
+
+const handleClassLinkRemove = () => {
+    classLinkData.value.other_thing_id = '';
+    classLinkData.value.link_id = null;
+};
+const handleParentLinkUpdate = ({ data }) => {
+    parentLinkData.value = { ...parentLinkData.value, ...data };
+};
+const handleParentLinkRemove = () => {
+    parentLinkData.value.other_thing_id = '';
+    parentLinkData.value.link_id = null;
+};
+
 const modalId = `editObjectModal-${formData.value.thing_id}`;
 const modalLabelId = `editObjectModalLabel-${formData.value.thing_id}`;
 const confirmModalId = `confirmModal-${formData.value.thing_id}`;
 
-// Initialize data and store original state
+// Guards for recursive initialization
+const isInitializing = ref(false);
+const lastInitializedId = ref(null);
+
+// Initialize data
 const initializeData = () => {
-    // Initialize linked objects
-    if (isEditMode.value) {
-        linkedObjects.value = props.initialLinkedObjects
-            .filter(item => item.link_type_id !== 'c217c185-742f-4a9f-8e69-acea2b4f5aea')
-            .map(item => ({
-                id: uuidv4(),
-                otherThingUuid: item.other_thing_id || '',
-                linkTypeUuid: item.link_type_id || '',
-                comment: item.description || '',
-                linkId: item.link_id || null,
-            }));
-    } else {
-        if (props.initialLinkedObjects && props.initialLinkedObjects.length > 0) {
-            linkedObjects.value = props.initialLinkedObjects.map(item => ({
-                id: uuidv4(),
-                otherThingUuid: item.other_thing_id || item.otherThingUuid || '',
-                linkTypeUuid: item.link_type_id || item.linkTypeUuid || '',
-                comment: item.description || item.comment || '',
-                linkId: item.link_id || item.linkId || null,
-            }));
-        } else if (props.parentObject) {
-            linkedObjects.value = [{
-                id: uuidv4(),
-                otherThingUuid: props.parentObject.thing_id,
-                linkTypeUuid: props.parentLinkType,
-                comment: '',
-                linkId: null,
-            }];
-        } else if (props.parentObjectId) {
-            linkedObjects.value = [{
-                id: uuidv4(),
-                otherThingUuid: props.parentObjectId,
-                linkTypeUuid: props.parentLinkType,
-                comment: '',
-                linkId: null,
-            }];
-        } else {
-            linkedObjects.value = [];
+    if (isInitializing.value) return;
+    isInitializing.value = true;
+
+    linkedObjects.value = [];
+
+    // Reset special links
+    classLinkData.value = {
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: LINK_TO_CLASS,
+        translation: '',
+        link_id: null,
+    };
+    parentLinkData.value = {
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: LINK_TO_PARENT,
+        translation: '',
+        link_id: null,
+    };
+
+    // Process initialLinkedObjects
+    props.initialLinkedObjects.forEach(item => {
+        const linkItem = {
+            one_thing_id: item.one_thing_id || '',
+            other_thing_id: item.other_thing_id || '',
+            link_type_id: item.link_type_id || '',
+            translation: item.description || item.translation || '',
+            link_id: item.linkId || null,
+        };
+
+        if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
+            classLinkData.value = { ...classLinkData.value, ...linkItem };
+            return;
+        }
+
+        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
+            // The parent ID can be in either field; prefer one_thing_id as it's the source.
+            const parentId = linkItem.one_thing_id || linkItem.other_thing_id;
+            if (parentId) {
+                parentLinkData.value.other_thing_id = parentId;
+                parentLinkData.value.link_id = linkItem.link_id;
+                parentLinkData.value.translation = linkItem.translation;
+            }
+            console.log('[EditObject] parentLinkData set to:', JSON.parse(JSON.stringify(parentLinkData.value)));
+            return;
+        }
+
+        linkedObjects.value.push(linkItem);
+    });
+
+    // For edit mode, also read from existing object
+    if (isEditMode.value && props.object) {
+        if (formData.value.type === THING_TYPE && props.object.class?.thing_id && !classLinkData.value.other_thing_id) {
+            classLinkData.value.other_thing_id = props.object.class.thing_id;
+            classLinkData.value.link_id = props.object.class?.link_id || null;
+        }
+        // FIX: Always update parentLinkData from existing links, even if other_thing_id already set
+        if (formData.value.type === CLASS_TYPE && props.object.links) {
+            const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
+            if (parentLinkFromLinks) {
+                // Determine which side is the parent (the one that is not the current object)
+                let parentId;
+                if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
+                    parentId = parentLinkFromLinks.other_thing_id;
+                } else {
+                    parentId = parentLinkFromLinks.one_thing_id;
+                }
+                parentLinkData.value.other_thing_id = parentId;
+                parentLinkData.value.link_id = parentLinkFromLinks.link_id;
+                parentLinkData.value.translation = parentLinkFromLinks.translation || '';
+                console.log('[EditObject] parentLinkData updated from existing links:', JSON.parse(JSON.stringify(parentLinkData.value)));
+            }
         }
     }
 
+    // Store original state
     originalFormData.value = JSON.parse(JSON.stringify(formData.value));
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
+    originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
+    originalParentLink.value = JSON.parse(JSON.stringify(parentLinkData.value));
+
+    isInitializing.value = false;
 };
 
 initializeData();
 
+// Helper methods
 const addNewLinkedObject = () => {
     linkedObjects.value.push({
         id: uuidv4(),
-        otherThingUuid: '',
-        linkTypeUuid: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
-        comment: '',
-        linkId: null,
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: '',
+        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+        translation: '',
+        link_id: null,
     });
 };
 
 const updateItem = ({ index, data }) => {
-    linkedObjects.value[index] = {
-        ...linkedObjects.value[index],
-        otherThingUuid: data.other_thing_id,
-        linkTypeUuid: data.link_type_id,
-        comment: data.translation,
-        linkId: data.link_id,
-    };
+    linkedObjects.value[index] = { ...linkedObjects.value[index], ...data };
 };
 
 const removeItem = (index) => {
@@ -300,35 +385,43 @@ const removeItem = (index) => {
 };
 
 const confirmClose = () => {
-    confirmModalInstance?.hide();
-
+    if (document.activeElement?.blur) document.activeElement.blur();
+    if (confirmModalInstance) confirmModalInstance.hide();
     const modalElement = document.getElementById(modalId);
-    if (modalElement) {
+    if (modalElement && modalInstance) {
         modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-        modalInstance?.hide();
-        setTimeout(() => {
-            modalElement.addEventListener('hide.bs.modal', handleHideModal);
-        }, 100);
+        modalInstance.hide();
     }
+    emit('close');
 };
 
 const handleHideModal = (event) => {
-    if (hasUnsavedChanges.value) {
+    if (document.activeElement?.blur) document.activeElement.blur();
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement || !modalInstance) {
         event.preventDefault();
         event.stopPropagation();
-        confirmModalInstance?.show();
+        return;
+    }
+    if (hasUnsavedChanges.value && !isClosing && !isSubmitting) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (confirmModalInstance) confirmModalInstance.show();
     }
 };
 
 const submitForm = async () => {
+    if (isSubmitting) return;
     try {
-        const linksToAdd = linkedObjects.value
-            .filter(item => item.otherThingUuid?.trim() && !item.linkId)
+        isSubmitting = true;
+
+        const linksToAdd = regularLinks.value
+            .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
                 one_thing_id: formData.value.thing_id,
-                link_type_id: item.linkTypeUuid,
-                other_thing_id: item.otherThingUuid,
-                description: item.comment || '',
+                link_type_id: item.link_type_id,
+                other_thing_id: item.other_thing_id,
+                description: item.translation || '',
                 public: 0,
             }));
 
@@ -339,43 +432,71 @@ const submitForm = async () => {
             start: formData.value.start || null,
             end: formData.value.end || null,
             public: formData.value.public,
-            parent_id: formData.value.parent_id,
             type: formData.value.type,
         };
 
-        if (formData.value.class_id) {
+        if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_CLASS,
-                other_thing_id: formData.value.class_id,
-                description: '',
-                link_id: formData.value.link_id || undefined,
+                other_thing_id: classLinkData.value.other_thing_id,
+                description: classLinkData.value.translation || '',
+                link_id: classLinkData.value.link_id || undefined,
                 public: 1,
             };
         }
 
-        if (formData.value.parent_id) {
-            payload.class = {
-                one_thing_id: formData.value.thing_id,
+        if (formData.value.type === CLASS_TYPE && parentLinkData.value.other_thing_id) {
+            payload.parent = {
+                one_thing_id: parentLinkData.value.other_thing_id, // parent as source
                 link_type_id: LINK_TO_PARENT,
-                other_thing_id: formData.value.parent_id,
-                description: '',
-                link_id: formData.value.link_id || undefined,
+                other_thing_id: formData.value.thing_id,           // child (new class) as target
+                description: parentLinkData.value.translation || '',
+                link_id: parentLinkData.value.link_id || undefined,
                 public: 1,
             };
         }
 
-        if (linksToAdd.length > 0) {
-            payload.links_to_add = linksToAdd;
+        if (linksToAdd.length > 0) payload.links_to_add = linksToAdd;
+
+        if (isEditMode.value) {
+            const linksToUpdate = regularLinks.value
+                .filter(item => item.link_id && item.other_thing_id?.trim())
+                .map(item => ({
+                    link_id: item.link_id,
+                    one_thing_id: formData.value.thing_id,
+                    other_thing_id: item.other_thing_id,
+                    link_type_id: item.link_type_id,
+                    translation: item.translation,
+                }));
+            if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
+
+            const linksToDelete = originalLinkedObjects.value
+                .filter(orig => orig.link_id && !regularLinks.value.find(curr => curr.link_id === orig.link_id))
+                .map(orig => orig.link_id);
+            if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
         }
+
+        console.log('[EditObject] Final payload:', JSON.parse(JSON.stringify(payload)));
 
         let response;
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             emit('object-updated', response.data);
+            if (formData.value.type === CLASS_TYPE) {
+                const oldParentId = props.object?.parent_id;
+                const newParentId = parentLinkData.value.other_thing_id;
+                if (oldParentId !== newParentId) {
+                    objectsStore.moveClassInTree(formData.value.thing_id, newParentId);
+                }
+                objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
+            }
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
             emit('object-created', response.data);
+            if (formData.value.type === CLASS_TYPE) {
+                objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, parentLinkData.value.other_thing_id);
+            }
             if (props.callback && props.callback.type === 'link-created') {
                 eventBus.emit('link-created', {
                     requestId: props.callback.requestId,
@@ -386,65 +507,66 @@ const submitForm = async () => {
                     comment: props.callback.comment
                 });
             }
-            if (props.parentObjectId) {
-                router.push({ name: 'object', params: { id: props.parentObjectId } });
-            }
         }
 
-        modalInstance?.hide();
+        if (document.activeElement?.blur) document.activeElement.blur();
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+        if (modalInstance) modalInstance.hide();
+        setTimeout(() => {
+            emit('close');
+            isSubmitting = false;
+        }, 300);
     } catch (error) {
         console.error('Submit error:', error.response || error);
         alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
+        isSubmitting = false;
     }
 };
 
 onMounted(async () => {
     await nextTick();
-
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
-
     if (modalElement) {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
-        modalElement.addEventListener('hidden.bs.modal', () => emit('close'));
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            if (!isSubmitting) emit('close');
+        });
         setTimeout(() => {
-            modalInstance.show();
+            if (modalInstance && modalElement) modalInstance.show();
         }, 100);
     }
-
-    if (confirmModalElement) {
-        confirmModalInstance = new Modal(confirmModalElement);
-    }
+    if (confirmModalElement) confirmModalInstance = new Modal(confirmModalElement);
 });
 
 onUnmounted(() => {
     const modalElement = document.getElementById(modalId);
-    if (modalElement) {
-        modalElement.removeEventListener('hide.bs.modal', handleHideModal);
-    }
-    if (modalInstance) modalInstance.dispose();
-    if (confirmModalInstance) confirmModalInstance.dispose();
+    if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+    if (modalInstance) modalInstance.hide();
+    if (confirmModalInstance) confirmModalInstance.hide();
 });
 
-watch(() => props.object, (newObject) => {
-    if (newObject) {
-        formData.value = {
-            thing_id: newObject.thing_id || newObject.id || uuidv4(),
-            name: newObject.name || '',
-            description: newObject.description || '',
-            start: newObject.start || '',
-            end: newObject.end || '',
-            public: newObject.public || 0,
-            parent_id: props.params.parentId || null,
-            class_id: props.params.classId || newObject.class?.thing_id || null,
-            class_name: props.params.className || newObject.class?.name || null,
-            type: props.params.type || 3,
-            link_id: newObject.class?.link_id || null,
-        };
-        initializeData();
-    }
-}, { deep: true });
+// Fixed watch to prevent recursion
+watch(() => props.object, (newObject, oldObject) => {
+    if (!newObject) return;
+    const newId = newObject.thing_id || newObject.id;
+    const oldId = oldObject?.thing_id || oldObject?.id;
+    if (newId === oldId && lastInitializedId.value === newId) return;
+    lastInitializedId.value = newId;
+
+    formData.value = {
+        thing_id: newObject.thing_id || newObject.id || uuidv4(),
+        name: newObject.name || '',
+        description: newObject.description || '',
+        start: newObject.start || '',
+        end: newObject.end || '',
+        public: newObject.public || 0,
+        type: props.params.type || 3,
+    };
+    initializeData();
+}, { deep: false }); // shallow watch – only triggers when the object reference changes
 </script>
 
 <style scoped>

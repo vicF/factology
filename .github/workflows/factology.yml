@@ -1,0 +1,137 @@
+name: Full Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: securerootpassword
+          MYSQL_DATABASE: factology_tmp_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: pdo_mysql, mbstring, dom, fileinfo, bcmath, zip
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create .env file
+        run: |
+          cat > .env << 'EOF'
+          APP_ENV=testing
+          APP_KEY=
+          APP_DEBUG=true
+          APP_URL=http://localhost:8005
+          DB_CONNECTION=mysql
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_DATABASE=factology_tmp_test
+          DB_USERNAME=root
+          DB_PASSWORD=securerootpassword
+          LOG_CHANNEL=single
+          EOF
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Dump autoload
+        run: composer dump-autoload
+
+      - name: Clear Laravel caches
+        run: |
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan view:clear
+          php artisan route:clear
+
+      - name: Install Node dependencies
+        run: |
+          npm ci --no-optional --no-audit --no-fund
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Run database migrations
+        env:
+          APP_ENV: testing
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Start Laravel server and capture logs
+        env:
+          APP_ENV: testing
+          APP_DEBUG: true
+        run: |
+          mkdir -p storage/logs
+          php artisan serve --host=0.0.0.0 --port=8005 > server.log 2>&1 &
+          sleep 10
+
+          echo "=== Testing API status ==="
+          curl -s http://localhost:8005/api/test/status || echo "API test failed"
+
+          echo "=== Testing registration endpoint ==="
+          curl -v -X POST http://localhost:8005/register \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Test","email":"test@test.com","password":"password","password_confirmation":"password"}' \
+            2>&1 || true
+
+          echo "=== Laravel log ==="
+          cat storage/logs/laravel.log 2>/dev/null || echo "No laravel log yet"
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-logs
+          path: |
+            storage/logs/
+            server.log
+            .env
+
+      - name: Run CodeceptJS tests
+        working-directory: tests-js
+        env:
+          CI: true
+          HEADLESS: true
+          APP_URL: http://localhost:8005
+        run: npx codeceptjs run --steps --verbose
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-artifacts
+          path: |
+            tests-js/output/
+            storage/logs/
+            server.log

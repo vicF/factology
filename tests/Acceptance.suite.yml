@@ -40,6 +40,7 @@ modules:
                 "--enable-logging",
                 "--v=1",                                  # logging level
                 "start-maximized",
+                "--user-agent=Codeception-Test",
                 "%CHROME_ARGS%"  # here you can set if you run Chrome in headless mode
               ]
               excludeSwitches: [ "enable-automation" ]

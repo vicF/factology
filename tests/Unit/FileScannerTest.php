@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 class FileScannerTest extends TestCase
 {
-    public function fileToDateDataProvider()
+    public static function fileToDateDataProvider(): array
     {
         return [
             ['IMG_20200223_190915.jpg', '2020-02-23 19:09:15'],
@@ -38,7 +38,7 @@ class FileScannerTest extends TestCase
         self::assertEquals($dateExpected, $date->format(Anything::TIME_FORMAT));
     }
 
-    public function getDateFromFileDataProvider()
+    public static function getDateFromFileDataProvider()
     {
         return [
             ['VID_20200220_230730.mp4', '20200220230730'],

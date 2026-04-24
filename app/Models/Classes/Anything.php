@@ -10,6 +10,7 @@ namespace App\Models\Classes;
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
 use Fokin\Facts\Data\UUID;
+use http\Exception\InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -85,6 +86,7 @@ class Anything
         'start_variety',
         'thing_id',
         'type',
+        'owner',
     ];
 
     public $params = [
@@ -346,7 +348,7 @@ class Anything
      * @param null $class
      * @return static
      */
-    public static function CreateFromData(array $ObjectData, $class = null)
+    public static function CreateFromData(array $ObjectData, $class = null): static
     {
         //$className = self::getClassById($ObjectData->thing_id);
         $className = self::getPhpClassFromInput($ObjectData);
@@ -515,9 +517,21 @@ class Anything
     }
 
     /**
+     * @throws \Exception
      */
     public function save()
     {
+        $existingRecord = DB::table('things')
+            ->where('thing_id', $this->thing_id)
+            ->first();
+
+        // Check ownership
+        if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
+            throw new \Exception('You do not have permission to update this record', 403);
+            // Or return response with 403 Forbidden status
+        } elseif (empty($this->owner)) {
+            $this->owner = auth()->user()->thing_id;
+        }
         $this->_validate();
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
@@ -539,6 +553,7 @@ class Anything
                 'start'          => $data['start'] ?? null,
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],
+                'owner'          => $data['owner'],
                 'record_updated' => now(),
             ];
 
@@ -605,11 +620,25 @@ class Anything
             }
             $classLink['translation'] = "{$this->name} is of class $className";
         }
+        $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
         return $this->setLink($classLink);
-
     }
 
-    protected function setLinkTranslation(array &$link)
+    public function setParent(array $classLink): bool
+    {
+        if (empty($classLink['translation'])) {
+            try {
+                $className = $this->getObjectNameByUid($classLink['one_thing_id'])->name;
+            } catch (\ErrorException $e) {
+                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
+            }
+            $classLink['translation'] = "{$this->name} is a child of $className";
+        }
+        $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
+        return $this->setLink($classLink);
+    }
+
+    protected function setLinkTranslation(array &$link): void
     {
         if (empty($link['translation'])) {
             try {
@@ -630,7 +659,7 @@ class Anything
 
     public function setLink(array $link): bool
     {
-        $this->setLinkTranslation($link);
+        //$this->setLinkTranslation($link);
         if (@$link['link_id']) {
             // update
             return $this->updateLink($link);
@@ -645,7 +674,7 @@ class Anything
         return DB::table('links')
             ->where('link_id', $link['link_id'])
             ->update([
-                'one_thing_id'   => $this->thing_id,
+                'one_thing_id'   => $link['one_thing_id'],
                 'link_type_id'   => $link['link_type_id'],
                 'other_thing_id' => $link['other_thing_id'],
                 'translation'    => $link['translation'],
@@ -655,10 +684,18 @@ class Anything
     public function addLink(array $link): bool
     {
         $this->setLinkTranslation($link);
+        // Ensure that both ids are in place
+        if(empty($link['one_thing_id']) && empty($link['other_thing_id'])) {
+            throw new InvalidArgumentException('Link object ids (one_thing_id, other_thing_id) are empty ');
+        } elseif(empty($link['one_thing_id']) && $link['other_thing_id'] != $this->thing_id) {
+            $link['one_thing_id'] = $this->thing_id;
+        } elseif (empty($link['other_thing_id']) && $link['one_thing_id'] != $this->thing_id) {
+            $link['other_thing_id'] = $this->thing_id;
+        }
 
         return DB::table('links')->updateOrInsert(
             [
-                'one_thing_id'   => $this->thing_id,
+                'one_thing_id'   => $link['one_thing_id'],
                 'link_type_id'   => $link['link_type_id'],
                 'other_thing_id' => $link['other_thing_id'],
             ],
@@ -838,7 +875,6 @@ class Anything
             ->where('links.one_thing_id', $this->thing_id)
             ->where('link_type_id', UUID::LINK_TO_CLASS)
             ->where('things.deleted', 0)
-            ->where('links.deleted', 0)
             ->join('things', 'other_thing_id', 'things.thing_id')
             ->get()
             ->toArray();
@@ -852,7 +888,6 @@ class Anything
                 ->auth('links')
                 ->where('links.one_thing_id', $this->thing_id)
                 ->where('link_type_id', UUID::LINK_TO_CLASS)
-                ->where('links.deleted', 0)
                 ->pluck('other_thing_id')->toArray();
         }
         return $this->_classes;

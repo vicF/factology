@@ -3,7 +3,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useClickOutside } from '@/composables/useClickOutside.js'
-import { THING_TYPE } from "../../constants.js";
+import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
 import axios from 'axios';
 
 const props = defineProps({
@@ -30,6 +30,10 @@ const props = defineProps({
     dropdownMinWidth: {
         type: String,
         default: '360px'
+    },
+    excludeUuid: {
+        type: String,
+        default: null
     }
 })
 
@@ -65,20 +69,41 @@ const displayValue = computed(() => {
 
 const hasSelection = computed(() => !!props.modelValue)
 
+// Icon based on the selected object's type (if any), otherwise fallback to the prop type
+const defaultIcon = computed(() => {
+    // First, try the selected object's type
+    if (selectedObject.value?.type === CLASS_TYPE) return 'bi bi-diagram-3'
+    if (selectedObject.value?.type === THING_TYPE) return 'bi bi-box'
+    if (selectedObject.value?.type === LINK_TYPE) return 'bi bi-link-45deg'
+    // Fallback to the prop type (for empty fields)
+    if (props.type === CLASS_TYPE) return 'bi bi-diagram-3'
+    if (props.type === THING_TYPE) return 'bi bi-box'
+    return 'bi bi-link-45deg'
+})
+
 const filteredObjects = computed(() => {
+    let results = [];
+
     // If we have search results from server, show them
     if (searchResults.value && searchResults.value.length > 0) {
-        return searchResults.value;
+        results = searchResults.value;
     }
-
     // If no search text, show recent objects
-    if (!searchText.value.trim()) {
-        return cacheStore.getRecent(props.type, props.maxResults) || []
+    else if (!searchText.value.trim()) {
+        results = cacheStore.getRecent(props.type, props.maxResults) || [];
+    }
+    // Otherwise search in cache
+    else {
+        const term = searchText.value.toLowerCase().trim()
+        results = cacheStore.searchCached('object', term, props.maxResults) || [];
     }
 
-    // Otherwise search in cache
-    const term = searchText.value.toLowerCase().trim()
-    return cacheStore.searchCached('object', term, props.maxResults) || []
+    // Filter out the excluded UUID if provided
+    if (props.excludeUuid && results.length > 0) {
+        results = results.filter(obj => obj.thing_id !== props.excludeUuid);
+    }
+
+    return results;
 })
 
 // ── Custom click outside handler for teleported dropdown ─────
@@ -367,7 +392,7 @@ const handleDropdownMouseDown = (e) => {
                             :is="selectedObject.icon"
                             style="width: 1.3em; height: 1.3em;"
                         />
-                        <i v-else class="bi bi-link-45deg"></i>
+                        <i v-else :class="defaultIcon"></i>
                     </span>
 
                     <input
@@ -431,20 +456,20 @@ const handleDropdownMouseDown = (e) => {
                                     type="button"
                                     class="dropdown-item"
                                     @click="selectObject(obj)"
-                                    @mousedown.prevent="" <!-- Prevent mousedown from closing -->
+                                    @mousedown.prevent=""
                                 >
-                                <i class="bi bi-box flex-shrink-0"></i>
+                                    <i class="bi bi-box flex-shrink-0"></i>
 
-                                <div class="flex-grow-1 text-truncate text-start">
-                                    <div>{{ obj.name || 'Unnamed' }}</div>
-                                    <small v-if="obj.description" class="text-muted d-block text-truncate">
-                                        {{ obj.description }}
+                                    <div class="flex-grow-1 text-truncate text-start">
+                                        <div>{{ obj.name || 'Unnamed' }}</div>
+                                        <small v-if="obj.description" class="text-muted d-block text-truncate">
+                                            {{ obj.description }}
+                                        </small>
+                                    </div>
+
+                                    <small class="text-muted ms-auto font-monospace">
+                                        {{ (obj.thing_id || '').substring(0, 6) }}…
                                     </small>
-                                </div>
-
-                                <small class="text-muted ms-auto font-monospace">
-                                    {{ (obj.thing_id || '').substring(0, 6) }}…
-                                </small>
                                 </button>
                             </div>
                         </template>

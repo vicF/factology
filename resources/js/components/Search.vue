@@ -14,7 +14,10 @@
                             <!-- Image Column -->
                             <div class="col-md-2" style="font-size: x-small;">
                                 <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }">
-                                    <img :src="getThumbUrl(thing.thing_id)" />
+                                    <Image
+                                        :node-id="thing.thing_id"
+                                        width="50px"
+                                    />
                                 </RouterLink>
                             </div>
 
@@ -58,6 +61,7 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
+import Image from "./Image.vue";
 
 // Props
 const props = defineProps({

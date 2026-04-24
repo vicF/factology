@@ -1,7 +1,7 @@
 <?php
 /**
  * factology
- * User: fokin
+ * UserClass: fokin
  * Created: 26/02/2020
  */
 
@@ -14,7 +14,7 @@ use Tests\TestCase;
 
 class TakeExifDateTest extends TestCase
 {
-    public function DataProvider(): array
+    public static function DataProvider(): array
     {
         $data = [
             [
