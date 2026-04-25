@@ -56,6 +56,7 @@
                 ></textarea>
             </div>
 
+            <!-- Auto‑generated preview with safe fallback -->
             <div class="form-group"
                  v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
                 <div class="generated-preview p-2 bg-light rounded border">
@@ -64,9 +65,9 @@
                         Auto-generated preview:
                     </small>
                     <LinkDescription
+                        :key="`${link.one_thing_id}-${link.link_type_id}-${link.other_thing_id}`"
                         :link="link"
                         :object="currentObject"
-                        size="medium"
                     />
                 </div>
             </div>
@@ -93,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
@@ -125,10 +126,9 @@ if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
 
-// Flag to prevent recursive emits
 let isUpdatingFromParent = false;
+let previousEmitted = JSON.stringify(link.value);
 
-// Watch for changes from parent – update internal copy without emitting back
 watch(() => props.link, (newLink) => {
     const newCopy = { ...newLink };
     if (props.singleField && props.fixedLinkTypeUuid) {
@@ -139,12 +139,10 @@ watch(() => props.link, (newLink) => {
     isUpdatingFromParent = false;
 }, { deep: true });
 
-// Watch internal changes – emit only if they originated from user interaction
-let previousEmitted = JSON.stringify(link.value);
 watch(link, () => {
-    if (isUpdatingFromParent) return; // ignore updates that came from parent
+    if (isUpdatingFromParent) return;
     const newSerialized = JSON.stringify(link.value);
-    if (newSerialized === previousEmitted) return; // no real change
+    if (newSerialized === previousEmitted) return;
     previousEmitted = newSerialized;
     emit('update', {
         index: props.index,
@@ -152,30 +150,26 @@ watch(link, () => {
     });
 }, { deep: true });
 
-const oneObjectName = ref('');
-const otherObjectName = ref('');
-const typeName = ref('');
-
-const loadObjectNames = async () => {
-    if (link.value.one_thing_id) {
-        try {
-            const obj = await store.getObject(link.value.one_thing_id);
-            if (obj?.name) oneObjectName.value = obj.name;
-        } catch (e) {}
-    }
-    if (link.value.other_thing_id) {
-        try {
-            const obj = await store.getObject(link.value.other_thing_id);
-            if (obj?.name) otherObjectName.value = obj.name;
-        } catch (e) {}
-    }
-    if (link.value.link_type_id) {
-        try {
-            const obj = await store.getObject(link.value.link_type_id);
-            if (obj?.name) typeName.value = obj.name;
-        } catch (e) {}
+// Safe preloading: only fetch valid UUIDs (length > 20)
+const preloadObjectNames = async () => {
+    const ids = [link.value.one_thing_id, link.value.other_thing_id, link.value.link_type_id]
+        .filter(id => id && typeof id === 'string' && id.length > 20);
+    for (const id of ids) {
+        if (!store.hasCachedObject(id)) {
+            try {
+                await store.fetchOrGetObject(id);
+            } catch (e) {
+                // Silently ignore 404 – the object might not exist yet (e.g., new unsaved object)
+                console.debug(`Preload failed for ${id}:`, e.message);
+            }
+        }
     }
 };
+
+watch(() => [link.value.one_thing_id, link.value.other_thing_id, link.value.link_type_id],
+    () => { preloadObjectNames(); },
+    { deep: true }
+);
 
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -204,18 +198,26 @@ const removeSelf = () => {
     emit('remove', props.index);
 };
 
-const handleLinkCreated = (data) => {
+const handleLinkCreated = async (data) => {
     if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
-        if (!link.value.other_thing_id) {
-            link.value.other_thing_id = data.newObjectId;
+        const newId = data.newObjectId;
+        if (newId && !link.value.other_thing_id) {
+            await nextTick();
+            link.value.other_thing_id = newId;
+            if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
+            if (data.comment !== undefined) link.value.translation = data.comment;
+
+            // No need to preload – the object is already created and cached by the modal
+            emit('update', {
+                index: props.index,
+                data: { ...link.value }
+            });
         }
-        if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
-        if (data.comment !== undefined) link.value.translation = data.comment;
     }
 };
 
 onMounted(() => {
-    loadObjectNames();
+    preloadObjectNames();
     eventBus.on('link-created', handleLinkCreated);
 });
 
@@ -225,7 +227,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ... (no changes to styles) ... */
+/* (same styles as before – unchanged) */
 .linked-object {
     border: 1px solid #ddd;
     padding: 15px;
