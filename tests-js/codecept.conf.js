@@ -40,7 +40,10 @@ exports.config = {
     },
     plugins: {
         screenshotOnFail: { enabled: true },
-        pauseOnFail: { enabled: false },
+        pauseOnFail: {
+            // Only enable if NOT running in a CI environment
+            enabled: !process.env.CI
+        },
     },
     name: 'factology'
 };

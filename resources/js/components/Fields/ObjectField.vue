@@ -218,7 +218,12 @@ async function loadObjectByUuid(uuid) {
     }
 }
 
-function selectObject(obj) {
+// FIX: Added event parameter and stopPropagation
+function selectObject(obj, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     if (!obj?.thing_id) return
     isClickingDropdown.value = true
     selectedObject.value = obj
@@ -368,7 +373,8 @@ function handleDropdownMouseDown(e) {
                                     :key="obj.thing_id || index"
                                     type="button"
                                     class="dropdown-item"
-                                    @click="selectObject(obj)"
+                                    :data-test-name="obj.name"
+                                    @click="selectObject(obj, $event)"
                                     @mousedown.prevent
                                 >
                                     <i class="bi bi-box flex-shrink-0"></i>
@@ -434,6 +440,7 @@ function handleDropdownMouseDown(e) {
     list-style: none;
     background-clip: padding-box;
     box-sizing: border-box;
+    z-index: 99999 !important;
 }
 .object-field-dropdown .dropdown-item {
     display: flex;
@@ -460,7 +467,6 @@ function handleDropdownMouseDown(e) {
     font-size: 0.75rem;
 }
 .object-field-dropdown .alert { margin-bottom: 0; }
-.object-field-dropdown { z-index: 99999 !important; }
 .object-field-dropdown,
 .object-field-dropdown * { box-sizing: border-box; }
 </style>
