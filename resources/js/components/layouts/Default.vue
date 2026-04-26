@@ -3,41 +3,82 @@
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
-                        aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+                <!-- Mobile: Button to open tree drawer -->
+                <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas"
+                        data-bs-target="#treeOffcanvas" aria-controls="treeOffcanvas">
+                    ☰ Browse
                 </button>
+
+<!--                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>-->
+
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home</router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home"><svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 -960 960 960"
+                                fill="#e3e3e3"
+                            >
+                                <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
+                            </svg></router-link>
                         </li>
                     </ul>
                     <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery"
+                               aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
-                                   role="button" data-bs-toggle="dropdown" aria-haspopup="true"
-                                   aria-expanded="false">
-                                    {{ authenticated && user ? user.name : 'User' }}
+                                <a
+                                    class="nav-link dropdown-toggle d-flex align-items-center"
+                                    href="#"
+                                    id="navbarDropdownMenuLink"
+                                    role="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                >
+                                    <!-- Not authenticated: show login icon -->
+                                    <svg
+                                        v-if="!authenticated || !user"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        viewBox="0 -960 960 960"
+                                        fill="currentColor"
+                                        class="me-1"
+                                        role="img"
+                                        aria-label="Login"
+                                    >
+                                        <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                    </svg>
+
+                                    <!-- Authenticated: show username -->
+                                    <span v-else class="fw-semibold">
+      {{ user.name }}
+    </span>
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end"
-                                     aria-labelledby="navbarDropdownMenuLink">
-                                    <template v-if="authenticated">
-                                        <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
+
+                                <!-- Dropdown menu -->
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                                    <!-- Guest links -->
+                                    <template v-if="!authenticated">
+                                        <li><router-link class="dropdown-item" to="/login">Login</router-link></li>
+                                        <li><router-link class="dropdown-item" to="/register">Register</router-link></li>
                                     </template>
+
+                                    <!-- User links -->
                                     <template v-else>
-                                        <router-link class="dropdown-item" to="/login">Log in</router-link>
-                                        <router-link class="dropdown-item" to="/register">Register</router-link>
+                                        <li><router-link class="dropdown-item" to="/profile">Profile</router-link></li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li><a class="dropdown-item" href="#" @click.prevent="logout">Logout</a></li>
                                     </template>
-                                </div>
+                                </ul>
                             </li>
                         </ul>
                     </div>
@@ -47,22 +88,36 @@
 
         <!-- Main content area -->
         <main class="mt-3">
-            <div class="container ps-5">
+            <div class="container px-3 px-md-5">
                 <div class="row">
-                    <div class="col-3 ps-0">
+                    <!-- Desktop: persistent tree column -->
+                    <div class="col-3 ps-0 d-none d-md-block">
                         <class-tree></class-tree>
                     </div>
-                    <div class="col-9">
+
+                    <!-- Content column: full width on mobile, 9 cols on desktop -->
+                    <div class="col-12 col-md-9">
                         <router-view></router-view>
                     </div>
                 </div>
             </div>
         </main>
+
+        <!-- Mobile: Offcanvas drawer for tree (slides from left) -->
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="treeOffcanvas" aria-labelledby="treeOffcanvasLabel">
+            <div class="offcanvas-header">
+                <h5 id="treeOffcanvasLabel">Classification Tree</h5>
+                <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+                <class-tree></class-tree>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import LanguageSwitcher from "../LanguageSwitcher.vue"
@@ -84,13 +139,34 @@ const getThumbUrl = (thing_id) => {
 provide('getThumbUrl', getThumbUrl);
 
 const router = useRouter()
-const route  = useRoute()
+const route = useRoute()
 
-const authStore    = useAuthStore()
-const searchStore  = useSearchStore()
+const authStore = useAuthStore()
+const searchStore = useSearchStore()
 
-const showModal    = ref(false)
+const showModal = ref(false)
 const selectedType = ref('')
+
+// ---------------------------------------------------------------------------
+// Helper: close the mobile offcanvas drawer if open
+const closeMobileTreeDrawer = () => {
+    // Check if Bootstrap is available and try to hide the offcanvas
+    if (typeof bootstrap !== 'undefined') {
+        const offcanvasElement = document.getElementById('treeOffcanvas')
+        if (offcanvasElement) {
+            const offcanvasInstance = bootstrap.Offcanvas.getInstance(offcanvasElement)
+            if (offcanvasInstance) {
+                offcanvasInstance.hide()
+            }
+        }
+    } else {
+        // Fallback: try to find and click the close button
+        const closeButton = document.querySelector('#treeOffcanvas .btn-close')
+        if (closeButton) {
+            closeButton.click()
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 
@@ -133,10 +209,16 @@ const submitSearch = () => {
 
 onMounted(() => {
     checkAuth()
+
+    // Initialize Bootstrap offcanvas (just to ensure event handlers are bound)
+    // Bootstrap will auto-initialize elements with data-bs-toggle="offcanvas"
+    // No extra code needed, but we close drawer on route changes (see watcher below)
 })
 
+// Watch for route changes to automatically close the mobile drawer when navigating
 watch(() => route.path, () => {
     checkAuth()
+    closeMobileTreeDrawer()
 })
 
 watch(() => route.query.q, (newQuery) => {
@@ -195,6 +277,11 @@ const handleObjectCreated = (object) => {
     console.log('Object created:', object)
     router.push({ path: '/', query: { q: searchQuery.value } })
 }
+
+// Clean up any potential global listeners if needed
+onUnmounted(() => {
+    // No specific cleanup required for offcanvas
+})
 </script>
 
 <style scoped>
@@ -204,5 +291,17 @@ const handleObjectCreated = (object) => {
 
 .container {
     max-width: 100%;
+}
+
+/* Optional: adjust offcanvas width for better mobile experience */
+@media (max-width: 576px) {
+    .offcanvas {
+        width: 85% !important;
+    }
+}
+
+/* Ensure the offcanvas drawer has a proper z-index if needed */
+.offcanvas {
+    z-index: 1050;
 }
 </style>

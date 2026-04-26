@@ -4,6 +4,27 @@ use Illuminate\Support\Facades\Route;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
+
+Route::get('/', function () {
+    $viteUrl = env('VITE_DEV_SERVER_URL', 'http://localhost:5173');
+    return <<<HTML
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Your App</title>
+        <link href="https://fonts.bunny.net/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body>
+        <div id="app"></div>
+        <script type="module" src="{$viteUrl}/@vite/client"></script>
+        <script type="module" src="{$viteUrl}/resources/js/app.js"></script>
+    </body>
+    </html>
+    HTML;
+});
+
 // ✅ Documentation routes FIRST (these will be handled by Laravel)
 Route::get('/docs/api', function () {
     return Scramble::ui('api');
@@ -20,3 +41,4 @@ Route::get('{any}', function () {
 
 // Remove Auth::routes() to avoid conflicts
 // Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
