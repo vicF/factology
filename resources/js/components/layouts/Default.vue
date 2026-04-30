@@ -3,82 +3,41 @@
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
-                <!-- Mobile: Button to open tree drawer -->
-                <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas"
-                        data-bs-target="#treeOffcanvas" aria-controls="treeOffcanvas">
-                    ☰ Browse
+                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
+                        aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
                 </button>
-
-<!--                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>-->
-
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-3">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home"><svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 -960 960 960"
-                                fill="#e3e3e3"
-                            >
-                                <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
-                            </svg></router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link">Home</router-link>
                         </li>
                     </ul>
                     <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery"
-                               aria-label="Search">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
                         <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
                     </form>
                     <div class="d-flex flex-shrink-0">
                         <LanguageSwitcher/>
                         <ul class="navbar-nav ms-3">
                             <li class="nav-item dropdown">
-                                <a
-                                    class="nav-link dropdown-toggle d-flex align-items-center"
-                                    href="#"
-                                    id="navbarDropdownMenuLink"
-                                    role="button"
-                                    data-bs-toggle="dropdown"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                >
-                                    <!-- Not authenticated: show login icon -->
-                                    <svg
-                                        v-if="!authenticated || !user"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="24"
-                                        height="24"
-                                        viewBox="0 -960 960 960"
-                                        fill="currentColor"
-                                        class="me-1"
-                                        role="img"
-                                        aria-label="Login"
-                                    >
-                                        <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
-                                    </svg>
-
-                                    <!-- Authenticated: show username -->
-                                    <span v-else class="fw-semibold">
-      {{ user.name }}
-    </span>
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
+                                   role="button" data-bs-toggle="dropdown" aria-haspopup="true"
+                                   aria-expanded="false">
+                                    {{ authenticated && user ? user.name : 'User' }}
                                 </a>
-
-                                <!-- Dropdown menu -->
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
-                                    <!-- Guest links -->
-                                    <template v-if="!authenticated">
-                                        <li><router-link class="dropdown-item" to="/login">Login</router-link></li>
-                                        <li><router-link class="dropdown-item" to="/register">Register</router-link></li>
+                                <div class="dropdown-menu dropdown-menu-end"
+                                     aria-labelledby="navbarDropdownMenuLink">
+                                    <template v-if="authenticated">
+                                        <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
                                     </template>
-
-                                    <!-- User links -->
                                     <template v-else>
-                                        <li><router-link class="dropdown-item" to="/profile">Profile</router-link></li>
-                                        <li><hr class="dropdown-divider" /></li>
-                                        <li><a class="dropdown-item" href="#" @click.prevent="logout">Logout</a></li>
+                                        <router-link class="dropdown-item" to="/login">Log in</router-link>
+                                        <router-link class="dropdown-item" to="/register">Register</router-link>
                                     </template>
-                                </ul>
+                                </div>
                             </li>
                         </ul>
                     </div>
@@ -88,37 +47,50 @@
 
         <!-- Main content area -->
         <main class="mt-3">
-            <div class="container px-3 px-md-5">
-                <div class="row">
-                    <!-- Desktop: persistent tree column -->
-                    <div class="col-3 ps-0 d-none d-md-block">
-                        <class-tree></class-tree>
+            <!-- Mobile: Swiper Carousel -->
+            <div v-if="isMobile" class="swiper-container" ref="swiperContainer">
+                <div class="swiper-wrapper">
+                    <!-- Screen 1: Tree -->
+                    <div class="swiper-slide">
+                        <div class="slide-content">
+                            <class-tree></class-tree>
+                        </div>
                     </div>
 
-                    <!-- Content column: full width on mobile, 9 cols on desktop -->
-                    <div class="col-12 col-md-9">
+                    <!-- Screen 2: Main content (router-view) -->
+                    <div class="swiper-slide">
+                        <div class="slide-content">
+                            <router-view></router-view>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination dots -->
+                <div class="swiper-pagination"></div>
+            </div>
+
+            <!-- Desktop: Traditional grid layout -->
+            <div v-else class="container ps-5">
+                <div class="row">
+                    <div class="col-3 ps-0">
+                        <class-tree></class-tree>
+                    </div>
+                    <div class="col-9">
                         <router-view></router-view>
                     </div>
                 </div>
             </div>
         </main>
-
-        <!-- Mobile: Offcanvas drawer for tree (slides from left) -->
-        <div class="offcanvas offcanvas-start" tabindex="-1" id="treeOffcanvas" aria-labelledby="treeOffcanvasLabel">
-            <div class="offcanvas-header">
-                <h5 id="treeOffcanvasLabel">Classification Tree</h5>
-                <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-            </div>
-            <div class="offcanvas-body">
-                <class-tree></class-tree>
-            </div>
-        </div>
     </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Swiper from 'swiper'
+import { Pagination } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/pagination'
 
 import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
@@ -127,15 +99,12 @@ import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import axios from 'axios'
-import { provide } from 'vue';
 
-// Маленькая функция для получения URL картинки
+// Provide getThumbUrl function for child components
 const getThumbUrl = (thing_id) => {
     if (!thing_id) return '';
     return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
 };
-
-// Делаем функцию доступной для всех дочерних компонентов
 provide('getThumbUrl', getThumbUrl);
 
 const router = useRouter()
@@ -146,25 +115,49 @@ const searchStore = useSearchStore()
 
 const showModal = ref(false)
 const selectedType = ref('')
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
+const swiperContainer = ref(null)
+let swiperInstance = null
 
-// ---------------------------------------------------------------------------
-// Helper: close the mobile offcanvas drawer if open
-const closeMobileTreeDrawer = () => {
-    // Check if Bootstrap is available and try to hide the offcanvas
-    if (typeof bootstrap !== 'undefined') {
-        const offcanvasElement = document.getElementById('treeOffcanvas')
-        if (offcanvasElement) {
-            const offcanvasInstance = bootstrap.Offcanvas.getInstance(offcanvasElement)
-            if (offcanvasInstance) {
-                offcanvasInstance.hide()
-            }
-        }
-    } else {
-        // Fallback: try to find and click the close button
-        const closeButton = document.querySelector('#treeOffcanvas .btn-close')
-        if (closeButton) {
-            closeButton.click()
-        }
+// Check if mobile
+const isMobile = computed(() => windowWidth.value < 768)
+
+// Handle window resize
+const handleResize = () => {
+    windowWidth.value = window.innerWidth
+}
+
+// Initialize Swiper for mobile
+const initSwiper = () => {
+    if (isMobile.value && swiperContainer.value && !swiperInstance) {
+        swiperInstance = new Swiper(swiperContainer.value, {
+            modules: [Pagination],
+            slidesPerView: 1,
+            spaceBetween: 0,
+            pagination: {
+                el: '.swiper-pagination',
+                clickable: true,
+                dynamicBullets: true,
+            },
+            // Enhanced touch settings for better UX
+            touchStartPreventDefault: false,
+            simulateTouch: true,
+            threshold: 30, // Requires 30px drag before sliding
+            touchRatio: 0.8,
+            touchAngle: 45, // Max angle for horizontal swipe
+            resistance: true,
+            resistanceRatio: 0.85,
+            speed: 400,
+            followFinger: true,
+            freeMode: false,
+            shortSwipes: true,
+            longSwipes: false,
+            touchMoveStopPropagation: true,
+        })
+    } else if (!isMobile.value && swiperInstance) {
+        // Destroy Swiper when switching to desktop
+        swiperInstance.destroy(true, true)
+        swiperInstance = null
     }
 }
 
@@ -209,20 +202,32 @@ const submitSearch = () => {
 
 onMounted(() => {
     checkAuth()
+    window.addEventListener('resize', handleResize)
 
-    // Initialize Bootstrap offcanvas (just to ensure event handlers are bound)
-    // Bootstrap will auto-initialize elements with data-bs-toggle="offcanvas"
-    // No extra code needed, but we close drawer on route changes (see watcher below)
+    // Initialize Swiper after DOM is ready
+    nextTick(() => {
+        initSwiper()
+    })
 })
 
-// Watch for route changes to automatically close the mobile drawer when navigating
+// Watch for route changes
 watch(() => route.path, () => {
     checkAuth()
-    closeMobileTreeDrawer()
 })
 
 watch(() => route.query.q, (newQuery) => {
     searchQuery.value = newQuery || ''
+})
+
+// Re-initialize Swiper when switching between mobile/desktop
+watch(isMobile, () => {
+    if (swiperInstance) {
+        swiperInstance.destroy(true, true)
+        swiperInstance = null
+    }
+    nextTick(() => {
+        initSwiper()
+    })
 })
 
 watch(
@@ -242,8 +247,6 @@ watch(
 const user = computed(() => authStore.user || null)
 const authenticated = computed(() => authStore.authenticated)
 
-// Note: eventBus is used directly — no need for computed wrapper anymore
-
 // ---------------------------------------------------------------------------
 
 const logout = async () => {
@@ -251,10 +254,8 @@ const logout = async () => {
         await authStore.logout();
         router.push('/');
     } catch (error) {
-        // If it's a 401, the user is already logged out - this is fine
         if (error.response?.status === 401) {
             console.log('Already logged out');
-            // Still clear local state and redirect
             authStore.clearAuth();
             router.push('/');
         } else {
@@ -278,9 +279,11 @@ const handleObjectCreated = (object) => {
     router.push({ path: '/', query: { q: searchQuery.value } })
 }
 
-// Clean up any potential global listeners if needed
 onUnmounted(() => {
-    // No specific cleanup required for offcanvas
+    window.removeEventListener('resize', handleResize)
+    if (swiperInstance) {
+        swiperInstance.destroy(true, true)
+    }
 })
 </script>
 
@@ -293,15 +296,49 @@ onUnmounted(() => {
     max-width: 100%;
 }
 
-/* Optional: adjust offcanvas width for better mobile experience */
-@media (max-width: 576px) {
-    .offcanvas {
-        width: 85% !important;
-    }
+/* Swiper styles for mobile */
+.swiper-container {
+    width: 100%;
+    height: calc(100vh - 70px);
+    overflow: hidden;
 }
 
-/* Ensure the offcanvas drawer has a proper z-index if needed */
-.offcanvas {
-    z-index: 1050;
+.swiper-slide {
+    overflow-y: auto;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.slide-content {
+    height: 100%;
+}
+
+/* Pagination dots styling */
+:deep(.swiper-pagination) {
+    position: fixed;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+}
+
+:deep(.swiper-pagination-bullet) {
+    background: #6c757d;
+    opacity: 0.5;
+    width: 8px;
+    height: 8px;
+    margin: 0 6px;
+}
+
+:deep(.swiper-pagination-bullet-active) {
+    background: #0d6efd;
+    opacity: 1;
+}
+
+/* Hide pagination on desktop */
+@media (min-width: 768px) {
+    :deep(.swiper-pagination) {
+        display: none;
+    }
 }
 </style>

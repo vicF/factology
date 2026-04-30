@@ -41,6 +41,7 @@
         "mitt": "^3.0.1",
         "pinia": "^2.0.34",
         "relation-graph-vue3": "^2.2.11",
+        "swiper": "^12.1.4",
         "uuid": "^11.1.0",
         "vue-i18n": "^11.1.1",
         "vue-loader": "^17.0.1",
