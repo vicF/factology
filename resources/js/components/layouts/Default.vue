@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="app-container">
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
@@ -47,26 +47,42 @@
 
         <!-- Main content area -->
         <main class="mt-3">
-            <!-- Mobile: Swiper Carousel -->
-            <div v-if="isMobile" class="swiper-container" ref="swiperContainer">
-                <div class="swiper-wrapper">
-                    <!-- Screen 1: Tree -->
-                    <div class="swiper-slide">
-                        <div class="slide-content">
-                            <class-tree></class-tree>
+            <!-- Mobile: Custom Swipe Implementation -->
+            <div v-if="isMobile" class="mobile-view">
+                <div
+                    class="swipe-container"
+                    ref="swipeContainer"
+                    @touchstart="onTouchStart"
+                    @touchmove="onTouchMove"
+                    @touchend="onTouchEnd"
+                >
+                    <div class="swipe-track" :style="{ transform: `translateX(${currentOffset}px)`, transition: isTransitioning ? 'transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)' : 'none' }">
+                        <!-- Screen 1: Tree -->
+                        <div class="swipe-screen">
+                            <div class="screen-content" ref="screen1Content">
+                                <class-tree></class-tree>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Screen 2: Main content (router-view) -->
-                    <div class="swiper-slide">
-                        <div class="slide-content">
-                            <router-view></router-view>
+                        <!-- Screen 2: Main content -->
+                        <div class="swipe-screen">
+                            <div class="screen-content" ref="screen2Content">
+                                <router-view></router-view>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Pagination dots -->
-                <div class="swiper-pagination"></div>
+                <div class="pagination-dots">
+                    <div
+                        v-for="index in 2"
+                        :key="index"
+                        class="dot"
+                        :class="{ active: currentScreen === index - 1 }"
+                        @click="goToScreen(index - 1)"
+                    ></div>
+                </div>
             </div>
 
             <!-- Desktop: Traditional grid layout -->
@@ -85,12 +101,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import Swiper from 'swiper'
-import { Pagination } from 'swiper/modules'
-import 'swiper/css'
-import 'swiper/css/pagination'
 
 import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
@@ -113,11 +125,18 @@ const route = useRoute()
 const authStore = useAuthStore()
 const searchStore = useSearchStore()
 
-const showModal = ref(false)
-const selectedType = ref('')
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
-const swiperContainer = ref(null)
-let swiperInstance = null
+const swipeContainer = ref(null)
+const screen1Content = ref(null)
+const screen2Content = ref(null)
+const currentScreen = ref(0)
+const startX = ref(0)
+const startY = ref(0)
+const currentOffset = ref(0)
+const isTransitioning = ref(false)
+const screenWidth = ref(0)
+const isDragging = ref(false)
+const dragDirection = ref(null) // 'horizontal' or 'vertical'
 
 // Check if mobile
 const isMobile = computed(() => windowWidth.value < 768)
@@ -125,40 +144,105 @@ const isMobile = computed(() => windowWidth.value < 768)
 // Handle window resize
 const handleResize = () => {
     windowWidth.value = window.innerWidth
+    if (isMobile.value) {
+        updateScreenWidth()
+        goToScreen(currentScreen.value, true)
+    }
 }
 
-// Initialize Swiper for mobile
-const initSwiper = () => {
-    if (isMobile.value && swiperContainer.value && !swiperInstance) {
-        swiperInstance = new Swiper(swiperContainer.value, {
-            modules: [Pagination],
-            slidesPerView: 1,
-            spaceBetween: 0,
-            pagination: {
-                el: '.swiper-pagination',
-                clickable: true,
-                dynamicBullets: true,
-            },
-            // Enhanced touch settings for better UX
-            touchStartPreventDefault: false,
-            simulateTouch: true,
-            threshold: 30, // Requires 30px drag before sliding
-            touchRatio: 0.8,
-            touchAngle: 45, // Max angle for horizontal swipe
-            resistance: true,
-            resistanceRatio: 0.85,
-            speed: 400,
-            followFinger: true,
-            freeMode: false,
-            shortSwipes: true,
-            longSwipes: false,
-            touchMoveStopPropagation: true,
-        })
-    } else if (!isMobile.value && swiperInstance) {
-        // Destroy Swiper when switching to desktop
-        swiperInstance.destroy(true, true)
-        swiperInstance = null
+const updateScreenWidth = () => {
+    if (swipeContainer.value) {
+        screenWidth.value = swipeContainer.value.clientWidth
     }
+}
+
+const goToScreen = (index, instant = false) => {
+    if (index < 0 || index > 1) return
+    currentScreen.value = index
+    isTransitioning.value = !instant
+    currentOffset.value = -index * screenWidth.value
+
+    setTimeout(() => {
+        isTransitioning.value = false
+    }, 300)
+}
+
+const onTouchStart = (e) => {
+    startX.value = e.touches[0].clientX
+    startY.value = e.touches[0].clientY
+    isDragging.value = true
+    dragDirection.value = null
+    isTransitioning.value = false
+}
+
+const onTouchMove = (e) => {
+    if (!isDragging.value) return
+
+    const deltaX = e.touches[0].clientX - startX.value
+    const deltaY = e.touches[0].clientY - startY.value
+
+    // Determine scroll direction after minimal movement
+    if (!dragDirection.value && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+        dragDirection.value = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical'
+    }
+
+    // If vertical scroll, let the browser handle it naturally
+    if (dragDirection.value === 'vertical') {
+        return // Allow native vertical scrolling
+    }
+
+    // Horizontal swipe logic
+    if (dragDirection.value === 'horizontal') {
+        e.preventDefault()
+
+        const newOffset = -currentScreen.value * screenWidth.value + deltaX
+
+        // Add resistance at edges
+        if ((currentScreen.value === 0 && deltaX > 0) || (currentScreen.value === 1 && deltaX < 0)) {
+            currentOffset.value = -currentScreen.value * screenWidth.value + deltaX * 0.3
+        } else {
+            currentOffset.value = newOffset
+        }
+    }
+}
+
+const onTouchEnd = (e) => {
+    if (!isDragging.value) {
+        isDragging.value = false
+        return
+    }
+
+    // If vertical scroll, just reset and exit
+    if (dragDirection.value === 'vertical') {
+        isDragging.value = false
+        dragDirection.value = null
+        startX.value = 0
+        startY.value = 0
+        return
+    }
+
+    // Horizontal swipe logic
+    if (dragDirection.value === 'horizontal') {
+        const deltaX = e.changedTouches[0].clientX - startX.value
+        const threshold = screenWidth.value * 0.2
+
+        if (Math.abs(deltaX) > threshold) {
+            if (deltaX < 0 && currentScreen.value < 1) {
+                goToScreen(currentScreen.value + 1)
+            } else if (deltaX > 0 && currentScreen.value > 0) {
+                goToScreen(currentScreen.value - 1)
+            } else {
+                goToScreen(currentScreen.value)
+            }
+        } else {
+            goToScreen(currentScreen.value)
+        }
+    }
+
+    isDragging.value = false
+    dragDirection.value = null
+    startX.value = 0
+    startY.value = 0
 }
 
 // ---------------------------------------------------------------------------
@@ -204,30 +288,31 @@ onMounted(() => {
     checkAuth()
     window.addEventListener('resize', handleResize)
 
-    // Initialize Swiper after DOM is ready
-    nextTick(() => {
-        initSwiper()
-    })
+    if (isMobile.value) {
+        nextTick(() => {
+            updateScreenWidth()
+        })
+    }
 })
 
 // Watch for route changes
 watch(() => route.path, () => {
     checkAuth()
+    // Reset to first screen on route change
+    if (isMobile.value && currentScreen.value !== 0) {
+        goToScreen(0)
+    }
 })
 
 watch(() => route.query.q, (newQuery) => {
     searchQuery.value = newQuery || ''
 })
 
-// Re-initialize Swiper when switching between mobile/desktop
-watch(isMobile, () => {
-    if (swiperInstance) {
-        swiperInstance.destroy(true, true)
-        swiperInstance = null
+// Update screen width when route changes (content might change height)
+watch(() => route.path, () => {
+    if (isMobile.value) {
+        setTimeout(updateScreenWidth, 100)
     }
-    nextTick(() => {
-        initSwiper()
-    })
 })
 
 watch(
@@ -241,6 +326,16 @@ watch(
     },
     { immediate: true }
 )
+
+// Watch for window width changes to reinitialize swiping
+watch(isMobile, (newVal) => {
+    if (newVal) {
+        nextTick(() => {
+            updateScreenWidth()
+            goToScreen(currentScreen.value, true)
+        })
+    }
+})
 
 // ---------------------------------------------------------------------------
 
@@ -264,26 +359,8 @@ const logout = async () => {
     }
 };
 
-const openCreateModal = (type) => {
-    selectedType.value = type
-    showModal.value = true
-}
-
-const closeModal = () => {
-    showModal.value = false
-    selectedType.value = ''
-}
-
-const handleObjectCreated = (object) => {
-    console.log('Object created:', object)
-    router.push({ path: '/', query: { q: searchQuery.value } })
-}
-
 onUnmounted(() => {
     window.removeEventListener('resize', handleResize)
-    if (swiperInstance) {
-        swiperInstance.destroy(true, true)
-    }
 })
 </script>
 
@@ -296,49 +373,90 @@ onUnmounted(() => {
     max-width: 100%;
 }
 
-/* Swiper styles for mobile */
-.swiper-container {
+/* Mobile view - custom swipe implementation */
+.mobile-view {
+    position: relative;
     width: 100%;
-    height: calc(100vh - 70px);
     overflow: hidden;
 }
 
-.swiper-slide {
+.swipe-container {
+    width: 100%;
+    overflow: hidden;
+    touch-action: pan-y pinch-zoom; /* Allow vertical scrolling */
+}
+
+.swipe-track {
+    display: flex;
+    flex-direction: row;
+    width: 200%; /* 2 screens = 200% */
+    height: calc(100vh - 70px);
+    will-change: transform;
+}
+
+.swipe-screen {
+    flex: 0 0 50%; /* Each screen takes exactly 50% of track */
+    width: 50%;
+    height: 100%;
     overflow-y: auto;
-    padding: 16px;
     -webkit-overflow-scrolling: touch;
 }
 
-.slide-content {
+.screen-content {
+    width: 100%;
     height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
 }
 
-/* Pagination dots styling */
-:deep(.swiper-pagination) {
+/* Pagination dots */
+.pagination-dots {
     position: fixed;
     bottom: 10px;
     left: 0;
     right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
     z-index: 10;
+    padding: 8px;
 }
 
-:deep(.swiper-pagination-bullet) {
-    background: #6c757d;
-    opacity: 0.5;
+.dot {
     width: 8px;
     height: 8px;
-    margin: 0 6px;
+    border-radius: 50%;
+    background-color: #6c757d;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-:deep(.swiper-pagination-bullet-active) {
-    background: #0d6efd;
+.dot.active {
+    width: 20px;
+    border-radius: 4px;
+    background-color: #0d6efd;
     opacity: 1;
 }
 
 /* Hide pagination on desktop */
 @media (min-width: 768px) {
-    :deep(.swiper-pagination) {
+    .pagination-dots {
         display: none;
+    }
+}
+
+/* Ensure no overflow on mobile */
+@media (max-width: 767px) {
+    body, html {
+        overflow-x: hidden;
+        position: relative;
+        width: 100%;
+    }
+
+    .app-container {
+        overflow-x: hidden;
+        width: 100%;
     }
 }
 </style>
