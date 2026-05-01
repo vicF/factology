@@ -1,45 +1,103 @@
 <template>
     <div class="app-container">
         <!-- Main Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
             <div class="container-fluid">
-                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
-                        aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
                 <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
-                    <ul class="navbar-nav flex-shrink-0 me-3">
+                    <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home</router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 -960 960 960"
+                                    fill="#ffffff"
+                                >
+                                    <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
+                                </svg>
+                            </router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
+                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch">
                         <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-                        <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
+                        <button class="btn btn-outline-light flex-shrink-0" type="submit" style="padding: 0 12px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 -960 960 960" fill="white">
+                                <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
+                            </svg>
+                        </button>
                     </form>
-                    <div class="d-flex flex-shrink-0">
-                        <LanguageSwitcher/>
-                        <ul class="navbar-nav ms-3">
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
-                                   role="button" data-bs-toggle="dropdown" aria-haspopup="true"
-                                   aria-expanded="false">
-                                    {{ authenticated && user ? user.name : 'User' }}
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-end"
-                                     aria-labelledby="navbarDropdownMenuLink">
-                                    <template v-if="authenticated">
-                                        <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
-                                    </template>
-                                    <template v-else>
-                                        <router-link class="dropdown-item" to="/login">Log in</router-link>
-                                        <router-link class="dropdown-item" to="/register">Register</router-link>
-                                    </template>
-                                </div>
-                            </li>
-                        </ul>
+                    <div class="d-flex flex-shrink-0 align-items-center">
+                        <!-- Compact Language Switcher with SVG Flags -->
+                        <div class="language-switcher me-2">
+                            <button
+                                class="btn btn-link nav-link p-1 dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                style="color: white; text-decoration: none;"
+                            >
+                                <component :is="getFlagComponent(currentLocale)" class="flag-icon" />
+                                <span class="d-none d-sm-inline ms-1">{{ currentLocale.toUpperCase() }}</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li v-for="locale in availableLocales" :key="locale.code">
+                                    <a
+                                        class="dropdown-item"
+                                        href="#"
+                                        :class="{ active: currentLocale === locale.code }"
+                                        @click.prevent="switchLanguage(locale.code)"
+                                    >
+                                        <component :is="getFlagComponent(locale.code)" class="flag-icon-dropdown" />
+                                        <span class="ms-2">{{ locale.name }}</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- User Dropdown - Fixed for mobile -->
+                        <div class="user-dropdown ms-2">
+                            <button
+                                class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                style="color: white; text-decoration: none; padding: 0.5rem 0;"
+                            >
+                                <!-- Not authenticated: show login icon -->
+                                <svg
+                                    v-if="!authenticated || !user"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 -960 960 960"
+                                    fill="white"
+                                    class="me-1"
+                                >
+                                    <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                </svg>
+
+                                <!-- Authenticated: show username -->
+                                <span v-else class="fw-semibold" style="font-size: 14px;">
+                                    {{ user.name }}
+                                </span>
+                            </button>
+
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <!-- Guest links -->
+                                <template v-if="!authenticated">
+                                    <li><router-link class="dropdown-item" to="/login">Login</router-link></li>
+                                    <li><router-link class="dropdown-item" to="/register">Register</router-link></li>
+                                </template>
+
+                                <!-- User links -->
+                                <template v-else>
+                                    <li><router-link class="dropdown-item" to="/profile">Profile</router-link></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" href="#" @click.prevent="logout">Logout</a></li>
+                                </template>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -129,7 +187,7 @@ const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
 const swipeContainer = ref(null)
 const screen1Content = ref(null)
 const screen2Content = ref(null)
-const currentScreen = ref(0)
+const currentScreen = ref(1) // Start on main content (right screen)
 const startX = ref(0)
 const startY = ref(0)
 const currentOffset = ref(0)
@@ -137,6 +195,53 @@ const isTransitioning = ref(false)
 const screenWidth = ref(0)
 const isDragging = ref(false)
 const dragDirection = ref(null) // 'horizontal' or 'vertical'
+
+// Language switcher data
+const currentLocale = ref('en')
+const availableLocales = [
+    { code: 'en', name: 'English' },
+    { code: 'ru', name: 'Русский' },
+    { code: 'fr', name: 'Français' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'es', name: 'Español' }
+]
+
+// SVG Flag components (self-contained, no external dependencies)
+const FlagUS = {
+    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480"><path fill="#bd3d44" d="M0 0h640v480H0"/><path stroke="#fff" stroke-width="37" d="M0 55.3h640M0 129h640M0 203h640M0 277h640M0 351h640M0 425h640"/><path fill="#192f5d" d="M0 0h364.8v258.5H0"/><marker id="us-a" markerHeight="30" markerWidth="30"><path fill="#fff" d="m14 0 9 27L0 10h28L5 27z"/></marker><path fill="none" marker-mid="url(#us-a)" d="m0 0 16 11h61 61 61 61 60L47 37h61 61 60 61L16 63h61 61 61 61 60L47 89h61 61 60 61L16 115h61 61 61 61 60L47 141h61 61 60 61L16 167h61 61 61 61 60L47 193h61 61 60 61L16 219h61 61 61 61 60"/></svg>`
+}
+
+const FlagRU = {
+    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="2" fill="#fff"/><rect y="2" width="9" height="2" fill="#0039a6"/><rect y="4" width="9" height="2" fill="#d52b1e"/></svg>`
+}
+
+const FlagFR = {
+    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="6" fill="#fff"/><rect width="3" height="6" fill="#0055a4"/><rect x="6" width="3" height="6" fill="#ef4135"/></svg>`
+}
+
+const FlagDE = {
+    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 3"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#f00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`
+}
+
+const FlagES = {
+    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500"><rect width="750" height="500" fill="#f1bf00"/><rect width="750" height="125" fill="#ad1519"/><rect y="375" width="750" height="125" fill="#ad1519"/><rect width="187.5" height="125" fill="#ad1519"/><rect x="562.5" width="187.5" height="125" fill="#ad1519"/><rect y="375" width="187.5" height="125" fill="#ad1519"/><rect x="562.5" y="375" width="187.5" height="125" fill="#ad1519"/></svg>`
+}
+
+const getFlagComponent = (localeCode) => {
+    const flags = {
+        en: FlagUS,
+        ru: FlagRU,
+        fr: FlagFR,
+        de: FlagDE,
+        es: FlagES
+    }
+    return flags[localeCode] || FlagUS
+}
+
+const switchLanguage = (locale) => {
+    currentLocale.value = locale
+    console.log('Language switched to:', locale)
+}
 
 // Check if mobile
 const isMobile = computed(() => windowWidth.value < 768)
@@ -153,6 +258,8 @@ const handleResize = () => {
 const updateScreenWidth = () => {
     if (swipeContainer.value) {
         screenWidth.value = swipeContainer.value.clientWidth
+        // Update offset after width change
+        currentOffset.value = -currentScreen.value * screenWidth.value
     }
 }
 
@@ -291,6 +398,8 @@ onMounted(() => {
     if (isMobile.value) {
         nextTick(() => {
             updateScreenWidth()
+            // Start on screen 1 (main content) by default
+            goToScreen(1, true)
         })
     }
 })
@@ -298,9 +407,12 @@ onMounted(() => {
 // Watch for route changes
 watch(() => route.path, () => {
     checkAuth()
-    // Reset to first screen on route change
-    if (isMobile.value && currentScreen.value !== 0) {
-        goToScreen(0)
+    // Keep current screen or reset to main content based on route
+    if (isMobile.value) {
+        // If we're on a detail page, stay on main content screen
+        if (currentScreen.value !== 1) {
+            goToScreen(1)
+        }
     }
 })
 
@@ -373,6 +485,86 @@ onUnmounted(() => {
     max-width: 100%;
 }
 
+/* Language switcher styles */
+.language-switcher {
+    position: relative;
+}
+
+.language-switcher .dropdown-toggle::after {
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.flag-icon {
+    width: 20px;
+    height: 15px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.flag-icon-dropdown {
+    width: 24px;
+    height: 18px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* User dropdown styles */
+.user-dropdown {
+    position: relative;
+}
+
+.user-dropdown .dropdown-toggle::after {
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Fix for mobile dropdowns */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        position: absolute !important;
+        right: 0 !important;
+        left: auto !important;
+        min-width: 160px !important;
+    }
+
+    .user-dropdown .dropdown-menu,
+    .language-switcher .dropdown-menu {
+        right: 0 !important;
+        left: auto !important;
+        top: 100% !important;
+        transform: none !important;
+    }
+}
+
+.language-switcher .dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.language-switcher .dropdown-item:active {
+    background-color: #0d6efd;
+}
+
+.user-dropdown .dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.user-dropdown .dropdown-item:active {
+    background-color: #0d6efd;
+}
+
+/* Reduced spacing between Home icon and search */
+.navbar-nav.me-2 {
+    margin-right: 0.5rem !important;
+}
+
+form.mx-2 {
+    margin-left: 0.5rem !important;
+    margin-right: 0.5rem !important;
+}
+
 /* Mobile view - custom swipe implementation */
 .mobile-view {
     position: relative;
@@ -383,19 +575,19 @@ onUnmounted(() => {
 .swipe-container {
     width: 100%;
     overflow: hidden;
-    touch-action: pan-y pinch-zoom; /* Allow vertical scrolling */
+    touch-action: pan-y pinch-zoom;
 }
 
 .swipe-track {
     display: flex;
     flex-direction: row;
-    width: 200%; /* 2 screens = 200% */
+    width: 200%;
     height: calc(100vh - 70px);
     will-change: transform;
 }
 
 .swipe-screen {
-    flex: 0 0 50%; /* Each screen takes exactly 50% of track */
+    flex: 0 0 50%;
     width: 50%;
     height: 100%;
     overflow-y: auto;
