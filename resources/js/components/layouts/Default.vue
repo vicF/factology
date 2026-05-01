@@ -21,24 +21,23 @@
                     </ul>
                     <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch">
                         <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-                        <button class="btn btn-outline-light flex-shrink-0" type="submit" style="padding: 0 12px;">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 -960 960 960" fill="white">
                                 <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
                             </svg>
                         </button>
                     </form>
                     <div class="d-flex flex-shrink-0 align-items-center">
-                        <!-- Compact Language Switcher with SVG Flags -->
+                        <!-- Compact Language Switcher with Text Only -->
                         <div class="language-switcher me-2">
                             <button
                                 class="btn btn-link nav-link p-1 dropdown-toggle"
                                 type="button"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
-                                style="color: white; text-decoration: none;"
+                                style="color: white; text-decoration: none; font-weight: 500; font-size: 14px;"
                             >
-                                <component :is="getFlagComponent(currentLocale)" class="flag-icon" />
-                                <span class="d-none d-sm-inline ms-1">{{ currentLocale.toUpperCase() }}</span>
+                                {{ currentLocale.toUpperCase() }}
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li v-for="locale in availableLocales" :key="locale.code">
@@ -48,8 +47,7 @@
                                         :class="{ active: currentLocale === locale.code }"
                                         @click.prevent="switchLanguage(locale.code)"
                                     >
-                                        <component :is="getFlagComponent(locale.code)" class="flag-icon-dropdown" />
-                                        <span class="ms-2">{{ locale.name }}</span>
+                                        {{ locale.name }}
                                     </a>
                                 </li>
                             </ul>
@@ -205,38 +203,6 @@ const availableLocales = [
     { code: 'de', name: 'Deutsch' },
     { code: 'es', name: 'Español' }
 ]
-
-// SVG Flag components (self-contained, no external dependencies)
-const FlagUS = {
-    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480"><path fill="#bd3d44" d="M0 0h640v480H0"/><path stroke="#fff" stroke-width="37" d="M0 55.3h640M0 129h640M0 203h640M0 277h640M0 351h640M0 425h640"/><path fill="#192f5d" d="M0 0h364.8v258.5H0"/><marker id="us-a" markerHeight="30" markerWidth="30"><path fill="#fff" d="m14 0 9 27L0 10h28L5 27z"/></marker><path fill="none" marker-mid="url(#us-a)" d="m0 0 16 11h61 61 61 61 60L47 37h61 61 60 61L16 63h61 61 61 61 60L47 89h61 61 60 61L16 115h61 61 61 61 60L47 141h61 61 60 61L16 167h61 61 61 61 60L47 193h61 61 60 61L16 219h61 61 61 61 60"/></svg>`
-}
-
-const FlagRU = {
-    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="2" fill="#fff"/><rect y="2" width="9" height="2" fill="#0039a6"/><rect y="4" width="9" height="2" fill="#d52b1e"/></svg>`
-}
-
-const FlagFR = {
-    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 6"><rect width="9" height="6" fill="#fff"/><rect width="3" height="6" fill="#0055a4"/><rect x="6" width="3" height="6" fill="#ef4135"/></svg>`
-}
-
-const FlagDE = {
-    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 3"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#f00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`
-}
-
-const FlagES = {
-    template: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500"><rect width="750" height="500" fill="#f1bf00"/><rect width="750" height="125" fill="#ad1519"/><rect y="375" width="750" height="125" fill="#ad1519"/><rect width="187.5" height="125" fill="#ad1519"/><rect x="562.5" width="187.5" height="125" fill="#ad1519"/><rect y="375" width="187.5" height="125" fill="#ad1519"/><rect x="562.5" y="375" width="187.5" height="125" fill="#ad1519"/></svg>`
-}
-
-const getFlagComponent = (localeCode) => {
-    const flags = {
-        en: FlagUS,
-        ru: FlagRU,
-        fr: FlagFR,
-        de: FlagDE,
-        es: FlagES
-    }
-    return flags[localeCode] || FlagUS
-}
 
 const switchLanguage = (locale) => {
     currentLocale.value = locale
@@ -495,18 +461,14 @@ onUnmounted(() => {
     vertical-align: middle;
 }
 
-.flag-icon {
-    width: 20px;
-    height: 15px;
-    display: inline-block;
-    vertical-align: middle;
+/* Search button hover fix - keep icon visible */
+.search-btn:hover svg {
+    fill: #0d6efd;
 }
 
-.flag-icon-dropdown {
-    width: 24px;
-    height: 18px;
-    display: inline-block;
-    vertical-align: middle;
+.search-btn:hover {
+    background-color: white;
+    border-color: white;
 }
 
 /* User dropdown styles */
