@@ -1,14 +1,10 @@
-// tests-js/register_login_test.js
+// tests-js/e2e/acceptance/register_login_test.js
 const DB_HELPER = require('../../helpers/dbHelper');
 
 Feature('User Registration and Login');
 
 let testUser = null;
 let createdUserId = null;
-
-/*Before(async ({ I }) => {
-    await DB_HELPER.resetDatabase(I, { showOutput: false });
-});*/
 
 After(async ({ I }) => {
     if (createdUserId) {
@@ -25,51 +21,68 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 
     // Register via UI
     I.amOnPage('/');
-    I.click('User');
-    I.click('Register');
 
+    I.waitForElement('.user-dropdown button', 10);
+    I.click('.user-dropdown button');
+
+    I.waitForElement('.dropdown-menu', 5);
+    I.click('a.dropdown-item[href="/register"]');
+
+    I.waitForElement('input[name="name"]', 10);
     I.fillField('Name', userData.name);
     I.fillField('Email', userData.email);
     I.fillField('Password', userData.password);
     I.fillField('Confirm Password', userData.password);
-    I.click('Register');
 
-    // Wait for successful registration
-    I.waitForText(userData.name, 15);
+    I.click('button[type="submit"]');
 
-    // Store for cleanup
+    I.waitForElement('.user-dropdown button', 15);
+    I.see(userData.name, '.user-dropdown button');
+
     testUser = userData;
-    createdUserId = testUser.id;
 
-    I.waitForText('Something', 15);
-    I.waitForInvisible('text=Loading...', 10);
+    // Wait for the main content area to load
+    I.waitForElement('.col-9', 15);
+
+    // Navigate to Something
+    I.waitForElement('.col-3 a', 15);
     I.click('Something');
 
-    // Wait for the next page to load
     I.waitForText('Create', 15);
+    I.wait(2);
 
-    // Test dialog interactions
-    I.click('Edit this object');
-    I.waitForElement('.modal', 5);
-    I.click('Close');
+    // Simple button selector - avoid :has-text()
+    I.click('[title="Edit this object"]');
 
-    I.click('Create');
     I.waitForElement('.modal', 5);
-    I.click('Close');
+    I.click('.modal button:has-text("Close")');
+
+    I.waitForInvisible('.modal', 5);
+
+    I.click('[title="Create"]');
+
+    I.waitForElement('.modal', 5);
+    I.click('.modal button:has-text("Close")');
 
     // Logout
-    await DB_HELPER.logout(I, testUser.name);
+    I.click('.user-dropdown button');
+    I.waitForElement('.dropdown-menu', 5);
+    I.click('Logout');
 
     // Login with same user
-    I.click('User');
+    I.click('.user-dropdown button');
+    I.waitForElement('.dropdown-menu', 5);
     I.click('Log in');
+
     I.fillField('Email', testUser.email);
     I.fillField('Password', testUser.password);
     I.click('Log in');
 
-    // Verify login success
-    I.see(testUser.name);
+    I.waitForElement('.user-dropdown button', 10);
+    I.see(testUser.name, '.user-dropdown button');
 
     // Final logout
-    await DB_HELPER.logout(I, testUser.name);
+    I.click('.user-dropdown button');
+    I.waitForElement('.dropdown-menu', 5);
+    I.click('Logout');
 });

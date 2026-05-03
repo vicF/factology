@@ -1,4 +1,3 @@
-// tests-js/e2e/acceptance/create_delete_classes_test.js
 const DB_HELPER = require('../../helpers/dbHelper');
 
 Feature('Object Hierarchy Management');
@@ -10,7 +9,6 @@ const TEST_USER = {
 };
 
 BeforeSuite(async ({ I }) => {
-    // Ensure we start with a clean slate
     await DB_HELPER.resetDatabase(I, { silent: true, showOutput: false });
 });
 
@@ -30,7 +28,6 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.click('Save');
         I.waitForInvisible('.modal', 10);
         I.waitForInvisible('.modal-backdrop', 10);
-        // Ensure it appears in the tree
         I.waitForElement(`a:has-text("${name}")`, 15);
     }
 
@@ -43,24 +40,20 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.click('button[title="Edit this object"]');
         I.waitForElement('.modal', 10);
 
-        // Click the Parent field input (ObjectField component)
         const parentInput = locate('input').inside(locate('.object-field').withDescendant('.form-label').withText('Parent'));
         I.click(parentInput);
         I.fillField(parentInput, newParentName);
 
-        // Wait for the specific data-test-hook we added to the Vue component
         const dropdownHook = `.dropdown-item[data-test-name="${newParentName}"]`;
         I.waitForElement(dropdownHook, 10);
         I.click(dropdownHook, null, { force: true });
 
-        // Confirm the selection is locked in before updating
         I.waitForValue(parentInput, newParentName, 10);
 
         I.click('.modal button:has-text("Update")');
         I.waitForInvisible('.modal', 10);
         I.waitForInvisible('.modal-backdrop', 10);
 
-        // Refresh tree state by clicking the root
         I.click('Something');
         I.wait(1);
     }
@@ -77,19 +70,23 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.dontSee(name);
     }
 
+    // Wait for the main content area to load (not just the tree)
+    I.waitForElement('.col-9', 15);
+    I.waitForElement('.col-3', 15);
+
+    // Wait for Something to be present in the tree
+    I.waitForElement('.col-3 a:has-text("Something")', 15);
+
     // 1. Build initial structure
-    // Something -> Material Object -> Live being -> Human being
     await createClass('Something', 'Material Object', 'Physical thing');
     await createClass('Material Object', 'Live being', 'Живое существо');
     await createClass('Live being', 'Human being', 'Человек');
 
-    // Something -> Dog
     await createClass('Something', 'Dog', 'Woof woof');
 
     // 2. Move Dog under Human being
     await moveClassTo('Dog', 'Human being');
 
-    // Verify move: Dog should be visible, and logically "inside" Human being
     I.click('Human being');
     I.waitForElement(`a:has-text("Dog")`, 10);
     I.see('Dog');
@@ -97,22 +94,19 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     // 3. Move Dog under Live being
     await moveClassTo('Dog', 'Live being');
 
-    // Verify move: Dog should be under Live being
     I.click('Live being');
     I.see('Dog');
 
-    // Verify Dog is no longer under Human being
-    // We use a locator to check specifically inside the Human being branch
     const humanBranch = locate('li').withText('Human being');
     I.dontSeeElement(locate('a').withText('Dog').inside(humanBranch));
 
-    // 4. Cleanup hierarchy from leaf to root
+    // 4. Cleanup hierarchy
     await deleteClass('Dog');
     await deleteClass('Human being');
     await deleteClass('Live being');
     await deleteClass('Material Object');
 
-    // 5. Final check: Only the root remains
+    // 5. Final check
     I.waitForText('Something', 20);
     I.dontSee('Dog');
     I.dontSee('Human being');

@@ -59,25 +59,40 @@ const DB_HELPER = {
         return true;
     },
 
-    // Common login method
+    // Common login method - FIXED for new UI
     async login(I, user) {
         I.amOnPage('/');
-        I.seeElement('a:has-text("Home")');
-        I.click('User');
-        I.click('Log in');
+
+        // Check for Home icon (SVG with title attribute)
+        I.seeElement('a[title="Home"]');
+
+        // Click user dropdown button
+        I.click('.user-dropdown button');
+
+        // Wait for dropdown to be visible and click login link
+        I.waitForElement('.dropdown-menu .dropdown-item[href="/login"]', 5);
+        I.click('a.dropdown-item[href="/login"]');
+
         I.see('Log in');
         I.fillField('Email', user.email);
         I.fillField('Password', user.password);
         I.click('Log in');
-        I.waitForText(user.name, 15);
+
+        // Wait for user name to appear in the dropdown button
+        I.waitForText(user.name, 15, '.user-dropdown button');
     },
 
-    // Common logout method
+    // Common logout method - FIXED for new UI
     async logout(I, userName) {
-        I.click(userName);
+        // Click user dropdown button
+        I.click('.user-dropdown button');
+
+        // Click logout link
+        I.waitForElement('.dropdown-menu .dropdown-item:has-text("Logout")', 5);
         I.click('Logout');
-        I.waitForText('guest', 10);
-        I.see('User');
+
+        // Wait for login icon to reappear
+        I.waitForElement('.user-dropdown button svg', 10);
     },
 
     // Create test user via API

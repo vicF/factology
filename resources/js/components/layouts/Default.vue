@@ -53,7 +53,7 @@
                             </ul>
                         </div>
 
-                        <!-- User Dropdown - Fixed for mobile -->
+                        <!-- User Dropdown - Icon with state indication -->
                         <div class="user-dropdown ms-2">
                             <button
                                 class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
@@ -61,38 +61,73 @@
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
+                                :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
                             >
-                                <!-- Not authenticated: show login icon -->
-                                <svg
-                                    v-if="!authenticated || !user"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 -960 960 960"
-                                    fill="white"
-                                    class="me-1"
-                                >
-                                    <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
-                                </svg>
+                                <!-- Base user silhouette (same for both states) -->
+                                <div class="user-icon-container">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 -960 960 960"
+                                        fill="white"
+                                    >
+                                        <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                    </svg>
 
-                                <!-- Authenticated: show username -->
-                                <span v-else class="fw-semibold" style="font-size: 14px;">
-                                    {{ user.name }}
-                                </span>
+                                    <!-- Status indicator overlay -->
+                                    <div v-if="authenticated && user" class="status-indicator logged-in">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
+                                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
+                                        </svg>
+                                    </div>
+                                    <div v-else class="status-indicator logged-out">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
+                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                        </svg>
+                                    </div>
+                                </div>
                             </button>
 
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <!-- Guest links -->
                                 <template v-if="!authenticated">
-                                    <li><router-link class="dropdown-item" to="/login">Login</router-link></li>
-                                    <li><router-link class="dropdown-item" to="/register">Register</router-link></li>
+                                    <li class="dropdown-header text-muted small">Guest Mode</li>
+                                    <li><router-link class="dropdown-item" to="/login">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Login
+                                    </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/register">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Register
+                                    </router-link></li>
                                 </template>
 
                                 <!-- User links -->
                                 <template v-else>
-                                    <li><router-link class="dropdown-item" to="/profile">Profile</router-link></li>
+                                    <li class="dropdown-header text-muted small">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" class="me-1">
+                                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
+                                        </svg>
+                                        Logged in as
+                                    </li>
+                                    <li><router-link class="dropdown-item fw-semibold" to="/profile">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                        </svg>
+                                        {{ user.name }}
+                                    </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
-                                    <li><a class="dropdown-item" href="#" @click.prevent="logout">Logout</a></li>
+                                    <li><a class="dropdown-item" href="#" @click.prevent="logout">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-56-56 103-104H360v-80h327L584-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Logout
+                                    </a></li>
                                 </template>
                             </ul>
                         </div>
@@ -481,13 +516,45 @@ onUnmounted(() => {
     vertical-align: middle;
 }
 
+/* User icon with status indicator */
+.user-icon-container {
+    position: relative;
+    display: inline-block;
+}
+
+.status-indicator {
+    position: absolute;
+    bottom: -4px;
+    right: -6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #0d6efd;
+}
+
+.status-indicator.logged-in {
+    background-color: #28a745;
+}
+
+.status-indicator.logged-out {
+    background-color: #dc3545;
+}
+
+.status-indicator svg {
+    width: 8px;
+    height: 8px;
+}
+
 /* Fix for mobile dropdowns */
 @media (max-width: 768px) {
     .dropdown-menu {
         position: absolute !important;
         right: 0 !important;
         left: auto !important;
-        min-width: 160px !important;
+        min-width: 180px !important;
     }
 
     .user-dropdown .dropdown-menu,
@@ -515,6 +582,11 @@ onUnmounted(() => {
 
 .user-dropdown .dropdown-item:active {
     background-color: #0d6efd;
+}
+
+.dropdown-header {
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
 }
 
 /* Reduced spacing between Home icon and search */
