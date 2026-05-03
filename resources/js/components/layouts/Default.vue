@@ -3,10 +3,10 @@
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
             <div class="container-fluid">
-                <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
+                <div class="collapse navbar-collapse d-flex justify-content-between align-items-center" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home">
+                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
                                     width="24"
@@ -19,25 +19,28 @@
                             </router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit">
+
+                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 -960 960 960" fill="white">
                                 <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
                             </svg>
                         </button>
                     </form>
-                    <div class="d-flex flex-shrink-0 align-items-center">
-                        <!-- Compact Language Switcher with Text Only -->
-                        <div class="language-switcher me-2">
+
+                    <div class="d-flex flex-shrink-0 align-items-center" style="gap: 0.5rem;">
+                        <!-- Compact Language Switcher -->
+                        <div class="language-switcher" data-testid="language-switcher">
                             <button
-                                class="btn btn-link nav-link p-1 dropdown-toggle"
+                                class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
                                 type="button"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
-                                style="color: white; text-decoration: none; font-weight: 500; font-size: 14px;"
+                                data-testid="language-dropdown-btn"
+                                style="color: white; text-decoration: none; font-weight: 500; font-size: 14px; padding: 0.5rem 0;"
                             >
-                                {{ currentLocale.toUpperCase() }}
+                                {{ (currentLocale || 'en').toUpperCase() }}
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li v-for="locale in availableLocales" :key="locale.code">
@@ -46,6 +49,7 @@
                                         href="#"
                                         :class="{ active: currentLocale === locale.code }"
                                         @click.prevent="switchLanguage(locale.code)"
+                                        :data-testid="`lang-${locale.code}`"
                                     >
                                         {{ locale.name }}
                                     </a>
@@ -53,17 +57,18 @@
                             </ul>
                         </div>
 
-                        <!-- User Dropdown - Icon with state indication -->
-                        <div class="user-dropdown ms-2">
+                        <!-- User Dropdown -->
+                        <div class="user-dropdown" data-testid="user-dropdown">
                             <button
                                 class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
                                 type="button"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
+                                data-testid="user-dropdown-btn"
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
                                 :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
                             >
-                                <!-- Base user silhouette (same for both states) -->
+                                <!-- Base user silhouette -->
                                 <div class="user-icon-container">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -76,12 +81,12 @@
                                     </svg>
 
                                     <!-- Status indicator overlay -->
-                                    <div v-if="authenticated && user" class="status-indicator logged-in">
+                                    <div v-if="authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
                                         </svg>
                                     </div>
-                                    <div v-else class="status-indicator logged-out">
+                                    <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
                                         </svg>
@@ -89,17 +94,17 @@
                                 </div>
                             </button>
 
-                            <ul class="dropdown-menu dropdown-menu-end">
+                            <ul class="dropdown-menu dropdown-menu-end" data-testid="user-dropdown-menu">
                                 <!-- Guest links -->
                                 <template v-if="!authenticated">
                                     <li class="dropdown-header text-muted small">Guest Mode</li>
-                                    <li><router-link class="dropdown-item" to="/login">
+                                    <li><router-link class="dropdown-item" to="/login" data-testid="login-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
                                             <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
                                         </svg>
                                         Login
                                     </router-link></li>
-                                    <li><router-link class="dropdown-item" to="/register">
+                                    <li><router-link class="dropdown-item" to="/register" data-testid="register-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
                                             <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
                                         </svg>
@@ -115,14 +120,14 @@
                                         </svg>
                                         Logged in as
                                     </li>
-                                    <li><router-link class="dropdown-item fw-semibold" to="/profile">
+                                    <li><router-link class="dropdown-item fw-semibold" to="/profile" data-testid="profile-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
                                             <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
                                         </svg>
                                         {{ user.name }}
                                     </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
-                                    <li><a class="dropdown-item" href="#" @click.prevent="logout">
+                                    <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
                                             <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-56-56 103-104H360v-80h327L584-624l56-56 200 200-200 200Z"/>
                                         </svg>
@@ -139,7 +144,7 @@
         <!-- Main content area -->
         <main class="mt-3">
             <!-- Mobile: Custom Swipe Implementation -->
-            <div v-if="isMobile" class="mobile-view">
+            <div v-if="isMobile" class="mobile-view" data-testid="mobile-view">
                 <div
                     class="swipe-container"
                     ref="swipeContainer"
@@ -149,14 +154,14 @@
                 >
                     <div class="swipe-track" :style="{ transform: `translateX(${currentOffset}px)`, transition: isTransitioning ? 'transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)' : 'none' }">
                         <!-- Screen 1: Tree -->
-                        <div class="swipe-screen">
+                        <div class="swipe-screen" data-testid="tree-screen">
                             <div class="screen-content" ref="screen1Content">
                                 <class-tree></class-tree>
                             </div>
                         </div>
 
                         <!-- Screen 2: Main content -->
-                        <div class="swipe-screen">
+                        <div class="swipe-screen" data-testid="content-screen">
                             <div class="screen-content" ref="screen2Content">
                                 <router-view></router-view>
                             </div>
@@ -165,24 +170,25 @@
                 </div>
 
                 <!-- Pagination dots -->
-                <div class="pagination-dots">
+                <div class="pagination-dots" data-testid="pagination-dots">
                     <div
                         v-for="index in 2"
                         :key="index"
                         class="dot"
                         :class="{ active: currentScreen === index - 1 }"
                         @click="goToScreen(index - 1)"
+                        :data-testid="`dot-${index - 1}`"
                     ></div>
                 </div>
             </div>
 
             <!-- Desktop: Traditional grid layout -->
-            <div v-else class="container ps-5">
+            <div v-else class="container ps-5" data-testid="desktop-view">
                 <div class="row">
-                    <div class="col-3 ps-0">
+                    <div class="col-3 ps-0" data-testid="tree-column">
                         <class-tree></class-tree>
                     </div>
-                    <div class="col-9">
+                    <div class="col-9" data-testid="content-column">
                         <router-view></router-view>
                     </div>
                 </div>
@@ -486,6 +492,38 @@ onUnmounted(() => {
     max-width: 100%;
 }
 
+/* Fix alignment and spacing */
+.navbar-collapse {
+    gap: 0.5rem;
+}
+
+.navbar-nav.me-2 {
+    margin-right: 0.25rem !important;
+}
+
+form.mx-2 {
+    margin-left: 0.25rem !important;
+    margin-right: 0.25rem !important;
+}
+
+.language-switcher {
+    display: flex;
+    align-items: center;
+}
+
+.user-dropdown {
+    display: flex;
+    align-items: center;
+}
+
+/* Consistent button styling */
+.language-switcher .btn-link,
+.user-dropdown .btn-link {
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
 /* Language switcher styles */
 .language-switcher {
     position: relative;
@@ -589,14 +627,9 @@ onUnmounted(() => {
     padding: 0.5rem 1rem;
 }
 
-/* Reduced spacing between Home icon and search */
-.navbar-nav.me-2 {
-    margin-right: 0.5rem !important;
-}
-
-form.mx-2 {
-    margin-left: 0.5rem !important;
-    margin-right: 0.5rem !important;
+/* Ensure all icons are vertically centered */
+.nav-link svg {
+    display: block;
 }
 
 /* Mobile view - custom swipe implementation */

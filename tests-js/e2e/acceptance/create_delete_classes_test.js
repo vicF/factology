@@ -1,3 +1,4 @@
+// tests-js/e2e/acceptance/create_delete_classes_test.js
 const DB_HELPER = require('../../helpers/dbHelper');
 
 Feature('Object Hierarchy Management');
@@ -18,7 +19,6 @@ Before(async ({ I }) => {
 
 Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
 
-    // ----- Helper: Create a class under a parent -----
     async function createClass(parent, name, description) {
         I.say(`Creating class: ${name} under ${parent}`);
         await I.addChildTo(parent);
@@ -31,13 +31,12 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.waitForElement(`a:has-text("${name}")`, 15);
     }
 
-    // ----- Helper: Move a class to a new parent -----
     async function moveClassTo(className, newParentName) {
         I.say(`Moving ${className} to ${newParentName}`);
         I.click(className);
         I.waitForText(className, 20);
 
-        I.click('button[title="Edit this object"]');
+        I.click('[title="Edit this object"]');
         I.waitForElement('.modal', 10);
 
         const parentInput = locate('input').inside(locate('.object-field').withDescendant('.form-label').withText('Parent'));
@@ -58,30 +57,30 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.wait(1);
     }
 
-    // ----- Helper: Delete a class -----
+// Update the deleteClass function in create_delete_classes_test.js
     async function deleteClass(name) {
         I.say(`Deleting class: ${name}`);
         I.click(name);
         I.waitForText(name, 20);
-        I.waitForElement('button:has-text("Delete")', 15);
-        I.amAcceptingPopups();
+
+        // Try multiple possible selectors for delete button
+        // On the object detail page, the delete button might be a button with text "Delete"
+        I.waitForElement('button:has-text("Delete"), .btn-danger, [title="Delete"], .delete-btn', 15);
         I.click('button:has-text("Delete")');
+
+        I.amAcceptingPopups();
         I.waitForDetached(`a:has-text("${name}")`, 20);
         I.dontSee(name);
     }
 
-    // Wait for the main content area to load (not just the tree)
-    I.waitForElement('.col-9', 15);
-    I.waitForElement('.col-3', 15);
-
-    // Wait for Something to be present in the tree
+    // Wait for main content to load
+    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
     I.waitForElement('.col-3 a:has-text("Something")', 15);
 
     // 1. Build initial structure
     await createClass('Something', 'Material Object', 'Physical thing');
     await createClass('Material Object', 'Live being', 'Живое существо');
     await createClass('Live being', 'Human being', 'Человек');
-
     await createClass('Something', 'Dog', 'Woof woof');
 
     // 2. Move Dog under Human being

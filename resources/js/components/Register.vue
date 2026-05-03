@@ -7,9 +7,9 @@
                     <div class="card-body p-4 p-md-5">
                         <h1 class="text-center mb-4">{{ $t('Register') }}</h1>
                         <hr class="mb-4"/>
-                        <form @submit.prevent="register" class="row">
+                        <form @submit.prevent="register" class="row" data-testid="register-form">
                             <div class="col-12" v-if="Object.keys(validationErrors).length > 0">
-                                <div class="alert alert-danger">
+                                <div class="alert alert-danger" data-testid="register-error-alert">
                                     <ul class="mb-0">
                                         <li v-for="(value, key) in validationErrors" :key="key">{{ value[0] }}</li>
                                     </ul>
@@ -26,6 +26,7 @@
                                     class="form-control"
                                     autocomplete="name"
                                     required
+                                    data-testid="register-name"
                                 >
                             </div>
                             <div class="form-group col-12 mb-3">
@@ -39,6 +40,7 @@
                                     class="form-control"
                                     autocomplete="email"
                                     required
+                                    data-testid="register-email"
                                 >
                             </div>
                             <div class="form-group col-12 mb-3">
@@ -52,6 +54,7 @@
                                     class="form-control"
                                     autocomplete="new-password"
                                     required
+                                    data-testid="register-password"
                                 >
                             </div>
                             <div class="form-group col-12 mb-4">
@@ -65,16 +68,17 @@
                                     class="form-control"
                                     autocomplete="new-password"
                                     required
+                                    data-testid="register-password-confirmation"
                                 >
                             </div>
                             <div class="col-12 mb-3">
-                                <button type="submit" :disabled="processing" class="btn btn-primary btn-block w-100">
+                                <button type="submit" :disabled="processing" class="btn btn-primary btn-block w-100" data-testid="register-submit-btn">
                                     {{ processing ? $t('Please wait') : $t('Register') }}
                                 </button>
                             </div>
                             <div class="col-12 text-center">
                                 <label>{{ $t('Already have an account?') }}
-                                    <router-link :to="{name: 'login'}">{{ $t('Log in Now!') }}</router-link>
+                                    <router-link :to="{name: 'login'}" data-testid="login-link-from-register">{{ $t('Log in Now!') }}</router-link>
                                 </label>
                             </div>
                         </form>

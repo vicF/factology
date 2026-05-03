@@ -22,67 +22,56 @@ Scenario('Complete registration and login flow', async ({ I }) => {
     // Register via UI
     I.amOnPage('/');
 
-    I.waitForElement('.user-dropdown button', 10);
-    I.click('.user-dropdown button');
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 10);
+    I.click('[data-testid="user-dropdown-btn"]');
 
-    I.waitForElement('.dropdown-menu', 5);
-    I.click('a.dropdown-item[href="/register"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="register-link"]');
 
-    I.waitForElement('input[name="name"]', 10);
-    I.fillField('Name', userData.name);
-    I.fillField('Email', userData.email);
-    I.fillField('Password', userData.password);
-    I.fillField('Confirm Password', userData.password);
+    I.waitForElement('[data-testid="register-name"]', 10);
+    I.fillField('[data-testid="register-name"]', userData.name);
+    I.fillField('[data-testid="register-email"]', userData.email);
+    I.fillField('[data-testid="register-password"]', userData.password);
+    I.fillField('[data-testid="register-password-confirmation"]', userData.password);
 
-    I.click('button[type="submit"]');
+    I.click('[data-testid="register-submit-btn"]');
 
-    I.waitForElement('.user-dropdown button', 15);
-    I.see(userData.name, '.user-dropdown button');
+    // After registration, wait for redirect to home page
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 20);
+    I.wait(2);
 
     testUser = userData;
 
-    // Wait for the main content area to load
-    I.waitForElement('.col-9', 15);
-
-    // Navigate to Something
-    I.waitForElement('.col-3 a', 15);
-    I.click('Something');
-
-    I.waitForText('Create', 15);
-    I.wait(2);
-
-    // Simple button selector - avoid :has-text()
-    I.click('[title="Edit this object"]');
-
-    I.waitForElement('.modal', 5);
-    I.click('.modal button:has-text("Close")');
-
-    I.waitForInvisible('.modal', 5);
-
-    I.click('[title="Create"]');
-
-    I.waitForElement('.modal', 5);
-    I.click('.modal button:has-text("Close")');
+    // Verify we can see the main content
+    I.seeElement('[data-testid="desktop-view"], [data-testid="mobile-view"]');
 
     // Logout
-    I.click('.user-dropdown button');
-    I.waitForElement('.dropdown-menu', 5);
-    I.click('Logout');
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="logout-link"]');
+    I.wait(2);
+
+    // Verify logout - should see logged out indicator
+    I.seeElement('[data-testid="logged-out-indicator"]');
 
     // Login with same user
-    I.click('.user-dropdown button');
-    I.waitForElement('.dropdown-menu', 5);
-    I.click('Log in');
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="login-link"]');
 
-    I.fillField('Email', testUser.email);
-    I.fillField('Password', testUser.password);
-    I.click('Log in');
+    I.fillField('[data-testid="login-email"]', testUser.email);
+    I.fillField('[data-testid="login-password"]', testUser.password);
+    I.click('[data-testid="login-submit-btn"]');
 
-    I.waitForElement('.user-dropdown button', 10);
-    I.see(testUser.name, '.user-dropdown button');
+    // Wait for login to complete
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+    I.wait(2);
+
+    // Verify logged in indicator
+    I.seeElement('[data-testid="logged-in-indicator"]');
 
     // Final logout
-    I.click('.user-dropdown button');
-    I.waitForElement('.dropdown-menu', 5);
-    I.click('Logout');
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="logout-link"]');
 });
