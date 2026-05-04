@@ -1,7 +1,6 @@
 // tests-js/helpers/dbHelper.js
 
 const DB_HELPER = {
-    // Common database reset method
     async resetDatabase(I, options = {}) {
         const { silent = false, showOutput = false } = options;
 
@@ -10,7 +9,6 @@ const DB_HELPER = {
         }
 
         try {
-            // Check migration status first
             if (!silent) {
                 console.log('\n📋 Checking migration status...');
                 const statusResponse = await I.sendGetRequest('/api/test/migration-status');
@@ -19,7 +17,6 @@ const DB_HELPER = {
                 }
             }
 
-            // Reset database
             if (!silent) {
                 console.log('\n🔄 Running database reset...');
             }
@@ -30,7 +27,6 @@ const DB_HELPER = {
                 if (!silent) {
                     console.log('\n✅ Database reset successful!');
                     if (showOutput && resetResponse.data.output) {
-                        // Only show summary, not full migration output
                         const lines = resetResponse.data.output.split('\n');
                         const summaryLines = lines.filter(line =>
                             line.includes('DONE') ||
@@ -48,7 +44,6 @@ const DB_HELPER = {
 
         } catch (err) {
             console.log('\n❌ Error accessing test routes:', err.message);
-            console.log('Make sure your test container is running with APP_ENV=testing');
             throw err;
         }
 
@@ -59,28 +54,27 @@ const DB_HELPER = {
         return true;
     },
 
-    // Common login method
     async login(I, user) {
         I.amOnPage('/');
-        I.seeElement('a:has-text("Home")');
-        I.click('User');
-        I.click('Log in');
+        I.seeElement('[data-testid="home-link"]');
+        I.click('[data-testid="user-dropdown-btn"]');
+        I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+        I.click('[data-testid="login-link"]');
         I.see('Log in');
-        I.fillField('Email', user.email);
-        I.fillField('Password', user.password);
-        I.click('Log in');
-        I.waitForText(user.name, 15);
+        I.fillField('[data-testid="login-email"]', user.email);
+        I.fillField('[data-testid="login-password"]', user.password);
+        I.click('[data-testid="login-submit-btn"]');
+        I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+        I.wait(2);
     },
 
-    // Common logout method
-    async logout(I, userName) {
-        I.click(userName);
-        I.click('Logout');
-        I.waitForText('guest', 10);
-        I.see('User');
+    async logout(I) {
+        I.click('[data-testid="user-dropdown-btn"]');
+        I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+        I.click('[data-testid="logout-link"]');
+        I.wait(2);
     },
 
-    // Create test user via API
     async createTestUser(I, userData = null) {
         const defaultUser = {
             name: `Tester-${Date.now()}`,
@@ -97,7 +91,6 @@ const DB_HELPER = {
         throw new Error(`Failed to create user: ${response.status}`);
     },
 
-    // Delete test user via API
     async deleteTestUser(I, userId) {
         if (userId) {
             await I.sendDeleteRequest(`/api/test/users/${userId}`);

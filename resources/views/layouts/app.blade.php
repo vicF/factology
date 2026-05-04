@@ -14,7 +14,7 @@
     <link rel="preload" href="https://fonts.bunny.net/css?family=Nunito">
 
     <!-- Scripts -->
-    @vite(['resources/js/app.js'])
+
     <script>
         /*to prevent Firefox FOUC, this must be here*/
         let FF_FOUC_FIX;

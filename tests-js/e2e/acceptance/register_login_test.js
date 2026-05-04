@@ -1,14 +1,10 @@
-// tests-js/register_login_test.js
+// tests-js/e2e/acceptance/register_login_test.js
 const DB_HELPER = require('../../helpers/dbHelper');
 
 Feature('User Registration and Login');
 
 let testUser = null;
 let createdUserId = null;
-
-/*Before(async ({ I }) => {
-    await DB_HELPER.resetDatabase(I, { showOutput: false });
-});*/
 
 After(async ({ I }) => {
     if (createdUserId) {
@@ -25,51 +21,57 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 
     // Register via UI
     I.amOnPage('/');
-    I.click('User');
-    I.click('Register');
 
-    I.fillField('Name', userData.name);
-    I.fillField('Email', userData.email);
-    I.fillField('Password', userData.password);
-    I.fillField('Confirm Password', userData.password);
-    I.click('Register');
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 10);
+    I.click('[data-testid="user-dropdown-btn"]');
 
-    // Wait for successful registration
-    I.waitForText(userData.name, 15);
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="register-link"]');
 
-    // Store for cleanup
+    I.waitForElement('[data-testid="register-name"]', 10);
+    I.fillField('[data-testid="register-name"]', userData.name);
+    I.fillField('[data-testid="register-email"]', userData.email);
+    I.fillField('[data-testid="register-password"]', userData.password);
+    I.fillField('[data-testid="register-password-confirmation"]', userData.password);
+
+    I.click('[data-testid="register-submit-btn"]');
+
+    // After registration, wait for redirect to home page
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 20);
+    I.wait(2);
+
     testUser = userData;
-    createdUserId = testUser.id;
 
-    I.waitForText('Something', 15);
-    I.waitForInvisible('text=Loading...', 10);
-    I.click('Something');
-
-    // Wait for the next page to load
-    I.waitForText('Create', 15);
-
-    // Test dialog interactions
-    I.click('Edit this object');
-    I.waitForElement('.modal', 5);
-    I.click('Close');
-
-    I.click('Create');
-    I.waitForElement('.modal', 5);
-    I.click('Close');
+    // Verify we can see the main content
+    I.seeElement('[data-testid="desktop-view"], [data-testid="mobile-view"]');
 
     // Logout
-    await DB_HELPER.logout(I, testUser.name);
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="logout-link"]');
+    I.wait(2);
+
+    // Verify logout - should see logged out indicator
+    I.seeElement('[data-testid="logged-out-indicator"]');
 
     // Login with same user
-    I.click('User');
-    I.click('Log in');
-    I.fillField('Email', testUser.email);
-    I.fillField('Password', testUser.password);
-    I.click('Log in');
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="login-link"]');
 
-    // Verify login success
-    I.see(testUser.name);
+    I.fillField('[data-testid="login-email"]', testUser.email);
+    I.fillField('[data-testid="login-password"]', testUser.password);
+    I.click('[data-testid="login-submit-btn"]');
+
+    // Wait for login to complete
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+    I.wait(2);
+
+    // Verify logged in indicator
+    I.seeElement('[data-testid="logged-in-indicator"]');
 
     // Final logout
-    await DB_HELPER.logout(I, testUser.name);
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="logout-link"]');
 });

@@ -16,7 +16,7 @@
                                 <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }">
                                     <Image
                                         :node-id="thing.thing_id"
-                                        width="50px"
+                                        width="25px"
                                     />
                                 </RouterLink>
                             </div>

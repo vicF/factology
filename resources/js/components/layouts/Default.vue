@@ -1,45 +1,141 @@
 <template>
-    <div>
+    <div class="app-container">
         <!-- Main Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
             <div class="container-fluid">
-                <span style="color:white" class="me-3">{{ authenticated && user ? user.name : 'guest' }}</span>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false"
-                        aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNavDropdown">
-                    <ul class="navbar-nav flex-shrink-0 me-3">
+                <div class="collapse navbar-collapse d-flex justify-content-between align-items-center" id="navbarNavDropdown">
+                    <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link">Home</router-link>
+                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 -960 960 960"
+                                    fill="#ffffff"
+                                >
+                                    <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
+                                </svg>
+                            </router-link>
                         </li>
                     </ul>
-                    <form class="d-flex flex-grow-1 mx-3" @submit.prevent="submitSearch">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search">
-                        <button class="btn btn-outline-success flex-shrink-0" type="submit">Search</button>
+
+                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form">
+                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 -960 960 960" fill="white">
+                                <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
+                            </svg>
+                        </button>
                     </form>
-                    <div class="d-flex flex-shrink-0">
-                        <LanguageSwitcher/>
-                        <ul class="navbar-nav ms-3">
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink"
-                                   role="button" data-bs-toggle="dropdown" aria-haspopup="true"
-                                   aria-expanded="false">
-                                    {{ authenticated && user ? user.name : 'User' }}
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-end"
-                                     aria-labelledby="navbarDropdownMenuLink">
-                                    <template v-if="authenticated">
-                                        <a class="dropdown-item" href="javascript:void(0)" @click="logout">Logout</a>
-                                    </template>
-                                    <template v-else>
-                                        <router-link class="dropdown-item" to="/login">Log in</router-link>
-                                        <router-link class="dropdown-item" to="/register">Register</router-link>
-                                    </template>
+
+                    <div class="d-flex flex-shrink-0 align-items-center" style="gap: 0.5rem;">
+                        <!-- Compact Language Switcher -->
+                        <div class="language-switcher" data-testid="language-switcher">
+                            <button
+                                class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-testid="language-dropdown-btn"
+                                style="color: white; text-decoration: none; font-weight: 500; font-size: 14px; padding: 0.5rem 0;"
+                            >
+                                {{ (currentLocale || 'en').toUpperCase() }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li v-for="locale in availableLocales" :key="locale.code">
+                                    <a
+                                        class="dropdown-item"
+                                        href="#"
+                                        :class="{ active: currentLocale === locale.code }"
+                                        @click.prevent="switchLanguage(locale.code)"
+                                        :data-testid="`lang-${locale.code}`"
+                                    >
+                                        {{ locale.name }}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- User Dropdown -->
+                        <div class="user-dropdown" data-testid="user-dropdown">
+                            <button
+                                class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                data-testid="user-dropdown-btn"
+                                style="color: white; text-decoration: none; padding: 0.5rem 0;"
+                                :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
+                            >
+                                <!-- Base user silhouette -->
+                                <div class="user-icon-container">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 -960 960 960"
+                                        fill="white"
+                                    >
+                                        <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                    </svg>
+
+                                    <!-- Status indicator overlay -->
+                                    <div v-if="authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
+                                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
+                                        </svg>
+                                    </div>
+                                    <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
+                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                        </svg>
+                                    </div>
                                 </div>
-                            </li>
-                        </ul>
+                            </button>
+
+                            <ul class="dropdown-menu dropdown-menu-end" data-testid="user-dropdown-menu">
+                                <!-- Guest links -->
+                                <template v-if="!authenticated">
+                                    <li class="dropdown-header text-muted small">Guest Mode</li>
+                                    <li><router-link class="dropdown-item" to="/login" data-testid="login-link">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Login
+                                    </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/register" data-testid="register-link">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Register
+                                    </router-link></li>
+                                </template>
+
+                                <!-- User links -->
+                                <template v-else>
+                                    <li class="dropdown-header text-muted small">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" class="me-1">
+                                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
+                                        </svg>
+                                        Logged in as
+                                    </li>
+                                    <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
+                                        </svg>
+                                        {{ user.name }}
+                                    </router-link></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
+                                            <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-56-56 103-104H360v-80h327L584-624l56-56 200 200-200 200Z"/>
+                                        </svg>
+                                        Logout
+                                    </a></li>
+                                </template>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -47,12 +143,52 @@
 
         <!-- Main content area -->
         <main class="mt-3">
-            <div class="container ps-5">
+            <!-- Mobile: Custom Swipe Implementation -->
+            <div v-if="isMobile" class="mobile-view" data-testid="mobile-view">
+                <div
+                    class="swipe-container"
+                    ref="swipeContainer"
+                    @touchstart="onTouchStart"
+                    @touchmove="onTouchMove"
+                    @touchend="onTouchEnd"
+                >
+                    <div class="swipe-track" :style="{ transform: `translateX(${currentOffset}px)`, transition: isTransitioning ? 'transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1)' : 'none' }">
+                        <!-- Screen 1: Tree -->
+                        <div class="swipe-screen" data-testid="tree-screen">
+                            <div class="screen-content" ref="screen1Content">
+                                <class-tree></class-tree>
+                            </div>
+                        </div>
+
+                        <!-- Screen 2: Main content -->
+                        <div class="swipe-screen" data-testid="content-screen">
+                            <div class="screen-content" ref="screen2Content">
+                                <router-view></router-view>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination dots -->
+                <div class="pagination-dots" data-testid="pagination-dots">
+                    <div
+                        v-for="index in 2"
+                        :key="index"
+                        class="dot"
+                        :class="{ active: currentScreen === index - 1 }"
+                        @click="goToScreen(index - 1)"
+                        :data-testid="`dot-${index - 1}`"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Desktop: Traditional grid layout -->
+            <div v-else class="container ps-5" data-testid="desktop-view">
                 <div class="row">
-                    <div class="col-3 ps-0">
+                    <div class="col-3 ps-0" data-testid="tree-column">
                         <class-tree></class-tree>
                     </div>
-                    <div class="col-9">
+                    <div class="col-9" data-testid="content-column">
                         <router-view></router-view>
                     </div>
                 </div>
@@ -62,7 +198,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import LanguageSwitcher from "../LanguageSwitcher.vue"
@@ -72,25 +208,158 @@ import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import axios from 'axios'
-import { provide } from 'vue';
 
-// Маленькая функция для получения URL картинки
+// Provide getThumbUrl function for child components
 const getThumbUrl = (thing_id) => {
     if (!thing_id) return '';
     return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
 };
-
-// Делаем функцию доступной для всех дочерних компонентов
 provide('getThumbUrl', getThumbUrl);
 
 const router = useRouter()
-const route  = useRoute()
+const route = useRoute()
 
-const authStore    = useAuthStore()
-const searchStore  = useSearchStore()
-
+const authStore = useAuthStore()
+const searchStore = useSearchStore()
 const showModal    = ref(false)
 const selectedType = ref('')
+
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
+const swipeContainer = ref(null)
+const screen1Content = ref(null)
+const screen2Content = ref(null)
+const currentScreen = ref(1) // Start on main content (right screen)
+const startX = ref(0)
+const startY = ref(0)
+const currentOffset = ref(0)
+const isTransitioning = ref(false)
+const screenWidth = ref(0)
+const isDragging = ref(false)
+const dragDirection = ref(null) // 'horizontal' or 'vertical'
+
+// Language switcher data
+const currentLocale = ref('en')
+const availableLocales = [
+    { code: 'en', name: 'English' },
+    { code: 'ru', name: 'Русский' },
+    { code: 'fr', name: 'Français' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'es', name: 'Español' }
+]
+
+const switchLanguage = (locale) => {
+    currentLocale.value = locale
+    console.log('Language switched to:', locale)
+}
+
+// Check if mobile
+const isMobile = computed(() => windowWidth.value < 768)
+
+// Handle window resize
+const handleResize = () => {
+    windowWidth.value = window.innerWidth
+    if (isMobile.value) {
+        updateScreenWidth()
+        goToScreen(currentScreen.value, true)
+    }
+}
+
+const updateScreenWidth = () => {
+    if (swipeContainer.value) {
+        screenWidth.value = swipeContainer.value.clientWidth
+        // Update offset after width change
+        currentOffset.value = -currentScreen.value * screenWidth.value
+    }
+}
+
+const goToScreen = (index, instant = false) => {
+    if (index < 0 || index > 1) return
+    currentScreen.value = index
+    isTransitioning.value = !instant
+    currentOffset.value = -index * screenWidth.value
+
+    setTimeout(() => {
+        isTransitioning.value = false
+    }, 300)
+}
+
+const onTouchStart = (e) => {
+    startX.value = e.touches[0].clientX
+    startY.value = e.touches[0].clientY
+    isDragging.value = true
+    dragDirection.value = null
+    isTransitioning.value = false
+}
+
+const onTouchMove = (e) => {
+    if (!isDragging.value) return
+
+    const deltaX = e.touches[0].clientX - startX.value
+    const deltaY = e.touches[0].clientY - startY.value
+
+    // Determine scroll direction after minimal movement
+    if (!dragDirection.value && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+        dragDirection.value = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical'
+    }
+
+    // If vertical scroll, let the browser handle it naturally
+    if (dragDirection.value === 'vertical') {
+        return // Allow native vertical scrolling
+    }
+
+    // Horizontal swipe logic
+    if (dragDirection.value === 'horizontal') {
+        e.preventDefault()
+
+        const newOffset = -currentScreen.value * screenWidth.value + deltaX
+
+        // Add resistance at edges
+        if ((currentScreen.value === 0 && deltaX > 0) || (currentScreen.value === 1 && deltaX < 0)) {
+            currentOffset.value = -currentScreen.value * screenWidth.value + deltaX * 0.3
+        } else {
+            currentOffset.value = newOffset
+        }
+    }
+}
+
+const onTouchEnd = (e) => {
+    if (!isDragging.value) {
+        isDragging.value = false
+        return
+    }
+
+    // If vertical scroll, just reset and exit
+    if (dragDirection.value === 'vertical') {
+        isDragging.value = false
+        dragDirection.value = null
+        startX.value = 0
+        startY.value = 0
+        return
+    }
+
+    // Horizontal swipe logic
+    if (dragDirection.value === 'horizontal') {
+        const deltaX = e.changedTouches[0].clientX - startX.value
+        const threshold = screenWidth.value * 0.2
+
+        if (Math.abs(deltaX) > threshold) {
+            if (deltaX < 0 && currentScreen.value < 1) {
+                goToScreen(currentScreen.value + 1)
+            } else if (deltaX > 0 && currentScreen.value > 0) {
+                goToScreen(currentScreen.value - 1)
+            } else {
+                goToScreen(currentScreen.value)
+            }
+        } else {
+            goToScreen(currentScreen.value)
+        }
+    }
+
+    isDragging.value = false
+    dragDirection.value = null
+    startX.value = 0
+    startY.value = 0
+}
 
 // ---------------------------------------------------------------------------
 
@@ -133,14 +402,38 @@ const submitSearch = () => {
 
 onMounted(() => {
     checkAuth()
+    window.addEventListener('resize', handleResize)
+
+    if (isMobile.value) {
+        nextTick(() => {
+            updateScreenWidth()
+            // Start on screen 1 (main content) by default
+            goToScreen(1, true)
+        })
+    }
 })
 
+// Watch for route changes
 watch(() => route.path, () => {
     checkAuth()
+    // Keep current screen or reset to main content based on route
+    if (isMobile.value) {
+        // If we're on a detail page, stay on main content screen
+        if (currentScreen.value !== 1) {
+            goToScreen(1)
+        }
+    }
 })
 
 watch(() => route.query.q, (newQuery) => {
     searchQuery.value = newQuery || ''
+})
+
+// Update screen width when route changes (content might change height)
+watch(() => route.path, () => {
+    if (isMobile.value) {
+        setTimeout(updateScreenWidth, 100)
+    }
 })
 
 watch(
@@ -155,12 +448,20 @@ watch(
     { immediate: true }
 )
 
+// Watch for window width changes to reinitialize swiping
+watch(isMobile, (newVal) => {
+    if (newVal) {
+        nextTick(() => {
+            updateScreenWidth()
+            goToScreen(currentScreen.value, true)
+        })
+    }
+})
+
 // ---------------------------------------------------------------------------
 
 const user = computed(() => authStore.user || null)
 const authenticated = computed(() => authStore.authenticated)
-
-// Note: eventBus is used directly — no need for computed wrapper anymore
 
 // ---------------------------------------------------------------------------
 
@@ -169,10 +470,8 @@ const logout = async () => {
         await authStore.logout();
         router.push('/');
     } catch (error) {
-        // If it's a 401, the user is already logged out - this is fine
         if (error.response?.status === 401) {
             console.log('Already logged out');
-            // Still clear local state and redirect
             authStore.clearAuth();
             router.push('/');
         } else {
@@ -195,6 +494,10 @@ const handleObjectCreated = (object) => {
     console.log('Object created:', object)
     router.push({ path: '/', query: { q: searchQuery.value } })
 }
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <style scoped>
@@ -204,5 +507,232 @@ const handleObjectCreated = (object) => {
 
 .container {
     max-width: 100%;
+}
+
+/* Fix alignment and spacing */
+.navbar-collapse {
+    gap: 0.5rem;
+}
+
+.navbar-nav.me-2 {
+    margin-right: 0.25rem !important;
+}
+
+form.mx-2 {
+    margin-left: 0.25rem !important;
+    margin-right: 0.25rem !important;
+}
+
+.language-switcher {
+    display: flex;
+    align-items: center;
+}
+
+.user-dropdown {
+    display: flex;
+    align-items: center;
+}
+
+/* Consistent button styling */
+.language-switcher .btn-link,
+.user-dropdown .btn-link {
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+/* Language switcher styles */
+.language-switcher {
+    position: relative;
+}
+
+.language-switcher .dropdown-toggle::after {
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Search button hover fix - keep icon visible */
+.search-btn:hover svg {
+    fill: #0d6efd;
+}
+
+.search-btn:hover {
+    background-color: white;
+    border-color: white;
+}
+
+/* User dropdown styles */
+.user-dropdown {
+    position: relative;
+}
+
+.user-dropdown .dropdown-toggle::after {
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* User icon with status indicator */
+.user-icon-container {
+    position: relative;
+    display: inline-block;
+}
+
+.status-indicator {
+    position: absolute;
+    bottom: -4px;
+    right: -6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #0d6efd;
+}
+
+.status-indicator.logged-in {
+    background-color: #28a745;
+}
+
+.status-indicator.logged-out {
+    background-color: #dc3545;
+}
+
+.status-indicator svg {
+    width: 8px;
+    height: 8px;
+}
+
+/* Fix for mobile dropdowns */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        position: absolute !important;
+        right: 0 !important;
+        left: auto !important;
+        min-width: 180px !important;
+    }
+
+    .user-dropdown .dropdown-menu,
+    .language-switcher .dropdown-menu {
+        right: 0 !important;
+        left: auto !important;
+        top: 100% !important;
+        transform: none !important;
+    }
+}
+
+.language-switcher .dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.language-switcher .dropdown-item:active {
+    background-color: #0d6efd;
+}
+
+.user-dropdown .dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.user-dropdown .dropdown-item:active {
+    background-color: #0d6efd;
+}
+
+.dropdown-header {
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Ensure all icons are vertically centered */
+.nav-link svg {
+    display: block;
+}
+
+/* Mobile view - custom swipe implementation */
+.mobile-view {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+
+.swipe-container {
+    width: 100%;
+    overflow: hidden;
+    touch-action: pan-y pinch-zoom;
+}
+
+.swipe-track {
+    display: flex;
+    flex-direction: row;
+    width: 200%;
+    height: calc(100vh - 70px);
+    will-change: transform;
+}
+
+.swipe-screen {
+    flex: 0 0 50%;
+    width: 50%;
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.screen-content {
+    width: 100%;
+    height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+/* Pagination dots */
+.pagination-dots {
+    position: fixed;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    z-index: 10;
+    padding: 8px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #6c757d;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dot.active {
+    width: 20px;
+    border-radius: 4px;
+    background-color: #0d6efd;
+    opacity: 1;
+}
+
+/* Hide pagination on desktop */
+@media (min-width: 768px) {
+    .pagination-dots {
+        display: none;
+    }
+}
+
+/* Ensure no overflow on mobile */
+@media (max-width: 767px) {
+    body, html {
+        overflow-x: hidden;
+        position: relative;
+        width: 100%;
+    }
+
+    .app-container {
+        overflow-x: hidden;
+        width: 100%;
+    }
 }
 </style>
