@@ -26,7 +26,7 @@
                     </svg>
                 </div>
 
-                <!-- Type icon overlay (using icons instead of text) -->
+                <!-- Type icon overlay (bottom right corner) -->
                 <div
                     v-if="shouldShowTypeLabel"
                     class="overlay-badge type-badge"
@@ -35,15 +35,19 @@
                     @mouseenter="onBadgeMouseEnter"
                     @mouseleave="onBadgeMouseLeave"
                 >
+                    <!-- Class Icon (Hierarchy/Tree structure) -->
                     <svg v-if="props.type === 2" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="currentColor">
-                        <path d="M480-120 200-280v-240L40-600l440-240 440 240v400h-80v-360l-80 40v240l-280 160Zm0-280 160-88v-80l-160 88-160-88v80l160 88Zm-80 200v-80l-80-44v80l80 44Zm160 0 80-44v-80l-80 44v80ZM480-480l160-88-160-88-160 88 160 88Z"/>
+                        <path d="M160-120q-33 0-56.5-23.5T80-200v-160q0-33 23.5-56.5T160-440h160q33 0 56.5 23.5T400-360v160q0 33-23.5 56.5T320-120H160Zm320-240q-17 0-28.5-11.5T440-400q0-17 11.5-28.5T480-440q17 0 28.5 11.5T520-400q0 17-11.5 28.5T480-360Zm160 0q-17 0-28.5-11.5T600-400q0-17 11.5-28.5T640-440q17 0 28.5 11.5T680-400q0 17-11.5 28.5T640-360Zm160 0q-17 0-28.5-11.5T760-400q0-17 11.5-28.5T800-440q17 0 28.5 11.5T840-400q0 17-11.5 28.5T800-360ZM160-520q-33 0-56.5-23.5T80-600v-160q0-33 23.5-56.5T160-840h160q33 0 56.5 23.5T400-760v160q0 33-23.5 56.5T320-520H160Zm480-80q-17 0-28.5-11.5T600-640q0-17 11.5-28.5T640-680q17 0 28.5 11.5T680-640q0 17-11.5 28.5T640-600Zm160 0q-17 0-28.5-11.5T760-640q0-17 11.5-28.5T800-680q17 0 28.5 11.5T840-640q0 17-11.5 28.5T800-600Z"/>
                     </svg>
+                    <!-- Link Icon -->
                     <svg v-else-if="props.type === 4" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="currentColor">
                         <path d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"/>
                     </svg>
+                    <!-- General Icon -->
                     <svg v-else-if="props.type === 1" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="currentColor">
                         <path d="M480-80 240-220v-260L80-560l400-240 400 240v320h-80v-280l-80 40v260L480-80Zm0-400 160-88-160-88-160 88 160 88Z"/>
                     </svg>
+                    <!-- External Icon -->
                     <svg v-else-if="props.type === 5" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="currentColor">
                         <path d="M480-80 200-280v-240L40-600l440-240 440 240v400h-80v-360l-80 40v240L480-80Z"/>
                     </svg>
@@ -71,22 +75,18 @@ const props = defineProps({
         type: String,
         default: '100%'
     },
-    // Alternative UUIDs to try if main image fails
     alternativeUuids: {
         type: Array,
         default: () => []
     },
-    // Numeric object type: 1=general, 2=class, 3=thing, 4=link, 5=external
     type: {
         type: Number,
         default: null
     },
-    // Whether to show the type label overlay (default: true for non-thing)
     showTypeLabel: {
         type: Boolean,
         default: true
     },
-    // Is this object private? Shows lock icon overlay
     isPrivate: {
         type: Boolean,
         default: false
@@ -99,7 +99,6 @@ const currentImageIndex = ref(0)
 const isHoveringImage = ref(false)
 const isHoveringBadge = ref(false)
 
-// Determine type label for tooltip
 const typeLabel = computed(() => {
     if (props.type === 2) return 'Class'
     if (props.type === 4) return 'Link'
@@ -116,15 +115,18 @@ const typeBadgeClass = computed(() => {
     return ''
 })
 
-// Show type label only for non-thing types (where type is not 3)
 const shouldShowTypeLabel = computed(() => {
     if (!props.showTypeLabel) return false
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
-// Hover handlers
 const onMouseEnter = () => {
     isHoveringImage.value = true
+    setTimeout(() => {
+        if (!isHoveringBadge.value) {
+            isHoveringImage.value = false
+        }
+    }, 2000)
 }
 
 const onMouseLeave = () => {
@@ -140,7 +142,6 @@ const onBadgeMouseLeave = () => {
     isHoveringBadge.value = false
 }
 
-// Build array of image URLs to try
 const imageUrls = computed(() => {
     const urls = []
 
@@ -241,7 +242,7 @@ const placeholderStyle = computed(() => ({
     display: block;
 }
 
-/* Overlay styles - very transparent */
+/* Overlay styles */
 .image-overlay {
     position: absolute;
     top: 0;
@@ -249,84 +250,96 @@ const placeholderStyle = computed(() => ({
     right: 0;
     bottom: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Hide overlay when hovering image (but not badge) */
 .image-overlay.overlay-hidden {
     opacity: 0;
 }
 
 .overlay-badge {
     position: absolute;
-    background: rgba(0, 0, 0, 0.25);
-    color: white;
     border-radius: 3px;
     padding: 2px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
     backdrop-filter: blur(2px);
     pointer-events: auto;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    line-height: 1;
 }
 
-/* Private badge - top right corner */
+/* Private badge - top right corner, tightly positioned */
 .private-badge {
-    top: 3px;
-    right: 3px;
-    background: rgba(220, 53, 69, 0.35);
-    padding: 2px;
+    top: 2px;
+    right: 2px;
+    background: rgba(220, 53, 69, 0.4);
 }
 
 .private-badge svg {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
+    display: block;
 }
 
-/* Type badge - bottom left corner */
+/* Type badges - bottom right corner, tightly positioned */
 .type-badge {
-    bottom: 3px;
-    left: 3px;
-    background: rgba(0, 0, 0, 0.25);
-    padding: 2px;
+    bottom: 2px;
+    right: 2px;
 }
 
 .type-badge svg {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
+    display: block;
 }
 
-/* Slightly more visible on badge hover only */
+/* Light blue for class icon */
+.type-class {
+    background: rgba(13, 110, 253, 0.55);
+    box-shadow: 0 0 2px rgba(13, 110, 253, 0.3);
+}
+
+.type-link {
+    background: rgba(111, 66, 193, 0.55);
+    box-shadow: 0 0 2px rgba(111, 66, 193, 0.3);
+}
+
+.type-general {
+    background: rgba(108, 117, 125, 0.55);
+    box-shadow: 0 0 2px rgba(108, 117, 125, 0.3);
+}
+
+.type-external {
+    background: rgba(23, 162, 184, 0.55);
+    box-shadow: 0 0 2px rgba(23, 162, 184, 0.3);
+}
+
+/* Badge hover effects */
 .overlay-badge:hover {
-    background: rgba(0, 0, 0, 0.5);
-    transform: scale(1.1);
+    transform: scale(1.2);
+    backdrop-filter: blur(3px);
 }
 
 .private-badge:hover {
-    background: rgba(220, 53, 69, 0.7);
+    background: rgba(220, 53, 69, 0.8);
 }
 
 .type-class:hover {
-    background: rgba(13, 110, 253, 0.6);
+    background: rgba(13, 110, 253, 0.85);
 }
 
 .type-link:hover {
-    background: rgba(111, 66, 193, 0.6);
+    background: rgba(111, 66, 193, 0.85);
 }
 
 .type-general:hover {
-    background: rgba(108, 117, 125, 0.6);
+    background: rgba(108, 117, 125, 0.85);
 }
 
 .type-external:hover {
-    background: rgba(23, 162, 184, 0.6);
-}
-
-/* Remove the container hover effect that was making them brighter */
-.image-container:hover .overlay-badge {
-    /* No change - badges stay the same opacity */
+    background: rgba(23, 162, 184, 0.85);
 }
 </style>
