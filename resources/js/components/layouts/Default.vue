@@ -120,7 +120,7 @@
                                         </svg>
                                         Logged in as
                                     </li>
-                                    <li><router-link class="dropdown-item fw-semibold" to="/profile" data-testid="profile-link">
+                                    <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
                                             <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
                                         </svg>
@@ -221,6 +221,8 @@ const route = useRoute()
 
 const authStore = useAuthStore()
 const searchStore = useSearchStore()
+const showModal    = ref(false)
+const selectedType = ref('')
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
 const swipeContainer = ref(null)
@@ -477,6 +479,21 @@ const logout = async () => {
         }
     }
 };
+
+const openCreateModal = (type) => {
+    selectedType.value = type
+    showModal.value = true
+}
+
+const closeModal = () => {
+    showModal.value = false
+    selectedType.value = ''
+}
+
+const handleObjectCreated = (object) => {
+    console.log('Object created:', object)
+    router.push({ path: '/', query: { q: searchQuery.value } })
+}
 
 onUnmounted(() => {
     window.removeEventListener('resize', handleResize)

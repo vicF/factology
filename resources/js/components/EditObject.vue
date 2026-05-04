@@ -1,7 +1,6 @@
-<!-- Dialog to create new or edit existing object -->
 <template>
     <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" :id="modalLabelId">
@@ -92,7 +91,7 @@
                         </button>
 
                         <!-- Display regular links (not special ones) -->
-                        <div v-for="item in regularLinks" :key="item.id" class="linked-object-form">
+                        <div v-for="(item, idx) in regularLinks" :key="item.id" class="linked-object-form">
                             <LinkedObject
                                 :link="{
                                     one_thing_id: formData.thing_id,
@@ -105,7 +104,7 @@
                                     thing_id: formData.thing_id,
                                     name: formData.name
                                 }"
-                                :index="linkedObjects.indexOf(item)"
+                                :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -132,7 +131,7 @@
 
     <!-- Unsaved Changes Confirmation Modal -->
     <div class="modal fade" :id="confirmModalId" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-sm">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
@@ -161,11 +160,13 @@ import axios from 'axios';
 import { Modal } from 'bootstrap';
 import { v4 as uuidv4 } from 'uuid';
 import { useI18n } from 'vue-i18n';
+
+// CRITICAL: These component imports are required - DO NOT REMOVE
 import TextField from './Fields/TextField.vue';
-import ObjectField from './Fields/ObjectField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
-import {CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE} from "../constants.js";
+
+import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import { useObjectsStore } from '@/stores/objects';
 
@@ -314,7 +315,6 @@ const initializeData = () => {
         }
 
         if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
-            // The parent ID can be in either field; prefer one_thing_id as it's the source.
             const parentId = linkItem.one_thing_id || linkItem.other_thing_id;
             if (parentId) {
                 parentLinkData.value.other_thing_id = parentId;
@@ -334,11 +334,9 @@ const initializeData = () => {
             classLinkData.value.other_thing_id = props.object.class.thing_id;
             classLinkData.value.link_id = props.object.class?.link_id || null;
         }
-        // FIX: Always update parentLinkData from existing links, even if other_thing_id already set
         if (formData.value.type === CLASS_TYPE && props.object.links) {
             const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
             if (parentLinkFromLinks) {
-                // Determine which side is the parent (the one that is not the current object)
                 let parentId;
                 if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
                     parentId = parentLinkFromLinks.other_thing_id;
@@ -448,9 +446,9 @@ const submitForm = async () => {
 
         if (formData.value.type === CLASS_TYPE && parentLinkData.value.other_thing_id) {
             payload.parent = {
-                one_thing_id: parentLinkData.value.other_thing_id, // parent as source
+                one_thing_id: parentLinkData.value.other_thing_id,
                 link_type_id: LINK_TO_PARENT,
-                other_thing_id: formData.value.thing_id,           // child (new class) as target
+                other_thing_id: formData.value.thing_id,
                 description: parentLinkData.value.translation || '',
                 link_id: parentLinkData.value.link_id || undefined,
                 public: 1,
@@ -548,7 +546,6 @@ onUnmounted(() => {
     if (confirmModalInstance) confirmModalInstance.hide();
 });
 
-// Fixed watch to prevent recursion
 watch(() => props.object, (newObject, oldObject) => {
     if (!newObject) return;
     const newId = newObject.thing_id || newObject.id;
@@ -566,17 +563,97 @@ watch(() => props.object, (newObject, oldObject) => {
         type: props.params.type || 3,
     };
     initializeData();
-}, { deep: false }); // shallow watch – only triggers when the object reference changes
+}, { deep: false });
 </script>
 
 <style scoped>
-.modal-dialog { max-width: 800px; }
-.btn-primary { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 10px 0; }
-.btn-primary:hover { background-color: #0056b3; }
-.btn-secondary { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-.btn-secondary:hover { background-color: #5a6268; }
-.btn-danger { background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-.btn-danger:hover { background-color: #c82333; }
+.modal-dialog {
+    max-width: 800px;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 767.98px) {
+    .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+
+    .modal-content {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .modal-body {
+        padding: 1rem;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .linked-object-form {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-body {
+        padding: 0.75rem;
+    }
+
+    .linked-object-form {
+        padding: 8px;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+        margin: 0;
+    }
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 10px 0;
+}
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.btn-danger:hover {
+    background-color: #c82333;
+}
 .linked-object-form {
     border: 1px solid #ddd;
     padding: 15px;
