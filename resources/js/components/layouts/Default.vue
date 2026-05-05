@@ -7,15 +7,7 @@
                     <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
                             <router-link :to="{name:'dashboard'}" class="nav-link" title="Home" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 -960 960 960"
-                                    fill="#ffffff"
-                                >
-                                    <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
-                                </svg>
+                                <IconHome class="icon-xl" />
                             </router-link>
                         </li>
                     </ul>
@@ -23,9 +15,7 @@
                     <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form">
                         <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
                         <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 -960 960 960" fill="white">
-                                <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
-                            </svg>
+                            <IconSearch class="icon-md" />
                         </button>
                     </form>
 
@@ -68,28 +58,15 @@
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
                                 :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
                             >
-                                <!-- Base user silhouette -->
                                 <div class="user-icon-container">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 -960 960 960"
-                                        fill="white"
-                                    >
-                                        <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
-                                    </svg>
-
-                                    <!-- Status indicator overlay -->
+                                    <IconUser class="icon-lg" />
                                     <div v-if="authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
                                         </svg>
                                     </div>
                                     <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
-                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
-                                        </svg>
+                                        <IconUser class="icon-xs" />
                                     </div>
                                 </div>
                             </button>
@@ -99,15 +76,11 @@
                                 <template v-if="!authenticated">
                                     <li class="dropdown-header text-muted small">Guest Mode</li>
                                     <li><router-link class="dropdown-item" to="/login" data-testid="login-link">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
-                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
-                                        </svg>
+                                        <IconLogin class="icon-sm me-2" />
                                         Login
                                     </router-link></li>
                                     <li><router-link class="dropdown-item" to="/register" data-testid="register-link">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
-                                            <path d="M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-56-56 103-104H120v-80h327L344-624l56-56 200 200-200 200Z"/>
-                                        </svg>
+                                        <IconAdd class="icon-sm me-2" />
                                         Register
                                     </router-link></li>
                                 </template>
@@ -115,22 +88,16 @@
                                 <!-- User links -->
                                 <template v-else>
                                     <li class="dropdown-header text-muted small">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor" class="me-1">
-                                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
-                                        </svg>
+                                        <IconCheck class="icon-xs me-1" />
                                         Logged in as
                                     </li>
                                     <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
-                                            <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Z"/>
-                                        </svg>
+                                        <IconUser class="icon-sm me-2" />
                                         {{ user.name }}
                                     </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 -960 960 960" fill="currentColor" class="me-2">
-                                            <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-56-56 103-104H360v-80h327L584-624l56-56 200 200-200 200Z"/>
-                                        </svg>
+                                        <IconLogout class="icon-sm me-2" />
                                         Logout
                                     </a></li>
                                 </template>
@@ -509,6 +476,16 @@ onUnmounted(() => {
     max-width: 100%;
 }
 
+/* Icon size utilities */
+.icon-xs { width: 10px; height: 10px; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-md { width: 20px; height: 20px; }
+.icon-lg { width: 24px; height: 24px; }
+.icon-xl { width: 28px; height: 28px; }
+
+.me-1 { margin-right: 0.25rem; }
+.me-2 { margin-right: 0.5rem; }
+
 /* Fix alignment and spacing */
 .navbar-collapse {
     gap: 0.5rem;
@@ -598,11 +575,6 @@ form.mx-2 {
     background-color: #dc3545;
 }
 
-.status-indicator svg {
-    width: 8px;
-    height: 8px;
-}
-
 /* Fix for mobile dropdowns */
 @media (max-width: 768px) {
     .dropdown-menu {
@@ -642,11 +614,6 @@ form.mx-2 {
 .dropdown-header {
     font-size: 0.75rem;
     padding: 0.5rem 1rem;
-}
-
-/* Ensure all icons are vertically centered */
-.nav-link svg {
-    display: block;
 }
 
 /* Mobile view - custom swipe implementation */

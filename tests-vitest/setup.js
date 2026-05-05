@@ -1,6 +1,12 @@
 // tests-vitest/setup.js
 import { vi } from 'vitest'
 import { config } from '@vue/test-utils'
+import * as Icons from '@icons'
+
+// Register all icons globally for tests
+Object.entries(Icons).forEach(([name, component]) => {
+    config.global.components[name] = component
+})
 
 // Mock the object cache store completely
 vi.mock('@/stores/objectCache', () => ({

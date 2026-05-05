@@ -11,11 +11,19 @@ import router from './router';
 import i18n from './lang/i18n';
 import LinkDescription from './components/LinkDescription.vue';
 
+// Import all icons
+import * as Icons from './components/icons';
 
 const app = createApp(App);
 app.use(router);
 app.use(i18n);
 app.use(pinia);
+
+// Register all icons globally
+Object.entries(Icons).forEach(([name, component]) => {
+    app.component(name, component);
+});
+
 // Глобальная регистрация
 app.component('LinkDescription', LinkDescription);
 
