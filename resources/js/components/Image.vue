@@ -12,7 +12,7 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg"/>
 
             <!-- Overlay -->
-            <div class="image-overlay" :class="{ 'overlay-hidden': isHoveringImage && !isHoveringBadge }">
+            <div class="image-overlay" :class="{ 'overlay-hidden': shouldHideOverlay }">
                 <!-- Private lock icon overlay -->
                 <div
                     v-if="isPrivate"
@@ -98,6 +98,13 @@ const imageError = ref(false)
 const currentImageIndex = ref(0)
 const isHoveringImage = ref(false)
 const isHoveringBadge = ref(false)
+const hideOverlay = ref(false)
+let hideTimeout = null
+let showTimeout = null
+
+const shouldHideOverlay = computed(() => {
+    return hideOverlay.value && !isHoveringBadge.value
+})
 
 const typeLabel = computed(() => {
     if (props.type === 2) return 'Class'
@@ -120,26 +127,58 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
+const clearTimeouts = () => {
+    if (hideTimeout) {
+        clearTimeout(hideTimeout)
+        hideTimeout = null
+    }
+    if (showTimeout) {
+        clearTimeout(showTimeout)
+        showTimeout = null
+    }
+}
+
 const onMouseEnter = () => {
+    clearTimeouts()
     isHoveringImage.value = true
-    setTimeout(() => {
-        if (!isHoveringBadge.value) {
-            isHoveringImage.value = false
-        }
-    }, 2000)
+    hideOverlay.value = true
 }
 
 const onMouseLeave = () => {
     isHoveringImage.value = false
-    isHoveringBadge.value = false
+
+    // Wait 3 seconds after mouse leaves, then fade back in
+    showTimeout = setTimeout(() => {
+        if (!isHoveringImage.value && !isHoveringBadge.value) {
+            hideOverlay.value = false
+        }
+    }, 3000)
 }
 
 const onBadgeMouseEnter = () => {
+    clearTimeouts()
     isHoveringBadge.value = true
+    hideOverlay.value = false
 }
 
 const onBadgeMouseLeave = () => {
     isHoveringBadge.value = false
+
+    // If mouse leaves badge but is still on image, hide again after delay
+    if (isHoveringImage.value) {
+        hideTimeout = setTimeout(() => {
+            if (isHoveringImage.value && !isHoveringBadge.value) {
+                hideOverlay.value = true
+            }
+        }, 500)
+    } else {
+        // If mouse leaves badge and image, wait 3 seconds then show
+        showTimeout = setTimeout(() => {
+            if (!isHoveringImage.value && !isHoveringBadge.value) {
+                hideOverlay.value = false
+            }
+        }, 3000)
+    }
 }
 
 const imageUrls = computed(() => {
@@ -242,7 +281,7 @@ const placeholderStyle = computed(() => ({
     display: block;
 }
 
-/* Overlay styles */
+/* Overlay styles - with smooth fade transition */
 .image-overlay {
     position: absolute;
     top: 0;
@@ -250,7 +289,8 @@ const placeholderStyle = computed(() => ({
     right: 0;
     bottom: 0;
     pointer-events: none;
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
 }
 
 .image-overlay.overlay-hidden {
