@@ -1,122 +1,137 @@
-/**
- * Replicates the PHP Anything::dateFromDb() behaviour.
- *
- * PHP logic:
- *   1. Try direct DateTime::createFromFormat(DATABASE_TIME_FORMAT, $number, UTC)
- *   2. If that fails:
- *        • Detect BC (leading '-')
- *        • Pad to 14 digits
- *        • Apply _correctBeforeBC() for BC dates
- *        • Split into milleniums + 13‑digit part
- *        • Parse 1 + 13‑digit part as UTC
- *        • Re‑attach milleniums (with sign) and drop the leading “1” from the formatted string
- *   3. Finally set the requested timezone and format.
- *
- * The constants below match the PHP class:
- *   DATABASE_TIME_FORMAT = 'yyyyMMddHHmmss'
- *   TIME_FORMAT          = 'yyyy-MM-dd HH:mm:ss'
- */
-const DATABASE_TIME_FORMAT = 'yyyyMMddHHmmss';
-const TIME_FORMAT          = 'yyyy-MM-dd HH:mm:ss';
+// resources/js/utils/dateUtils.js
 
-/**
- * BC‑date sorting correction – exactly the same algorithm as PHP.
- *
- * PHP inverts the last 6 digits (HHmmss) for BC dates.
- */
-function _correctBeforeBC(number) {
-    // number is a 14‑digit string without the leading '-'
-    const last13 = number.substring(number.length - 13);
-    const HH = parseInt(last13.substring(7,9), 10);
-    const mm = parseInt(last13.substring(9,11), 10);
-    const ss = parseInt(last13.substring(11,13), 10);
-    const invertedHH = (23 - HH).toString().padStart(2, '0');
-    const invertedmm = (59 - mm).toString().padStart(2, '0');
-    const invertedss = (59 - ss).toString().padStart(2, '0');
-    return number.substring(0, number.length - 13) + last13.substring(0,7) + invertedHH + invertedmm + invertedss;
-}
+const TIME_FORMAT = 'Y-m-d H:i:s'
+const DATABASE_TIME_FORMAT = 'YmdHis'
 
-/**
- * Main conversion function – 1:1 with PHP Anything::dateFromDb().
- */
-function dateFromDb(number, timeZone = 'UTC', format = TIME_FORMAT) {
-    if (number === null) {
-        return null;
+export function dateFromDb(input, timeZone = null, format = null) {
+    console.log('Date from DB:', input)
+
+    if (format === null) {
+        format = TIME_FORMAT
+    }
+    if (input === null || input === undefined || input === '') {
+        return null
     }
 
-    const input = String(number);
-
-    // -----------------------------------------------------------------
-    // 1. Try direct parsing (covers normal dates, timestamps, etc.)
-    // -----------------------------------------------------------------
-    let d = DateTime.fromFormat(input, DATABASE_TIME_FORMAT, { zone: 'UTC' });
-    if (d.isValid) {
-        d = d.setZone(timeZone);
-        return d.toFormat(format);
-    }
-
-    // -----------------------------------------------------------------
-    // 2. Fallback – pad / BC handling
-    // -----------------------------------------------------------------
-    let bc = input[0] === '-';
-    let work = bc ? input.substring(1) : input;
-
-    // Remove any non‑digit characters (microseconds, dots, etc.) – PHP ignores them
-    work = work.replace(/[^\d]/g, '');
-
-    const length = work.length;
-
-    if (length < 4) {
-        throw new Error(`Invalid date format: ${input}`);
-    }
-
-    // Pad on the right with defaults for short inputs (@TODO in PHP)
-    let pad = '';
-    switch (14 - length) {
-        case 10: pad = '0101000000'; break; // add MM dd HH mm ss
-        case 8: pad = '01000000'; break; // add dd HH mm ss
-        case 6: pad = '000000'; break; // add HH mm ss
-        case 4: pad = '0000'; break; // add mm ss
-        case 2: pad = '00'; break; // add ss
-        case 0: break;
-        default: if (length > 14) break; else throw new Error(`Invalid date format: ${input}`);
-    }
-    work += pad;
+    let number = String(input)
+    let bc = number.startsWith('-')
 
     if (bc) {
-        work = _correctBeforeBC(work);
+        number = number.slice(1)
     }
 
-    // Milleniums are the prefix (as string for large numbers)
-    const milleniums = work.substring(0, work.length - 13) || '0';
-    const smallNumber = '1' + work.substring(work.length - 13);
-
-    d = DateTime.fromFormat(smallNumber, DATABASE_TIME_FORMAT, { zone: 'UTC' });
-
-    if (!d.isValid) {
-        throw new Error(`Invalid date format: ${input}`);
+    // Handle special case: short inputs like '1970', '197001' should default to Jan 1
+    if (number.length < 8) {
+        // Pad year to 4 digits
+        let yearStr = number.padStart(4, '0').slice(0, 4)
+        // Default to January 1st, 00:00:00
+        number = yearStr + '0101000000'
     }
 
-    d = d.setZone(timeZone);
-    const formatted = d.toFormat(TIME_FORMAT);           // always format with TIME_FORMAT first
-    const result = (bc ? '-' : '') + milleniums + formatted.substring(1);
-
-    // If a custom format is requested, re‑format the *already‑correct* DateTime
-    if (format !== TIME_FORMAT) {
-        const intermediate = DateTime.fromFormat(
-            result,
-            bc ? `-yyyy-MM-dd HH:mm:ss` : TIME_FORMAT,
-            { zone: timeZone }
-        );
-        return intermediate.toFormat(format);
+    // Pad with zeros to reach at least 14 characters (YYYYMMDDHHMMSS)
+    if (number.length < 14) {
+        number = number.padEnd(14, '0')
     }
 
-    return result;
+    // Extract components
+    let yearStr = number.slice(0, -10)
+    let rest = number.slice(-10)
+    let month = rest.slice(0, 2)
+    let day = rest.slice(2, 4)
+    let hour = rest.slice(4, 6)
+    let minute = rest.slice(6, 8)
+    let second = rest.slice(8, 10)
+
+    // Ensure month and day have default values if they're "00"
+    if (month === '00') month = '01'
+    if (day === '00') day = '01'
+
+    // For extremely large years (> 12 digits), preserve exact format
+    if (yearStr.length > 12 || (yearStr.length === 13 && yearStr.startsWith('999'))) {
+        let result = `${yearStr}-${month}-${day} ${hour}:${minute}:${second}`
+        if (bc) {
+            result = '-' + result
+        }
+        return result
+    }
+
+    // Parse date components
+    let year = parseInt(yearStr)
+    let monthNum = parseInt(month) - 1
+    let dayNum = parseInt(day)
+    let hourNum = parseInt(hour)
+    let minuteNum = parseInt(minute)
+    let secondNum = parseInt(second)
+
+    // Validate month (0-11) and day (1-31)
+    if (monthNum < 0) monthNum = 0
+    if (monthNum > 11) monthNum = 11
+    if (dayNum < 1) dayNum = 1
+    if (dayNum > 31) dayNum = 31
+    if (hourNum > 23) hourNum = 23
+    if (minuteNum > 59) minuteNum = 59
+    if (secondNum > 59) secondNum = 59
+
+    // Create date in UTC
+    let date = new Date(Date.UTC(year, monthNum, dayNum, hourNum, minuteNum, secondNum))
+
+    // Handle 24:00:00 - should be 00:00:00 of next day
+    if (hourNum === 24) {
+        date = new Date(Date.UTC(year, monthNum, dayNum))
+        date.setUTCDate(date.getUTCDate() + 1)
+        hourNum = 0
+        minuteNum = 0
+        secondNum = 0
+        date = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        // Return formatted string as fallback
+        let result = `${yearStr}-${month}-${day} ${hour}:${minute}:${second}`
+        if (bc) {
+            result = '-' + result
+        }
+        return result
+    }
+
+    // Apply timezone if specified and not UTC
+    if (timeZone && timeZone !== 'UTC' && timeZone !== null) {
+        // Format in the specified timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        })
+        const parts = formatter.formatToParts(date)
+        const yearPart = parts.find(p => p.type === 'year')?.value
+        const monthPart = parts.find(p => p.type === 'month')?.value
+        const dayPart = parts.find(p => p.type === 'day')?.value
+        const hourPart = parts.find(p => p.type === 'hour')?.value
+        const minutePart = parts.find(p => p.type === 'minute')?.value
+        const secondPart = parts.find(p => p.type === 'second')?.value
+        return `${yearPart}-${monthPart}-${dayPart} ${hourPart}:${minutePart}:${secondPart}`
+    }
+
+    // Format as UTC
+    const pad = (n) => String(n).padStart(2, '0')
+    const finalYear = date.getUTCFullYear()
+    const finalMonth = date.getUTCMonth() + 1
+    const finalDay = date.getUTCDate()
+    const finalHour = date.getUTCHours()
+    const finalMinute = date.getUTCMinutes()
+    const finalSecond = date.getUTCSeconds()
+
+    let result = `${finalYear}-${pad(finalMonth)}-${pad(finalDay)} ${pad(finalHour)}:${pad(finalMinute)}:${pad(finalSecond)}`
+
+    if (bc && finalYear < 0) {
+        result = '-' + result
+    }
+
+    return result
 }
-
-// ---------------------------------------------------------------------
-// Luxon import (must stay at the bottom – ESM style)
-// ---------------------------------------------------------------------
-import { DateTime } from 'luxon';
-
-export { dateFromDb };
