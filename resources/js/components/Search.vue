@@ -30,7 +30,7 @@
                                                 />
                                             </RouterLink>
 
-                                            <!-- Vertical icon bar -->
+                                            <!-- Vertical icon bar - using icon components -->
                                             <div class="vertical-icon-bar">
                                                 <!-- Private icon -->
                                                 <div
@@ -38,34 +38,20 @@
                                                     class="icon-item private-icon"
                                                     title="Private"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor">
-                                                        <path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm240-160q33 0 56.5-23.5T560-320q0-33-23.5-56.5T480-400q-33 0-56.5 23.5T400-320q0 33 23.5 56.5T480-240ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80Z"/>
-                                                    </svg>
+                                                    <IconPrivate />
                                                 </div>
 
-                                                <!-- Type icon -->
+                                                <!-- Type icon (only for non-thing types) - USING ICON COMPONENTS -->
                                                 <div
                                                     v-if="thing.type !== 3"
                                                     class="icon-item type-icon"
                                                     :class="getTypeIconClass(thing.type)"
                                                     :title="getTypeLabel(thing.type)"
                                                 >
-                                                    <!-- Class Icon -->
-                                                    <svg v-if="thing.type === 2" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor">
-                                                        <path d="M160-120q-33 0-56.5-23.5T80-200v-160q0-33 23.5-56.5T160-440h160q33 0 56.5 23.5T400-360v160q0 33-23.5 56.5T320-120H160Zm320-240q-17 0-28.5-11.5T440-400q0-17 11.5-28.5T480-440q17 0 28.5 11.5T520-400q0 17-11.5 28.5T480-360Zm160 0q-17 0-28.5-11.5T600-400q0-17 11.5-28.5T640-440q17 0 28.5 11.5T680-400q0 17-11.5 28.5T640-360Zm160 0q-17 0-28.5-11.5T760-400q0-17 11.5-28.5T800-440q17 0 28.5 11.5T840-400q0 17-11.5 28.5T800-360ZM160-520q-33 0-56.5-23.5T80-600v-160q0-33 23.5-56.5T160-840h160q33 0 56.5 23.5T400-760v160q0 33-23.5 56.5T320-520H160Zm480-80q-17 0-28.5-11.5T600-640q0-17 11.5-28.5T640-680q17 0 28.5 11.5T680-640q0 17-11.5 28.5T640-600Zm160 0q-17 0-28.5-11.5T760-640q0-17 11.5-28.5T800-680q17 0 28.5 11.5T840-640q0 17-11.5 28.5T800-600Z"/>
-                                                    </svg>
-                                                    <!-- Link Icon -->
-                                                    <svg v-else-if="thing.type === 4" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor">
-                                                        <path d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"/>
-                                                    </svg>
-                                                    <!-- General Icon -->
-                                                    <svg v-else-if="thing.type === 1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor">
-                                                        <path d="M480-80 240-220v-260L80-560l400-240 400 240v320h-80v-280l-80 40v260L480-80Zm0-400 160-88-160-88-160 88 160 88Z"/>
-                                                    </svg>
-                                                    <!-- External Icon -->
-                                                    <svg v-else-if="thing.type === 5" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 -960 960 960" fill="currentColor">
-                                                        <path d="M480-80 200-280v-240L40-600l440-240 440 240v400h-80v-360l-80 40v240L480-80Z"/>
-                                                    </svg>
+                                                    <IconClass v-if="thing.type === 2"/>
+                                                    <IconLink v-else-if="thing.type === 4"/>
+                                                    <IconThing v-else-if="thing.type === 1"/>
+                                                    <IconExternal v-else-if="thing.type === 5"/>
                                                 </div>
                                             </div>
                                         </div>
@@ -85,7 +71,8 @@
                                     <div class="result-info-section">
                                         <div class="result-header">
                                             <div class="result-title">
-                                                <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }" class="title-link">
+                                                <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }"
+                                                            class="title-link">
                                                     {{ thing.name }}
                                                 </RouterLink>
                                             </div>
@@ -93,8 +80,10 @@
 
                                         <!-- Class badge for Things (horizontal, compact) -->
                                         <div v-if="thing.type === 3 && thing.class" class="class-badge">
-                                            <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
-                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
+                                            <Image :node-id="thing.class.thing_id" width="12px"
+                                                   class="class-badge-icon"/>
+                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }"
+                                                        class="class-badge-link">
                                                 {{ thing.class.name }}
                                             </RouterLink>
                                         </div>
@@ -113,14 +102,22 @@
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
                                             <div class="links-list">
-                                                <div v-for="(link, linkIndex) in thing.links.slice(0, 3)" :key="`${link.link_type_id}-${linkIndex}`" class="link-item">
-                                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
-                                                        <Image :node-id="link.link_type_id" width="14px" />
+                                                <div v-for="(link, linkIndex) in thing.links.slice(0, 3)"
+                                                     :key="`${link.link_type_id}-${linkIndex}`" class="link-item">
+                                                    <RouterLink
+                                                        :to="{ name: 'object', params: { uid: link.link_type_id } }"
+                                                        class="link-type-icon">
+                                                        <Image :node-id="link.link_type_id" width="14px"/>
                                                     </RouterLink>
                                                     <span class="link-arrow">→</span>
-                                                    <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
-                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
+                                                    <RouterLink
+                                                        :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }"
+                                                        class="link-target">
+                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)"
+                                                               width="14px" class="link-icon"/>
+                                                        <span class="link-name">{{
+                                                                truncateText(link.name || 'Related', 30)
+                                                            }}</span>
                                                     </RouterLink>
                                                 </div>
                                                 <div v-if="thing.links.length > 3" class="more-links">
@@ -143,12 +140,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import {ref, onMounted, onUnmounted, watch} from 'vue';
+import {useRoute} from 'vue-router';
 import axios from 'axios';
-import { eventBus } from "../eventBus";
-import { useSearchStore } from '../stores/search';
+import {eventBus} from "../eventBus";
+import {useSearchStore} from '../stores/search';
 import Image from "./Image.vue";
+
+// Icon components are globally registered, no need to import
+// IconClass, IconLink, IconThing, IconPrivate, IconExternal are available
 
 const props = defineProps({
     searchText: String,
@@ -156,7 +156,7 @@ const props = defineProps({
     typeClass: String
 });
 
-defineOptions({ name: "Search" });
+defineOptions({name: "Search"});
 
 const route = useRoute();
 const searchStore = useSearchStore();
@@ -203,7 +203,7 @@ const formatDateShort = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
+    return date.toLocaleDateString(undefined, {month: 'numeric', day: 'numeric', year: '2-digit'});
 };
 
 const getObjects = async () => {
@@ -261,7 +261,7 @@ watch(() => route.query.q, (newQuery, oldQuery) => {
 
 watch(() => searchStore.checkedItems, () => {
     getObjects();
-}, { deep: true });
+}, {deep: true});
 
 onMounted(() => {
     eventBus.on('trigger-search', triggerSearchHandler);
@@ -287,108 +287,117 @@ onUnmounted(() => {
 .result-content {
     display: flex;
     gap: 1rem;
+    align-items: flex-start;
 }
 
 /* Icon section with image and vertical bar */
 .result-icon-section {
     flex-shrink: 0;
-    width: 70px;
-    text-align: center;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .image-with-bar {
     display: flex;
     align-items: flex-start;
     gap: 4px;
-    justify-content: center;
+    position: relative;
 }
 
 .icon-link {
     display: inline-block;
     flex-shrink: 0;
+    line-height: 0;
 }
 
-/* Vertical icon bar */
+/* Vertical icon bar - same background as placeholder */
 .vertical-icon-bar {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     flex-shrink: 0;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 4px 3px;
+    margin-top: 0;
 }
 
 .icon-item {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 3px;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.5);
 }
 
-.icon-item svg {
-    width: 11px;
-    height: 11px;
+.icon-item :deep(svg) {
+    width: 10px;
+    height: 10px;
     display: block;
 }
 
 .icon-item:hover {
     transform: scale(1.1);
+    background: rgba(0, 0, 0, 0.8);
 }
 
 /* Icon colors */
 .private-icon {
-    background: rgba(220, 53, 69, 0.8);
+    background: rgba(220, 53, 69, 0.7);
     color: white;
 }
 
 .private-icon:hover {
-    background: rgba(220, 53, 69, 1);
+    background: rgba(220, 53, 69, 0.95);
 }
 
 .type-class {
-    background: rgba(13, 110, 253, 0.8);
+    background: rgba(13, 110, 253, 0.7);
     color: white;
 }
 
 .type-class:hover {
-    background: rgba(13, 110, 253, 1);
+    background: rgba(13, 110, 253, 0.95);
 }
 
 .type-link {
-    background: rgba(111, 66, 193, 0.8);
+    background: rgba(111, 66, 193, 0.7);
     color: white;
 }
 
 .type-link:hover {
-    background: rgba(111, 66, 193, 1);
+    background: rgba(111, 66, 193, 0.95);
 }
 
 .type-general {
-    background: rgba(108, 117, 125, 0.8);
+    background: rgba(108, 117, 125, 0.7);
     color: white;
 }
 
 .type-general:hover {
-    background: rgba(108, 117, 125, 1);
+    background: rgba(108, 117, 125, 0.95);
 }
 
 .type-external {
-    background: rgba(23, 162, 184, 0.8);
+    background: rgba(23, 162, 184, 0.7);
     color: white;
 }
 
 .type-external:hover {
-    background: rgba(23, 162, 184, 1);
+    background: rgba(23, 162, 184, 0.95);
 }
 
 .image-dates {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: #adb5bd;
     text-align: center;
-    margin-top: 6px;
+    margin-top: 4px;
     line-height: 1.2;
 }
 
@@ -396,10 +405,12 @@ onUnmounted(() => {
     display: block;
 }
 
-/* Info section */
+/* Info section - aligns with top of image */
 .result-info-section {
     flex: 2;
     min-width: 150px;
+    margin-top: 0;
+    padding-top: 0;
 }
 
 .result-header {
@@ -409,6 +420,7 @@ onUnmounted(() => {
 .result-title {
     font-size: 0.95rem;
     font-weight: 600;
+    line-height: 1.3;
 }
 
 .title-link {
@@ -420,7 +432,6 @@ onUnmounted(() => {
     text-decoration: underline;
 }
 
-/* Class badge - compact */
 .class-badge {
     display: inline-flex;
     align-items: center;
@@ -452,7 +463,6 @@ onUnmounted(() => {
     line-height: 1.35;
 }
 
-/* Links section */
 .result-links-section {
     flex: 1.2;
     min-width: 180px;
@@ -529,60 +539,65 @@ onUnmounted(() => {
     border-top: 1px dashed #dee2e6;
 }
 
-/* Separator */
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
 }
 
-/* Desktop: show links section normally */
-@media (min-width: 769px) {
-    .result-links-section {
-        display: block;
-    }
+/* Desktop styles - same for all screen sizes */
+.result-links-section {
+    display: block;
 }
 
-/* Mobile: conditionally hide empty links section */
+/* Same layout for all screen sizes - no horizontal bars on mobile */
+.result-icon-section {
+    width: auto;
+    flex-direction: column;
+    align-items: center;
+}
+
+.image-with-bar {
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.vertical-icon-bar {
+    flex-direction: column;
+}
+
+/* Small screens - just shrink padding */
 @media (max-width: 768px) {
     .result-content {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .result-icon-section {
-        width: auto;
+        gap: 0.75rem;
     }
 
     .result-info-section {
-        flex: 1;
-        min-width: calc(100% - 80px);
+        min-width: auto;
     }
 
     .result-links-section {
         width: 100%;
         min-width: auto;
-        margin-top: 0.5rem;
-    }
-
-    .result-links-section:empty {
-        display: none;
-    }
-
-    .link-name {
-        max-width: 150px;
-        white-space: normal;
-        word-break: break-word;
     }
 }
 
-/* Extra small screens */
 @media (max-width: 480px) {
     .result-item {
         padding: 0.5rem 0;
     }
 
-    .result-info-section {
-        min-width: calc(100% - 70px);
+    .icon-item {
+        width: 14px;
+        height: 14px;
+    }
+
+    .icon-item :deep(svg) {
+        width: 8px;
+        height: 8px;
+    }
+
+    .icon-item {
+        background: rgba(0, 0, 0, 0.6);
     }
 
     .result-title {
@@ -591,10 +606,6 @@ onUnmounted(() => {
 
     .result-description {
         font-size: 0.7rem;
-    }
-
-    .link-item {
-        gap: 3px;
     }
 
     .link-name {
@@ -607,7 +618,6 @@ onUnmounted(() => {
     }
 }
 
-/* Loading spinner */
 .spinner-border {
     width: 2rem;
     height: 2rem;
