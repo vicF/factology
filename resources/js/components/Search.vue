@@ -342,7 +342,7 @@ onUnmounted(() => {
     transform: scale(1.1);
 }
 
-/* Icon colors - ensure they stay colored even on mobile */
+/* Icon colors */
 .private-icon {
     background: rgba(220, 53, 69, 0.8);
     color: white;
@@ -388,11 +388,11 @@ onUnmounted(() => {
     background: rgba(23, 162, 184, 1);
 }
 
-/* Info section */
+/* Info section - perfect alignment with image top */
 .result-info-section {
     flex: 2;
     min-width: 150px;
-    margin-top: 0;
+    margin-top: -2px; /* Поднимаем на 2 пикселя для лучшего выравнивания */
     padding-top: 0;
 }
 
@@ -401,12 +401,16 @@ onUnmounted(() => {
     flex-wrap: wrap;
     align-items: baseline;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
+    line-height: 1.2;
 }
 
 .result-title {
     font-size: 0.95rem;
     font-weight: 600;
+    line-height: 1.2;
+    margin: 0;
+    padding: 0;
 }
 
 .title-link {
@@ -421,6 +425,7 @@ onUnmounted(() => {
 /* Date badge styling */
 .result-dates {
     display: inline-flex;
+    line-height: 1.2;
 }
 
 .date-badge {
@@ -430,9 +435,10 @@ onUnmounted(() => {
     padding: 2px 8px;
     border-radius: 12px;
     white-space: nowrap;
+    line-height: 1.2;
 }
 
-/* Class badge */
+/* Class badge - compact */
 .class-badge {
     display: inline-flex;
     align-items: center;
@@ -442,7 +448,8 @@ onUnmounted(() => {
     border-radius: 12px;
     background: #f8f9fa;
     color: #6c757d;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
+    line-height: 1.2;
 }
 
 .class-badge-icon {
@@ -461,7 +468,9 @@ onUnmounted(() => {
 .result-description {
     font-size: 0.75rem;
     color: #6c757d;
-    line-height: 1.35;
+    line-height: 1.3;
+    margin: 0;
+    padding: 0;
 }
 
 /* Links section */
@@ -546,7 +555,14 @@ onUnmounted(() => {
     border-bottom: 1px solid #e9ecef;
 }
 
-/* Responsive */
+/* Desktop styles */
+@media (min-width: 769px) {
+    .result-info-section {
+        max-width: calc(100% - 280px);
+    }
+}
+
+/* Mobile adjustments - уменьшенные отступы */
 @media (max-width: 768px) {
     .result-content {
         gap: 0.75rem;
@@ -554,6 +570,7 @@ onUnmounted(() => {
 
     .result-info-section {
         min-width: auto;
+        margin-top: -2px; /* Держим то же выравнивание */
     }
 
     .result-links-section {
@@ -565,14 +582,32 @@ onUnmounted(() => {
         flex-direction: column;
         align-items: flex-start;
         gap: 4px;
+        margin-bottom: 2px; /* Уменьшили отступ между заголовком и остальным */
     }
 
     .date-badge {
         white-space: normal;
         display: inline-block;
     }
+
+    .result-title {
+        line-height: 1.2;
+        font-size: 0.9rem;
+    }
+
+    /* Уменьшенные отступы для мобильной версии */
+    .class-badge {
+        margin-bottom: 2px;
+    }
+
+    .result-description {
+        font-size: 0.7rem;
+        line-height: 1.25;
+        margin-top: 0;
+    }
 }
 
+/* Extra small screens */
 @media (max-width: 480px) {
     .result-item {
         padding: 0.5rem 0;
@@ -603,6 +638,10 @@ onUnmounted(() => {
 
     .links-container {
         padding: 4px 8px;
+    }
+
+    .result-info-section {
+        margin-top: -2px;
     }
 }
 
