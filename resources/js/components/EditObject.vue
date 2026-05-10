@@ -1,174 +1,177 @@
 <template>
-    <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" :id="modalLabelId">
-                        {{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}
-                    </h5>
-                    <button
-                        type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"
-                        :aria-label="$t('Close')"
-                    ></button>
+    <Teleport to="body">
+        <!-- Main Edit/Create Modal -->
+        <div class="modal fade" :id="modalId" tabindex="-1" :aria-labelledby="modalLabelId" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" :id="modalLabelId">
+                            {{ title || (isEditMode ? $t('Edit Object') : $t('Create Object')) }}
+                        </h5>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            :aria-label="$t('Close')"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="submitForm">
+                            <!-- Class field for Thing type (type 3) -->
+                            <div class="mb-3" v-if="formData.type === 3">
+                                <LinkedObject
+                                    :link="classLinkData"
+                                    :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                    :index="0"
+                                    :singleField="true"
+                                    :fixedLinkTypeUuid="LINK_TO_CLASS"
+                                    :targetLabel="$t('Class')"
+                                    @update="handleClassLinkUpdate"
+                                    @remove="handleClassLinkRemove"
+                                />
+                            </div>
+
+                            <!-- Parent field for Class type (type 2) -->
+                            <div class="mb-3" v-if="formData.type === 2">
+                                <LinkedObject
+                                    :link="parentLinkData"
+                                    :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
+                                    :index="0"
+                                    :singleField="true"
+                                    :fixedLinkTypeUuid="LINK_TO_PARENT"
+                                    :targetLabel="$t('Parent')"
+                                    @update="handleParentLinkUpdate"
+                                    @remove="handleParentLinkRemove"
+                                />
+                            </div>
+
+                            <!-- rest of the form (name, description, dates, etc.) -->
+                            <div class="mb-3">
+                                <TextField
+                                    fieldName="name"
+                                    v-model="formData.name"
+                                    :isEditable="true"
+                                    :label="$t('Name')"
+                                    required
+                                />
+                            </div>
+                            <div class="mb-3">
+                                <TextField
+                                    fieldName="description"
+                                    v-model="formData.description"
+                                    :isEditable="true"
+                                    :label="$t('Description')"
+                                />
+                            </div>
+                            <div class="mb-3">
+                                <DateField
+                                    fieldName="start"
+                                    v-model="formData.start"
+                                    :isEditable="true"
+                                    :label="$t('Start')"
+                                />
+                            </div>
+                            <div class="mb-3">
+                                <DateField
+                                    fieldName="end"
+                                    v-model="formData.end"
+                                    :isEditable="true"
+                                    :label="$t('End')"
+                                />
+                            </div>
+
+                            <!-- Public checkbox -->
+                            <div class="mb-3 form-check">
+                                <input
+                                    type="checkbox"
+                                    class="form-check-input"
+                                    id="publicCheckbox"
+                                    v-model="formData.public"
+                                    :true-value="1"
+                                    :false-value="0"
+                                />
+                                <label class="form-check-label" for="publicCheckbox">
+                                    {{ $t('Public') }}
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    {{ $t('Make this object visible to everyone') }}
+                                </small>
+                            </div>
+
+                            <!-- Object type indicator -->
+                            <div v-if="formData.type == 1" class="mb-3">General</div>
+                            <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
+                            <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
+                            <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
+                            <div v-else-if="formData.type == 5" class="mb-3">External</div>
+                            <div v-else class="mb-3">!Unknown type!</div>
+
+                            <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
+                                {{ $t('Add Link') }}
+                            </button>
+
+                            <!-- Display regular links (not special ones) -->
+                            <div v-for="(item, idx) in regularLinks" :key="item.id" class="linked-object-form">
+                                <LinkedObject
+                                    :link="{
+                                        one_thing_id: formData.thing_id,
+                                        other_thing_id: item.other_thing_id,
+                                        link_type_id: item.link_type_id,
+                                        translation: item.translation,
+                                        link_id: item.link_id
+                                    }"
+                                    :currentObject="{
+                                        thing_id: formData.thing_id,
+                                        name: formData.name
+                                    }"
+                                    :index="idx"
+                                    :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
+                                    @update="updateItem"
+                                    @remove="removeItem"
+                                />
+                            </div>
+
+                            <div class="modal-footer">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    data-bs-dismiss="modal"
+                                >
+                                    {{ $t('Close') }}
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    {{ isEditMode ? $t('Update') : $t('Save') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form @submit.prevent="submitForm">
-                        <!-- Class field for Thing type (type 3) -->
-                        <div class="mb-3" v-if="formData.type === 3">
-                            <LinkedObject
-                                :link="classLinkData"
-                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
-                                :index="0"
-                                :singleField="true"
-                                :fixedLinkTypeUuid="LINK_TO_CLASS"
-                                :targetLabel="$t('Class')"
-                                @update="handleClassLinkUpdate"
-                                @remove="handleClassLinkRemove"
-                            />
-                        </div>
+            </div>
+        </div>
 
-                        <!-- Parent field for Class type (type 2) -->
-                        <div class="mb-3" v-if="formData.type === 2">
-                            <LinkedObject
-                                :link="parentLinkData"
-                                :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
-                                :index="0"
-                                :singleField="true"
-                                :fixedLinkTypeUuid="LINK_TO_PARENT"
-                                :targetLabel="$t('Parent')"
-                                @update="handleParentLinkUpdate"
-                                @remove="handleParentLinkRemove"
-                            />
-                        </div>
-
-                        <!-- rest of the form (name, description, dates, etc.) -->
-                        <div class="mb-3">
-                            <TextField
-                                fieldName="name"
-                                v-model="formData.name"
-                                :isEditable="true"
-                                :label="$t('Name')"
-                                required
-                            />
-                        </div>
-                        <div class="mb-3">
-                            <TextField
-                                fieldName="description"
-                                v-model="formData.description"
-                                :isEditable="true"
-                                :label="$t('Description')"
-                            />
-                        </div>
-                        <div class="mb-3">
-                            <DateField
-                                fieldName="start"
-                                v-model="formData.start"
-                                :isEditable="true"
-                                :label="$t('Start')"
-                            />
-                        </div>
-                        <div class="mb-3">
-                            <DateField
-                                fieldName="end"
-                                v-model="formData.end"
-                                :isEditable="true"
-                                :label="$t('End')"
-                            />
-                        </div>
-
-                        <!-- Public checkbox -->
-                        <div class="mb-3 form-check">
-                            <input
-                                type="checkbox"
-                                class="form-check-input"
-                                id="publicCheckbox"
-                                v-model="formData.public"
-                                :true-value="1"
-                                :false-value="0"
-                            />
-                            <label class="form-check-label" for="publicCheckbox">
-                                {{ $t('Public') }}
-                            </label>
-                            <small class="form-text text-muted d-block">
-                                {{ $t('Make this object visible to everyone') }}
-                            </small>
-                        </div>
-
-                        <!-- Object type indicator -->
-                        <div v-if="formData.type == 1" class="mb-3">General</div>
-                        <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
-                        <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
-                        <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
-                        <div v-else-if="formData.type == 5" class="mb-3">External</div>
-                        <div v-else class="mb-3">!Unknown type!</div>
-
-                        <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
-                            {{ $t('Add Link') }}
+        <!-- Unsaved Changes Confirmation Modal -->
+        <div class="modal fade" :id="confirmModalId" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>{{ $t('You have unsaved changes. Are you sure you want to close?') }}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            {{ $t('Cancel') }}
                         </button>
-
-                        <!-- Display regular links (not special ones) -->
-                        <div v-for="(item, idx) in regularLinks" :key="item.id" class="linked-object-form">
-                            <LinkedObject
-                                :link="{
-                                    one_thing_id: formData.thing_id,
-                                    other_thing_id: item.other_thing_id,
-                                    link_type_id: item.link_type_id,
-                                    translation: item.translation,
-                                    link_id: item.link_id
-                                }"
-                                :currentObject="{
-                                    thing_id: formData.thing_id,
-                                    name: formData.name
-                                }"
-                                :index="idx"
-                                :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                @update="updateItem"
-                                @remove="removeItem"
-                            />
-                        </div>
-
-                        <div class="modal-footer">
-                            <button
-                                type="button"
-                                class="btn btn-secondary"
-                                data-bs-dismiss="modal"
-                            >
-                                {{ $t('Close') }}
-                            </button>
-                            <button type="submit" class="btn btn-primary">
-                                {{ isEditMode ? $t('Update') : $t('Save') }}
-                            </button>
-                        </div>
-                    </form>
+                        <button type="button" class="btn btn-danger" @click="confirmClose">
+                            {{ $t('Close without Saving') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Unsaved Changes Confirmation Modal -->
-    <div class="modal fade" :id="confirmModalId" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>{{ $t('You have unsaved changes. Are you sure you want to close?') }}</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        {{ $t('Cancel') }}
-                    </button>
-                    <button type="button" class="btn btn-danger" @click="confirmClose">
-                        {{ $t('Close without Saving') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    </Teleport>
 </template>
 
 <script setup>
