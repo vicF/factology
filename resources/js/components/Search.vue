@@ -41,49 +41,47 @@
                                                     <IconPrivate />
                                                 </div>
 
-                                                <!-- Type icon (only for non-thing types) - USING ICON COMPONENTS -->
+                                                <!-- Type icon (only for non-thing types) -->
                                                 <div
                                                     v-if="thing.type !== 3"
                                                     class="icon-item type-icon"
                                                     :class="getTypeIconClass(thing.type)"
                                                     :title="getTypeLabel(thing.type)"
                                                 >
-                                                    <IconClass v-if="thing.type === 2"/>
-                                                    <IconLink v-else-if="thing.type === 4"/>
-                                                    <IconThing v-else-if="thing.type === 1"/>
-                                                    <IconExternal v-else-if="thing.type === 5"/>
+                                                    <IconClass v-if="thing.type === 2" />
+                                                    <IconLink v-else-if="thing.type === 4" />
+                                                    <IconThing v-else-if="thing.type === 1" />
+                                                    <IconExternal v-else-if="thing.type === 5" />
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <!-- Dates below image -->
-                                        <div class="image-dates">
-                                            <span v-if="thing.start" class="image-date">
-                                                {{ formatDateShort(thing.start) }}
-                                            </span>
-                                            <span v-if="thing.end" class="image-date">
-                                                → {{ formatDateShort(thing.end) }}
-                                            </span>
-                                        </div>
                                     </div>
 
-                                    <!-- Middle: Title, description, class badge -->
+                                    <!-- Middle: Title, dates, description, class badge -->
                                     <div class="result-info-section">
                                         <div class="result-header">
                                             <div class="result-title">
-                                                <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }"
-                                                            class="title-link">
+                                                <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }" class="title-link">
                                                     {{ thing.name }}
                                                 </RouterLink>
                                             </div>
+
+                                            <!-- Dates moved to the top, right after title -->
+                                            <div class="result-dates">
+                                                <span v-if="thing.start" class="date-badge">
+                                                    📅 {{ formatDateShort(thing.start) }}
+                                                    <span v-if="thing.end"> → {{ formatDateShort(thing.end) }}</span>
+                                                </span>
+                                                <span v-else-if="thing.end" class="date-badge">
+                                                    📅 until {{ formatDateShort(thing.end) }}
+                                                </span>
+                                            </div>
                                         </div>
 
-                                        <!-- Class badge for Things (horizontal, compact) -->
+                                        <!-- Class badge for Things -->
                                         <div v-if="thing.type === 3 && thing.class" class="class-badge">
-                                            <Image :node-id="thing.class.thing_id" width="12px"
-                                                   class="class-badge-icon"/>
-                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }"
-                                                        class="class-badge-link">
+                                            <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
                                                 {{ thing.class.name }}
                                             </RouterLink>
                                         </div>
@@ -94,7 +92,7 @@
                                         </div>
                                     </div>
 
-                                    <!-- Right: Links/Relationships (only shown if has links) -->
+                                    <!-- Right: Links/Relationships -->
                                     <div v-if="thing.links && thing.links.length > 0" class="result-links-section">
                                         <div class="links-container">
                                             <div class="links-title">
@@ -102,22 +100,14 @@
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
                                             <div class="links-list">
-                                                <div v-for="(link, linkIndex) in thing.links.slice(0, 3)"
-                                                     :key="`${link.link_type_id}-${linkIndex}`" class="link-item">
-                                                    <RouterLink
-                                                        :to="{ name: 'object', params: { uid: link.link_type_id } }"
-                                                        class="link-type-icon">
-                                                        <Image :node-id="link.link_type_id" width="14px"/>
+                                                <div v-for="(link, linkIndex) in thing.links.slice(0, 3)" :key="`${link.link_type_id}-${linkIndex}`" class="link-item">
+                                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
+                                                        <Image :node-id="link.link_type_id" width="14px" />
                                                     </RouterLink>
                                                     <span class="link-arrow">→</span>
-                                                    <RouterLink
-                                                        :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }"
-                                                        class="link-target">
-                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)"
-                                                               width="14px" class="link-icon"/>
-                                                        <span class="link-name">{{
-                                                                truncateText(link.name || 'Related', 30)
-                                                            }}</span>
+                                                    <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
+                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
+                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
                                                     </RouterLink>
                                                 </div>
                                                 <div v-if="thing.links.length > 3" class="more-links">
@@ -140,15 +130,12 @@
 </template>
 
 <script setup>
-import {ref, onMounted, onUnmounted, watch} from 'vue';
-import {useRoute} from 'vue-router';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import axios from 'axios';
-import {eventBus} from "../eventBus";
-import {useSearchStore} from '../stores/search';
+import { eventBus } from "../eventBus";
+import { useSearchStore } from '../stores/search';
 import Image from "./Image.vue";
-
-// Icon components are globally registered, no need to import
-// IconClass, IconLink, IconThing, IconPrivate, IconExternal are available
 
 const props = defineProps({
     searchText: String,
@@ -156,7 +143,7 @@ const props = defineProps({
     typeClass: String
 });
 
-defineOptions({name: "Search"});
+defineOptions({ name: "Search" });
 
 const route = useRoute();
 const searchStore = useSearchStore();
@@ -203,7 +190,7 @@ const formatDateShort = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString(undefined, {month: 'numeric', day: 'numeric', year: '2-digit'});
+    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
 };
 
 const getObjects = async () => {
@@ -261,7 +248,7 @@ watch(() => route.query.q, (newQuery, oldQuery) => {
 
 watch(() => searchStore.checkedItems, () => {
     getObjects();
-}, {deep: true});
+}, { deep: true });
 
 onMounted(() => {
     eventBus.on('trigger-search', triggerSearchHandler);
@@ -312,7 +299,7 @@ onUnmounted(() => {
     line-height: 0;
 }
 
-/* Vertical icon bar - same background as placeholder */
+/* Vertical icon bar */
 .vertical-icon-bar {
     display: flex;
     flex-direction: column;
@@ -333,94 +320,97 @@ onUnmounted(() => {
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: rgba(0, 0, 0, 0.5);
 }
 
+/* Force SVG colors to stay white */
 .icon-item :deep(svg) {
     width: 10px;
     height: 10px;
     display: block;
+    stroke: white;
+    fill: none;
+    stroke-width: 2;
+}
+
+/* For icons that need fill (like checkmark) */
+.icon-item :deep(svg[fill="currentColor"]) {
+    fill: white;
+    stroke: none;
 }
 
 .icon-item:hover {
     transform: scale(1.1);
-    background: rgba(0, 0, 0, 0.8);
 }
 
 /* Icon colors */
 .private-icon {
-    background: rgba(220, 53, 69, 0.7);
+    background: rgba(220, 53, 69, 0.8);
     color: white;
 }
 
 .private-icon:hover {
-    background: rgba(220, 53, 69, 0.95);
+    background: rgba(220, 53, 69, 1);
 }
 
 .type-class {
-    background: rgba(13, 110, 253, 0.7);
+    background: rgba(13, 110, 253, 0.8);
     color: white;
 }
 
 .type-class:hover {
-    background: rgba(13, 110, 253, 0.95);
+    background: rgba(13, 110, 253, 1);
 }
 
 .type-link {
-    background: rgba(111, 66, 193, 0.7);
+    background: rgba(111, 66, 193, 0.8);
     color: white;
 }
 
 .type-link:hover {
-    background: rgba(111, 66, 193, 0.95);
+    background: rgba(111, 66, 193, 1);
 }
 
 .type-general {
-    background: rgba(108, 117, 125, 0.7);
+    background: rgba(108, 117, 125, 0.8);
     color: white;
 }
 
 .type-general:hover {
-    background: rgba(108, 117, 125, 0.95);
+    background: rgba(108, 117, 125, 1);
 }
 
 .type-external {
-    background: rgba(23, 162, 184, 0.7);
+    background: rgba(23, 162, 184, 0.8);
     color: white;
 }
 
 .type-external:hover {
-    background: rgba(23, 162, 184, 0.95);
+    background: rgba(23, 162, 184, 1);
 }
 
-.image-dates {
-    font-size: 0.55rem;
-    color: #adb5bd;
-    text-align: center;
-    margin-top: 4px;
-    line-height: 1.2;
-}
-
-.image-date {
-    display: block;
-}
-
-/* Info section - aligns with top of image */
+/* Info section - perfect alignment with image top */
 .result-info-section {
     flex: 2;
     min-width: 150px;
-    margin-top: 0;
+    margin-top: -2px; /* Поднимаем на 2 пикселя для лучшего выравнивания */
     padding-top: 0;
 }
 
 .result-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
     margin-bottom: 4px;
+    line-height: 1.2;
 }
 
 .result-title {
     font-size: 0.95rem;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.2;
+    margin: 0;
+    padding: 0;
 }
 
 .title-link {
@@ -432,6 +422,23 @@ onUnmounted(() => {
     text-decoration: underline;
 }
 
+/* Date badge styling */
+.result-dates {
+    display: inline-flex;
+    line-height: 1.2;
+}
+
+.date-badge {
+    font-size: 0.65rem;
+    color: #6c757d;
+    background: #f8f9fa;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+/* Class badge - compact */
 .class-badge {
     display: inline-flex;
     align-items: center;
@@ -441,7 +448,8 @@ onUnmounted(() => {
     border-radius: 12px;
     background: #f8f9fa;
     color: #6c757d;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
+    line-height: 1.2;
 }
 
 .class-badge-icon {
@@ -460,9 +468,12 @@ onUnmounted(() => {
 .result-description {
     font-size: 0.75rem;
     color: #6c757d;
-    line-height: 1.35;
+    line-height: 1.3;
+    margin: 0;
+    padding: 0;
 }
 
+/* Links section */
 .result-links-section {
     flex: 1.2;
     min-width: 180px;
@@ -544,28 +555,14 @@ onUnmounted(() => {
     border-bottom: 1px solid #e9ecef;
 }
 
-/* Desktop styles - same for all screen sizes */
-.result-links-section {
-    display: block;
+/* Desktop styles */
+@media (min-width: 769px) {
+    .result-info-section {
+        max-width: calc(100% - 280px);
+    }
 }
 
-/* Same layout for all screen sizes - no horizontal bars on mobile */
-.result-icon-section {
-    width: auto;
-    flex-direction: column;
-    align-items: center;
-}
-
-.image-with-bar {
-    flex-direction: row;
-    align-items: flex-start;
-}
-
-.vertical-icon-bar {
-    flex-direction: column;
-}
-
-/* Small screens - just shrink padding */
+/* Mobile adjustments - уменьшенные отступы */
 @media (max-width: 768px) {
     .result-content {
         gap: 0.75rem;
@@ -573,14 +570,44 @@ onUnmounted(() => {
 
     .result-info-section {
         min-width: auto;
+        margin-top: -2px; /* Держим то же выравнивание */
     }
 
     .result-links-section {
         width: 100%;
         min-width: auto;
     }
+
+    .result-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        margin-bottom: 2px; /* Уменьшили отступ между заголовком и остальным */
+    }
+
+    .date-badge {
+        white-space: normal;
+        display: inline-block;
+    }
+
+    .result-title {
+        line-height: 1.2;
+        font-size: 0.9rem;
+    }
+
+    /* Уменьшенные отступы для мобильной версии */
+    .class-badge {
+        margin-bottom: 2px;
+    }
+
+    .result-description {
+        font-size: 0.7rem;
+        line-height: 1.25;
+        margin-top: 0;
+    }
 }
 
+/* Extra small screens */
 @media (max-width: 480px) {
     .result-item {
         padding: 0.5rem 0;
@@ -594,10 +621,6 @@ onUnmounted(() => {
     .icon-item :deep(svg) {
         width: 8px;
         height: 8px;
-    }
-
-    .icon-item {
-        background: rgba(0, 0, 0, 0.6);
     }
 
     .result-title {
@@ -615,6 +638,10 @@ onUnmounted(() => {
 
     .links-container {
         padding: 4px 8px;
+    }
+
+    .result-info-section {
+        margin-top: -2px;
     }
 }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Eloquent\Link;
+use App\Http\Requests\SearchRequest;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -370,10 +371,12 @@ class ApiController extends BaseController
     /**
      * Search objects
      *
+     * @param \App\Http\Requests\SearchRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function search(): \Illuminate\Http\JsonResponse
+    public function search(SearchRequest $request): \Illuminate\Http\JsonResponse
     {
+        $validated = $request->validated();
         $requestBody = json_decode(file_get_contents('php://input'), true);
         if (@$requestBody['tree']) {
             return $this->searchTree();
@@ -440,38 +443,62 @@ class ApiController extends BaseController
      */
     public function searchTree()
     {
+        $rootId = UUID::ANYTHING;
+        $linkTypeParent = UUID::LINK_TO_PARENT;
+        $classType = UUID::G_CLASS;
+        $linkType = UUID::G_LINK;
 
         $rawSql = "
-        WITH RECURSIVE descendants (name, level, id, parent_id, description, translation) AS (
-            SELECT c.name, 1 AS level, c.thing_id, l.one_thing_id, c.description, l.translation
-            FROM things c
-            LEFT JOIN links l ON l.other_thing_id = c.thing_id AND l.link_type_id = ?
-            WHERE c.thing_id = ?
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
+        SELECT
+            c.name,
+            1,
+            c.thing_id,
+            CAST(NULL AS CHAR(36)),
+            c.description,
+            CAST(NULL AS CHAR(255)),
+            c.public
+        FROM things c
+        WHERE c.thing_id = ?
 
-            UNION ALL
+        UNION ALL
 
-            SELECT c.name, d.level + 1, c.thing_id, l.one_thing_id, c.description, l.translation
-            FROM descendants d
-            JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
-            JOIN things c ON l.other_thing_id = c.thing_id
-            WHERE (c.type = ? OR c.type = ?) AND d.level < 10
-        )
-        SELECT * FROM descendants ORDER BY level;
+        SELECT
+            c.name,
+            d.level + 1,
+            c.thing_id,
+            l.one_thing_id,
+            c.description,
+            CAST(l.translation AS CHAR(255)),
+            c.public
+        FROM descendants d
+        JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
+        JOIN things c ON l.other_thing_id = c.thing_id
+        WHERE (c.type = ? OR c.type = ?) AND d.level < 10
+    )
+    SELECT * FROM descendants ORDER BY level;
     ";
 
-        // Bind parameters in order: link_type_id (anchor), thing_id (anchor), link_type_id (recursive)
-        $results = $this->buildTree(
-            (array) DB::select($rawSql, [
-                UUID::LINK_TO_PARENT,
-                UUID::ANYTHING,
-                UUID::LINK_TO_PARENT,
-                UUID::G_CLASS,
-                UUID::G_LINK])
-        );
-
-        return response()->json([
-            'things' => $results,
+        $results = DB::select($rawSql, [
+            $rootId,
+            $linkTypeParent,
+            $classType,
+            $linkType,
         ]);
+
+        // --- Remove duplicate nodes, keep the one with the smallest level ---
+        $uniqueRows = [];
+        foreach ($results as $row) {
+            $id = (string) $row->id;
+            if (!isset($uniqueRows[$id]) || $row->level < $uniqueRows[$id]->level) {
+                $uniqueRows[$id] = $row;
+            }
+        }
+        $results = array_values($uniqueRows);
+        // ----------------------------------------------------------------
+
+        $tree = $this->buildTree($results);
+        return response()->json(['things' => $tree]);
     }
 
     protected function buildTree($items)

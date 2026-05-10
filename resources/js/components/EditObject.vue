@@ -78,6 +78,24 @@
                             />
                         </div>
 
+                        <!-- Public checkbox -->
+                        <div class="mb-3 form-check">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="publicCheckbox"
+                                v-model="formData.public"
+                                :true-value="1"
+                                :false-value="0"
+                            />
+                            <label class="form-check-label" for="publicCheckbox">
+                                {{ $t('Public') }}
+                            </label>
+                            <small class="form-text text-muted d-block">
+                                {{ $t('Make this object visible to everyone') }}
+                            </small>
+                        </div>
+
                         <!-- Object type indicator -->
                         <div v-if="formData.type == 1" class="mb-3">General</div>
                         <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
@@ -198,7 +216,7 @@ const formData = ref({
     description: isEditMode.value ? props.object.description || '' : '',
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
-    public: isEditMode.value ? props.object.public || 0 : 0,
+    public: isEditMode.value ? (props.object.public === 1 ? 1 : 0) : 0,
     type: props.params.type || 3,
 });
 
@@ -559,7 +577,7 @@ watch(() => props.object, (newObject, oldObject) => {
         description: newObject.description || '',
         start: newObject.start || '',
         end: newObject.end || '',
-        public: newObject.public || 0,
+        public: newObject.public === 1 ? 1 : 0,
         type: props.params.type || 3,
     };
     initializeData();
@@ -659,5 +677,27 @@ watch(() => props.object, (newObject, oldObject) => {
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 4px;
+}
+
+/* Public checkbox styling */
+.form-check {
+    padding-left: 1.8em;
+}
+
+.form-check-input {
+    width: 1.2em;
+    height: 1.2em;
+    margin-top: 0.15em;
+    margin-left: -1.8em;
+}
+
+.form-check-label {
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.form-text {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
 }
 </style>
