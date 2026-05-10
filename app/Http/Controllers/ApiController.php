@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Eloquent\Link;
 use App\Http\Requests\SearchRequest;
+use App\Http\Resources\LinkResource;
+use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -430,8 +432,8 @@ class ApiController extends BaseController
             ->get()->toArray();
 
         return response()->json([
-            'things' => $data->toArray(),
-            'links'  => $links,
+            'things' => ThingResource::collection($data),
+            'links'  => LinkResource::collection($links),
         ]);
 
     }
