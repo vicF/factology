@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { SOMETHING } from "../constants.js"
+import {CLASS_TYPE, LINK_TYPE, SOMETHING} from "../constants.js"
 import { eventBus } from "../eventBus.js"
 
 export const useObjectsStore = defineStore('objects', {
@@ -22,7 +22,7 @@ export const useObjectsStore = defineStore('objects', {
                 const response = await axios.post('/object', JSON.stringify({
                     tree: true,
                     search: this.searchText,
-                    type: [2]
+                    type: [CLASS_TYPE, LINK_TYPE]
                 }))
                 this.validationErrors = {}
                 console.log('response', response.data.things)

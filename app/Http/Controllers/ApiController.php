@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Eloquent\Link;
+use App\Http\Requests\SearchRequest;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Anything;
@@ -370,10 +371,12 @@ class ApiController extends BaseController
     /**
      * Search objects
      *
+     * @param \App\Http\Requests\SearchRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function search(): \Illuminate\Http\JsonResponse
+    public function search(SearchRequest $request): \Illuminate\Http\JsonResponse
     {
+        $validated = $request->validated();
         $requestBody = json_decode(file_get_contents('php://input'), true);
         if (@$requestBody['tree']) {
             return $this->searchTree();
