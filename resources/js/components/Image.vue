@@ -1,6 +1,6 @@
 <template>
     <div v-if="nodeId" class="image-wrapper" :style="wrapperStyle">
-        <!-- Main image (always left) -->
+        <!-- Main image (left) -->
         <div class="image-container">
             <template v-if="!imageError">
                 <img
@@ -13,8 +13,8 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
 
-        <!-- Side bar with icons (always visible, no hover hiding) -->
-        <div v-if="sideBar === 'right'" class="vertical-icon-bar">
+        <!-- Side bar with icons – only rendered when there is at least one icon -->
+        <div v-if="sideBar === 'right' && hasAnyIcon" class="vertical-icon-bar">
             <!-- Private icon -->
             <div v-if="isPrivate" class="icon-item private-icon" title="Private">
                 <IconPrivate />
@@ -77,6 +77,8 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
+const hasAnyIcon = computed(() => props.isPrivate || shouldShowTypeLabel.value)
+
 const imageUrls = computed(() => {
     const urls = []
     if (props.nodeId) urls.push(getThumbUrl(props.nodeId))
@@ -120,7 +122,7 @@ const wrapperStyle = computed(() => ({
     cursor: 'pointer',
     position: 'relative',
     alignItems: 'flex-start',
-    gap: props.sideBar === 'right' ? '6px' : '0'
+    gap: props.sideBar === 'right' && hasAnyIcon.value ? '6px' : '0'
 }))
 
 const placeholderStyle = computed(() => ({
@@ -165,18 +167,16 @@ const placeholderStyle = computed(() => ({
     display: block;
 }
 
-/* Vertical side bar – always visible, small square icons */
+/* Side bar container – no background, only spacing */
 .vertical-icon-bar {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    border-radius: 8px;
-    padding: 5px 4px;
+    /* No background, no blur, no border-radius */
     pointer-events: auto;
-    z-index: 10;
 }
+
+/* Icon items – square, colored backgrounds, no pointer cursor */
 .icon-item {
     width: 18px;
     height: 18px;
@@ -184,8 +184,8 @@ const placeholderStyle = computed(() => ({
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease;
+    /* No cursor: pointer – keep default arrow */
 }
 .icon-item svg {
     width: 12px;
@@ -197,34 +197,34 @@ const placeholderStyle = computed(() => ({
 }
 .private-icon:hover {
     background: rgba(220, 53, 69, 1);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 .type-class {
     background: rgba(13, 110, 253, 0.85);
 }
 .type-class:hover {
     background: rgba(13, 110, 253, 1);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 .type-link {
     background: rgba(111, 66, 193, 0.85);
 }
 .type-link:hover {
     background: rgba(111, 66, 193, 1);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 .type-general {
     background: rgba(108, 117, 125, 0.85);
 }
 .type-general:hover {
     background: rgba(108, 117, 125, 1);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 .type-external {
     background: rgba(23, 162, 184, 0.85);
 }
 .type-external:hover {
     background: rgba(23, 162, 184, 1);
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 </style>
