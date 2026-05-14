@@ -236,10 +236,15 @@ onUnmounted(() => {
     align-items: flex-start;
 }
 
+/* CRITICAL FIX: expandable left column */
 .result-icon-section {
     flex-shrink: 0;
-    width: 60px;
-    text-align: center;
+    width: auto !important;
+    min-width: 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start !important;
+    text-align: left !important;
 }
 
 .icon-link {
@@ -249,7 +254,7 @@ onUnmounted(() => {
 .image-dates {
     font-size: 0.6rem;
     color: #adb5bd;
-    text-align: center;
+    text-align: left;
     margin-top: 4px;
     line-height: 1.2;
 }
@@ -258,6 +263,7 @@ onUnmounted(() => {
     display: block;
 }
 
+/* Rest of your styles (unchanged) */
 .result-info-section {
     flex: 2;
     min-width: 150px;
@@ -407,7 +413,7 @@ onUnmounted(() => {
         gap: 0.5rem;
     }
     .result-icon-section {
-        width: 48px;
+        width: auto !important;
     }
     .result-info-section {
         flex: 1;

@@ -553,8 +553,10 @@ watch(() => object.value, (newObject) => {
 }
 .result-icon-section {
     flex-shrink: 0;
-    width: 60px;
-    text-align: center;
+    width: auto;               /* was 60px – change to auto */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;   /* ← added to prevent image shifting */
 }
 .icon-link {
     display: inline-block;
@@ -671,7 +673,7 @@ watch(() => object.value, (newObject) => {
         gap: 0.5rem;
     }
     .result-icon-section {
-        width: 48px;
+        width: auto;           /* keep auto */
     }
     .result-info-section {
         min-width: calc(100% - 60px);

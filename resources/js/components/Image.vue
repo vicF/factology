@@ -1,6 +1,6 @@
 <template>
     <div v-if="nodeId" class="image-wrapper" :style="wrapperStyle">
-        <!-- Main image (left) -->
+        <!-- Main image container -->
         <div class="image-container">
             <template v-if="!imageError">
                 <img
@@ -13,20 +13,21 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
 
-        <!-- Side bar with icons – only rendered when there is at least one icon -->
-        <div v-if="sideBar === 'right' && hasAnyIcon" class="vertical-icon-bar">
+        <!-- Side bar – always present (with a placeholder when empty) to keep width stable -->
+        <div v-if="sideBar === 'right'" class="vertical-icon-bar">
             <!-- Private icon -->
             <div v-if="isPrivate" class="icon-item private-icon" title="Private">
                 <IconPrivate />
             </div>
-
-            <!-- Type icon (only for non‑thing types) -->
+            <!-- Type icon -->
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
                 <IconLink v-else-if="type === 4" />
                 <IconThing v-else-if="type === 1" />
                 <IconExternal v-else-if="type === 5" />
             </div>
+            <!-- Invisible placeholder to reserve space when no icons -->
+            <div v-if="!hasAnyIcon" class="icon-item invisible-placeholder"></div>
         </div>
     </div>
 </template>
@@ -49,7 +50,7 @@ const props = defineProps({
     type: { type: Number, default: null },
     showTypeLabel: { type: Boolean, default: true },
     isPrivate: { type: Boolean, default: false },
-    sideBar: { type: String, default: null } // 'right' or null
+    sideBar: { type: String, default: null }
 })
 
 const getThumbUrl = inject('getThumbUrl')
@@ -122,7 +123,7 @@ const wrapperStyle = computed(() => ({
     cursor: 'pointer',
     position: 'relative',
     alignItems: 'flex-start',
-    gap: props.sideBar === 'right' && hasAnyIcon.value ? '6px' : '0'
+    gap: props.sideBar === 'right' ? '6px' : '0'
 }))
 
 const placeholderStyle = computed(() => ({
@@ -167,16 +168,14 @@ const placeholderStyle = computed(() => ({
     display: block;
 }
 
-/* Side bar container – no background, only spacing */
+/* Side bar – always has a width (18px minimum) */
 .vertical-icon-bar {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    /* No background, no blur, no border-radius */
+    min-width: 18px;          /* forces consistent width even when empty */
     pointer-events: auto;
 }
-
-/* Icon items – square, colored backgrounds, no pointer cursor */
 .icon-item {
     width: 18px;
     height: 18px;
@@ -185,13 +184,18 @@ const placeholderStyle = computed(() => ({
     justify-content: center;
     border-radius: 4px;
     transition: transform 0.2s ease;
-    /* No cursor: pointer – keep default arrow */
 }
 .icon-item svg {
     width: 12px;
     height: 12px;
     display: block;
 }
+.invisible-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+    background: transparent;
+}
+/* Icon colours */
 .private-icon {
     background: rgba(220, 53, 69, 0.85);
 }
