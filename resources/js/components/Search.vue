@@ -219,7 +219,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Keep all existing styles exactly as they were – only removed .image-with-bar, .vertical-icon-bar */
 .results-list {
     display: flex;
     flex-direction: column;
@@ -263,7 +262,6 @@ onUnmounted(() => {
     display: block;
 }
 
-/* Rest of your styles (unchanged) */
 .result-info-section {
     flex: 2;
     min-width: 150px;
@@ -407,6 +405,7 @@ onUnmounted(() => {
     }
 }
 
+/* ✅ FIXED MOBILE – text no longer overlaps sidebar */
 @media (max-width: 768px) {
     .result-content {
         flex-wrap: wrap;
@@ -414,10 +413,13 @@ onUnmounted(() => {
     }
     .result-icon-section {
         width: auto !important;
+        flex-shrink: 0;
     }
     .result-info-section {
-        flex: 1;
-        min-width: calc(100% - 60px);
+        flex: 1 1 100%;
+        min-width: 0;
+        overflow: hidden;
+        word-break: break-word;
         margin-top: -1px;
     }
     .result-links-section {

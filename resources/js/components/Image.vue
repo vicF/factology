@@ -1,32 +1,21 @@
 <template>
     <div v-if="nodeId" class="image-wrapper" :style="wrapperStyle">
-        <!-- Main image container -->
         <div class="image-container">
             <template v-if="!imageError">
-                <img
-                    :src="currentImageUrl"
-                    :alt="alt"
-                    @error="handleImageError"
-                    class="real-image"
-                />
+                <img :src="currentImageUrl" :alt="alt" @error="handleImageError" class="real-image" />
             </template>
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
-
-        <!-- Side bar – always present (with a placeholder when empty) to keep width stable -->
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <!-- Private icon -->
             <div v-if="isPrivate" class="icon-item private-icon" title="Private">
                 <IconPrivate />
             </div>
-            <!-- Type icon -->
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
                 <IconLink v-else-if="type === 4" />
                 <IconThing v-else-if="type === 1" />
                 <IconExternal v-else-if="type === 5" />
             </div>
-            <!-- Invisible placeholder to reserve space when no icons -->
             <div v-if="!hasAnyIcon" class="icon-item invisible-placeholder"></div>
         </div>
     </div>
@@ -35,7 +24,6 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
 import * as jdenticon from 'jdenticon'
-
 import IconPrivate from './icons/IconPrivate.vue'
 import IconClass from './icons/IconClass.vue'
 import IconLink from './icons/IconLink.vue'
@@ -167,13 +155,11 @@ const placeholderStyle = computed(() => ({
     height: 100%;
     display: block;
 }
-
-/* Side bar – always has a width (18px minimum) */
 .vertical-icon-bar {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    min-width: 18px;          /* forces consistent width even when empty */
+    min-width: 18px;
     pointer-events: auto;
 }
 .icon-item {
@@ -184,51 +170,32 @@ const placeholderStyle = computed(() => ({
     justify-content: center;
     border-radius: 4px;
     transition: transform 0.2s ease;
+    color: white;
 }
 .icon-item svg {
     width: 12px;
     height: 12px;
     display: block;
+    stroke: white;
+    fill: none;
+}
+.icon-item svg[fill="currentColor"] {
+    fill: white;
+    stroke: none;
 }
 .invisible-placeholder {
     visibility: hidden;
     pointer-events: none;
     background: transparent;
 }
-/* Icon colours */
-.private-icon {
-    background: rgba(220, 53, 69, 0.85);
-}
-.private-icon:hover {
-    background: rgba(220, 53, 69, 1);
-    transform: scale(1.05);
-}
-.type-class {
-    background: rgba(13, 110, 253, 0.85);
-}
-.type-class:hover {
-    background: rgba(13, 110, 253, 1);
-    transform: scale(1.05);
-}
-.type-link {
-    background: rgba(111, 66, 193, 0.85);
-}
-.type-link:hover {
-    background: rgba(111, 66, 193, 1);
-    transform: scale(1.05);
-}
-.type-general {
-    background: rgba(108, 117, 125, 0.85);
-}
-.type-general:hover {
-    background: rgba(108, 117, 125, 1);
-    transform: scale(1.05);
-}
-.type-external {
-    background: rgba(23, 162, 184, 0.85);
-}
-.type-external:hover {
-    background: rgba(23, 162, 184, 1);
-    transform: scale(1.05);
-}
+.private-icon { background: rgba(220, 53, 69, 0.9); }
+.private-icon:hover { background: rgba(220, 53, 69, 1); transform: scale(1.05); }
+.type-class { background: rgba(13, 110, 253, 0.9); }
+.type-class:hover { background: rgba(13, 110, 253, 1); transform: scale(1.05); }
+.type-link { background: rgba(111, 66, 193, 0.9); }
+.type-link:hover { background: rgba(111, 66, 193, 1); transform: scale(1.05); }
+.type-general { background: rgba(108, 117, 125, 0.9); }
+.type-general:hover { background: rgba(108, 117, 125, 1); transform: scale(1.05); }
+.type-external { background: rgba(23, 162, 184, 0.9); }
+.type-external:hover { background: rgba(23, 162, 184, 1); transform: scale(1.05); }
 </style>
