@@ -161,6 +161,23 @@
                 </div>
             </div>
         </main>
+
+        <!-- Global Error Notification (only in development, filters expected errors) -->
+        <div v-if="isDevelopment && errorMessages.length > 0" class="global-error-container">
+            <div
+                v-for="(error, index) in errorMessages"
+                :key="error.id"
+                class="global-error-toast"
+                :style="{ animationDelay: `${index * 0.1}s` }"
+            >
+                <div class="error-icon">⚠️</div>
+                <div class="error-content">
+                    <div class="error-title">Error</div>
+                    <div class="error-message">{{ error.message }}</div>
+                </div>
+                <button class="error-close" @click="removeError(error.id)">×</button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -365,6 +382,75 @@ const submitSearch = () => {
     eventBus.emit('trigger-search')
 }
 
+// ========== GLOBAL ERROR HANDLING (Development only, filters expected errors) ==========
+const isDevelopment = import.meta.env.DEV
+const errorMessages = ref([])
+
+// Helper: decide if an error should be ignored (no toast)
+const shouldIgnoreError = (message, statusCode = null, url = null) => {
+    const lowerMsg = (message || '').toLowerCase()
+    // Ignore 401 Unauthorized when user is not logged in
+    if (statusCode === 401) return true
+    // Ignore any message containing "unauthorized" or "unauthenticated"
+    if (lowerMsg.includes('unauthorized') || lowerMsg.includes('unauthenticated')) return true
+    // Ignore aborted requests (e.g., navigation cancellations)
+    if (lowerMsg.includes('aborted') || lowerMsg.includes('canceled')) return true
+    // Ignore network errors that are expected (like offline checks)
+    if (lowerMsg.includes('network error') && !navigator.onLine) return true
+    return false
+}
+
+const addError = (message, statusCode = null, url = null) => {
+    if (shouldIgnoreError(message, statusCode, url)) return
+    const id = Date.now() + Math.random()
+    errorMessages.value.push({ id, message, timestamp: Date.now() })
+    setTimeout(() => removeError(id), 5000)
+}
+
+const removeError = (id) => {
+    const index = errorMessages.value.findIndex(e => e.id === id)
+    if (index !== -1) errorMessages.value.splice(index, 1)
+}
+
+// Listen to custom errors via eventBus
+eventBus.on('global-error', ({ message, statusCode, url }) => {
+    if (isDevelopment) addError(message, statusCode, url)
+})
+
+// Global unhandled rejection handler
+window.addEventListener('unhandledrejection', (event) => {
+    if (isDevelopment) {
+        const error = event.reason
+        const statusCode = error?.response?.status
+        const message = error?.response?.data?.message || error?.message || event.reason || 'Unhandled Promise Rejection'
+        addError(message, statusCode)
+    }
+})
+
+// Global error handler
+const originalErrorHandler = window.onerror
+window.onerror = (message, source, lineno, colno, error) => {
+    if (isDevelopment) {
+        const statusCode = error?.response?.status
+        addError(error?.message || message, statusCode)
+    }
+    if (originalErrorHandler) originalErrorHandler(message, source, lineno, colno, error)
+}
+
+// Axios interceptor for errors
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (isDevelopment) {
+            const statusCode = error.response?.status
+            const message = error.response?.data?.message || error.message || 'Network error'
+            addError(message, statusCode, error.config?.url)
+        }
+        return Promise.reject(error)
+    }
+)
+// ==============================================================
+
 // ---------------------------------------------------------------------------
 
 onMounted(() => {
@@ -468,6 +554,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* All existing styles remain exactly as they were – no changes */
 .navbar-light .btn {
     margin-right: 0.5rem;
 }
@@ -700,6 +787,79 @@ form.mx-2 {
     .app-container {
         overflow-x: hidden;
         width: 100%;
+    }
+}
+
+/* Global error notification styles */
+.global-error-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.global-error-toast {
+    background: #fff3e6;
+    border-left: 4px solid #ff6b6b;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 400px;
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out;
+}
+
+.error-icon {
+    font-size: 20px;
+}
+
+.error-content {
+    flex: 1;
+}
+
+.error-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #c92a2a;
+    margin-bottom: 2px;
+}
+
+.error-message {
+    font-size: 0.8rem;
+    color: #343a40;
+    word-break: break-word;
+}
+
+.error-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.error-close:hover {
+    color: #dc3545;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
     }
 }
 </style>

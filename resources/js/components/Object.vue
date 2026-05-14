@@ -1,32 +1,27 @@
-<!-- Object page -->
 <template>
     <div class="container" id="search">
-        <!-- Loading state -->
-        <div v-if="!loaded" class="row text-center py-5">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">{{ $t('Loading...') }}</span>
-            </div>
-        </div>
-
-        <!-- Server Error (500) -->
-        <div v-else-if="serverError" class="row">
+        <!-- Loading -->
+        <div v-if="!loaded" class="row">
             <div class="col text-center py-5">
-                <div class="alert alert-danger">
-                    <h4>{{ $t('Server Error') }}</h4>
-                    <p>
-                        {{ $t('An unexpected error occurred on the server. Please try again later or contact support if the problem persists.') }}
-                    </p>
-                    <button @click="retryLoading" class="btn btn-primary mt-3">
-                        {{ $t('Try Again') }}
-                    </button>
-                    <router-link to="/" class="btn btn-secondary mt-3 ms-2">
-                        {{ $t('Go to Home') }}
-                    </router-link>
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">{{ $t('Loading...') }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Object not accessible or doesn't exist -->
+        <!-- Server Error -->
+        <div v-else-if="serverError" class="row">
+            <div class="col text-center py-5">
+                <div class="alert alert-danger">
+                    <h4>{{ $t('Server Error') }}</h4>
+                    <p>{{ $t('An unexpected error occurred on the server. Please try again later or contact support if the problem persists.') }}</p>
+                    <button @click="retryLoading" class="btn btn-primary mt-3">{{ $t('Try Again') }}</button>
+                    <router-link to="/" class="btn btn-secondary mt-3 ms-2">{{ $t('Go to Home') }}</router-link>
+                </div>
+            </div>
+        </div>
+
+        <!-- Not found -->
         <div v-else-if="!object" class="row">
             <div class="col text-center py-5">
                 <div class="alert" :class="authenticated ? 'alert-warning' : 'alert-info'">
@@ -34,8 +29,7 @@
                     <p>
                         {{ authenticated
                         ? $t('This object is private or does not exist.')
-                        : $t('This object is private or does not exist. You may need to log in to view it.')
-                        }}
+                        : $t('This object is private or does not exist. You may need to log in to view it.') }}
                     </p>
                     <router-link v-if="!authenticated" to="/login" class="btn btn-primary mt-3">
                         {{ $t('Log in to see more') }}
@@ -44,138 +38,174 @@
             </div>
         </div>
 
-        <!-- Object loaded successfully -->
-        <div v-else-if="object" class="row">
+        <!-- Object loaded -->
+        <div v-else class="row">
             <div class="col">
-                <h1>
-                    {{ object.name || '' }}
-                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkedModal" title="Create new object linked to this one">
-                        {{ $t('Create') }}
-                    </button>
-                    <button v-if="authenticated" class="btn btn-primary ms-2" @click="openEditModal" title="Edit this object">
-                        {{ $t('Edit') }}
-                    </button>
-                    <!-- "Link" button now uses its own modal for creation -->
-                    <button v-if="authenticated" class="btn btn-success ms-2" @click="openCreateLinkModal" title="Link this object to another">
-                        {{ $t('Link') }}
-                    </button>
-                    <button v-if="authenticated" class="btn btn-danger ms-2" @click="deleteObject" title="Delete this object">
-                        {{ $t('Delete') }}
-                    </button>
-                </h1>
+                <div class="row mt-3">
+                    <div class="col-md-10 offset-md-1">
 
-                <!-- Bootstrap Tabs -->
-                <ul class="nav nav-tabs justify-content-end mb-3">
-                    <li class="nav-item">
-                        <a class="nav-link" :class="{ active: activeTab === 'details' }" @click="activeTab = 'details'" href="#">
-                            {{ $t('Details') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'" href="#">
-                            {{ $t('Graph') }}
-                        </a>
-                    </li>
-                </ul>
-
-                <!-- Details Tab Content -->
-                <div v-show="activeTab === 'details'" class="tab-content">
-                    <div class="col-md-10 col-md-offset-1">
-                        <div class="row rounded border p-3 rounded-4">
-                            <div class="col-md-2" style="font-size: x-small">
-                                <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }">
-                                    <Image :node-id="object.thing_id" />
-                                </RouterLink>
-                            </div>
-                            <div class="col-md-10">
-                                <div>{{ $t('Start') }}: {{ object.start ? $dateFromDb(object.start) : '-' }}</div>
-                                <div>{{ $t('End') }}: {{ object.end ? $dateFromDb(object.end) : '-' }}</div>
-                                <div>{{ $t('Description') }}: {{ object.description || '-' }}</div>
-                                <div v-if="object.record_created">{{ $t('Record created') }}: {{ object.record_created }}</div>
-                                <div v-if="object.record_updated">{{ $t('Record updated') }}: {{ object.record_updated }}</div>
-                                <div>{{ $t('Access') }}: {{ object.public ? $t('Public') : $t('Private') }}</div>
+                        <!-- Header -->
+                        <div class="object-header">
+                            <h1 class="object-title">
+                                {{ object.name || $t('Unnamed') }}
+                                <IconPrivate v-if="object.public === 0" class="private-icon-header" />
+                            </h1>
+                            <div v-if="authenticated" class="object-actions">
+                                <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
+                                <button class="btn btn-primary" @click="openEditModal" :title="$t('Edit this object')">{{ $t('Edit') }}</button>
+                                <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
+                                <button class="btn btn-danger" @click="deleteObject" :title="$t('Delete this object')">{{ $t('Delete') }}</button>
                             </div>
                         </div>
 
-                        <!-- class -->
-                        <div class="row p-3" v-if="object.class">
-                            <div class="col-md-2">
-                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                    <Image :node-id="object.class.thing_id" width="50px" />
-                                </RouterLink>
-                                <RouterLink :to="{ name: 'object', params: { uid: object.class.link_type_id } }">
-                                    <Image :node-id="object.class.link_type_id" width="50px" />
-                                </RouterLink>
-                            </div>
-                            <div class="col-md-10">
-                                <div v-if="object.class.name">
-                                    <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }">
-                                        {{ object.class.name }}
-                                    </RouterLink>
+                        <!-- Tabs -->
+                        <ul class="nav nav-tabs justify-content-end mb-3">
+                            <li class="nav-item">
+                                <a class="nav-link" :class="{ active: activeTab === 'details' }" @click.prevent="activeTab = 'details'" href="#">
+                                    {{ $t('Details') }}
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" :class="{ active: activeTab === 'graph' }" @click.prevent="activeTab = 'graph'" href="#">
+                                    {{ $t('Graph') }}
+                                </a>
+                            </li>
+                        </ul>
+
+                        <!-- Details -->
+                        <div v-show="activeTab === 'details'">
+                            <div class="results-list">
+
+                                <!-- Main object card -->
+                                <div class="result-item">
+                                    <div class="result-content">
+                                        <div class="result-icon-section">
+                                            <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }" class="icon-link">
+                                                <Image
+                                                    :node-id="object.thing_id"
+                                                    :type="object.type"
+                                                    :is-private="object.public === 0"
+                                                    width="48px"
+                                                    side-bar="right"
+                                                />
+                                            </RouterLink>
+                                        </div>
+
+                                        <div class="result-info-section">
+                                            <div class="result-header">
+                                                <div class="result-title">{{ object.name }}</div>
+                                                <div class="result-dates" v-if="object.start || object.end">
+                                                    <span class="date-badge">
+                                                        📅
+                                                        <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
+                                                        <template v-if="object.start && object.end"> → </template>
+                                                        <template v-else-if="object.end">{{ $t('until') }} </template>
+                                                        <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div v-if="object.class" class="class-badge">
+                                                <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
+                                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
+                                                    {{ object.class.name }}
+                                                </RouterLink>
+                                            </div>
+
+                                            <div v-if="object.description" class="result-description">
+                                                {{ object.description }}
+                                            </div>
+
+                                            <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
+                                                <span v-if="object.record_created" class="result-meta-row">
+                                                    {{ $t('Created') }}: {{ object.record_created }}
+                                                </span>
+                                                <span v-if="object.record_updated" class="result-meta-row">
+                                                    {{ $t('Updated') }}: {{ object.record_updated }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div v-if="object.class.description">
-                                    {{ $t('Description') }}: {{ $truncateText(object.class.description, 300) }}
+
+                                <!-- Separator before links -->
+                                <div v-if="object.links && object.links.length" class="result-separator"></div>
+
+                                <!-- Links list -->
+                                <div v-for="link in (object.links || [])" :key="link.link_id" class="result-item">
+                                    <div class="result-content">
+                                        <div class="result-icon-section">
+                                            <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="icon-link">
+                                                <Image
+                                                    :node-id="getLinkTargetId(link)"
+                                                    :type="link.type"
+                                                    :is-private="link.public === 0"
+                                                    width="48px"
+                                                    side-bar="right"
+                                                />
+                                            </RouterLink>
+                                        </div>
+
+                                        <div class="result-info-section">
+                                            <div class="result-header">
+                                                <div class="result-title" v-if="link.name">
+                                                    <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
+                                                        {{ link.name }}
+                                                    </RouterLink>
+                                                </div>
+                                                <div class="result-dates" v-if="link.start || link.end">
+                                                    <span class="date-badge">
+                                                        📅
+                                                        <template v-if="link.start">{{ $dateFromDb(link.start) }}</template>
+                                                        <template v-if="link.start && link.end"> → </template>
+                                                        <template v-if="link.end">{{ $dateFromDb(link.end) }}</template>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div v-if="link.link_start || link.link_end" class="result-meta">
+                                                <span v-if="link.link_start" class="result-meta-row">
+                                                    {{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}
+                                                </span>
+                                                <span v-if="link.link_end" class="result-meta-row">
+                                                    {{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}
+                                                </span>
+                                            </div>
+
+                                            <div v-if="link.description" class="result-description">
+                                                {{ $truncateText(link.description, 300) }}
+                                            </div>
+
+                                            <div v-if="link" class="link-description mt-1">
+                                                <LinkDescription :link="link" :object="object" size="small" />
+                                            </div>
+
+                                            <div v-if="link.translation" class="link-translation mt-1">
+                                                {{ link.translation }}
+                                            </div>
+
+                                            <div v-if="authenticated" class="link-actions">
+                                                <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
+                                                <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div v-if="object.class.translation">{{ object.class.translation }}</div>
+
                             </div>
                         </div>
 
-                        <!-- Going through links -->
-                        <div v-if="object.links && object.links.length">
-                            <div v-for="link in object.links" :key="link.link_id" class="row p-3 border-top pt-3">
-                                <div class="col-md-2">
-                                    <RouterLink :to="{ name: 'object', params: { uid: link.thing_id } }">
-                                        <Image :node-id="link.thing_id" width="50px" />
-                                    </RouterLink>
-                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }">
-                                        <Image :node-id="link.link_type_id" :alt="link.description" width="50px" />
-                                    </RouterLink>
-                                </div>
-                                <div class="col-md-10">
-                                    <div v-if="link.name">
-                                        <RouterLink :to="{ name: 'object', params: { uid: link.one_thing_id === object.thing_id?link.other_thing_id:link.one_thing_id } }">
-                                            {{ link.name }}
-                                        </RouterLink>
-                                    </div>
-                                    <div v-if="link.start">{{ $t('Start') }}: {{ $dateFromDb(link.start) }}</div>
-                                    <div v-if="link.end">{{ $t('End') }}: {{ $dateFromDb(link.end) }}</div>
-                                    <div v-if="link.link_start">{{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}</div>
-                                    <div v-if="link.link_end">{{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}</div>
-                                    <div v-if="link.description">
-                                        {{ $t('Description') }}: {{ $truncateText(link.description, 300) }}
-                                    </div>
-
-                                    <div class="link-description mt-1">
-                                        <LinkDescription :link="link" :object="object" size="small" />
-                                    </div>
-
-                                    <div v-if="link.translation" class="mt-1">
-                                        <small>{{ link.translation }}</small>
-                                    </div>
-
-                                    <div class="mt-2">
-                                        <button v-if="authenticated" class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">
-                                            {{ $t('Delete') }}
-                                        </button>
-                                        <!-- Edit existing link -->
-                                        <button v-if="authenticated" class="btn btn-primary btn-sm ms-2" @click="openEditLinkModal(link)">
-                                            {{ $t('Edit') }}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                        <!-- Graph -->
+                        <div v-show="activeTab === 'graph'">
+                            <Graph v-if="graphInitialized" ref="graphComponentRef" :object="object" />
                         </div>
+
                     </div>
-                </div>
-
-                <!-- Graph Tab Content -->
-                <div v-show="activeTab === 'graph'" class="tab-content">
-                    <Graph v-if="graphInitialized" ref="graphComponentRef" :object="object" />
                 </div>
             </div>
         </div>
 
-        <!-- === РЕДАКТИРОВАНИЕ ТЕКУЩЕГО ОБЪЕКТА === -->
+        <!-- Modals (unchanged) -->
         <EditObject
             v-if="showEditModal"
             :object="editObject"
@@ -184,8 +214,6 @@
             @object-updated="handleObjectUpdated"
             @close="showEditModal = false"
         />
-
-        <!-- === СОЗДАНИЕ НОВОГО ОБЪЕКТА (ClassTree) === -->
         <EditObject
             v-if="showTreeModal"
             :object="null"
@@ -194,8 +222,6 @@
             @object-created="handleObjectCreated"
             @close="showTreeModal = false"
         />
-
-        <!-- === СОЗДАНИЕ СВЯЗАННОГО ОБЪЕКТА (с автосвязью) === -->
         <EditObject
             v-if="showCreateLinkedModal"
             :object="null"
@@ -204,8 +230,6 @@
             @object-created="handleLinkedObjectCreated"
             @close="showCreateLinkedModal = false"
         />
-
-        <!-- === МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ССЫЛКИ (для существующих ссылок) === -->
         <EditLinkModal
             v-if="showEditLinkModal"
             :link="editingLink"
@@ -213,8 +237,6 @@
             @save="handleLinkSave"
             @close="showEditLinkModal = false"
         />
-
-        <!-- === МОДАЛЬНОЕ ОКНО СОЗДАНИЯ НОВОЙ ССЫЛКИ === -->
         <EditLinkModal
             v-if="showCreateLinkModal"
             :link="newLinkData"
@@ -226,7 +248,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, inject } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -236,17 +258,11 @@ import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
-import { inject } from 'vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
 
+// Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
-
-const props = defineProps({
-    searchText: String,
-    typeThing: String,
-    typeClass: String
-});
 
 const router = useRouter();
 const route = useRoute();
@@ -265,13 +281,13 @@ const showEditModal = ref(false);
 const showTreeModal = ref(false);
 const showCreateLinkedModal = ref(false);
 const showEditLinkModal = ref(false);
-const showCreateLinkModal = ref(false); // for the "Link" button
+const showCreateLinkModal = ref(false);
 
 const editObject = ref(null);
 const modalParams = ref({});
 const treeModalParams = ref({});
 const editingLink = ref(null);
-const newLinkData = ref(null); // holds data for a new link
+const newLinkData = ref(null);
 
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
@@ -288,11 +304,13 @@ const defaultLinkedObjects = computed(() => {
     return links;
 });
 
-const createLinkedParams = computed(() => ({
-    type: 3,
-}));
-
+const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
+
+const getLinkTargetId = (link) => {
+    if (!object.value) return link.thing_id;
+    return link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id;
+};
 
 const getObject = async () => {
     try {
@@ -329,18 +347,7 @@ const getObject = async () => {
     }
 };
 
-const retryLoading = () => {
-    getObject();
-};
-
-const openCreateModal = (type) => {
-    if (!object.value) return;
-    modalParams.value = {
-        classId: object.value.class?.thing_id,
-        type: type === 'Class' ? 2 : 3
-    };
-    showTreeModal.value = true;
-};
+const retryLoading = () => { getObject(); };
 
 const openEditModal = () => {
     if (!object.value) return;
@@ -365,8 +372,6 @@ const openEditLinkModal = (link) => {
 
 const openCreateLinkModal = () => {
     if (!object.value) return;
-    // Prepare a new link with the current object as one side.
-    // The other side will be selected by the user in the modal.
     newLinkData.value = {
         one_thing_id: object.value.thing_id,
         other_thing_id: null,
@@ -417,10 +422,7 @@ const handleLinkSave = async (result) => {
 
 const handleNewLinkSave = async (result) => {
     showCreateLinkModal.value = false;
-    if (result.delete) {
-        // Not applicable for new link
-        return;
-    }
+    if (result.delete) return;
     await createLink(result.data);
 };
 
@@ -466,21 +468,18 @@ const createLink = async (linkData) => {
 };
 
 const handleObjectCreated = (newObject) => {
-    console.log('Object.vue - Created via tree:', newObject);
     showTreeModal.value = false;
     if (newObject?.data?.thing_id) {
         router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
     }
 };
 
-const handleObjectUpdated = async (updatedObject) => {
-    console.log('Object.vue - Object updated:', updatedObject);
+const handleObjectUpdated = async () => {
     showEditModal.value = false;
     await getObject();
 };
 
 const handleLinkedObjectCreated = async () => {
-    console.log('Object.vue - Linked object created → refreshing current object');
     showCreateLinkedModal.value = false;
     await getObject();
 };
@@ -514,17 +513,12 @@ watch(() => route.params.uid, (newUid, oldUid) => {
 
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
-    console.log('Saved global tab state:', newTab);
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
-            console.log('First time opening graph tab, initializing...');
             graphInitialized.value = true;
         } else {
-            console.log('Refreshing existing graph view');
             nextTick(() => {
-                if (graphComponentRef.value) {
-                    graphComponentRef.value.refreshView();
-                }
+                if (graphComponentRef.value) graphComponentRef.value.refreshView();
             });
         }
     }
@@ -532,13 +526,10 @@ watch(activeTab, (newTab) => {
 
 watch(() => object.value, (newObject) => {
     if (graphInitialized.value && graphComponentRef.value && newObject) {
-        console.log('Object changed, updating graph data');
         graphComponentRef.value.updateData(newObject);
         if (activeTab.value === 'graph') {
             setTimeout(() => {
-                if (graphComponentRef.value) {
-                    graphComponentRef.value.refreshView();
-                }
+                if (graphComponentRef.value) graphComponentRef.value.refreshView();
             }, 200);
         }
     }
@@ -546,13 +537,166 @@ watch(() => object.value, (newObject) => {
 </script>
 
 <style scoped>
-.border-top { border-top: 1px solid #dee2e6; }
-.btn-success {
-    background-color: #28a745;
-    border-color: #28a745;
+/* ========== reuse styles from Search.vue (with minor additions) ========== */
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
-.btn-success:hover {
-    background-color: #218838;
+.result-item {
+    padding: 0.75rem 0;
+}
+.result-content {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+.result-icon-section {
+    flex-shrink: 0;
+    width: 60px;
+    text-align: center;
+}
+.icon-link {
+    display: inline-block;
+}
+.result-info-section {
+    flex: 2;
+    min-width: 150px;
+    margin-top: -2px;
+}
+.result-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.result-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+.title-link {
+    color: #0d6efd;
+    text-decoration: none;
+}
+.title-link:hover {
+    text-decoration: underline;
+}
+.date-badge {
+    font-size: 0.65rem;
+    color: #6c757d;
+    background: #f8f9fa;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+.class-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 12px;
+    background: #f8f9fa;
+    color: #6c757d;
+    margin-bottom: 6px;
+}
+.class-badge-icon {
+    border-radius: 2px;
+}
+.class-badge-link {
+    color: #6c757d;
+    text-decoration: none;
+}
+.class-badge-link:hover {
+    color: #0d6efd;
+}
+.result-description {
+    font-size: 0.75rem;
+    color: #6c757d;
+    line-height: 1.35;
+}
+.result-meta {
+    font-size: 0.7rem;
+    color: #adb5bd;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+.result-meta-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.link-translation {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-style: italic;
+}
+.link-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+}
+.result-separator {
+    margin-top: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+}
+.object-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.object-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 2rem;
+    font-weight: 600;
+}
+.private-icon-header {
+    font-size: 1rem;
+    vertical-align: middle;
+}
+.object-actions {
+    display: flex;
+    gap: 8px;
+}
+@media (max-width: 768px) {
+    .result-content {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .result-icon-section {
+        width: 48px;
+    }
+    .result-info-section {
+        min-width: calc(100% - 60px);
+        margin-top: -1px;
+    }
+    .object-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .object-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .date-badge {
+        white-space: normal;
+    }
+}
+@media (max-width: 480px) {
+    .result-item {
+        padding: 0.5rem 0;
+    }
+    .result-title {
+        font-size: 0.85rem;
+    }
 }
 .nav-tabs {
     border-bottom: 1px solid #dee2e6;
@@ -566,13 +710,15 @@ watch(() => object.value, (newObject) => {
     background-color: #fff;
     border-color: #dee2e6 #dee2e6 #fff;
 }
-.nav-tabs .nav-link:hover {
-    border-color: #e9ecef #e9ecef #dee2e6;
-    isolation: isolate;
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
 }
-.link-translation {
-    font-style: italic;
-    color: #6c757d;
-    font-size: 0.9em;
+.btn-success:hover {
+    background-color: #218838;
+}
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
 }
 </style>

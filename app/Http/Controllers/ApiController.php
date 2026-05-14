@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Eloquent\Link;
 use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
@@ -13,6 +12,7 @@ use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -449,6 +449,10 @@ class ApiController extends BaseController
         $linkTypeParent = UUID::LINK_TO_PARENT;
         $classType = UUID::G_CLASS;
         $linkType = UUID::G_LINK;
+        $isAuthenticated = Auth::check();
+
+        // Only filter by public if user is not authenticated
+        $publicCondition = $isAuthenticated ? '' : 'AND c.public = 1';
 
         $rawSql = "
     WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
@@ -461,7 +465,7 @@ class ApiController extends BaseController
             CAST(NULL AS CHAR(255)),
             c.public
         FROM things c
-        WHERE c.thing_id = ?
+        WHERE c.thing_id = ? $publicCondition
 
         UNION ALL
 
@@ -476,7 +480,7 @@ class ApiController extends BaseController
         FROM descendants d
         JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
         JOIN things c ON l.other_thing_id = c.thing_id
-        WHERE (c.type = ? OR c.type = ?) AND d.level < 10
+        WHERE (c.type = ? OR c.type = ?) AND d.level < 10 $publicCondition
     )
     SELECT * FROM descendants ORDER BY level;
     ";
@@ -488,7 +492,7 @@ class ApiController extends BaseController
             $linkType,
         ]);
 
-        // --- Remove duplicate nodes, keep the one with the smallest level ---
+        // Remove duplicate nodes, keep the one with the smallest level
         $uniqueRows = [];
         foreach ($results as $row) {
             $id = (string) $row->id;
@@ -497,7 +501,6 @@ class ApiController extends BaseController
             }
         }
         $results = array_values($uniqueRows);
-        // ----------------------------------------------------------------
 
         $tree = $this->buildTree($results);
         return response()->json(['things' => $tree]);
