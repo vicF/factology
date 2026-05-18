@@ -17,9 +17,13 @@
                 <div class="row mt-3">
                     <div class="col-md-10 offset-md-1">
                         <div class="results-list">
-                            <div v-for="(thing, thingIndex) in objects" :key="`${thing.thing_id}-${thingIndex}`" class="result-item">
+                            <div
+                                v-for="(thing, thingIndex) in objects"
+                                :key="`${thing.thing_id}-${thingIndex}`"
+                                class="result-item"
+                            >
                                 <div class="result-content">
-                                    <!-- Left: Image with optional side bar -->
+                                    <!-- LEFT: icon only -->
                                     <div class="result-icon-section">
                                         <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }" class="icon-link">
                                             <Image
@@ -30,19 +34,9 @@
                                                 side-bar="right"
                                             />
                                         </RouterLink>
-                                        <!-- Dates below image -->
-                                        <div class="image-dates">
-                                            <span v-if="thing.start" class="image-date">
-                                                {{ formatDateShort(thing.start) }}
-                                                <span v-if="thing.end"> → {{ formatDateShort(thing.end) }}</span>
-                                            </span>
-                                            <span v-else-if="thing.end" class="image-date">
-                                                📅 until {{ formatDateShort(thing.end) }}
-                                            </span>
-                                        </div>
                                     </div>
 
-                                    <!-- Middle: Title, dates, description, class badge -->
+                                    <!-- MIDDLE: name, then dates inline with description -->
                                     <div class="result-info-section">
                                         <div class="result-header">
                                             <div class="result-title">
@@ -52,7 +46,6 @@
                                             </div>
                                         </div>
 
-                                        <!-- Class badge for Things -->
                                         <div v-if="thing.type === 3 && thing.class" class="class-badge">
                                             <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
                                             <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
@@ -60,21 +53,38 @@
                                             </RouterLink>
                                         </div>
 
-                                        <!-- Description -->
-                                        <div v-if="thing.description" class="result-description">
-                                            {{ truncateText(thing.description, 120) }}
+                                        <!-- Dates inline on the first line of the description -->
+                                        <div
+                                            v-if="thing.start || thing.end || thing.description"
+                                            class="result-description"
+                                        >
+                                            <span v-if="thing.start || thing.end" class="inline-date">
+                                                📅
+                                                <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
+                                                <template v-if="thing.start && thing.end"> → </template>
+                                                <template v-else-if="thing.end">until </template>
+                                                <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
+                                            </span>
+                                            <span v-if="thing.description">{{ truncateText(thing.description, 120) }}</span>
                                         </div>
                                     </div>
 
-                                    <!-- Right: Links/Relationships -->
-                                    <div v-if="thing.links && thing.links.length > 0" class="result-links-section">
+                                    <!-- RIGHT: links (optional, shrinks when empty) -->
+                                    <div
+                                        v-if="thing.links && thing.links.length > 0"
+                                        class="result-links-section"
+                                    >
                                         <div class="links-container">
                                             <div class="links-title">
                                                 <span>🔗 Related</span>
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
                                             <div class="links-list">
-                                                <div v-for="(link, linkIndex) in thing.links.slice(0, 3)" :key="`${link.link_type_id}-${linkIndex}`" class="link-item">
+                                                <div
+                                                    v-for="(link, linkIndex) in thing.links.slice(0, 3)"
+                                                    :key="`${link.link_type_id}-${linkIndex}`"
+                                                    class="link-item"
+                                                >
                                                     <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
                                                         <Image :node-id="link.link_type_id" width="14px" />
                                                     </RouterLink>
@@ -92,7 +102,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Subtle separator -->
                                 <div v-if="thingIndex < objects.length - 1" class="result-separator"></div>
                             </div>
                         </div>
@@ -180,7 +189,6 @@ const getObjects = async () => {
         } else {
             objects.value = response.data.things || response.data || [];
         }
-
     } catch (error) {
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
@@ -193,9 +201,7 @@ const getObjects = async () => {
     }
 };
 
-const triggerSearchHandler = () => {
-    getObjects();
-};
+const triggerSearchHandler = () => { getObjects(); };
 
 watch(() => route.query.q, (newQuery, oldQuery) => {
     if (newQuery !== oldQuery) {
@@ -206,7 +212,7 @@ watch(() => route.query.q, (newQuery, oldQuery) => {
 
 watch(() => searchStore.checkedItems, () => {
     getObjects();
-}, { deep: true });
+}, {deep: true});
 
 onMounted(() => {
     eventBus.on('trigger-search', triggerSearchHandler);
@@ -217,253 +223,3 @@ onUnmounted(() => {
     eventBus.off('trigger-search', triggerSearchHandler);
 });
 </script>
-
-<style scoped>
-.results-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.result-item {
-    padding: 0.75rem 0;
-}
-
-.result-content {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-}
-
-/* CRITICAL FIX: expandable left column */
-.result-icon-section {
-    flex-shrink: 0;
-    width: auto !important;
-    min-width: 0 !important;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start !important;
-    text-align: left !important;
-}
-
-.icon-link {
-    display: inline-block;
-}
-
-.image-dates {
-    font-size: 0.6rem;
-    color: #adb5bd;
-    text-align: left;
-    margin-top: 4px;
-    line-height: 1.2;
-}
-
-.image-date {
-    display: block;
-}
-
-.result-info-section {
-    flex: 2;
-    min-width: 150px;
-    margin-top: -2px;
-}
-
-.result-header {
-    margin-bottom: 4px;
-}
-
-.result-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    line-height: 1.3;
-}
-
-.title-link {
-    color: #0d6efd;
-    text-decoration: none;
-}
-
-.title-link:hover {
-    text-decoration: underline;
-}
-
-.class-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 12px;
-    background: #f8f9fa;
-    color: #6c757d;
-    margin-bottom: 6px;
-}
-
-.class-badge-icon {
-    border-radius: 2px;
-}
-
-.class-badge-link {
-    color: #6c757d;
-    text-decoration: none;
-}
-
-.class-badge-link:hover {
-    color: #0d6efd;
-}
-
-.result-description {
-    font-size: 0.75rem;
-    color: #6c757d;
-    line-height: 1.35;
-}
-
-.result-links-section {
-    flex: 1.2;
-    min-width: 180px;
-}
-
-.links-container {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 6px 10px;
-}
-
-.links-title {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #6c757d;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.links-count {
-    font-weight: normal;
-    font-size: 0.6rem;
-}
-
-.links-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.link-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.7rem;
-    flex-wrap: wrap;
-}
-
-.link-type-icon,
-.link-target {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
-}
-
-.link-icon {
-    border-radius: 2px;
-    margin-right: 2px;
-}
-
-.link-name {
-    color: #495057;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.link-name:hover {
-    color: #0d6efd;
-}
-
-.link-arrow {
-    color: #adb5bd;
-    font-size: 9px;
-}
-
-.more-links {
-    font-size: 0.65rem;
-    color: #6c757d;
-    margin-top: 2px;
-    padding-top: 2px;
-    border-top: 1px dashed #dee2e6;
-}
-
-.result-separator {
-    margin-top: 0.75rem;
-    border-bottom: 1px solid #e9ecef;
-}
-
-@media (min-width: 769px) {
-    .result-links-section {
-        display: block;
-    }
-}
-
-/* ✅ FIXED MOBILE – text no longer overlaps sidebar */
-@media (max-width: 768px) {
-    .result-content {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    .result-icon-section {
-        width: auto !important;
-        flex-shrink: 0;
-    }
-    .result-info-section {
-        flex: 1 1 100%;
-        min-width: 0;
-        overflow: hidden;
-        word-break: break-word;
-        margin-top: -1px;
-    }
-    .result-links-section {
-        width: 100%;
-        min-width: auto;
-        margin-top: 0.5rem;
-    }
-    .result-links-section:empty {
-        display: none;
-    }
-    .link-name {
-        max-width: 150px;
-        white-space: normal;
-        word-break: break-word;
-    }
-}
-
-@media (max-width: 480px) {
-    .result-item {
-        padding: 0.5rem 0;
-    }
-    .result-info-section {
-        min-width: calc(100% - 56px);
-    }
-    .result-title {
-        font-size: 0.85rem;
-    }
-    .result-description {
-        font-size: 0.7rem;
-    }
-    .link-item {
-        gap: 3px;
-    }
-    .link-name {
-        max-width: 120px;
-        font-size: 0.65rem;
-    }
-    .links-container {
-        padding: 4px 8px;
-    }
-}
-
-.spinner-border {
-    width: 2rem;
-    height: 2rem;
-}
-</style>
