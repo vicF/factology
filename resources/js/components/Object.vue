@@ -94,15 +94,6 @@
                                         <div class="result-info-section">
                                             <div class="result-header">
                                                 <div class="result-title">{{ object.name }}</div>
-                                                <div class="result-dates" v-if="object.start || object.end">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
-                                                        <template v-if="object.start && object.end"> → </template>
-                                                        <template v-else-if="object.end">{{ $t('until') }} </template>
-                                                        <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
-                                                    </span>
-                                                </div>
                                             </div>
 
                                             <div v-if="object.class" class="class-badge">
@@ -112,8 +103,17 @@
                                                 </RouterLink>
                                             </div>
 
-                                            <div v-if="object.description" class="result-description">
-                                                {{ object.description }}
+                                            <div v-if="object.start || object.end || object.description" class="result-description">
+                                                <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
+                                                    <span class="date-badge">
+                                                        📅
+                                                        <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
+                                                        <template v-if="object.start && object.end"> → </template>
+                                                        <template v-else-if="object.end">{{ $t('until') }} </template>
+                                                        <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
+                                                    </span>
+                                                </span>
+                                                <span v-if="object.description">{{ object.description }}</span>
                                             </div>
 
                                             <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
@@ -153,14 +153,18 @@
                                                         {{ link.name }}
                                                     </RouterLink>
                                                 </div>
-                                                <div class="result-dates" v-if="link.start || link.end">
+                                            </div>
+
+                                            <div v-if="link.start || link.end || link.description" class="result-description">
+                                                <span v-if="link.start || link.end" class="inline-date" style="margin-right: 8px;">
                                                     <span class="date-badge">
                                                         📅
                                                         <template v-if="link.start">{{ $dateFromDb(link.start) }}</template>
                                                         <template v-if="link.start && link.end"> → </template>
                                                         <template v-if="link.end">{{ $dateFromDb(link.end) }}</template>
                                                     </span>
-                                                </div>
+                                                </span>
+                                                <span v-if="link.description">{{ $truncateText(link.description, 300) }}</span>
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
@@ -170,10 +174,6 @@
                                                 <span v-if="link.link_end" class="result-meta-row">
                                                     {{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}
                                                 </span>
-                                            </div>
-
-                                            <div v-if="link.description" class="result-description">
-                                                {{ $truncateText(link.description, 300) }}
                                             </div>
 
                                             <div v-if="link" class="link-description mt-1">
@@ -557,6 +557,7 @@ watch(() => object.value, (newObject) => {
     display: flex;
     flex-direction: column;
     align-items: flex-start;   /* ← added to prevent image shifting */
+    margin-right: 4px;
 }
 .icon-link {
     display: inline-block;
