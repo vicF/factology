@@ -58,7 +58,9 @@
                                             v-if="thing.start || thing.end || thing.description"
                                             class="result-description"
                                         >
-                                            <span v-if="thing.start || thing.end" class="inline-date">
+                                            
+        <span v-if="thing.start || thing.end" class="inline-date" style="margin-right: 8px;">
+
                                                 📅
                                                 <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
                                                 <template v-if="thing.start && thing.end"> → </template>
