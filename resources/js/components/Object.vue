@@ -588,9 +588,9 @@ watch(() => object.value, (newObject) => {
 .date-badge {
     font-size: 0.65rem;
     color: #6c757d;
-    background: #f8f9fa;
+    background: none;
     padding: 2px 8px;
-    border-radius: 12px;
+    border-radius: 0;
     white-space: nowrap;
 }
 .class-badge {

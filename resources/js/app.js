@@ -13,7 +13,7 @@ import LinkDescription from './components/LinkDescription.vue';
 
 // Import all icons
 import * as Icons from './components/icons';
-import '../css/results.css';
+import '../css/app.css';
 
 const app = createApp(App);
 app.use(router);
