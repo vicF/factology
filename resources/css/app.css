@@ -1,10 +1,15 @@
+/* ==========================================================================
+   Global & Utility
+   ========================================================================== */
+
 [v-cloak] {
     display: none;
 }
 
-/* ========== REUSABLE LAYOUT STYLES ========== */
+/* ==========================================================================
+   Base List & Item Layout
+   ========================================================================== */
 
-/* Base grid and spacing */
 .results-list {
     display: flex;
     flex-direction: column;
@@ -17,12 +22,11 @@
     width: 100%;
 }
 
-/*
- * Table-like 3-column grid:
- *   left  : auto  (shrinks to icon width)
- *   mid   : 1fr   (takes all remaining space)
- *   right : auto  (shrinks to 0 when empty)
- */
+/* ==========================================================================
+   Result Content – primary layout (partially overridden later)
+   ========================================================================== */
+
+/* Grid version (later flex version overrides display but keeps width, etc.) */
 .result-content {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -31,7 +35,18 @@
     width: 100%;
 }
 
-/* ---------- LEFT: Icon ---------- */
+/* ==========================================================================
+   Left Column: Icon
+   ========================================================================== */
+
+.result-icon-section {
+    flex-shrink: 0;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 4px;
+}
 
 .result-icon-section .Image {
     max-width: 100%;
@@ -45,141 +60,9 @@
     line-height: 0;
 }
 
-/* ---------- MIDDLE: Title + meta + description ---------- */
-
-/* Meta */
-.result-meta {
-    font-size: 0.7rem;
-    color: #adb5bd;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
-}
-.result-meta-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* ---------- RIGHT: optional links ---------- */
-.result-links-section {
-    flex-shrink: 0;
-    width: max-content;
-    max-width: 260px;
-}
-
-.links-container {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 6px 10px;
-}
-.links-title {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #6c757d;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.links-count {
-    font-weight: normal;
-    font-size: 0.6rem;
-    margin-left: 4px;
-}
-.links-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.link-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.7rem;
-}
-.link-type-icon,
-.link-target {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
-}
-.link-icon { border-radius: 2px; margin-right: 2px; }
-.link-name {
-    color: #495057;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.link-name:hover { color: #0d6efd; }
-.link-arrow { color: #adb5bd; font-size: 9px; }
-.more-links {
-    font-size: 0.65rem;
-    color: #6c757d;
-    margin-top: 2px;
-    padding-top: 2px;
-    border-top: 1px dashed #dee2e6;
-}
-
-/* Links/actions for Object page */
-.link-translation {
-    font-size: 0.75rem;
-    color: #6c757d;
-    font-style: italic;
-    display: inline;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.link-actions {
-    margin-top: 8px;
-    display: flex;
-    gap: 6px;
-}
-
-/* Separator */
-.result-separator {
-    margin-top: 0.75rem;
-    border-bottom: 1px solid #e9ecef;
-}
-
-/* Spinner */
-.spinner-border {
-    width: 2rem;
-    height: 2rem;
-}
-
-/* ---------- RESPONSIVE ---------- */
-@media (max-width: 768px) {
-    .result-content {
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 1rem;            /* a bit more breathing room around the icon */
-    }
-    /* Right column drops to a new row underneath */
-    .result-links-section {
-        grid-column: 1 / -1;
-        max-width: 100%;
-        width: 100%;
-    }
-    .result-icon-section .Image { width: 40px; }
-}
-
-@media (max-width: 480px) {
-    .result-item { padding: 0.5rem 0; }
-    .result-content { gap: 0.85rem; }   /* keep enough gap so text doesn't kiss the icon */
-    .result-icon-section .Image { width: 36px; }
-    .link-name { max-width: 100px; font-size: 0.65rem; }
-}
-
-.result-icon-section {
-    flex-shrink: 0;
-    width: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-right: 4px;
-}
+/* ==========================================================================
+   Middle Column: Info (title, meta, description)
+   ========================================================================== */
 
 .result-info-section {
     flex: 2;
@@ -252,6 +135,21 @@
     word-break: break-word;
 }
 
+.result-meta {
+    font-size: 0.7rem;
+    color: #adb5bd;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.result-meta-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .inline-date {
     display: inline-block;
     font-size: 0.7rem;
@@ -261,6 +159,108 @@
     white-space: nowrap;
     vertical-align: baseline;
 }
+
+/* ==========================================================================
+   Right Column: Links
+   ========================================================================== */
+
+.result-links-section {
+    flex-shrink: 0;
+    width: max-content;
+    max-width: 260px;
+}
+
+.links-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.links-title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.links-count {
+    font-weight: normal;
+    font-size: 0.6rem;
+    margin-left: 4px;
+}
+
+.links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+}
+
+.link-type-icon,
+.link-target {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.link-icon {
+    border-radius: 2px;
+    margin-right: 2px;
+}
+
+.link-name {
+    color: #495057;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.link-name:hover {
+    color: #0d6efd;
+}
+
+.link-arrow {
+    color: #adb5bd;
+    font-size: 9px;
+}
+
+.more-links {
+    font-size: 0.65rem;
+    color: #6c757d;
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: 1px dashed #dee2e6;
+}
+
+/* ==========================================================================
+   Separator & Spinner
+   ========================================================================== */
+
+.result-separator {
+    margin-top: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* ==========================================================================
+   Overrides / Additional rules (preserving original cascade order)
+   ========================================================================== */
+
+/* These rules appear later in the original file and may override some properties above.
+   Order is kept exactly as in the source to maintain the original behavior. */
 
 .results-list {
     display: flex;
@@ -272,6 +272,8 @@
     padding: 0.75rem 0;
 }
 
+/* Flex version of .result-content – overrides display and gap,
+   but keeps width/align-items from the grid version above */
 .result-content {
     display: flex;
     gap: 1rem;
@@ -339,9 +341,18 @@
     line-height: 1.2;
 }
 
-.class-badge-icon { border-radius: 2px; }
-.class-badge-link { color: #6c757d; text-decoration: none; }
-.class-badge-link:hover { color: #0d6efd; }
+.class-badge-icon {
+    border-radius: 2px;
+}
+
+.class-badge-link {
+    color: #6c757d;
+    text-decoration: none;
+}
+
+.class-badge-link:hover {
+    color: #0d6efd;
+}
 
 .result-description {
     font-size: 0.75rem;
@@ -408,7 +419,10 @@
     text-decoration: none;
 }
 
-.link-icon { border-radius: 2px; margin-right: 2px; }
+.link-icon {
+    border-radius: 2px;
+    margin-right: 2px;
+}
 
 .link-name {
     color: #495057;
@@ -418,7 +432,9 @@
     white-space: nowrap;
 }
 
-.link-name:hover { color: #0d6efd; }
+.link-name:hover {
+    color: #0d6efd;
+}
 
 .link-arrow {
     color: #adb5bd;
@@ -438,7 +454,10 @@
     border-bottom: 1px solid #e9ecef;
 }
 
-/* Object page specifics */
+/* ==========================================================================
+   Object page specifics
+   ========================================================================== */
+
 .object-header {
     display: flex;
     flex-wrap: wrap;
@@ -467,13 +486,17 @@
 }
 
 .link-translation {
-    font-style: italic;
+    font-size: 0.75rem;
     color: #6c757d;
-    font-size: 0.7rem;
+    font-style: italic;
+    display: inline;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .link-actions {
-    margin-top: 6px;
+    margin-top: 8px;
     display: flex;
     gap: 6px;
 }
@@ -481,6 +504,25 @@
 .link-actions .btn {
     font-size: 0.7rem;
     padding: 2px 8px;
+}
+
+/* ==========================================================================
+   Responsive overrides (preserving original order and conditions)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .result-content {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 1rem;
+    }
+    .result-links-section {
+        grid-column: 1 / -1;
+        max-width: 100%;
+        width: 100%;
+    }
+    .result-icon-section .Image {
+        width: 40px;
+    }
 }
 
 @media (min-width: 769px) {
@@ -515,27 +557,51 @@
         line-height: 1.2;
         font-size: 0.9rem;
     }
-    .class-badge { margin-bottom: 2px; }
+    .class-badge {
+        margin-bottom: 2px;
+    }
     .result-description {
         font-size: 0.7rem;
         line-height: 1.25;
         margin-top: 0;
     }
-    .object-title { font-size: 1.2rem; }
+    .object-title {
+        font-size: 1.2rem;
+    }
 }
 
 @media (max-width: 480px) {
-    .result-item { padding: 0.5rem 0; }
-    .icon-item { width: 14px; height: 14px; }
-    .icon-item svg { width: 8px; height: 8px; }
-    .result-title { font-size: 0.85rem; }
-    .result-description { font-size: 0.7rem; }
-    .link-name { max-width: 120px; font-size: 0.65rem; }
-    .links-container { padding: 4px 8px; }
-    .result-info-section { margin-top: -2px; }
-}
-
-.spinner-border {
-    width: 2rem;
-    height: 2rem;
+    .result-item {
+        padding: 0.5rem 0;
+    }
+    .result-content {
+        gap: 0.85rem;
+    }
+    .result-icon-section .Image {
+        width: 36px;
+    }
+    .link-name {
+        max-width: 100px;
+        font-size: 0.65rem;
+    }
+    .icon-item {
+        width: 14px;
+        height: 14px;
+    }
+    .icon-item svg {
+        width: 8px;
+        height: 8px;
+    }
+    .result-title {
+        font-size: 0.85rem;
+    }
+    .result-description {
+        font-size: 0.7rem;
+    }
+    .links-container {
+        padding: 4px 8px;
+    }
+    .result-info-section {
+        margin-top: -2px;
+    }
 }
