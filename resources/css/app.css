@@ -218,7 +218,6 @@
     padding: 2px 8px;
     border-radius: 0;
     white-space: nowrap;
-    vertical-align: middle;
 }
 
 .class-badge {
@@ -258,8 +257,6 @@
     font-size: 0.7rem;
     color: #495057;
     background: #f1f3f5;
-    border-radius: 10px;
-    padding: 0 6px;
     margin-right: 6px;
     white-space: nowrap;
     vertical-align: baseline;
