@@ -17,7 +17,10 @@ class RemoveEnum1FillGeneralTypesTable extends Migration
     {
 
         //DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
-
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::transaction(static function () {
             DB::table('general_types')->insert(['id' => UUID::GENERAL, 'name' => 'GENERAL']);
             DB::table('general_types')->insert(['id' => UUID::G_CLASS, 'name' => 'CLASS']);
@@ -34,6 +37,10 @@ class RemoveEnum1FillGeneralTypesTable extends Migration
      */
     public function down()
     {
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::table('general_types')->truncate();
     }
 }

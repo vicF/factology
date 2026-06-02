@@ -13,6 +13,10 @@ class AddTimestamps extends Migration
      */
     public function up()
     {
+        // Skip on PostgreSQL – handled by schema already (or not needed)
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         Schema::table('things', static function (Blueprint $table) {
             $table->timestamp('record_created')->default(DB::raw('CURRENT_TIMESTAMP'))
                 ->comment('Record creation time');
@@ -29,6 +33,10 @@ class AddTimestamps extends Migration
      */
     public function down()
     {
+        // Skip on PostgreSQL – handled by schema already (or not needed)
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         Schema::table('things', static function (Blueprint $table) {
             $table->dropColumn('record_created');
             $table->dropColumn('record_updated');

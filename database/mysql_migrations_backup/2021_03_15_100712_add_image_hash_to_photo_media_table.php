@@ -13,6 +13,11 @@ class AddImageHashToPhotoMediaTable extends Migration
      */
     public function up()
     {
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         Schema::table('photo_media', function (Blueprint $table) {
             $table->char('phash', 16)
                 ->charset('binary')

@@ -452,7 +452,7 @@ class ApiController extends BaseController
         $isAuthenticated = Auth::check();
 
         // Only filter by public if user is not authenticated
-        $publicCondition = $isAuthenticated ? '' : 'AND c.public = 1';
+        $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
         $rawSql = "
     WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
@@ -501,6 +501,13 @@ class ApiController extends BaseController
             }
         }
         $results = array_values($uniqueRows);
+
+        // Cast boolean fields to int (PostgreSQL returns 't'/'f' for booleans)
+        foreach ($results as $row) {
+            if (isset($row->public)) {
+                $row->public = $row->public === true || $row->public === 't' ? 1 : 0;
+            }
+        }
 
         $tree = $this->buildTree($results);
         return response()->json(['things' => $tree]);

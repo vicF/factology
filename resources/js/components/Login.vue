@@ -81,6 +81,7 @@ const login = async () => {
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors;
         } else {
+            console.error('Login failed:', error);
             alert(t('Login failed'));
         }
     } finally {

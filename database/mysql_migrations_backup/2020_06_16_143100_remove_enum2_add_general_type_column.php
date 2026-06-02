@@ -14,6 +14,10 @@ class RemoveEnum2AddGeneralTypeColumn extends Migration
      */
     public function up()
     {
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
 
         DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
         try {

@@ -18,6 +18,11 @@ class AddObjectGeneralType extends Migration
      */
     public function up(): void
     {
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         Schema::table('things', static function (Blueprint $table) {
             $table->enum('type', [Anything::GENERAL, Anything::LINK, Anything::CLS, Anything::THING])
                 ->after('name')
