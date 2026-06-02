@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -121,7 +122,7 @@ class CreateAllTablesForPostgres extends Migration
                 $table->string('remember_token', 100)->nullable();
                 $table->timestamp('created_at')->nullable();
                 $table->timestamp('updated_at')->nullable();
-                $table->uuid('thing_id')->comment('Id of person object(DC2Type:guid)');
+                $table->uuid('thing_id')->unique()->comment('Id of person object(DC2Type:guid)');
                 $table->unique('email', 'users_email_unique');
                 $table->unique('api_token', 'users_api_token_unique');
                 $table->foreign('thing_id', 'users_thing_id_foreign')->references('thing_id')->on('things');
@@ -162,7 +163,11 @@ class CreateAllTablesForPostgres extends Migration
                 $table->foreign('other_thing_id', 'links_other_thing_id_foreign')->references('thing_id')->on('things')->onDelete('cascade');
                 $table->foreign('one_thing_id', 'links_thing_id_foreign')->references('thing_id')->on('things')->onDelete('cascade');
             });
-            DB::statement('ALTER TABLE links ADD CONSTRAINT links_one_thing_not_equal_other_thing CHECK (one_thing_id <> other_thing_id)');
+        }
+
+        // Handle pre-existing links table that still uses old column name
+        if (Schema::hasTable('links') && Schema::hasColumn('links', 'thing_id') && !Schema::hasColumn('links', 'one_thing_id')) {
+            DB::statement('ALTER TABLE links RENAME COLUMN thing_id TO one_thing_id');
         }
 
         // === links_access ===
@@ -213,7 +218,7 @@ class CreateAllTablesForPostgres extends Migration
             });
         }
 
-        // === migrations ===
+        // === migrations (skip if already created by Laravel's migration system) ===
         if (!Schema::hasTable('migrations')) {
             Schema::create('migrations', function (Blueprint $table) {
                 $table->increments('id');
@@ -368,6 +373,94 @@ class CreateAllTablesForPostgres extends Migration
             });
         }
 
+        // === Seed initial data ===
+        $this->seedInitialData();
+
+    }
+
+    protected function seedInitialData(): void
+    {
+        // Seed general_types if empty
+        if (DB::table('general_types')->count() === 0) {
+            DB::table('general_types')->insert([
+                ['id' => 1, 'name' => 'GENERAL'],
+                ['id' => 2, 'name' => 'CLASS'],
+                ['id' => 3, 'name' => 'THING'],
+                ['id' => 4, 'name' => 'LINK'],
+                ['id' => 5, 'name' => 'EXTERNAL'],
+            ]);
+        }
+
+        // Seed bootstrap things if empty
+        if (DB::table('things')->count() === 0) {
+            DB::table('things')->insert([
+                [
+                    'thing_id'    => '939cd822-9e23-450c-8c5e-c23f67cca792',
+                    'name'        => 'Anything',
+                    'description' => 'base object for everything',
+                    'type'        => 1,
+                    'public'      => true,
+                ],
+                [
+                    'thing_id'    => '4b27fd0c-d8be-425c-a529-2186b2589e76',
+                    'name'        => 'Link',
+                    'description' => 'base object for links',
+                    'type'        => 1,
+                    'public'      => true,
+                ],
+                [
+                    'thing_id'    => '361c19af-c011-4051-9329-49c75d1ca0fb',
+                    'name'        => 'is a parent of',
+                    'description' => 'Type of parent link whatever it can mean',
+                    'type'        => 1,
+                    'public'      => true,
+                ],
+                [
+                    'thing_id'    => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                    'name'        => 'is of class',
+                    'description' => 'Link to a class of an object',
+                    'type'        => 1,
+                    'public'      => true,
+                ],
+                [
+                    'thing_id'    => '3e15244c-a9e1-4a91-a0ca-1c65722a64df',
+                    'name'        => 'Something',
+                    'description' => 'base class for all other classes',
+                    'type'        => 1,
+                    'public'      => true,
+                ],
+            ]);
+        }
+
+        // Seed bootstrap links if empty
+        if (DB::table('links')->count() === 0) {
+            DB::table('links')->insert([
+                [
+                    'translation'    => '"Link" is subclass of "Anything"',
+                    'one_thing_id'   => '4b27fd0c-d8be-425c-a529-2186b2589e76',   // Link
+                    'link_type_id'   => '361c19af-c011-4051-9329-49c75d1ca0fb',   // is a parent of
+                    'other_thing_id' => '939cd822-9e23-450c-8c5e-c23f67cca792',   // Anything
+                ],
+                [
+                    'translation'    => '"Parent" is subclass of "Link"',
+                    'one_thing_id'   => '361c19af-c011-4051-9329-49c75d1ca0fb',   // is a parent of
+                    'link_type_id'   => '361c19af-c011-4051-9329-49c75d1ca0fb',   // is a parent of
+                    'other_thing_id' => '4b27fd0c-d8be-425c-a529-2186b2589e76',   // Link
+                ],
+                [
+                    'translation'    => '"Class of" is subclass of "Link"',
+                    'one_thing_id'   => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',   // is of class
+                    'link_type_id'   => '361c19af-c011-4051-9329-49c75d1ca0fb',   // is a parent of
+                    'other_thing_id' => '4b27fd0c-d8be-425c-a529-2186b2589e76',   // Link
+                ],
+                [
+                    'translation'    => '"Something" is subclass of "Anything"',
+                    'one_thing_id'   => '3e15244c-a9e1-4a91-a0ca-1c65722a64df',   // Something
+                    'link_type_id'   => '361c19af-c011-4051-9329-49c75d1ca0fb',   // is a parent of
+                    'other_thing_id' => '939cd822-9e23-450c-8c5e-c23f67cca792',   // Anything
+                ],
+            ]);
+        }
     }
 
     public function down(): void
