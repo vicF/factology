@@ -460,9 +460,9 @@ class ApiController extends BaseController
             c.name,
             1,
             c.thing_id,
-            CAST(NULL AS CHAR(36)),
+            CAST(NULL AS UUID),
             c.description,
-            CAST(NULL AS CHAR(255)),
+            CAST(NULL AS VARCHAR(255)),
             c.public
         FROM things c
         WHERE c.thing_id = ? $publicCondition
@@ -475,7 +475,7 @@ class ApiController extends BaseController
             c.thing_id,
             l.one_thing_id,
             c.description,
-            CAST(l.translation AS CHAR(255)),
+            CAST(l.translation AS VARCHAR(255)),
             c.public
         FROM descendants d
         JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
