@@ -46,7 +46,10 @@ trait SafeRefreshDatabase
             );
         }
 
-        // Step 4: Begin database transaction for test isolation
+        // Step 4: Seed bootstrap data (general_types, things, links)
+        Artisan::call('db:seed', ['--force' => true]);
+
+        // Step 5: Begin database transaction for test isolation
         $this->originalBeginDatabaseTransaction();
     }
 }
