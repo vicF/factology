@@ -34,49 +34,49 @@ class DatabaseSeeder extends Seeder
                     'thing_id'    => UUID::ANYTHING,
                     'name'        => 'Anything',
                     'description' => 'base object for everything',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_CLASS,
                     'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::LINK,
                     'name'        => 'Link',
                     'description' => 'base object for links',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_LINK,
                     'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::LINK_TO_PARENT,
                     'name'        => 'is a parent of',
                     'description' => 'Type of parent link whatever it can mean',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_LINK,
                     'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::LINK_TO_CLASS,
                     'name'        => 'is of class',
                     'description' => 'Link to a class of an object',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_LINK,
                     'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::SOMETHING,
                     'name'        => 'Something',
                     'description' => 'base class for all other classes',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_CLASS,
                     'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::USER,
                     'name'        => 'User',
                     'description' => 'base class for user objects',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_CLASS,
                     'public'      => false,
                 ],
                 [
                     'thing_id'    => UUID::SYSTEM,
                     'name'        => 'System',
                     'description' => 'system class',
-                    'type'        => UUID::GENERAL,
+                    'type'        => UUID::G_CLASS,
                     'public'      => false,
                 ],
                 [
@@ -90,31 +90,33 @@ class DatabaseSeeder extends Seeder
         }
 
         // Bootstrap links (class hierarchy edges)
+        // Direction: one_thing_id is the PARENT, other_thing_id is the CHILD
+        // (e.g. "Anything is a parent of Link" means Link is subclass of Anything)
         if (DB::table('links')->count() === 0) {
             DB::table('links')->insert([
                 [
                     'translation'    => '"Link" is subclass of "Anything"',
-                    'one_thing_id'   => UUID::LINK,
+                    'one_thing_id'   => UUID::ANYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::ANYTHING,
+                    'other_thing_id' => UUID::LINK,
                 ],
                 [
                     'translation'    => '"Parent" is subclass of "Link"',
-                    'one_thing_id'   => UUID::LINK_TO_PARENT,
+                    'one_thing_id'   => UUID::LINK,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::LINK,
+                    'other_thing_id' => UUID::LINK_TO_PARENT,
                 ],
                 [
                     'translation'    => '"Class of" is subclass of "Link"',
-                    'one_thing_id'   => UUID::LINK_TO_CLASS,
+                    'one_thing_id'   => UUID::LINK,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::LINK,
+                    'other_thing_id' => UUID::LINK_TO_CLASS,
                 ],
                 [
                     'translation'    => '"Something" is subclass of "Anything"',
-                    'one_thing_id'   => UUID::SOMETHING,
+                    'one_thing_id'   => UUID::ANYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::ANYTHING,
+                    'other_thing_id' => UUID::SOMETHING,
                 ],
             ]);
         }
