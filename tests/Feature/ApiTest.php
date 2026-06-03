@@ -6,6 +6,7 @@ use App\Eloquent\Thing;
 use App\Models\User;
 use App\Models\Classes\Anything;
 use Fokin\Facts\Data\UUID;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\AssertionFailedError;
@@ -71,7 +72,7 @@ class ApiTest extends TestCase
     {
         // Important: Set thing_id on the user before creating object
         if (!isset($user->thing_id) || !$user->thing_id) {
-            $user->thing_id = uuid_create();
+            $user->thing_id = $this->createUserThing($user);
             $user->save();
         }
 
@@ -337,7 +338,7 @@ class ApiTest extends TestCase
         $user = $this->createTestUser()->getUser();
 
         // Set thing_id on the user
-        $user->thing_id = uuid_create();
+        $user->thing_id = $this->createUserThing($user);
         $user->save();
 
         Sanctum::actingAs($user, ['*']);
@@ -449,7 +450,7 @@ class ApiTest extends TestCase
     {
         // Create owner user with thing_id
         $owner = $this->createTestUser()->getUser();
-        $owner->thing_id = uuid_create();
+        $owner->thing_id = $this->createUserThing($owner);
         $owner->save();
 
         // Create an object as the owner
@@ -460,7 +461,7 @@ class ApiTest extends TestCase
 
         // Create a different user with their own thing_id
         $otherUser = $this->createTestUser()->getUser();
-        $otherUser->thing_id = uuid_create(); // Different thing_id
+        $otherUser->thing_id = $this->createUserThing($otherUser); // Different thing_id
         $otherUser->save();
 
         // Get the full object data for update (as the owner)
@@ -499,7 +500,7 @@ class ApiTest extends TestCase
         $user = $this->createTestUser()->getUser();
 
         // Set thing_id on the user
-        $user->thing_id = uuid_create();
+        $user->thing_id = $this->createUserThing($user);
         $user->save();
 
         Sanctum::actingAs($user, ['*']);
@@ -520,5 +521,23 @@ class ApiTest extends TestCase
         // Clean up
         $thingId = $json['data']['thing_id'];
         $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Create a things record for a user's thing_id.
+     * Required because users.thing_id FK constraint references things.thing_id.
+     */
+    private function createUserThing(User $user): string
+    {
+        $thingId = uuid_create();
+        DB::table('things')->insert([
+            'thing_id'    => $thingId,
+            'name'        => 'thing-' . $user->name,
+            'description' => 'Things record for user ' . $user->email,
+            'type'        => 3,
+            'owner'       => $thingId,
+            'public'      => false,
+        ]);
+        return $thingId;
     }
 }
