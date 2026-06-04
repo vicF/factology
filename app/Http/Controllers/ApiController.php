@@ -419,17 +419,20 @@ class ApiController extends BaseController
         $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get()->keyBy('thing_id');
 
         $ids = $data->pluck('thing_id')->toArray();
-        $links = DB::table('links')
-            ->select('links.*', 'things.name', 'link_types.name as link_name')
-            ->whereIn('links.one_thing_id', $ids)
-            ->orWhere('other_thing_id', $ids)
-            ->leftJoin('things', function ($join) {
-                $join->on('links.other_thing_id', '=', 'things.thing_id');
-            })
-            ->leftJoin('things as link_types', function ($join) {
-                $join->on('links.link_type_id', '=', 'link_types.thing_id');
-            })
-            ->get()->toArray();
+        $links = [];
+        if (!empty($ids)) {
+            $links = DB::table('links')
+                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->whereIn('links.one_thing_id', $ids)
+                ->orWhereIn('links.other_thing_id', $ids)
+                ->leftJoin('things', function ($join) {
+                    $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as link_types', function ($join) {
+                    $join->on('links.link_type_id', '=', 'link_types.thing_id');
+                })
+                ->get()->toArray();
+        }
 
         return response()->json([
             'things' => ThingResource::collection($data),
