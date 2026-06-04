@@ -6,6 +6,7 @@ import { THING_TYPE } from '@/constants.js'
 export const useObjectCacheStore = defineStore('objectCache', {
     state: () => ({
         cache: new Map(),           // uuid → object
+        missing: new Set(),         // uuid → known to not exist (404)
         recent: new Map(),          // type → [uuid, uuid, ...] — most recent first
         maxSize: 150,               // increased a bit — adjust as needed
         maxRecentPerType: 20
@@ -15,6 +16,8 @@ export const useObjectCacheStore = defineStore('objectCache', {
         // Add or update object in cache + update recent list
         cacheObject(uuid, data, type = THING_TYPE) {
             if (!uuid) return;
+            // If this was previously marked as missing, remove that flag
+            this.missing.delete(uuid);
 
             // NEW: Skip caching if uuid is invalid or data lacks matching uuid
             if (typeof uuid !== 'string' || uuid.trim() === '' || !data?.thing_id || data.thing_id !== uuid) {
@@ -74,22 +77,28 @@ export const useObjectCacheStore = defineStore('objectCache', {
         async fetchOrGetObject(uuid, type = null) {
             if (this.hasCachedObject(uuid)) {
                 const obj = this.getCachedObject(uuid);
-                // Promote in LRU
                 this.cache.delete(uuid);
                 this.cache.set(uuid, obj);
                 return obj;
             }
 
+            // Skip API call if we already know this UUID doesn't exist
+            if (this.missing.has(uuid)) {
+                return null;
+            }
+
             try {
                 const response = await axios.get(`/object/${uuid}`);
                 const data = response.data.data;
-
-                // Try to determine type if not provided
                 const inferredType = data.type || THING_TYPE;
                 this.cacheObject(uuid, data, inferredType);
-
                 return data;
             } catch (error) {
+                if (error.response && error.response.status === 404) {
+                    // Cache as "not found" so we don't retry
+                    this.missing.add(uuid);
+                    return null;
+                }
                 console.error('Error fetching object:', uuid, error);
                 throw error;
             }

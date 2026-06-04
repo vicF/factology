@@ -268,12 +268,7 @@ const handleGlobalKeyDown = (e) => {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────
-onMounted(async () => {
-    if (props.modelValue && !cacheStore.hasCachedObject(props.modelValue)) {
-        await loadObjectByUuid(props.modelValue)
-    } else if (props.modelValue) {
-        selectedObject.value = cacheStore.getCachedObject(props.modelValue)
-    }
+onMounted(() => {
     window.addEventListener('scroll', updateDropdownPosition, true)
     window.addEventListener('resize', updateDropdownPosition)
     window.addEventListener('keydown', handleGlobalKeyDown, true)
@@ -296,6 +291,8 @@ watch(() => props.modelValue, async (newUuid) => {
     }
     if (cacheStore.hasCachedObject(newUuid)) {
         selectedObject.value = cacheStore.getCachedObject(newUuid)
+    } else if (cacheStore.missing?.has?.(newUuid)) {
+        error.value = 'Object not found'
     } else {
         await loadObjectByUuid(newUuid)
     }
