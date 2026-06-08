@@ -14,7 +14,7 @@
 Homestead.json
 Homestead.yaml
 auth.json
-database/Dumps
+database/Dumps/*.sql
 error.log
 npm-debug.log
 public
