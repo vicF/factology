@@ -14,6 +14,10 @@ class AddDatesAsDecimal extends Migration
      */
     public function up()
     {
+        // Skip on PostgreSQL – handled by schema already (or not needed)
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         Schema::table('photo_media', static function (Blueprint $table) {
             DB::Statement('ALTER TABLE `photo_media` MODIFY `event_date` DECIMAL(28) NOT NULL;');
         });
@@ -32,6 +36,10 @@ class AddDatesAsDecimal extends Migration
      */
     public function down()
     {
+        // Skip on PostgreSQL – handled by schema already (or not needed)
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         Schema::table('photo_media', static function (Blueprint $table) {
             DB::Statement('ALTER TABLE `photo_media` MODIFY `event_date` datetime NOT NULL;');
         });

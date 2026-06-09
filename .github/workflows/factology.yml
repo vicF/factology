@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_ROOT_PASSWORD: securerootpassword
-          MYSQL_DATABASE: factology_tmp_test
+          POSTGRES_PASSWORD: securerootpassword
+          POSTGRES_DB: factology_tmp_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="pg_isready"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.3
-          extensions: pdo_mysql, mbstring, dom, fileinfo, bcmath, zip, curl, json, xml
+          extensions: pdo_pgsql, mbstring, dom, fileinfo, bcmath, zip, curl, json, xml
           coverage: none
 
       - name: Setup Node
@@ -49,9 +49,9 @@ jobs:
           APP_DEBUG=true
           APP_URL=http://localhost:8005
           APP_PORT=8005
-          DB_CONNECTION=mysql
+          DB_CONNECTION=pgsql
           DB_HOST=127.0.0.1
-          DB_PORT=3306
+          DB_PORT=5432
           DB_DATABASE=factology_tmp_test
           DB_USERNAME=root
           DB_PASSWORD=securerootpassword

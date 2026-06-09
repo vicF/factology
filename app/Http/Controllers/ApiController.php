@@ -419,17 +419,20 @@ class ApiController extends BaseController
         $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get()->keyBy('thing_id');
 
         $ids = $data->pluck('thing_id')->toArray();
-        $links = DB::table('links')
-            ->select('links.*', 'things.name', 'link_types.name as link_name')
-            ->whereIn('links.one_thing_id', $ids)
-            ->orWhere('other_thing_id', $ids)
-            ->leftJoin('things', function ($join) {
-                $join->on('links.other_thing_id', '=', 'things.thing_id');
-            })
-            ->leftJoin('things as link_types', function ($join) {
-                $join->on('links.link_type_id', '=', 'link_types.thing_id');
-            })
-            ->get()->toArray();
+        $links = [];
+        if (!empty($ids)) {
+            $links = DB::table('links')
+                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->whereIn('links.one_thing_id', $ids)
+                ->orWhereIn('links.other_thing_id', $ids)
+                ->leftJoin('things', function ($join) {
+                    $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as link_types', function ($join) {
+                    $join->on('links.link_type_id', '=', 'link_types.thing_id');
+                })
+                ->get()->toArray();
+        }
 
         return response()->json([
             'things' => ThingResource::collection($data),
@@ -452,7 +455,7 @@ class ApiController extends BaseController
         $isAuthenticated = Auth::check();
 
         // Only filter by public if user is not authenticated
-        $publicCondition = $isAuthenticated ? '' : 'AND c.public = 1';
+        $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
         $rawSql = "
     WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
@@ -460,9 +463,9 @@ class ApiController extends BaseController
             c.name,
             1,
             c.thing_id,
-            CAST(NULL AS CHAR(36)),
+            CAST(NULL AS UUID),
             c.description,
-            CAST(NULL AS CHAR(255)),
+            CAST(NULL AS VARCHAR(255)),
             c.public
         FROM things c
         WHERE c.thing_id = ? $publicCondition
@@ -475,7 +478,7 @@ class ApiController extends BaseController
             c.thing_id,
             l.one_thing_id,
             c.description,
-            CAST(l.translation AS CHAR(255)),
+            CAST(l.translation AS VARCHAR(255)),
             c.public
         FROM descendants d
         JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
@@ -501,6 +504,13 @@ class ApiController extends BaseController
             }
         }
         $results = array_values($uniqueRows);
+
+        // Cast boolean fields to int (PostgreSQL returns 't'/'f' for booleans)
+        foreach ($results as $row) {
+            if (isset($row->public)) {
+                $row->public = $row->public === true || $row->public === 't' ? 1 : 0;
+            }
+        }
 
         $tree = $this->buildTree($results);
         return response()->json(['things' => $tree]);

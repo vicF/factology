@@ -152,8 +152,9 @@ watch(link, () => {
 
 // Safe preloading: only fetch valid UUIDs (length > 20)
 const preloadObjectNames = async () => {
+    const selfId = props.currentObject?.thing_id;
     const ids = [link.value.one_thing_id, link.value.other_thing_id, link.value.link_type_id]
-        .filter(id => id && typeof id === 'string' && id.length > 20);
+        .filter(id => id && typeof id === 'string' && id.length > 20 && id !== selfId);
     for (const id of ids) {
         if (!store.hasCachedObject(id)) {
             try {

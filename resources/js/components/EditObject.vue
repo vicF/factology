@@ -190,6 +190,7 @@ import LinkedObject from './Fields/LinkedObject.vue';
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import { useObjectsStore } from '@/stores/objects';
+import { useObjectCacheStore } from '@/stores/objectCache.js';
 
 const objectsStore = useObjectsStore();
 
@@ -222,6 +223,16 @@ const formData = ref({
     public: isEditMode.value ? (props.object.public === 1 ? 1 : 0) : 0,
     type: props.params.type || 3,
 });
+
+// Cache new UUID immediately so ObjectField doesn't try to fetch a non-existent object
+const cacheStore = useObjectCacheStore();
+if (!isEditMode.value && formData.value.thing_id && !cacheStore.hasCachedObject(formData.value.thing_id)) {
+    cacheStore.cacheObject(formData.value.thing_id, {
+        thing_id: formData.value.thing_id,
+        name: formData.value.name || 'New Object',
+        type: formData.value.type,
+    }, formData.value.type);
+}
 
 // Special links as full objects (same shape as regular links)
 const classLinkData = ref({
@@ -501,6 +512,7 @@ const submitForm = async () => {
         let response;
         if (isEditMode.value) {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
+            cacheStore.cacheObject(formData.value.thing_id, response.data.data || response.data, formData.value.type);
             emit('object-updated', response.data);
             if (formData.value.type === CLASS_TYPE) {
                 const oldParentId = props.object?.parent_id;
@@ -512,6 +524,8 @@ const submitForm = async () => {
             }
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
+            // Update cache with real saved data
+            cacheStore.cacheObject(formData.value.thing_id, response.data.data || response.data, formData.value.type);
             emit('object-created', response.data);
             if (formData.value.type === CLASS_TYPE) {
                 objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, parentLinkData.value.other_thing_id);

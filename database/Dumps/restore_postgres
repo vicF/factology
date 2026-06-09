@@ -1,0 +1,8 @@
+#!/bin/bash
+DB_USER="${DB_USERNAME:-dbuser}"
+DB_NAME="${DB_DATABASE:-factology}"
+
+# Drop all existing tables to ensure clean restore (handles foreign keys via CASCADE)
+docker exec factology-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "DO \$\$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'DROP TABLE IF EXISTS \"' || r.tablename || '\" CASCADE'; END LOOP; END \$\$;"
+
+cat "$1" | docker exec -i factology-postgres /usr/bin/psql -U "$DB_USER" -d "$DB_NAME"

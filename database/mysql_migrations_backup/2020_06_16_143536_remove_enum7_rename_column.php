@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class RemoveEnum8ForeignKeyFromThingsToGeneralTypes extends Migration
+class RemoveEnum7RenameColumn extends Migration
 {
     /**
      * Run the migrations.
@@ -14,10 +14,14 @@ class RemoveEnum8ForeignKeyFromThingsToGeneralTypes extends Migration
      */
     public function up()
     {
+        // Skip on PostgreSQL — handled by consolidated migration
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::connection()->getDoctrineSchemaManager()->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
         Schema::table('things', static function (Blueprint $table) {
-            $table->smallInteger('type')->unsigned()->nullable(false)->change();
-            $table->foreign('type')->references('id')->on('general_types');
+            $table->renameColumn('general_type', 'type');
         });
     }
 
@@ -29,7 +33,7 @@ class RemoveEnum8ForeignKeyFromThingsToGeneralTypes extends Migration
     public function down()
     {
         Schema::table('things', static function (Blueprint $table) {
-            $table->dropForeign('things_type_foreign');
+            $table->renameColumn('type', 'general_type');
         });
     }
 }

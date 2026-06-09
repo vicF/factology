@@ -46,11 +46,22 @@ class UserClass extends Anything
             $this->setClass([
                 'other_thing_id' => UUID::USER,
             ]);
+            // Create a things record for the user's thing_id before creating the User
+            // (the FK constraint users_thing_id_foreign references things.thing_id)
+            $userThingId = uuid_create();
+            DB::table('things')->insert([
+                'thing_id'    => $userThingId,
+                'name'        => 'user-' . $this->name,
+                'description' => 'User account for ' . $this->name,
+                'type'        => UUID::G_THING,
+                'owner'       => $this->thing_id,
+                'public'      => false,
+            ]);
             $this->user = User::create([
                 'name'     => $this->name,
                 'email'    => $this->email,
                 'password' => $this->password,
-                'thing_id' => uuid_create(),
+                'thing_id' => $userThingId,
             ]);
             return $this;
         });

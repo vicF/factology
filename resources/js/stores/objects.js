@@ -37,6 +37,7 @@ export const useObjectsStore = defineStore('objects', {
                     // handle validation errors
                 } else {
                     this.validationErrors = {}
+                    console.error('Error loading class tree:', error.response?.data?.message || error.message)
                     alert(error.response?.data?.message || 'Error loading class tree')
                 }
             } finally {

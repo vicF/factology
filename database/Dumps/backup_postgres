@@ -1,0 +1,5 @@
+#!/bin/bash
+now=$(date +"%Y_%m_%d")
+echo "Backing up database to factology_$now.sql..."
+docker exec factology-postgres sh -c "pg_dump -U ${DB_USERNAME:-dbuser} ${DB_DATABASE:-factology}" > "factology_$now.sql"
+echo "Backup complete!"
