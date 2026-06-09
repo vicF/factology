@@ -5,10 +5,9 @@ $backupFile = "factology_$now.sql"
 
 Write-Host "Creating PostgreSQL backup: $backupFile" -ForegroundColor Cyan
 
-# --encoding=UTF8 is critical: without it pg_dump can produce UTF-16 on Windows hosts
-docker exec factology-postgres sh -c `
-    "pg_dump -U $dbUser -d $dbName --encoding=UTF8 --no-owner --no-acl" `
-    | Out-File -FilePath $backupFile -Encoding utf8NoBom
+# Write directly inside the container via the /dumps volume mount (mapped to ./database/Dumps).
+# This avoids PowerShell's pipeline encoding issues that can mangle Cyrillic.
+docker exec factology-postgres pg_dump -U $dbUser -d $dbName --encoding=UTF8 --no-owner --no-acl -f /dumps/$backupFile
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Backup created: $backupFile" -ForegroundColor Green

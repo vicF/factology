@@ -17,21 +17,30 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 2: Restore from dump
-Get-Content -Raw $file | docker exec -i factology-postgres psql -U $dbUser -d $dbName -v ON_ERROR_STOP=1
+# Step 2: Restore from dump — read directly from the /dumps volume mount,
+# bypassing PowerShell's pipeline encoding entirely.
+$restoreFile = "/dumps/$file"
+docker exec factology-postgres psql -U $dbUser -d $dbName -v ON_ERROR_STOP=1 -f $restoreFile
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Restore failed (exit code: $LASTEXITCODE)" -ForegroundColor Red
     exit 1
 }
 
-# Step 3: Quick Cyrillic integrity check
+# Step 3: Quick Cyrillic integrity check (guards against missing things table)
+# NOTE: keep ASCII-only in string literals; PowerShell on Windows may not read UTF-8 without BOM
 $cyrillicCheck = @"
-SELECT count(*) AS cyrillic_rows FROM things WHERE octet_length(description) <> char_length(description);
+SELECT CASE
+  WHEN EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'things')
+    THEN (SELECT count(*)::text FROM things WHERE octet_length(description) <> char_length(description))
+  ELSE 'SKIP'
+END AS cyrillic_rows;
 "@
 $result = $cyrillicCheck | docker exec -i factology-postgres psql -U $dbUser -d $dbName -t -A 2>&1
 $result = $result -replace '\s', ''
-if ([int]$result -gt 0) {
+if ($result -eq 'SKIP') {
+    Write-Host "Restore complete (skipped Cyrillic check - no 'things' table)." -ForegroundColor Green
+} elseif ([int]$result -gt 0) {
     Write-Host "Restore complete. Cyrillic integrity OK ($result rows with multi-byte chars)." -ForegroundColor Green
 } else {
-    Write-Host "WARNING: No multi-byte characters found in descriptions — Cyrillic may be corrupted!" -ForegroundColor Yellow
+    Write-Host "WARNING: No multi-byte characters found in descriptions - Cyrillic may be corrupted!" -ForegroundColor Yellow
 }
