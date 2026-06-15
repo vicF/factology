@@ -33,3 +33,4 @@ tests-js/output/
 dist-capacitor/
 /android/
 /electron/
+.env.capacitor
