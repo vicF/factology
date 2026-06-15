@@ -10,6 +10,14 @@ export default defineConfig({
     plugins: [
         vue(),
     ],
+    css: {
+        preprocessorOptions: {
+            scss: {
+                // Silence Bootstrap 5 Sass deprecation warnings (uses @import, global built-ins)
+                silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'if-function'],
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, 'resources/js'),
