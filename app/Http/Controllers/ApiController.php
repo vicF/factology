@@ -398,8 +398,8 @@ class ApiController extends BaseController
 
         if (@$requestBody['search']) {
             $query->where(function ($query) use ($requestBody) {
-                $query->where('name', 'like', '%' . $requestBody['search'] . '%')
-                    ->orWhere('description', 'like', '%' . $requestBody['search'] . '%');
+                $query->where('name', 'ilike', '%' . $requestBody['search'] . '%')
+                    ->orWhere('description', 'ilike', '%' . $requestBody['search'] . '%');
             });
         }
         if (!empty(@$requestBody['type'])) {
