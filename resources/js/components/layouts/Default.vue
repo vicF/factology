@@ -112,6 +112,25 @@
         <main class="mt-3">
             <!-- Mobile: Custom Swipe Implementation -->
             <div v-if="isMobile" class="mobile-view" data-testid="mobile-view">
+                <!-- Pull-to-refresh indicator -->
+                <div
+                    class="pull-refresh-indicator"
+                    :class="{ visible: pullDistance > 5 || isRefreshing }"
+                >
+                    <div class="pull-refresh-content" :style="{ opacity: pullDistance > 10 ? 1 : 0 }">
+                        <svg v-if="isRefreshing" class="pull-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10" stroke-dasharray="31.4" stroke-linecap="round"/>
+                        </svg>
+                        <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            :style="{ transform: pullDistance >= 80 ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }">
+                            <path d="M12 5v14M5 12l7-7 7 7"/>
+                        </svg>
+                        <span class="pull-refresh-text">
+                            {{ isRefreshing ? 'Refreshing...' : pullDistance >= 80 ? 'Release to refresh' : 'Pull to refresh' }}
+                        </span>
+                    </div>
+                </div>
+
                 <div
                     class="swipe-container"
                     ref="swipeContainer"
@@ -191,6 +210,7 @@ import ClassTree from "../ClassTree.vue"
 import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
+import { useObjectsStore } from '../../stores/objects'
 import axios from 'axios'
 
 // Provide getThumbUrl function for child components
@@ -205,6 +225,7 @@ const route = useRoute()
 
 const authStore = useAuthStore()
 const searchStore = useSearchStore()
+const objectsStore = useObjectsStore()
 const showModal    = ref(false)
 const selectedType = ref('')
 
@@ -220,6 +241,13 @@ const isTransitioning = ref(false)
 const screenWidth = ref(0)
 const isDragging = ref(false)
 const dragDirection = ref(null) // 'horizontal' or 'vertical'
+
+// Pull-to-refresh state
+const pullDistance = ref(0)
+const isRefreshing = ref(false)
+const isPullAnimating = ref(false)
+const pullStartY = ref(0)
+const wasAtTop = ref(false)
 
 // Language switcher data
 const currentLocale = ref('en')
@@ -267,19 +295,55 @@ const goToScreen = (index, instant = false) => {
     }, 300)
 }
 
+// Pull-to-refresh functions
+const springBack = () => {
+    isPullAnimating.value = true
+    pullDistance.value = 0
+    setTimeout(() => { isPullAnimating.value = false }, 400)
+}
+
+const triggerRefresh = async () => {
+    isRefreshing.value = true
+    pullDistance.value = 0
+    try {
+        await objectsStore.loadClassTree()
+        eventBus.emit('trigger-search')
+    } catch (err) {
+        console.error('Pull-to-refresh error:', err)
+    }
+    setTimeout(() => {
+        isRefreshing.value = false
+    }, 800)
+}
+
 const onTouchStart = (e) => {
     startX.value = e.touches[0].clientX
     startY.value = e.touches[0].clientY
     isDragging.value = true
     dragDirection.value = null
     isTransitioning.value = false
+
+    // Check if at top of scrollable area for pull-to-refresh
+    const screen = e.target.closest('.swipe-screen')
+    wasAtTop.value = screen ? screen.scrollTop <= 0 : false
+    pullStartY.value = e.touches[0].clientY
 }
 
 const onTouchMove = (e) => {
     if (!isDragging.value) return
 
-    const deltaX = e.touches[0].clientX - startX.value
     const deltaY = e.touches[0].clientY - startY.value
+
+    // Pull-to-refresh: at top and pulling down
+    if (wasAtTop.value && deltaY > 0 && !isRefreshing.value) {
+        const screen = e.target.closest('.swipe-screen')
+        if (screen && screen.scrollTop <= 0) {
+            pullDistance.value = deltaY
+            return
+        }
+    }
+
+    const deltaX = e.touches[0].clientX - startX.value
 
     // Determine scroll direction after minimal movement
     if (!dragDirection.value && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
@@ -310,6 +374,16 @@ const onTouchEnd = (e) => {
     if (!isDragging.value) {
         isDragging.value = false
         return
+    }
+
+    // Handle pull-to-refresh release
+    if (wasAtTop.value && pullDistance.value > 0) {
+        if (pullDistance.value >= 80 && !isRefreshing.value) {
+            triggerRefresh()
+        } else {
+            springBack()
+        }
+        pullDistance.value = 0
     }
 
     // If vertical scroll, just reset and exit
@@ -708,6 +782,49 @@ form.mx-2 {
     position: relative;
     width: 100%;
     overflow: hidden;
+}
+
+/* Pull-to-refresh indicator */
+.pull-refresh-indicator {
+    position: relative;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 0;
+    overflow: hidden;
+    transition: height 0.3s ease;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.pull-refresh-indicator.visible {
+    height: 50px;
+}
+
+.pull-refresh-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6c757d;
+    font-size: 13px;
+    font-weight: 500;
+    transition: opacity 0.2s ease;
+}
+
+.pull-refresh-text {
+    white-space: nowrap;
+}
+
+.pull-spinner {
+    animation: pull-spin 0.8s linear infinite;
+}
+
+@keyframes pull-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .swipe-container {

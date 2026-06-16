@@ -1,4 +1,9 @@
-import { createWebHistory, createRouter } from 'vue-router'
+import { createWebHistory, createWebHashHistory, createRouter } from 'vue-router'
+
+// Use hash history for Capacitor builds (no server), web history for browser SPA
+const history = import.meta.env.VITE_TARGET === 'capacitor'
+  ? createWebHashHistory()
+  : createWebHistory()
 
 /* Guest Component */
 const Login = () => import('@/components/Login.vue')
@@ -63,7 +68,7 @@ const routes = [
 ]
 
 const router = createRouter({
-    history: createWebHistory(),
+    history,
     routes, // short for `routes: routes`
     scrollBehavior() {
         // Always scroll to top on route change

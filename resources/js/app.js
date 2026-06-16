@@ -43,13 +43,20 @@ app.config.globalProperties.$navigateToObject = function(id) {
 import axios from 'axios';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-axios.defaults.baseURL = '/api/v1';
 axios.defaults.headers.common['Accept'] = 'application/json';
 
+// Base URL: in Capacitor builds, point to the remote API server.
+// In web SPA mode, use relative URLs (proxied by Laravel).
+const isCapacitor = import.meta.env.VITE_TARGET === 'capacitor';
+const apiBaseUrl = isCapacitor
+    ? (import.meta.env.VITE_API_URL || 'https://your-server.com/api/v1')
+    : '/api/v1';
+axios.defaults.baseURL = apiBaseUrl;
+
 // Automatically add Authorization header with Bearer token when available
-axios.interceptors.request.use(config => {
+axios.interceptors.request.use(async config => {
     const authStore = useAuthStore(pinia);  // pass pinia instance to access store outside setup()
-    authStore.restoreAuth();
+    await authStore.restoreAuth();
     if (authStore.token) {
         config.headers.Authorization = `Bearer ${authStore.token}`;
     }
