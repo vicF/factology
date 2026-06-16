@@ -454,6 +454,7 @@ const searchQuery = computed({
 const submitSearch = () => {
     console.log('default.vue - Emitting trigger-search')
     eventBus.emit('trigger-search')
+    router.push({ path: '/', query: { q: searchQuery.value } })
 }
 
 // ========== GLOBAL ERROR HANDLING (Development only, filters expected errors) ==========
