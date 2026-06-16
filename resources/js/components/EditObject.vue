@@ -106,9 +106,19 @@
                             <div v-else-if="formData.type == 5" class="mb-3">External</div>
                             <div v-else class="mb-3">!Unknown type!</div>
 
-                            <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
-                                {{ $t('Add Link') }}
-                            </button>
+                            <!-- Top action buttons (same style and order as footer) -->
+                            <div class="d-flex gap-2 mb-3 justify-content-end" v-if="regularLinks.length > 0">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    data-bs-dismiss="modal"
+                                >
+                                    {{ $t('Close') }}
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    {{ isEditMode ? $t('Update') : $t('Save') }}
+                                </button>
+                            </div>
 
                             <!-- Display regular links (not special ones) -->
                             <div v-for="(item, idx) in regularLinks" :key="item.id" class="linked-object-form">
@@ -130,6 +140,10 @@
                                     @remove="removeItem"
                                 />
                             </div>
+
+                            <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
+                                {{ $t('Add Link') }}
+                            </button>
 
                             <div class="modal-footer">
                                 <button
@@ -662,7 +676,6 @@ watch(() => props.object, (newObject, oldObject) => {
     padding: 10px 20px;
     border-radius: 4px;
     cursor: pointer;
-    margin: 10px 0;
 }
 .btn-primary:hover {
     background-color: #0056b3;
