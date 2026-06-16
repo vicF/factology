@@ -401,6 +401,8 @@ class ApiController extends BaseController
                 $query->where('name', 'ilike', '%' . $requestBody['search'] . '%')
                     ->orWhere('description', 'ilike', '%' . $requestBody['search'] . '%');
             });
+            // Sort name matches above description-only matches
+            $query->orderByRaw('CASE WHEN name ILIKE ? THEN 0 ELSE 1 END', ['%' . $requestBody['search'] . '%']);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {
