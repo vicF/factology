@@ -34,3 +34,5 @@ dist-capacitor/
 /android/
 /electron/
 .env.capacitor
+storage/logs/laravel.log
+.claude/settings.local.json
