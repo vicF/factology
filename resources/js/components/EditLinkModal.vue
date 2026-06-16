@@ -1,33 +1,35 @@
 <!-- Component to edit one link -->
 <template>
-    <div class="modal fade show" tabindex="-1" style="display: block;" @click.self="close">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ $t('Edit Link') }}</h5>
-                    <button type="button" class="btn-close" @click="close"></button>
-                </div>
-                <div class="modal-body">
-                    <LinkedObject
-                        :link="editingLink"
-                        :currentObject="currentObject"
-                        :index="0"
-                        @update="handleLinkUpdate"
-                        @remove="handleLinkRemove"
-                    />
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="close">
-                        {{ $t('Cancel') }}
-                    </button>
-                    <button type="button" class="btn btn-primary" @click="save">
-                        {{ $t('Save') }}
-                    </button>
+    <Teleport to="body">
+        <div class="modal fade show" tabindex="-1" style="display: block;" @click.self="close">
+            <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ $t('Edit Link') }}</h5>
+                        <button type="button" class="btn-close" @click="close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <LinkedObject
+                            :link="editingLink"
+                            :currentObject="currentObject"
+                            :index="0"
+                            @update="handleLinkUpdate"
+                            @remove="handleLinkRemove"
+                        />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @click="close">
+                            {{ $t('Cancel') }}
+                        </button>
+                        <button type="button" class="btn btn-primary" @click="save">
+                            {{ $t('Save') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="modal-backdrop fade show"></div>
+        <div class="modal-backdrop fade show"></div>
+    </Teleport>
 </template>
 
 <script setup>
