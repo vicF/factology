@@ -471,6 +471,8 @@ const shouldIgnoreError = (message, statusCode = null, url = null) => {
     if (lowerMsg.includes('aborted') || lowerMsg.includes('canceled')) return true
     // Ignore network errors that are expected (like offline checks)
     if (lowerMsg.includes('network error') && !navigator.onLine) return true
+    // Ignore harmless ResizeObserver loop warning (browser-level, no functional impact)
+    if (lowerMsg.includes('resizeobserver loop')) return true
     return false
 }
 
