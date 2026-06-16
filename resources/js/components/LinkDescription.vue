@@ -7,6 +7,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useObjectCacheStore } from '@/stores/objectCache.js';
 
 const props = defineProps({
     link: {
@@ -28,18 +29,38 @@ const props = defineProps({
     }
 });
 
+const cacheStore = useObjectCacheStore();
+
+const resolveName = (id, fallback) => {
+    if (fallback) return fallback;
+    if (!id) return 'Unknown';
+    const cached = cacheStore.getCachedObject(id);
+    return cached?.name || 'Unknown';
+};
+
 const generateLinkDescription = (link, object) => {
     if (!link) return ''
 
     const parts = []
 
-    // Link always contains linked object name, not the one that it is linked to
-    const oneLink = `<a href="/object/${link.one_thing_id}">${(object.thing_id === link.one_thing_id) ?object.name:link.name}<!-- (one)--></a>`
-    const otherLink = `<a href="/object/${link.other_thing_id}">${(object.thing_id === link.one_thing_id)?link.name:object.name}<!-- (other)--></a>`
+    const objectIsOne = object.thing_id === link.one_thing_id;
+
+    const oneName = objectIsOne
+        ? resolveName(link.one_thing_id, object.name)
+        : resolveName(link.one_thing_id, link.name);
+
+    const otherName = objectIsOne
+        ? resolveName(link.other_thing_id, link.name)
+        : resolveName(link.other_thing_id, object.name);
+
+    const linkTypeName = resolveName(link.link_type_id, link.link_name);
+
+    const oneLink = `<a href="/object/${link.one_thing_id}">${oneName}<!-- (one)--></a>`
+    const otherLink = `<a href="/object/${link.other_thing_id}">${otherName}<!-- (other)--></a>`
 
     parts.push(oneLink)
     parts.push(' → ')
-    parts.push(`<a href="/object/${link.link_type_id}">${link.link_name}</a>`)
+    parts.push(`<a href="/object/${link.link_type_id}">${linkTypeName}</a>`)
     parts.push(' → ')
     parts.push(otherLink)
 
