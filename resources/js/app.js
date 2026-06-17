@@ -49,13 +49,41 @@ axios.defaults.headers.common['Accept'] = 'application/json';
 // In web SPA mode, use relative URLs (proxied by Laravel).
 const isCapacitor = import.meta.env.VITE_TARGET === 'capacitor';
 const apiBaseUrl = isCapacitor
-    ? (import.meta.env.VITE_API_URL || 'https://your-server.com/api/v1')
+    ? (import.meta.env.VITE_API_URL || '')
     : '/api/v1';
 axios.defaults.baseURL = apiBaseUrl;
 
+// ── Offline fallback for Capacitor/standalone builds ──────────────────
+// When the API server is unreachable, route requests through the local DB.
+let localHandler = null;
+let standaloneMode = false;
+let serverChecked = false;
+
+async function tryServer() {
+    if (!isCapacitor || !apiBaseUrl) return false;
+    try {
+        await fetch(apiBaseUrl + '/object?limit=1', {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(3000),
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function getLocalHandler() {
+    if (!localHandler) {
+        const { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall, seedDemoData } = await import('./localDb/apiHandler');
+        await seedDemoData();
+        localHandler = { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall };
+    }
+    return localHandler;
+}
+
 // Automatically add Authorization header with Bearer token when available
 axios.interceptors.request.use(async config => {
-    const authStore = useAuthStore(pinia);  // pass pinia instance to access store outside setup()
+    const authStore = useAuthStore(pinia);
     await authStore.restoreAuth();
     if (authStore.token) {
         config.headers.Authorization = `Bearer ${authStore.token}`;
@@ -65,19 +93,51 @@ axios.interceptors.request.use(async config => {
 
 axios.interceptors.response.use(
     response => response,
-    error => {
+    async error => {
         const status = error.response?.status;
 
         if (status === 401) {
             if (error.config?.noAuthRedirect) {
                 return Promise.reject(error);
             }
-
             if (!router.currentRoute.value.fullPath.includes('/login') &&
                 !router.currentRoute.value.fullPath.includes('/register')) {
                 router.push({
                     name: 'login',
                     query: { redirect: router.currentRoute.value.fullPath || '/' }
+                });
+            }
+        }
+
+        // Network error (offline) → fall back to local DB
+        if (isCapacitor && !error.response && error.config) {
+            const handler = await getLocalHandler();
+            const url = error.config.url?.replace(apiBaseUrl, '') || '';
+            const method = error.config.method?.toLowerCase() || 'get';
+            const data = error.config.data;
+
+            try {
+                let result;
+                if (url.startsWith('/user')) {
+                    result = await handler.handleLocalUserCall();
+                } else if (url.startsWith('/link')) {
+                    result = await handler.handleLocalLinkCall(method, url, data);
+                } else {
+                    result = await handler.handleLocalApiCall(method, url, data);
+                }
+                return Promise.resolve({
+                    ...error.config,
+                    status: result.status,
+                    statusText: 'OK (local)',
+                    data: result.data,
+                });
+            } catch (localError) {
+                // If local handler also fails, return empty success
+                return Promise.resolve({
+                    ...error.config,
+                    status: 200,
+                    statusText: 'OK (local fallback)',
+                    data: { data: null, things: [] },
                 });
             }
         }
@@ -91,5 +151,11 @@ app.config.globalProperties.$dateFromDb = dateFromDb;
 const authStore = useAuthStore();
 await authStore.checkAuth();
 
+// In capacitor standalone mode, check server and seed local DB
+if (isCapacitor) {
+    getLocalHandler().then(() => {
+        console.log('Local DB ready for standalone mode');
+    });
+}
 
 app.mount('#app');
