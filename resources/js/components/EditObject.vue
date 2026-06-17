@@ -141,21 +141,23 @@
                                 />
                             </div>
 
-                            <button type="button" class="btn btn-primary mb-3" @click="addNewLinkedObject">
-                                {{ $t('Add Link') }}
-                            </button>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+                                    {{ $t('Add Link') }}
+                                </button>
 
-                            <div class="modal-footer">
-                                <button
-                                    type="button"
-                                    class="btn btn-secondary"
-                                    data-bs-dismiss="modal"
-                                >
-                                    {{ $t('Close') }}
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    {{ isEditMode ? $t('Update') : $t('Save') }}
-                                </button>
+                                <div class="modal-footer border-0 p-0 m-0">
+                                    <button
+                                        type="button"
+                                        class="btn btn-secondary"
+                                        data-bs-dismiss="modal"
+                                    >
+                                        {{ $t('Close') }}
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        {{ isEditMode ? $t('Update') : $t('Save') }}
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
