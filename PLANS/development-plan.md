@@ -95,29 +95,56 @@ POST /api/v1/sync/resolve
 
 ## Phase 3: Permissions & Policies
 
-### 3.1 Database Layer — Permissions
-Tables already exist: `things_access`, `links_access` (with `group_id`, `read`, `write`). They need integration into the application logic.
+### 3.1 Permission Model — Link-Based (implemented)
 
-Add new migration:
-```php
-// Add visibility column to things
-$table->enum('visibility', ['private', 'public', 'server', 'group'])->default('private');
-// Add server_id to things (which server this record belongs to)
-$table->uuid('server_id')->nullable();
+Permissions use the universal entity model (everything is a thing + links):
+
+| Concept | Implementation | Status |
+|---------|---------------|--------|
+| **Group** | A `things` record | Existing, used in data |
+| **User → Group membership** | `BELONGS_TO_USER_GROUP` link (`e18d73eb-...`) | Existing, used in data |
+| **Group → Thing read access** | `GROUP_READ_ACCESS` link (`ea206516-...`) | Existing, used in data |
+| **Auth query macro** | `DB::table('things')->auth()` — resolves access via link joins | **Rewritten** — no longer uses `things_access` table |
+| **Eloquent AuthScope** | Global scope on `Thing` model — same link-based logic | **Updated** — now handles group access for authenticated users |
+
+The `things_access` and `links_access` tables have been **removed**. The `auth()` macro now resolves access with a subquery:
+
+```
+things ──GROUP_READ_ACCESS──► groups ◄──BELONGS_TO_USER_GROUP── user
 ```
 
-### 3.2 Create Policy Framework
-- `app/Policies/ThingPolicy.php` — defines who can view/edit/delete a thing
-- `app/Policies/LinkPolicy.php` — defines who can view/edit/delete a link
-- Register policies in `app/Providers/AuthServiceProvider.php`
+To grant a group access to a thing, create a link:
+- `one_thing_id` = the thing
+- `link_type_id` = `GROUP_READ_ACCESS`
+- `other_thing_id` = the group
+
+To add a user to a group, create a link:
+- `one_thing_id` = the user's `thing_id`
+- `link_type_id` = `BELONGS_TO_USER_GROUP`
+- `other_thing_id` = the group
+
+**Policy files** (not yet created) — `ThingPolicy`/`LinkPolicy` can use the same link-based resolution.
+
+### 3.2 Add Visibility Column to Things
+New migration needed:
+```php
+// Add visibility to things
+$table->enum('visibility', ['private', 'public', 'group'])->default('private');
+```
+
+This field is **independent** of the link-based permission system. It controls:
+- `private` — only owner and group-read-access members see it
+- `public` — visible to everyone (equivalent to `things.public = 1`)
+- `group` — only visible to group members (via `GROUP_READ_ACCESS` links)
 
 ### 3.3 Visibility Rules
 | Visibility | Read | Default Write | Editable By Others | Sync |
 |---|---|---|---|---|
-| `private` | Owner only | Owner only | No | Local only (never pushed) |
-| `server` (server-saved) | Owner only | Owner only | No | Push/pull to specific server |
-| `group` (group-visible) | Group members + owner | Owner only | If owner grants write to group | Push/pull to server, server serves to group |
+| `private` | Owner + group members | Owner only | No | Local only (never pushed) |
+| `group` (group-visible) | Group members + owner | Owner only | If owner grants `GROUP_WRITE_ACCESS` link | Push/pull to server, server serves to group by link |
 | `public` | Anyone | Owner only | If owner grants edit permission | Push/pull to all servers |
+
+**Write access** — not yet implemented. Future: a `GROUP_WRITE_ACCESS` link type (same pattern as read).
 
 **Other-user edits** (TBD — two approaches to implement):
 - **Approach A (Manual merge)**: Other user's edit creates a pending change. Owner reviews and accepts/rejects.
@@ -125,21 +152,20 @@ $table->uuid('server_id')->nullable();
 
 Both approaches use field-level diffing — only changed fields are tracked.
 
-### 3.4 Group Management
-- Create `app/Http/Controllers/GroupController.php`:
-  - Create group (a thing with type=group)
-  - Add/remove members (link to group)
-  - Set group permissions on things/links
-- Add API routes for group management
-- `resources/js/components/GroupManager.vue` — UI for managing groups
+### 3.4 Group Management (not yet implemented)
+- No dedicated GroupController yet — groups are created as things via the existing API
+- Future: `app/Http/Controllers/GroupController.php`:
+  - Create/delete groups, add/remove members via link management
+  - Set group permissions by creating/removing `GROUP_READ_ACCESS` links
+- Future: `resources/js/components/GroupManager.vue` — UI for managing groups
 
-### 3.5 Apply Policies to API Controllers
-- Update `ApiController` to check policies:
-  - `list()` — filter by visibility + ownership + group membership
-  - `get()` — check read permission via policy
-  - `store()`/`update()` — check write permission via policy
-  - `delete()` — check delete permission via policy
-- Apply `auth()` scope consistently (already partially in search query)
+### 3.5 Apply Policies to API Controllers (not yet implemented)
+- Update `ApiController` to check link-based policies:
+  - `list()` / `get()` — already filtered by `auth()` macro
+  - `store()` / `update()` — check ownership + `GROUP_WRITE_ACCESS`
+  - `delete()` — owner-only
+- Create `app/Policies/ThingPolicy.php` and `app/Policies/LinkPolicy.php`
+- Register in `AuthServiceProvider`
 
 ### 3.6 Server Registry
 - `servers` table (or reuse things with type=server):
