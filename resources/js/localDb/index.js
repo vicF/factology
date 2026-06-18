@@ -173,7 +173,10 @@ export async function listObjects(filters = {}) {
     // Use Dexie .filter() for complex conditions
     query = query.filter(obj => {
         if (obj.deleted && !filters.includeDeleted) return false;
-        if (filters.type !== undefined && obj.type !== filters.type) return false;
+        if (filters.type !== undefined) {
+            const typeFilter = Array.isArray(filters.type) ? filters.type : [filters.type];
+            if (!typeFilter.includes(obj.type)) return false;
+        }
         if (filters.syncStatus && obj._syncStatus !== filters.syncStatus) return false;
         return true;
     });

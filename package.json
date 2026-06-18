@@ -8,6 +8,8 @@
         "build:analyze": "vite build --mode=production --ssrManifest",
         "preview": "vite preview --host=0.0.0.0 --port=4173",
         "build:capacitor": "vite build --config vite.config.capacitor.js --mode capacitor",
+        "build:standalone": "vite build --config vite.config.capacitor.js --mode standalone",
+        "serve:standalone": "vite preview --config vite.config.capacitor.js --port 4173",
         "dev:capacitor": "vite --config vite.config.capacitor.js --mode capacitor",
         "build:capacitor:dev": "vite build --config vite.config.capacitor.js --mode=development",
         "cap:sync": "npx cap sync",

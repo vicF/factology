@@ -27,6 +27,8 @@ import {
     SYNC_STATUS,
 } from './index';
 import { saveLink, deleteLink, getLink, listLinksForThing } from './links';
+import { seedLocalDb } from './seeder';
+import { UUID } from '../constants/uuid';
 
 /** Base path to strip from URLs */
 const API_PREFIX = '/object';
@@ -48,72 +50,11 @@ export async function handleLocalUserCall() {
 }
 
 /**
- * Seed the local DB with demo data for first-launch experience.
- * Only runs if the objects store is empty.
+ * Seed the local DB with system objects and demo data.
+ * Uses the standalone seeder for consistency across installations.
  */
 export async function seedDemoData() {
-    const db = getDb();
-    const count = await db.objects.count();
-    if (count > 0) return; // already seeded
-
-    const demoObjects = [
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000001',
-            name: 'Welcome to Factology',
-            type: 3,
-            description: 'This is a demo object stored locally on your device. Everything works offline!',
-            start: '20260101000000',
-            end: '20261231235959',
-            public: 1,
-            owner: 'local-user',
-            data: { tags: ['demo', 'offline'] },
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000002',
-            name: 'Offline Note',
-            type: 3,
-            description: 'You can create, edit, and delete objects without an internet connection. All changes are saved locally.',
-            start: '20260201000000',
-            public: 1,
-            owner: 'local-user',
-            data: { priority: 'high' },
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000003',
-            name: 'How Sync Works',
-            type: 3,
-            description: 'When you connect to a server, your local changes will sync automatically. Conflicts are resolved field-by-field.',
-            start: '20260301000000',
-            public: 1,
-            owner: 'local-user',
-            data: { type: 'info' },
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000004',
-            name: 'Private Object Example',
-            type: 3,
-            description: 'This object is marked private. Private objects stay on your device and never sync to any server.',
-            start: '20260401000000',
-            public: 0,
-            owner: 'local-user',
-            data: { tags: ['private'] },
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000005',
-            name: 'Classes & Categories',
-            type: 2,
-            description: 'This is a class/category object (type 2). Use classes to organize your objects into groups.',
-            public: 1,
-            owner: 'local-user',
-            data: { color: '#4A90D9' },
-        },
-    ];
-
-    for (const obj of demoObjects) {
-        await createObject(obj, { skipChangeLog: true });
-    }
-
-    console.log('Local DB seeded with', demoObjects.length, 'demo objects');
+    await seedLocalDb();
 }
 
 /**
@@ -160,10 +101,11 @@ async function handleSearch(body) {
 
     let results;
     if (params.tree) {
-        // Return all class-type objects as flat list for tree rendering
-        results = await listObjects({ type: [2, 5], includeDeleted: false });
+        // Return class tree built from objects + parent-child links
+        const things = await listObjects({ type: [UUID.G_CLASS], includeDeleted: false });
+        const tree = await buildClassTree(things);
         return {
-            data: { things: buildClassTree(results) },
+            data: { things: tree },
             status: 200,
         };
     }
@@ -273,19 +215,71 @@ export async function handleLocalLinkCall(method, url, data = null) {
 }
 
 /**
- * Build a simple class tree from flat list.
+ * Build a class tree from flat list of class objects + parent-child links.
+ *
+ * @param {Array} classObjects - Things with type=G_CLASS
+ * @returns {Array} Tree structure with nodes, level, parent_id
  */
-function buildClassTree(items) {
-    // For now return flat with empty nodes arrays
-    // Full tree building would need parent_id tracking
-    return items.map(item => ({
-        id: item.thing_id,
-        name: item.name,
-        level: 1,
-        description: item.description,
-        public: item.public || 0,
-        nodes: [],
-        translation: null,
-        parent_id: null,
-    }));
+async function buildClassTree(classObjects) {
+    const db = getDb();
+
+    // Get all parent-child links between classes
+    const allLinks = await db.links
+        .where('link_type_id')
+        .equals(UUID.LINK_TO_PARENT)
+        .toArray();
+
+    // Build parent → children map
+    const parentMap = {};
+    for (const link of allLinks) {
+        if (!parentMap[link.one_thing_id]) {
+            parentMap[link.one_thing_id] = [];
+        }
+        parentMap[link.one_thing_id].push(link.other_thing_id);
+    }
+
+    // Index class objects by UUID
+    const thingMap = {};
+    for (const obj of classObjects) {
+        thingMap[obj.thing_id] = obj;
+    }
+
+    // Recursively build tree
+    function buildNode(thingId, level) {
+        const obj = thingMap[thingId];
+        if (!obj) return null;
+
+        const children = (parentMap[thingId] || [])
+            .map(childId => buildNode(childId, level + 1))
+            .filter(Boolean);
+
+        // Find parent
+        let parentId = null;
+        for (const link of allLinks) {
+            if (link.other_thing_id === thingId) {
+                parentId = link.one_thing_id;
+                break;
+            }
+        }
+
+        return {
+            id: thingId,
+            name: obj.name,
+            level,
+            description: obj.description || null,
+            public: obj.public || 0,
+            nodes: children,
+            translation: null,
+            parent_id: parentId,
+        };
+    }
+
+    // Roots = classes that have no parent link (parent not found in link data)
+    const linkedChildren = new Set(allLinks.map(l => l.other_thing_id));
+    const roots = classObjects
+        .filter(obj => !linkedChildren.has(obj.thing_id))
+        .map(obj => buildNode(obj.thing_id, 1))
+        .filter(Boolean);
+
+    return roots;
 }
