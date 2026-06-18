@@ -34,9 +34,10 @@ Scenario('Create a new object @all', async () => {
     I.waitForElement('.add-object', 10);
     // Use force click because .add-object is a span that may be overlapped
     I.click('.add-object', null, { force: true });
-    I.waitForElement('input[name="name"], .modal', 10);
+    I.waitForElement('input[name="name"]', 10);
     I.fillField('input[name="name"]', 'E2E Test');
-    I.click('Save, button[type="submit"]');
+    // Click the Save button inside the modal footer (NOT the navbar search button)
+    I.click({css: '.modal-footer .btn-primary'});
     I.wait(2);
 });
 

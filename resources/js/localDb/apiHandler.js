@@ -40,7 +40,7 @@ const API_PREFIX = '/object';
 export async function handleLocalUserCall() {
     return {
         data: {
-            id: 0,
+            id: 1,
             name: 'Offline User',
             email: 'offline@local',
             thing_id: 'local-user-thing',

@@ -4,7 +4,8 @@
 const isHeadless = process.env.CI === 'true' || process.env.HEADLESS !== 'false';
 
 exports.config = {
-    tests: './e2e/**/*_test.js',
+    tests: './e2e/acceptance/!(create_delete_classes)*_test.js',
+    grep: '(@all|@local)',
     output: './output',
     helpers: {
         Playwright: {
