@@ -29,7 +29,7 @@
                                             <Image
                                                 :node-id="thing.thing_id"
                                                 :type="thing.type"
-                                                :is-private="thing.public === 0"
+                                                :is-private="!thing.public"
                                                 width="48px"
                                                 side-bar="right"
                                             />
