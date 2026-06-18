@@ -168,24 +168,89 @@ Both approaches use field-level diffing — only changed fields are tracked.
 - Register in `AuthServiceProvider`
 
 ### 3.6 Server Registry
-- `servers` table (or reuse things with type=server):
-  - id, name, url, auth_type, auth_config (encrypted)
+- Servers are `things` records with `type = G_SERVER (6)`:
+  - `thing_id` — UUID (unique server identifier)
+  - `name` — human-readable server name (e.g. "Main Server", "Family Tree")
+  - `description` — server URL (e.g. "https://api.example.com/api/v1")
+  - `owner` — who registered this server
 - `resources/js/stores/serverRegistry.js` — manage list of known servers
-- Allow user to add/remove servers
-- When syncing: iterate over registered servers
+- Allow user to add/remove servers via UI
+- Each known server gets a `stored_on` link for objects it holds (see §4.1)
 
 ---
 
-## Phase 4: Multi-Platform Adaptation
+## Phase 4: Multi-Source Data Layer
 
-### 4.1 Unify Data Access Layer
-- `resources/js/dataLayer/index.js`:
-  - `getObject(uuid)` — try local DB first, fall back to cache, then API
-  - `saveObject(uuid, data)` — write to local DB, enqueue for sync
-  - `searchObjects(params)` — search local DB + optionally query API
-- All Pinia stores (objects, objectCache, search) should use the data layer instead of direct API calls
+### 4.1 Unified Data Layer (implemented)
 
-### 4.2 Offline-First UI
+The data layer (`resources/js/dataLayer/index.js`) is the single entry point for all reads and writes. It hides whether data comes from local IndexedDB, Server A, Server B, or multiple sources.
+
+#### Core Model: `stored_on` Link
+
+An object's presence on a server is tracked by a **`stored_on` link** (reuses `LINK_TO_STORAGE` UUID = `1dcb897e-...`):
+
+```
+object ──stored_on──► server-thing-A
+object ──stored_on──► server-thing-B
+```
+
+- **No `stored_on` link** → local-only object (never leaves the device)
+- **One `stored_on` link** → lives on that specific server
+- **Multiple `stored_on` links** → lives on multiple servers
+- Links are created when the user chooses to sync an object to a server, or when pulling from a server
+
+#### API
+
+| Function | Behaviour |
+|----------|-----------|
+| `search(query, { sources, types })` | Queries local DB + all reachable servers in parallel, merges by UUID. Returns objects tagged with `_source: ['local', 'ServerA']` |
+| `getObject(uuid, { localOnly })` | Local DB first (instant) → falls back to servers if not found → caches server results locally |
+| `saveObject(data, { syncToServers })` | Always writes to local DB (offline-safe). Creates/updates `stored_on` links for target servers. Enqueues pending changes per server |
+| `deleteObject(uuid, { syncToServers })` | Soft-deletes locally, enqueues delete per server |
+| `getObjectServers(uuid)` | Returns server UUIDs this object has `stored_on` links to |
+| `getServers()` | Returns all known servers (cached from local DB) |
+
+#### Merge Strategy
+
+```
+Search "photo" →
+  Local:  [{id: A, name: "photo 1"}, {id: B, name: "photo 2"}]
+  Server: [{id: B, name: "photo 2 v2"}, {id: C, name: "photo 3"}]
+  Merge:  [{id: A, name: "photo 1",          _source: ['local']},
+           {id: B, name: "photo 2 v2",       _source: ['local', 'MyServer']},
+           {id: C, name: "photo 3",          _source: ['MyServer']}]
+```
+
+- **Local always wins** for display (fast, available offline)
+- Server data fills gaps (missing fields, new records not yet cached)
+- Duplicates resolved by UUID — no duplicate records
+- `_source` array tells the UI where each result came from
+
+#### Write Flow
+
+```
+saveObject(data, { syncToServers: ['server-a', 'server-b'] })
+  1. Write to IndexedDB immediately — UI updates instantly
+  2. Upsert `stored_on` links for each target server
+  3. Enqueue pending change per server (server-a: UPDATE, server-b: INSERT)
+  4. Sync engine picks up pending changes when online
+```
+
+### 4.2 Server-Specific Sync Status
+
+Objects track sync state **per server** through the combination of:
+- `_syncStatus` on the object itself (dirtiest state across all servers)
+- `stored_on` links (which servers have this object)
+- `pendingChanges` queue entries (per server, per object operation)
+
+| State | Meaning |
+|-------|---------|
+| Object has no `stored_on` links, `_syncStatus = local_only` | Local-only, never pushed |
+| Object has `stored_on` → Server A, `_syncStatus = synced` | Fully synced to Server A |
+| Object has `stored_on` → Server A + Server B, `_syncStatus = local` | Modified locally, pending push to both servers |
+| Object has `stored_on` → Server A, found via search from Server B | Exists on Server A, visible in cross-server search |
+
+### 4.3 Offline-First UI
 - Add offline indicator component: `resources/js/components/OfflineIndicator.vue`
 - Show sync status on objects: "Saved locally", "Synced", "Conflict"
 - `resources/js/components/SyncStatus.vue` — show pending changes count, last sync time
@@ -260,3 +325,9 @@ Both approaches use field-level diffing — only changed fields are tracked.
 6. **Visibility = sync behavior**: The `visibility` field controls what syncs where. Private records never leave the device. Server records go to a specific server. Public records sync everywhere. Group records sync to servers where the group exists.
 
 7. **Servers hold subsets**: Each record belongs to a specific server (or is local-only). Different servers can hold different subsets of data. Public records can be synced to multiple servers.
+
+8. **`stored_on` link = multi-server tracking**: Instead of a `_serverId` field (limited to one server), objects use `stored_on` links to track which servers hold them. This is the universal pattern — everything is a thing, relationships are links. Adding a new server requires no schema changes, just a new link.
+
+9. **Search merges, doesn't union**: When searching across sources, the data layer queries local DB and all reachable servers in parallel, then merges by UUID. Local data fills the UI instantly; server results augment it as they arrive. No duplicates in results — UUID deduplication is implicit.
+
+10. **Write-local, sync-async**: All writes go to IndexedDB first (sub-millisecond, offline-safe). Sync is a background concern — the user never waits for a network round-trip to see their data saved.

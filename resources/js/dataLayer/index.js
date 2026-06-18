@@ -32,7 +32,7 @@ export async function getServers() {
     const db = getDb();
     const servers = await db.objects
         .where('type')
-        .equals(5) // G_EXTERNAL = server
+        .equals(UUID.G_SERVER)
         .toArray();
     _serversCache = servers.map(s => ({
         thing_id: s.thing_id,

@@ -10,6 +10,7 @@ export const UUID = {
     G_THING: 3,
     G_LINK: 4,
     G_EXTERNAL: 5,
+    G_SERVER: 6,
 
     // ── System objects (things with these UUIDs exist in every installation) ──
     ANYTHING:       '939cd822-9e23-450c-8c5e-c23f67cca792',
