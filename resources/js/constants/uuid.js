@@ -68,4 +68,8 @@ export const UUID = {
     LINK_TYPE_SOURCE:  'd92fd5cd-ca65-41cb-879e-e87c0450fecd',
     LINK_TYPE_MEMBER:  '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf',
     LINK_TYPE_GROUP:   'e18d73eb-a5d3-47be-a785-106f6f185651',
+
+    // ── Server storage link ──
+    // Links a thing to a server it's stored on (same UUID as LINK_TO_STORAGE)
+    STORED_ON:         '1dcb897e-0f64-499f-b80d-2cac4a025ed4',
 };
