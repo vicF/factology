@@ -28,7 +28,20 @@ export const useAuthStore = defineStore('auth', () => {
     const authenticated = ref(!!initialToken);
     const user = ref(initialUser);
     const token = ref(initialToken);
+    const registrationEnabled = ref(true);
     const router = useRouter();
+
+    // Fetch public settings (registration status, etc.)
+    async function fetchSettings() {
+        try {
+            const response = await axios.get('/settings/public');
+            if (response.data?.data) {
+                registrationEnabled.value = response.data.data.registration_enabled;
+            }
+        } catch (error) {
+            console.warn('Failed to fetch public settings:', error.message);
+        }
+    }
 
     // Helper to set auth state after successful login
     async function setAuth(userData, authToken) {
@@ -157,5 +170,5 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { authenticated, user, token, login, logout, checkAuth, restoreAuth };
+    return { authenticated, user, token, registrationEnabled, login, logout, checkAuth, restoreAuth, fetchSettings };
 });

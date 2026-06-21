@@ -34,7 +34,7 @@
                             </button>
                         </div>
 
-                        <div class="col-12 text-center">
+                        <div class="col-12 text-center" v-if="registrationEnabled">
                             <label>{{ $t('Don\'t have an account?') }} <router-link :to="{name:'register'}" data-testid="register-link-from-login">{{ $t('Register Now!') }}</router-link></label>
                         </div>
                     </form>
@@ -50,11 +50,13 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { storeToRefs } from 'pinia';
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const authStore = useAuthStore();
+const { registrationEnabled } = storeToRefs(authStore);
 
 const auth = reactive({
     email: "",

@@ -84,4 +84,16 @@ router.afterEach(() => {
     document.documentElement.style.overflow = 'auto';
 });
 
+// Navigation guard: redirect from /register if registration is disabled
+router.beforeEach(async (to, from, next) => {
+    if (to.name === 'register') {
+        const { useAuthStore } = await import('../stores/auth');
+        const authStore = useAuthStore();
+        if (!authStore.registrationEnabled) {
+            return next({ name: 'login' });
+        }
+    }
+    next();
+});
+
 export default router

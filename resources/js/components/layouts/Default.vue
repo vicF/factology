@@ -79,7 +79,7 @@
                                         <IconLogin class="icon-sm me-2" />
                                         Login
                                     </router-link></li>
-                                    <li><router-link class="dropdown-item" to="/register" data-testid="register-link">
+                                    <li v-if="authStore.registrationEnabled"><router-link class="dropdown-item" to="/register" data-testid="register-link">
                                         <IconAdd class="icon-sm me-2" />
                                         Register
                                     </router-link></li>
