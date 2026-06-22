@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
         return response()->json([
             'data' => [
                 'registration_enabled' => config('app.registration_enabled', true),
+                'public_objects_visibility' => config('app.public_objects_visibility', 'everyone'),
             ],
             'success' => true,
         ]);

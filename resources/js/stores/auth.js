@@ -1,6 +1,6 @@
 // resources/js/stores/auth.js
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { storage, storageSync } from '../utils/storage';
@@ -29,7 +29,13 @@ export const useAuthStore = defineStore('auth', () => {
     const user = ref(initialUser);
     const token = ref(initialToken);
     const registrationEnabled = ref(true);
+    const publicObjectsVisibility = ref('everyone');
     const router = useRouter();
+
+    // Whether public-facing content should be hidden from unauthenticated users
+    const hidePublicContent = computed(() => {
+        return !authenticated.value && publicObjectsVisibility.value === 'registered_only';
+    });
 
     // Fetch public settings (registration status, etc.)
     async function fetchSettings() {
@@ -37,6 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
             const response = await axios.get('/settings/public');
             if (response.data?.data) {
                 registrationEnabled.value = response.data.data.registration_enabled;
+                publicObjectsVisibility.value = response.data.data.public_objects_visibility;
             }
         } catch (error) {
             console.warn('Failed to fetch public settings:', error.message);
@@ -170,5 +177,5 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { authenticated, user, token, registrationEnabled, login, logout, checkAuth, restoreAuth, fetchSettings };
+    return { authenticated, user, token, registrationEnabled, publicObjectsVisibility, hidePublicContent, login, logout, checkAuth, restoreAuth, fetchSettings };
 });

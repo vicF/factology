@@ -1,6 +1,6 @@
 <template>
     <div class="container d-flex justify-content-center align-items-start min-vh-100 py-4">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 d-flex justify-content-center">
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h1 class="text-center">{{ $t('Log in') }}</h1>

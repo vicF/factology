@@ -35,6 +35,9 @@ export const useObjectsStore = defineStore('objects', {
                 console.log('catch', error)
                 if (error.response?.status === 422) {
                     // handle validation errors
+                } else if (error.response?.status === 401) {
+                    // Silent fail — Axios interceptor handles redirect to login
+                    console.log('Tree load blocked: authentication required');
                 } else {
                     this.validationErrors = {}
                     console.error('Error loading class tree:', error.response?.data?.message || error.message)
