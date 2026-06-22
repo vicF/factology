@@ -147,17 +147,20 @@ class SettingsTest extends TestCase
         config(['app.public_objects_visibility' => 'everyone']);
 
         $user = $this->createTestUser()->getUser();
-        $user->thing_id = uuid_create();
-        $user->save();
 
-        // Create the things record for the user
+        // Create the things record for the user FIRST (FK constraint)
+        $userThingId = uuid_create();
         DB::table('things')->insert([
-            'thing_id'    => $user->thing_id,
+            'thing_id'    => $userThingId,
             'name'        => 'thing-' . $user->name,
             'type'        => UUID::G_THING,
-            'owner'       => $user->thing_id,
+            'owner'       => uuid_create(),
             'public'      => false,
         ]);
+
+        // Set the user's thing_id to match the things record
+        $user->thing_id = $userThingId;
+        $user->save();
 
         // Create a private object owned by this user
         $thingId = uuid_create();
