@@ -52,26 +52,41 @@ fi
 cd "$INSTALL_DIR"
 ok "Code ready at $INSTALL_DIR"
 
-# ── .env (only if it doesn't exist) ────────────────────────────────────────────
+# ── .env ──────────────────────────────────────────────────────────────────────
 step "Setting up environment"
+
+# Gather current DB_PASSWORD if .env already exists
+CURRENT_DB_PASSWORD=""
+if [[ -f .env ]]; then
+  CURRENT_DB_PASSWORD=$(grep -oP '^DB_PASSWORD=\K.*' .env 2>/dev/null || true)
+fi
 
 if [[ ! -f .env ]]; then
   if [[ -f .env.example ]]; then
     cp .env.example .env
-    # Production-safe defaults
-    sed -i 's|^APP_ENV=.*|APP_ENV=production|' .env
-    sed -i 's|^APP_DEBUG=.*|APP_DEBUG=false|' .env
-    sed -i 's|^DB_HOST=.*|DB_HOST=postgres|' .env
-    sed -i 's|^DB_PORT=.*|DB_PORT=5432|' .env
-    sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|' .env
-    ok ".env created with production defaults (edit if needed)"
   else
     echo "  No .env.example found. Create .env manually."
     exit 1
   fi
-else
-  ok ".env already exists"
 fi
+
+# Production-safe defaults
+sed -i 's|^APP_ENV=.*|APP_ENV=production|' .env
+sed -i 's|^APP_DEBUG=.*|APP_DEBUG=false|' .env
+sed -i 's|^DB_HOST=.*|DB_HOST=postgres|' .env
+sed -i 's|^DB_PORT=.*|DB_PORT=5432|' .env
+sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|' .env
+
+# Auto-generate DB_PASSWORD if it's the default or missing
+if [[ -z "$CURRENT_DB_PASSWORD" || "$CURRENT_DB_PASSWORD" == "secret" ]]; then
+  NEW_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 24 || date +%s | md5sum | head -c 24)
+  sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${NEW_PASS}|" .env
+  ok "DB_PASSWORD auto-generated"
+else
+  ok "Using existing DB_PASSWORD"
+fi
+
+ok ".env configured"
 
 # ── Launch ─────────────────────────────────────────────────────────────────────
 step "Starting containers (first build takes a few minutes)"

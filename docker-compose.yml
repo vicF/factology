@@ -43,7 +43,7 @@ services:
     environment:
       POSTGRES_DB: factology
       POSTGRES_USER: dbuser
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dbuser -d factology"]
