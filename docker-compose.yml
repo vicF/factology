@@ -1,0 +1,60 @@
+services:
+
+  ## ── Main application ─────────────────────────────────────────────────────────
+  factology:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: factology
+    ports:
+      - "8003:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_CONNECTION=pgsql
+    volumes:
+      # .env is bind-mounted so key:generate persists across restarts
+      - ./.env:/var/www/html/.env
+      # Storage (uploads, logs) — persists during image rebuilds
+      - factology_storage:/var/www/html/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ## ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: factology-postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: factology
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: secret
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbuser -d factology"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  factology_storage:
+
+networks:
+  default:
+    name: factology-prod
