@@ -37,7 +37,7 @@ $tablesReverse = [
     'oauth_refresh_tokens', 'oauth_auth_codes', 'oauth_access_tokens',
     'oauth_personal_access_clients', 'oauth_clients',
     'personal_access_tokens', 'password_resets', 'failed_jobs',
-    'things_access', 'history', 'favorites', 'links_access', 'links',
+    'history', 'favorites', 'links',
     'external_links', 'users', 'classes', 'photo_files', 'photo_media',
     'photo_places', 'things', 'general_types',
 ];
@@ -52,7 +52,7 @@ $tablesOrdered = [
     'general_types',
     'things', 'photo_media', 'photo_places', 'photo_files',
     'classes', 'users', 'external_links', 'links',
-    'links_access', 'favorites', 'history', 'things_access',
+    'favorites', 'history',
     'failed_jobs', 'password_resets', 'personal_access_tokens',
     'oauth_clients', 'oauth_personal_access_clients', 'oauth_access_tokens',
     'oauth_auth_codes', 'oauth_refresh_tokens',

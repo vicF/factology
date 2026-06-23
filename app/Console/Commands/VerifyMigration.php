@@ -27,8 +27,6 @@ class VerifyMigration extends Command
         'history',
         'photo_media',
         'photo_files',
-        'things_access',
-        'links_access',
     ];
 
     public function handle(): int

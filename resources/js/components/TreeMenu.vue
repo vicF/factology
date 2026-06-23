@@ -99,7 +99,7 @@ const showIcons = ref(false);
 const isChecked = computed(() => store.checkedItems.includes(props.id));
 const showToggle = computed(() => props.nodes && props.nodes.length > 0);
 const indent = computed(() => ({ marginLeft: `${props.depth * 15}px` }));
-const isPrivate = computed(() => props.public === 0);
+const isPrivate = computed(() => !props.public);
 
 // Methods
 const toggleChildren = () => {

@@ -1,6 +1,6 @@
 Feature('Debug');
 
-Scenario('Check page content', async ({ I }) => {
+Scenario('Check page content @all', async ({ I }) => {
     // Capture console logs
     I.executeScript(() => {
         window.__logs = [];

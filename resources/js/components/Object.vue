@@ -48,7 +48,7 @@
                         <div class="object-header">
                             <h1 class="object-title">
                                 {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="object.public === 0" class="private-icon-header" />
+                                <IconPrivate v-if="!object.public" class="private-icon-header" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -84,7 +84,7 @@
                                                 <Image
                                                     :node-id="object.thing_id"
                                                     :type="object.type"
-                                                    :is-private="object.public === 0"
+                                                    :is-private="!object.public"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -139,7 +139,7 @@
                                                 <Image
                                                     :node-id="getLinkTargetId(link)"
                                                     :type="link.type"
-                                                    :is-private="link.public === 0"
+                                                    :is-private="!link.public"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -330,7 +330,7 @@ const getObject = async () => {
             object.value = null;
         } else if (error.response?.status === 401) {
             const data = error.response?.data;
-            if (data?.data?.public === 1) {
+            if (data?.data?.public === true) {
                 object.value = data.data;
             } else {
                 object.value = null;

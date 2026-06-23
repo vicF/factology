@@ -1,10 +1,11 @@
 // factology/tests-js/codecept.conf.standalone.js
-// CodeceptJS config for the standalone (local DB, no API) build.
-// The standalone SPA is served by `vite preview` on port 4173.
-const isHeadless = process.env.CI === 'true' || process.env.HEADLESS === 'true';
+// E2E tests against the standalone (capacitor/dist-capacitor) build.
+// No API server — all data comes from local Dexie DB.
+const isHeadless = process.env.CI === 'true' || process.env.HEADLESS !== 'false';
 
 exports.config = {
-    tests: './standalone/*_test.js',
+    tests: './e2e/acceptance/!(create_delete_classes)*_test.js',
+    grep: '(@all|@local)',
     output: './output',
     helpers: {
         Playwright: {
@@ -32,7 +33,8 @@ exports.config = {
                     console.log(`[BROWSER ERROR]: ${error.message}`);
                 }
             }
-        }
+        },
+        REST: { endpoint: 'http://localhost:8005' },
     },
     include: {
         I: './steps_file.js'
