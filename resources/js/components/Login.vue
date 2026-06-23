@@ -1,6 +1,6 @@
 <template>
     <div class="container d-flex justify-content-center align-items-start min-vh-100 py-4">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 d-flex justify-content-center">
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h1 class="text-center">{{ $t('Log in') }}</h1>
@@ -34,7 +34,7 @@
                             </button>
                         </div>
 
-                        <div class="col-12 text-center">
+                        <div class="col-12 text-center" v-if="registrationEnabled">
                             <label>{{ $t('Don\'t have an account?') }} <router-link :to="{name:'register'}" data-testid="register-link-from-login">{{ $t('Register Now!') }}</router-link></label>
                         </div>
                     </form>
@@ -50,11 +50,13 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { storeToRefs } from 'pinia';
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const authStore = useAuthStore();
+const { registrationEnabled } = storeToRefs(authStore);
 
 const auth = reactive({
     email: "",

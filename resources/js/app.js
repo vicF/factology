@@ -90,6 +90,8 @@ app.config.globalProperties.$dateFromDb = dateFromDb;
 
 const authStore = useAuthStore();
 await authStore.checkAuth();
+// Fetch public settings (registration status, etc.)
+await authStore.fetchSettings();
 
 
 app.mount('#app');

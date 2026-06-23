@@ -12,7 +12,7 @@
                         </li>
                     </ul>
 
-                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form">
+                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
                         <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
                         <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
                             <IconSearch class="icon-md" />
@@ -79,7 +79,7 @@
                                         <IconLogin class="icon-sm me-2" />
                                         Login
                                     </router-link></li>
-                                    <li><router-link class="dropdown-item" to="/register" data-testid="register-link">
+                                    <li v-if="authStore.registrationEnabled"><router-link class="dropdown-item" to="/register" data-testid="register-link">
                                         <IconAdd class="icon-sm me-2" />
                                         Register
                                     </router-link></li>
@@ -110,8 +110,13 @@
 
         <!-- Main content area -->
         <main class="mt-3">
+            <!-- Mobile: content only (no tree/swipe) when public content is hidden -->
+            <div v-if="isMobile && authStore.hidePublicContent" data-testid="mobile-content-only">
+                <router-view></router-view>
+            </div>
+
             <!-- Mobile: Custom Swipe Implementation -->
-            <div v-if="isMobile" class="mobile-view" data-testid="mobile-view">
+            <div v-else-if="isMobile" class="mobile-view" data-testid="mobile-view">
                 <!-- Pull-to-refresh indicator -->
                 <div
                     class="pull-refresh-indicator"
@@ -169,7 +174,7 @@
             </div>
 
             <!-- Desktop: Traditional grid layout -->
-            <div v-else class="container ps-5" data-testid="desktop-view">
+            <div v-else-if="!authStore.hidePublicContent" class="container ps-5" data-testid="desktop-view">
                 <div class="row">
                     <div class="col-3 ps-0" data-testid="tree-column">
                         <class-tree></class-tree>
@@ -178,6 +183,11 @@
                         <router-view></router-view>
                     </div>
                 </div>
+            </div>
+
+            <!-- Desktop: content only (no tree) when public content is hidden -->
+            <div v-else data-testid="desktop-content-only">
+                <router-view></router-view>
             </div>
         </main>
 
@@ -568,11 +578,17 @@ watch(() => route.path, () => {
 
 watch(
     () => authStore.authenticated,
-    (isAuthenticated) => {
+    (isAuthenticated, wasAuthenticated) => {
         if (isAuthenticated && route.matched.some(r => r.components?.default?.name === 'login')) {
             const redirect = route.query.redirect || '/'
             console.debug('router.replace(' + redirect + ')')
             router.replace(redirect)
+        }
+        // Reload class tree when auth state changes (login/logout)
+        if (isAuthenticated !== wasAuthenticated) {
+            // Clear stale tree data immediately so private classes don't linger after logout
+            objectsStore.rootNodes = [];
+            objectsStore.loadClassTree();
         }
     },
     { immediate: true }

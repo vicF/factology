@@ -215,4 +215,16 @@ return [
 
     'vite_dev_server_url' => env('VITE_DEV_SERVER_URL', 'http://localhost:5173'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Application Settings
+    |--------------------------------------------------------------------------
+    |
+    | These settings control access and registration behavior.
+    |
+    */
+
+    'public_objects_visibility' => env('PUBLIC_OBJECTS_VISIBILITY', 'everyone'),
+    'registration_enabled' => env('REGISTRATION_ENABLED', true),
+
 ];

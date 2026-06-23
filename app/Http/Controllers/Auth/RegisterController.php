@@ -32,6 +32,14 @@ class RegisterController extends Controller
      */
     public function register(Request $request)
     {
+        // Check if registration is enabled via env config
+        if (!config('app.registration_enabled', true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration is currently disabled',
+            ], 403);
+        }
+
         Log::debug('Register ...');
 
         $validated = $request->validate([

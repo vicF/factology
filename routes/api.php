@@ -31,13 +31,29 @@ Route::prefix('v1')->group(function () {
     })->name('user');
 
     // ────────────────────────────────────────────────────────────────────────────────
-    // Your existing API endpoints
+    // Public settings endpoint (used by frontend to check registration status)
     // ────────────────────────────────────────────────────────────────────────────────
 
-    Route::get('/object',     [ApiController::class, 'list']);
-    Route::post('/object',    [ApiController::class, 'search']);
-    Route::get('/object/{id}', [ApiController::class, 'get']);
-    Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
+    Route::get('/settings/public', function () {
+        return response()->json([
+            'data' => [
+                'registration_enabled' => config('app.registration_enabled', true),
+                'public_objects_visibility' => config('app.public_objects_visibility', 'everyone'),
+            ],
+            'success' => true,
+        ]);
+    })->name('settings.public');
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    // Data endpoints (protected by public access middleware)
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    Route::middleware('check.public.access')->group(function () {
+        Route::get('/object',     [ApiController::class, 'list']);
+        Route::post('/object',    [ApiController::class, 'search']);
+        Route::get('/object/{id}', [ApiController::class, 'get']);
+        Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
+    });
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
