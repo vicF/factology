@@ -8,13 +8,20 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),
-            // Add this alias for icons
             '@icons': path.resolve(__dirname, './resources/js/components/icons'),
         }
     },
     test: {
         globals: true,
         environment: 'jsdom',
-        setupFiles: ['./tests-vitest/setup.js'],
+        setupFiles: [
+            './tests-vitest/setup.js',
+            './tests-vitest/setup.localDb.js',
+        ],
+        server: {
+            deps: {
+                inline: ['fake-indexeddb', 'dexie'],
+            },
+        },
     },
 })

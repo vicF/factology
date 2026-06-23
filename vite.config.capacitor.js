@@ -30,6 +30,9 @@ export default defineConfig({
         outDir: 'dist-capacitor',
         emptyOutDir: true,
         sourcemap: false,
+        rollupOptions: {
+            input: path.resolve(__dirname, 'index.capacitor.html'),
+        },
     },
     // Load .env.capacitor for VITE_TARGET and VITE_API_URL
     envDir: __dirname,

@@ -12,7 +12,7 @@ After(async ({ I }) => {
     }
 });
 
-Scenario('Complete registration and login flow', async ({ I }) => {
+Scenario('Complete registration and login flow @api', async ({ I }) => {
     const userData = {
         name: 'Tester',
         email: `tester-${Date.now()}@test.com`,
@@ -42,22 +42,25 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 
     testUser = userData;
 
-    // Verify we can see the main content
-    I.seeElement('[data-testid="desktop-view"], [data-testid="mobile-view"]');
-
-    // Logout
+    // Verify logged in — open dropdown and check for user name
     I.click('[data-testid="user-dropdown-btn"]');
     I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.see('Logged in as');
+    I.see(userData.name);
+
+    // Logout — click dropdown toggle again to close, then logout
     I.click('[data-testid="logout-link"]');
-    I.wait(2);
+    I.wait(1);
 
-    // Verify logout - should see logged out indicator
-    I.seeElement('[data-testid="logged-out-indicator"]');
-
-    // Login with same user
+    // Verify logged out — open dropdown and see Guest Mode
     I.click('[data-testid="user-dropdown-btn"]');
     I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
-    I.click('[data-testid="login-link"]');
+    I.see('Guest Mode');
+
+    // Login with same user — force click since Bootstrap dropdown can intercept
+    I.click('[data-testid="user-dropdown-btn"]');
+    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.click('[data-testid="login-link"]', null, { force: true });
 
     I.fillField('[data-testid="login-email"]', testUser.email);
     I.fillField('[data-testid="login-password"]', testUser.password);
@@ -65,13 +68,14 @@ Scenario('Complete registration and login flow', async ({ I }) => {
 
     // Wait for login to complete
     I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
-    I.wait(2);
+    I.wait(1);
 
-    // Verify logged in indicator
-    I.seeElement('[data-testid="logged-in-indicator"]');
-
-    // Final logout
+    // Verify logged in — open dropdown and check for user name
     I.click('[data-testid="user-dropdown-btn"]');
     I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.see('Logged in as');
+    I.see(testUser.name);
+
+    // Logout
     I.click('[data-testid="logout-link"]');
 });

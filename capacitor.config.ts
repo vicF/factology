@@ -7,8 +7,8 @@ const config: CapacitorConfig = {
     server: {
         androidScheme: 'http',
         "cleartext": true,
-        // For live reload: uncomment and run `npm run dev:capacitor`
-        url: 'http://localhost:5174',
+        // For live reload during development, uncomment the line below and run `npm run dev:capacitor`
+        // url: 'http://localhost:5174',
     },
 };
 

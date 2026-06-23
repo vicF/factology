@@ -170,18 +170,6 @@ class CreateAllTablesForPostgres extends Migration
             DB::statement('ALTER TABLE links RENAME COLUMN thing_id TO one_thing_id');
         }
 
-        // === links_access ===
-        if (!Schema::hasTable('links_access')) {
-            Schema::create('links_access', function (Blueprint $table) {
-                $table->bigIncrements('link_id');
-                $table->uuid('group_id');
-                $table->boolean('read');
-                $table->boolean('write');
-                $table->foreign('group_id', 'links_access_group_id_foreign')->references('thing_id')->on('things')->onDelete('cascade');
-                $table->foreign('link_id', 'links_access_link_id_foreign')->references('link_id')->on('links')->onDelete('cascade');
-            });
-        }
-
         // === favorites ===
         if (!Schema::hasTable('favorites')) {
             Schema::create('favorites', function (Blueprint $table) {
@@ -205,20 +193,7 @@ class CreateAllTablesForPostgres extends Migration
             });
         }
 
-        // === things_access ===
-        if (!Schema::hasTable('things_access')) {
-            Schema::create('things_access', function (Blueprint $table) {
-                $table->uuid('accessed_thing_id');
-                $table->uuid('group_id');
-                $table->boolean('read');
-                $table->boolean('write');
-                $table->primary('accessed_thing_id');
-                $table->foreign('group_id', 'things_access_group_id_foreign')->references('thing_id')->on('things')->onDelete('cascade');
-                $table->foreign('accessed_thing_id', 'things_access_thing_id_foreign')->references('thing_id')->on('things')->onDelete('cascade');
-            });
-        }
-
-        // === migrations (skip if already created by Laravel's migration system) ===
+	        // === migrations (skip if already created by Laravel's migration system) ===
         if (!Schema::hasTable('migrations')) {
             Schema::create('migrations', function (Blueprint $table) {
                 $table->increments('id');
@@ -387,10 +362,8 @@ class CreateAllTablesForPostgres extends Migration
         Schema::dropIfExists('personal_access_tokens');
         Schema::dropIfExists('password_resets');
         Schema::dropIfExists('failed_jobs');
-        Schema::dropIfExists('things_access');
         Schema::dropIfExists('history');
         Schema::dropIfExists('favorites');
-        Schema::dropIfExists('links_access');
         Schema::dropIfExists('links');
         Schema::dropIfExists('external_links');
         Schema::dropIfExists('users');

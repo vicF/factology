@@ -236,7 +236,7 @@ const formData = ref({
     description: isEditMode.value ? props.object.description || '' : '',
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
-    public: isEditMode.value ? (props.object.public === 1 ? 1 : 0) : 0,
+    public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
 });
 
@@ -610,7 +610,7 @@ watch(() => props.object, (newObject, oldObject) => {
         description: newObject.description || '',
         start: newObject.start || '',
         end: newObject.end || '',
-        public: newObject.public === 1 ? 1 : 0,
+        public: newObject.public ? 1 : 0,
         type: props.params.type || 3,
     };
     initializeData();

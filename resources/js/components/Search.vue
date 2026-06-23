@@ -29,7 +29,7 @@
                                             <Image
                                                 :node-id="thing.thing_id"
                                                 :type="thing.type"
-                                                :is-private="thing.public === 0"
+                                                :is-private="!thing.public"
                                                 width="48px"
                                                 side-bar="right"
                                             />
@@ -146,7 +146,8 @@ if (props.typeClass !== undefined && props.typeClass !== null) {
 }
 
 const getOtherThingId = (link, currentThingId) => {
-    return link.thing_id === currentThingId ? link.other_thing_id : link.thing_id;
+    const thingId = link.thing_id || link.one_thing_id;
+    return thingId === currentThingId ? link.other_thing_id : thingId;
 };
 
 const truncateText = (text, maxLength) => {
