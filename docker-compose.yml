@@ -40,13 +40,17 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Init script creates the app user with limited permissions
+      - ./db/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
     environment:
       POSTGRES_DB: factology
-      POSTGRES_USER: dbuser
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # Superuser 'postgres' password (stored in .env as DB_ROOT_PASSWORD)
+      POSTGRES_PASSWORD: ${DB_ROOT_PASSWORD}
+      # Passed to init script for creating the restricted app user
+      DB_PASSWORD: ${DB_PASSWORD}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dbuser -d factology"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d factology"]
       interval: 10s
       timeout: 5s
       retries: 5

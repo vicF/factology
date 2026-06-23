@@ -52,14 +52,15 @@ fi
 cd "$INSTALL_DIR"
 ok "Code ready at $INSTALL_DIR"
 
+# ── Helper: generate a random 24-char alphanumeric password ──────────────────
+gen_pass() {
+  tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 \
+    || openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 24 \
+    || date +%s | md5sum | head -c 24
+}
+
 # ── .env ──────────────────────────────────────────────────────────────────────
 step "Setting up environment"
-
-# Gather current DB_PASSWORD if .env already exists
-CURRENT_DB_PASSWORD=""
-if [[ -f .env ]]; then
-  CURRENT_DB_PASSWORD=$(grep -oP '^DB_PASSWORD=\K.*' .env 2>/dev/null || true)
-fi
 
 if [[ ! -f .env ]]; then
   if [[ -f .env.example ]]; then
@@ -77,16 +78,17 @@ sed -i 's|^DB_HOST=.*|DB_HOST=postgres|' .env
 sed -i 's|^DB_PORT=.*|DB_PORT=5432|' .env
 sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|' .env
 
-# Auto-generate DB_PASSWORD if it's the default or missing
-if [[ -z "$CURRENT_DB_PASSWORD" || "$CURRENT_DB_PASSWORD" == "secret" ]]; then
-  NEW_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 24 || date +%s | md5sum | head -c 24)
-  sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${NEW_PASS}|" .env
-  ok "DB_PASSWORD auto-generated"
-else
-  ok "Using existing DB_PASSWORD"
-fi
-
-ok ".env configured"
+# Auto-generate secrets that are still the defaults
+for VAR in DB_PASSWORD DB_ROOT_PASSWORD; do
+  CURRENT=$(grep -oP "^${VAR}=\K.*" .env 2>/dev/null || true)
+  if [[ -z "$CURRENT" || "$CURRENT" == "secret" ]]; then
+    NEW=$(gen_pass)
+    sed -i "s|^${VAR}=.*|${VAR}=${NEW}|" .env
+    ok "${VAR} auto-generated"
+  else
+    ok "Using existing ${VAR}"
+  fi
+done
 
 # ── Launch ─────────────────────────────────────────────────────────────────────
 step "Starting containers (first build takes a few minutes)"
