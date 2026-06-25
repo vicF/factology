@@ -45,6 +45,7 @@ COPY config    ./config
 COPY database  ./database
 COPY lang      ./lang
 COPY public    ./public
+RUN rm -f public/hot
 COPY resources ./resources
 COPY routes    ./routes
 COPY vite.config.js ./
