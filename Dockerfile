@@ -52,8 +52,9 @@ COPY vite.config.js ./
 # 6. Pre-built frontend from Node stage
 COPY --from=node-builder /build/public/build ./public/build
 
-# 7. Optimize + storage link + permissions
-RUN php artisan storage:link \
+# 7. Ensure cache/storage dirs exist, then optimize + permissions
+RUN mkdir -p bootstrap/cache storage/app/public storage/framework/cache storage/framework/views storage/logs \
+  && php artisan storage:link \
   && php artisan package:discover --ansi \
   && chown -R www-data:www-data storage bootstrap/cache public/build
 
