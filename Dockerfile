@@ -22,7 +22,7 @@ WORKDIR /var/www/html
 
 # 1. System packages + PHP extensions
 RUN apt-get update -qq && apt-get install -y -qq \
-    libpq-dev libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libonig-dev unzip curl \
+    libpq-dev libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libicu-dev unzip curl \
   && docker-php-ext-configure gd --with-jpeg --with-freetype \
   && docker-php-ext-install -j$(nproc) pdo_pgsql pdo_mysql gd zip bcmath intl mbstring \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
