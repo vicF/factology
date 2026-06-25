@@ -35,7 +35,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # 4. PHP dependencies (layer caching: package files change less often than code)
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
 # 5. Application code
 COPY artisan .env.example ./
@@ -52,8 +52,9 @@ COPY vite.config.js ./
 # 6. Pre-built frontend from Node stage
 COPY --from=node-builder /build/public/build ./public/build
 
-# 7. Storage link + permissions
+# 7. Optimize + storage link + permissions
 RUN php artisan storage:link \
+  && php artisan package:discover --ansi \
   && chown -R www-data:www-data storage bootstrap/cache public/build
 
 # 8. Document root → public/
