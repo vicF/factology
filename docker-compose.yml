@@ -11,8 +11,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
