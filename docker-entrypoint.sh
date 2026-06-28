@@ -36,11 +36,21 @@ php artisan db:seed --force --class=DatabaseSeeder 2>/dev/null || true
 # Create admin user if ADMIN_EMAIL is set (safe to re-run — command skips if users exist)
 if [ -n "$ADMIN_EMAIL" ]; then
     echo "==> Creating admin user: $ADMIN_EMAIL"
-    php artisan factology:install-admin \
-        --email="$ADMIN_EMAIL" \
-        --name="${ADMIN_NAME:-Admin}" \
-        --password="${ADMIN_PASSWORD:-admin}" \
-        --no-interaction
+
+    # If ADMIN_PASSWORD is not set, let the command auto-generate one
+    if [ -n "$ADMIN_PASSWORD" ]; then
+        php artisan factology:install-admin \
+            --email="$ADMIN_EMAIL" \
+            --name="${ADMIN_NAME:-Admin}" \
+            --password="$ADMIN_PASSWORD" \
+            --no-interaction
+    else
+        php artisan factology:install-admin \
+            --email="$ADMIN_EMAIL" \
+            --name="${ADMIN_NAME:-Admin}" \
+            --password=auto \
+            --no-interaction
+    fi
 fi
 
 # Production cache
