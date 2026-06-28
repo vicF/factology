@@ -33,21 +33,21 @@ done
 
 # ── Confirmation ────────────────────────────────────────────────────────────
 echo ""
-echo -e "${COLOR_RED}${COLOR_BOLD}  ╔══════════════════════════════════════════════════╗${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║   FACTOLOGY UNINSTALL                            ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This will:                                     ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Stop and remove containers                  ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Delete all data volumes (database, storage) ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Delete the project directory                ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • ${COLOR_RESET}Docker Engine is NOT removed (see instructions) ${COLOR_RED}║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This cannot be undone.                        ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ╚══════════════════════════════════════════════════╝${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ╔══════════════════════════════════════════════════════════╗${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║                  FACTOLOGY UNINSTALL                     ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                          ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This will:                                              ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Stop and remove containers                          ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Delete all data volumes (database, storage)         ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Delete the project directory                        ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • ${COLOR_RESET}Docker Engine is NOT removed (see instructions)${COLOR_RED}  ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                          ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This cannot be undone.                                  ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ╚══════════════════════════════════════════════════════════╝${COLOR_RESET}"
 echo ""
 
 if ! $FORCE; then
-  echo -n "  Type ${COLOR_RED}REMOVE${COLOR_RESET} to continue: "
+  echo -n -e "  Type ${COLOR_RED}REMOVE${COLOR_RESET} to continue: "
   read -r CONFIRM
   if [[ "$CONFIRM" != "REMOVE" ]]; then
     echo ""
