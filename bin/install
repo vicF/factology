@@ -103,7 +103,7 @@ echo "  Factology needs an admin account to get started."
 echo "  You can create one now or skip and use the command later."
 echo ""
 echo -n "  Admin email [admin@factology.local] (or 's' to skip): "
-read -r INPUT
+read -r INPUT </dev/tty || INPUT="admin@factology.local"
 INPUT="${INPUT:-admin@factology.local}"
 
 if [[ "$INPUT" == "s" || "$INPUT" == "S" || "$INPUT" == "skip" ]]; then
@@ -113,7 +113,7 @@ if [[ "$INPUT" == "s" || "$INPUT" == "S" || "$INPUT" == "skip" ]]; then
 else
   ADMIN_EMAIL="$INPUT"
   echo -n "  Admin name [Admin]: "
-  read -r ADMIN_NAME
+  read -r ADMIN_NAME </dev/tty || ADMIN_NAME="Admin"
   ADMIN_NAME="${ADMIN_NAME:-Admin}"
   ADMIN_PASSWORD=$(gen_pass)
   ok "Password auto-generated"
