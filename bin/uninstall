@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# ================================================================
+#  Factology — uninstall
+#  Removes everything the install script set up:
+#    - Docker containers, volumes, and images
+#    - The cloned project directory
+#    - Optionally: Docker Engine itself (instructions only)
+#
+#  Usage:
+#    cd ~/factology && ./bin/uninstall
+#    # Skip confirmation prompts:
+#    cd ~/factology && ./bin/uninstall --force
+# ================================================================
+set -euo pipefail
+
+COLOR_RESET='\033[0m'; COLOR_GREEN='\033[0;32m'; COLOR_YELLOW='\033[1;33m'; COLOR_RED='\033[0;31m'; COLOR_CYAN='\033[0;36m'; COLOR_BOLD='\033[1m'
+step() { echo -e "\n${COLOR_CYAN}==>${COLOR_RESET} ${COLOR_BOLD}$1${COLOR_RESET}"; }
+ok()   { echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $1"; }
+warn() { echo -e "  ${COLOR_YELLOW}⚠${COLOR_RESET} $1"; }
+fail() { echo -e "  ${COLOR_RED}✗${COLOR_RESET} $1"; }
+
+# ── Locate the project root ─────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Parse flags ─────────────────────────────────────────────────────────────
+FORCE=false
+for arg in "$@"; do
+  case "$arg" in
+    --force|-f) FORCE=true ;;
+  esac
+done
+
+# ── Confirmation ────────────────────────────────────────────────────────────
+echo ""
+echo -e "${COLOR_RED}${COLOR_BOLD}  ╔══════════════════════════════════════════════════╗${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║   FACTOLOGY UNINSTALL                            ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This will:                                     ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Stop and remove containers                  ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Delete all data volumes (database, storage) ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • Delete the project directory                ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║   • ${COLOR_RESET}Docker Engine is NOT removed (see instructions) ${COLOR_RED}║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This cannot be undone.                        ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ╚══════════════════════════════════════════════════╝${COLOR_RESET}"
+echo ""
+
+if ! $FORCE; then
+  echo -n "  Type ${COLOR_RED}REMOVE${COLOR_RESET} to continue: "
+  read -r CONFIRM
+  if [[ "$CONFIRM" != "REMOVE" ]]; then
+    echo ""
+    warn "Uninstall cancelled."
+    exit 0
+  fi
+fi
+
+# ── Step 1: Tear down Docker containers and volumes ─────────────────────────
+step "Stopping containers and removing volumes"
+
+DOCKER_CMD="docker"
+# Try passwordless first, fall back to sudo
+if ! docker compose version &>/dev/null && sudo docker compose version &>/dev/null; then
+  DOCKER_CMD="sudo docker"
+fi
+
+cd "$PROJECT_DIR"
+
+if $DOCKER_CMD compose ps &>/dev/null; then
+  $DOCKER_CMD compose down -v --remove-orphans
+  ok "Containers stopped, volumes deleted"
+else
+  warn "No running Factology containers found"
+fi
+
+# ── Step 2: Remove Docker images ────────────────────────────────────────────
+step "Removing Docker images"
+
+IMAGES=$($DOCKER_CMD images --filter "label=com.docker.compose.project=factology" -q 2>/dev/null || true)
+if [[ -z "$IMAGES" ]]; then
+  # Fallback: try removing by known name
+  IMAGES=$($DOCKER_CMD images factology -q 2>/dev/null || true)
+fi
+if [[ -n "$IMAGES" ]]; then
+  # shellcheck disable=SC2086
+  $DOCKER_CMD rmi $IMAGES 2>/dev/null || true
+  ok "Image(s) removed"
+else
+  warn "No Factology images found to remove"
+fi
+
+# ── Step 3: Delete project directory ────────────────────────────────────────
+step "Removing project directory"
+
+if [[ -d "$PROJECT_DIR" ]]; then
+  cd /
+  rm -rf "$PROJECT_DIR"
+  ok "Deleted $PROJECT_DIR"
+else
+  warn "Project directory not found at $PROJECT_DIR"
+fi
+
+# ── Step 4: Docker uninstall instructions ───────────────────────────────────
+step "Docker uninstall instructions"
+
+echo ""
+echo "  Docker Engine was NOT removed. To uninstall it:"
+echo ""
+if command -v apt &>/dev/null; then
+  echo "    sudo apt remove docker-ce docker-ce-cli containerd.io \\"
+  echo "      docker-buildx-plugin docker-compose-plugin"
+  echo "    sudo rm -rf /var/lib/docker"
+elif command -v yum &>/dev/null; then
+  echo "    sudo yum remove docker-ce docker-ce-cli containerd.io \\"
+  echo "      docker-buildx-plugin docker-compose-plugin"
+  echo "    sudo rm -rf /var/lib/docker"
+elif command -v dnf &>/dev/null; then
+  echo "    sudo dnf remove docker-ce docker-ce-cli containerd.io \\"
+  echo "      docker-buildx-plugin docker-compose-plugin"
+  echo "    sudo rm -rf /var/lib/docker"
+elif command -v zypper &>/dev/null; then
+  echo "    sudo zypper remove docker-ce docker-ce-cli containerd.io \\"
+  echo "      docker-buildx-plugin docker-compose-plugin"
+  echo "    sudo rm -rf /var/lib/docker"
+else
+  echo "    See: https://docs.docker.com/engine/install/#uninstall"
+fi
+echo ""
+echo "  To also remove the docker group (needs log out/in):"
+echo "    sudo groupdel docker"
+echo ""
+
+# ── Done ────────────────────────────────────────────────────────────────────
+echo -e "${COLOR_GREEN}${COLOR_BOLD}  Factology has been removed.${COLOR_RESET}"
+echo ""

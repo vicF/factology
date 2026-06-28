@@ -148,4 +148,6 @@ echo "    Update:  cd $INSTALL_DIR && git pull && ${DOCKER_CMD} compose up -d --
 echo "    Reset admin password:"
 echo "             cd $INSTALL_DIR && ${DOCKER_CMD} compose exec factology-app php artisan factology:reset-admin-password"
 echo "    Logs:    ${DOCKER_CMD} compose logs -f"
+echo "    Uninstall:"
+echo "             cd $INSTALL_DIR && ./bin/uninstall"
 echo ""

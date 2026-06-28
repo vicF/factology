@@ -1,13 +1,17 @@
 # Factology Multi-Platform Development Plan
 
+> Design decisions finalized in `PLANS/classes-sync-rules-plan.md`.
+> This document focuses on the technical implementation roadmap.
+
 ## Overview
 Upgrade the Factology application to support:
 - **Local mobile**: Android, iOS (via Capacitor — already configured)
 - **Desktop**: Windows, Linux (via Electron — already configured)
 - **Web SPA**: Using the same API as standalone apps
 - **Offline-first**: Full offline capability with local storage
-- **UUID-based sync**: Merge/sync between local storage and multiple server APIs
-- **Permissions**: Private, public, group-visible, server-saved records
+- **UUID-based sync**: Diff tracking between local storage and multiple server APIs
+- **Permissions**: Private, group, public visibility levels
+- **Difference tracking**: Divergent info allowed, users choose to adopt/ignore/suggest
 
 ---
 
@@ -69,22 +73,23 @@ POST /api/v1/sync/resolve
 ### 2.2 Server-Side Sync Logic
 - Create `app/Services/SyncService.php`:
   - `pull()` — query records updated since timestamp, return changes
-  - `push()` — accept client changes, detect conflicts (where server updated since client's last sync), return conflicts
-  - `resolveConflict()` — apply resolution
+  - `push()` — accept client changes, flag differences (not conflicts)
+  - See `PLANS/classes-sync-rules-plan.md` §11 for the difference tracking model
 - Add `record_updated` and `sync_version` columns to `things`/`links` tables (if not present — `things.record_updated` already exists)
 - Create `app/Http/Controllers/SyncController.php`
 
 ### 2.3 Client-Side Sync Engine
 - `resources/js/sync/SyncEngine.js`:
-  - `sync()` — pull→merge→push pipeline
+  - `sync()` — pull→diff→push pipeline
   - `pullFromServer()` — fetch server changes since last sync
-  - `pushToServer()` — send pending local changes, handle conflicts
-  - `mergeServerChanges()` — apply server changes to local DB
-  - `resolveConflicts()` — apply conflict resolution strategies
-- `resources/js/sync/ConflictResolver.js`:
-  - Last-write-wins (default, using `_serverRevision` vs `_localRevision`)
-  - Manual merge (flag for user review)
-  - Field-level merge strategies
+  - `pushToServer()` — send pending local changes
+  - `compareWithLocal()` — compare pulled objects with local copies
+  - `trackDifferences()` — store field-level diffs between `same_as`-linked objects
+- `resources/js/sync/DiffTracker.js`:
+  - `compareObjects(local, remote)` — returns list of differing fields
+  - `adoptChange(objectUuid, field, value)` — user decided to adopt remote value
+  - `ignoreDiff(objectUuid, field)` — dismiss this hint
+  - No auto-resolution. All merges are user-initiated.
 
 ### 2.4 Background Sync
 - Register periodic sync when online (every 30s default, configurable)
