@@ -304,35 +304,64 @@ Objects track sync state **per server** through the combination of:
 
 ## Implementation Order (Recommended)
 
-1. **Phase 1** (Local Storage) + **Phase 2.3** (Client Sync) — get offline working end-to-end first
-2. **Phase 2.1-2.2** (Server Sync API) — connect to backend
-3. **Phase 3** (Permissions) — add access control
-4. **Phase 4** (Multi-Platform) — polish platform-specific features
-5. **Phase 5** (Media Sync) — handle photos/files
-6. **Phase 6** (Testing) — continuously alongside each phase, not just at the end
+> Full design rationale in `PLANS/classes-sync-rules-plan.md`.
+> Current phase: **Phase 0** — admin setup + base classes (implemented).
+
+0. **Phase 0** — Admin + Base Classes (✅ done)
+   - `is_admin` migration, `InstallAdmin` command, `ResetAdminPassword` command
+   - Base class tree seeded (Events, People, Places, Media, Organizations)
+   - Provenance link types seeded (created_by, created_on, same_as, derived_from, ...)
+   - Docker entrypoint integrates seeding + admin creation
+   - `bin/install` script with interactive admin setup
+
+1. **Phase 1** (User/Person split) — get identity model right first
+   - `person_id` on users table
+   - `UserClass` creates User (per-server) + Person (server-scoped UUID)
+   - Ownership checks use `person_id`
+   - Owner default no longer hardcoded to UUID::VICTOR_FOKIN
+
+2. **Phase 1b** (created_by / created_on links)
+   - Set `created_by` (→ User) and `created_on` (→ Server) links when creating objects
+   - Server/app UUID generation during first setup
+
+3. **Phase 2** (Local Storage) + **Phase 2b** (Sync Engine)
+   - Dexie.js IndexedDB schema matching the `things`/`links` tables
+   - DiffTracker with field-level comparison
+   - Sync engine that pulls, diffs, and flags changes
+   - `same_as` link support in UI
+
+4. **Phase 3** (Permissions) — add access control
+   - Visibility enum (private/group/public) replacing `public` boolean
+   - Group management UI
+   - Policy files
+
+5. **Phase 4** (Multi-Platform) — polish platform-specific features
+6. **Phase 5** (Media Sync) — handle photos/files
+7. **Phase 6** (Testing) — continuously alongside each phase
 
 ---
 
 ## Key Design Decisions
 
+> Complete design decisions in `PLANS/classes-sync-rules-plan.md` §15.
+> Below are the technical implications relevant to implementation.
+
 1. **UUID everywhere**: The system already uses UUIDs for all records (things, links, media). This is correct for distributed sync — no ID conflicts across servers/clients.
 
 2. **Everything is a "thing"**: Users, groups, servers, link types, class types — all are things in the `things` table. This unified entity model means permissions, sync, and relationships all work the same way for every object in the system.
 
-3. **Field-level diffing**: Edits track which fields changed (name, description, data JSON, etc.). Merge can apply non-conflicting field changes automatically. Conflicting fields (both users changed the same field) require manual resolution.
+3. **Field-level diffing** (not conflict resolution): Edits track which fields changed. When syncing, differing fields are flagged for user review rather than auto-merged. Users can adopt, ignore, or suggest corrections.
 
-4. **Other-user edits** (undecided — two approaches):  
-   - **A) Manual merge**: Owner reviews pending edits and accepts/rejects.  
-   - **B) Copy-on-edit**: Edits by non-owners create a new linked thing (fork). Owner can merge the fork's data later.
+4. **Other-user edits**: Users can suggest changes via the suggestion protocol (`suggests_change` link). Owner reviews and accepts/declines. No automatic forking.
 
 5. **Local-first, not remote-first**: The local database is the source of truth. Server API is a sync target. This enables full offline use.
 
-6. **Visibility = sync behavior**: The `visibility` field controls what syncs where. Private records never leave the device. Server records go to a specific server. Public records sync everywhere. Group records sync to servers where the group exists.
+6. **Visibility = sync behavior**: The `visibility` field controls what syncs where. Private records never leave the device. Server records go to a specific server. Public records sync everywhere.
 
-7. **Servers hold subsets**: Each record belongs to a specific server (or is local-only). Different servers can hold different subsets of data. Public records can be synced to multiple servers.
+7. **Servers hold subsets**: Each record belongs to a specific server (or is local-only). Different servers can hold different subsets of data.
 
-8. **`stored_on` link = multi-server tracking**: Instead of a `_serverId` field (limited to one server), objects use `stored_on` links to track which servers hold them. This is the universal pattern — everything is a thing, relationships are links. Adding a new server requires no schema changes, just a new link.
+8. **`stored_on` link = multi-server tracking**: Instead of a `_serverId` field (limited to one server), objects use `stored_on` links to track which servers hold them. Adding a new server requires no schema changes, just a new link.
 
-9. **Search merges, doesn't union**: When searching across sources, the data layer queries local DB and all reachable servers in parallel, then merges by UUID. Local data fills the UI instantly; server results augment it as they arrive. No duplicates in results — UUID deduplication is implicit.
+9. **Search merges, doesn't union**: When searching across sources, the data layer queries local DB and all reachable servers in parallel, then merges by UUID. No duplicates in results — UUID deduplication is implicit.
 
-10. **Write-local, sync-async**: All writes go to IndexedDB first (sub-millisecond, offline-safe). Sync is a background concern — the user never waits for a network round-trip to see their data saved.
+10. **Write-local, sync-async**: All writes go to IndexedDB first (sub-millisecond, offline-safe). Sync is a background concern.
