@@ -40,7 +40,7 @@ echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This will:                             
 echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Stop and remove containers                          ║${COLOR_RESET}"
 echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Delete all data volumes (database, storage)         ║${COLOR_RESET}"
 echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • Delete the project directory                        ║${COLOR_RESET}"
-echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • ${COLOR_RESET}Docker Engine is NOT removed (see instructions)${COLOR_RED}  ║${COLOR_RESET}"
+echo -e "${COLOR_RED}${COLOR_BOLD}  ║    • ${COLOR_RESET}Docker Engine is NOT removed (see instructions)${COLOR_RED}       ║${COLOR_RESET}"
 echo -e "${COLOR_RED}${COLOR_BOLD}  ║                                                          ║${COLOR_RESET}"
 echo -e "${COLOR_RED}${COLOR_BOLD}  ║  This cannot be undone.                                  ║${COLOR_RESET}"
 echo -e "${COLOR_RED}${COLOR_BOLD}  ╚══════════════════════════════════════════════════════════╝${COLOR_RESET}"
