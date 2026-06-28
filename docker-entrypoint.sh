@@ -29,6 +29,20 @@ fi
 echo "==> Running database migrations"
 php artisan migrate --force
 
+# Seed base classes and link types (safe to re-run — uses upsert)
+echo "==> Seeding base data"
+php artisan db:seed --force --class=DatabaseSeeder 2>/dev/null || true
+
+# Create admin user if ADMIN_EMAIL is set (safe to re-run — command skips if users exist)
+if [ -n "$ADMIN_EMAIL" ]; then
+    echo "==> Creating admin user: $ADMIN_EMAIL"
+    php artisan factology:install-admin \
+        --email="$ADMIN_EMAIL" \
+        --name="${ADMIN_NAME:-Admin}" \
+        --password="${ADMIN_PASSWORD:-admin}" \
+        --no-interaction
+fi
+
 # Production cache
 echo "==> Caching config, routes, views"
 php artisan config:cache 2>/dev/null || true
