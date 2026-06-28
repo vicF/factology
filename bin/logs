@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ================================================================
+#  Factology — logs
+#  Tail logs from all containers.
+#
+#  Usage:
+#    ./bin/logs              # all containers
+#    ./bin/logs factology    # app only
+#    ./bin/logs postgres     # database only
+# ================================================================
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_DIR"
+
+SERVICE="${1:-}"
+
+if [ -n "$SERVICE" ]; then
+  docker compose logs -f "$SERVICE"
+else
+  docker compose logs -f
+fi

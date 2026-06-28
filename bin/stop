@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# ================================================================
+#  Factology — stop
+#  Stops all containers (data volumes are preserved).
+#
+#  Usage:
+#    ./bin/stop
+# ================================================================
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_DIR"
+
+docker compose down
+
+echo ""
+echo "  Containers stopped. To start again: docker compose up -d"
+echo ""

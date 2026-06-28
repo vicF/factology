@@ -142,12 +142,10 @@ if [ -n "$ADMIN_EMAIL" ]; then
   warn "Save the password now — it will not be shown again."
 fi
 
-echo "  Manage:"
-echo "    Stop:    cd $INSTALL_DIR && ${DOCKER_CMD} compose down"
-echo "    Update:  cd $INSTALL_DIR && git pull && ${DOCKER_CMD} compose up -d --build"
-echo "    Reset admin password:"
-echo "             cd $INSTALL_DIR && ${DOCKER_CMD} compose exec factology-app php artisan factology:reset-admin-password"
-echo "    Logs:    ${DOCKER_CMD} compose logs -f"
-echo "    Uninstall:"
-echo "             cd $INSTALL_DIR && ./bin/uninstall"
+echo "  Manage scripts:"
+echo "    Stop:    ./bin/stop"
+echo "    Logs:    ./bin/logs [service]"
+echo "    Update:  ./bin/update"
+echo "    Reset admin password:  ./bin/reset-admin-password.sh [email]"
+echo "    Uninstall:  ./bin/uninstall"
 echo ""
