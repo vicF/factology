@@ -55,9 +55,13 @@ ok "Code ready at $INSTALL_DIR"
 
 # ── Helper: generate a random 24-char alphanumeric password ──────────────────
 gen_pass() {
-  tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 \
-    || openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 24 \
-    || date +%s | md5sum | head -c 24
+  # Each option in its own subshell — if one fails, its partial output is discarded
+  local pw
+  pw=$(openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 24)
+  if [ "${#pw}" -eq 24 ]; then echo "$pw"; return; fi
+  pw=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24)
+  if [ "${#pw}" -eq 24 ]; then echo "$pw"; return; fi
+  date +%s | md5sum | head -c 24
 }
 
 # ── .env ──────────────────────────────────────────────────────────────────────
