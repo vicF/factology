@@ -59,6 +59,11 @@ php artisan config:cache 2>/dev/null || true
 php artisan route:cache  2>/dev/null || true
 php artisan view:cache   2>/dev/null || true
 
+# Ensure storage is writable by the Apache user (entrypoint runs as root,
+# but Apache runs as www-data). Without this, Laravel logging fails silently
+# and returns HTTP 500 with no log entries.
+chown -R www-data:www-data storage bootstrap/cache
+
 echo "==> Ready"
 
 exec "$@"
