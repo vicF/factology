@@ -68,22 +68,6 @@ class UUID
     public const GROUP_READ_ACCESS = 'ea206516-9e45-482f-89be-05313f52e5e3';
     public const BELONGS_TO_USER_GROUP = 'e18d73eb-a5d3-47be-a785-106f6f185651';
 
-    // ── Link types for provenance & identity ─────────────────────────
-    public const CREATED_BY      = 'a1000001-0000-4000-8000-000000000001';
-    public const CREATED_ON      = 'a1000001-0000-4000-8000-000000000002';
-    public const SAME_AS         = 'a1000001-0000-4000-8000-000000000003';
-    public const DERIVED_FROM    = 'a1000001-0000-4000-8000-000000000004';
-    public const SUPERSEDED_BY   = 'a1000001-0000-4000-8000-000000000005';
-    public const SUGGESTS_CHANGE = 'a1000001-0000-4000-8000-000000000006';
-
-    // ── System class UUIDs (seeded, owned by SYSTEM) ─────────────────
-    public const EVENTS         = 'a2000001-0000-4000-8000-000000000001';
-    public const PEOPLE         = 'a2000001-0000-4000-8000-000000000002';
-    public const PLACES         = 'a2000001-0000-4000-8000-000000000003';
-    public const MEDIA          = 'a2000001-0000-4000-8000-000000000004';
-    public const ORGANIZATIONS  = 'a2000001-0000-4000-8000-000000000005';
-    public const SYSTEM_CLASS   = 'a2000001-0000-4000-8000-000000000006';
-
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,
