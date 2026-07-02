@@ -198,6 +198,8 @@ class DatabaseSeeder extends Seeder
             ['thing_id' => 'd6320bf5-ca8b-4e50-ad5c-873216d9fcf0', 'name' => 'Yacht',                    'description' => 'Яхта',                                                                                                                               'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => 'dbb3866e-e5a8-4186-b6e3-a273a42b1809', 'name' => 'Flat',                 'description' => 'Квартира, офис',                                                                                                                       'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '1fdf78e0-aa61-4e52-bbed-4ce157da78ab', 'name' => 'Sports section',         'description' => '',                                                                                                                                   'type' => UUID::G_CLASS, 'public' => true],
+
+            // Instances referenced by class hierarchy links below
         ];
 
         foreach ($classes as $class) {
@@ -222,7 +224,6 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => '11544624-be5c-4cdc-8fe1-701c09391464', 'other_thing_id' => '4e605e49-3bbc-4bae-83fd-f1e7d7c76a77', 'translation' => 'Car is subclass of Vehicle'],
             ['one_thing_id' => '11544624-be5c-4cdc-8fe1-701c09391464', 'other_thing_id' => 'db91a470-2590-4f33-92bd-3e3dd33f5353', 'translation' => 'This is child of Vehicle'],
             // Car → subclasses
-            ['one_thing_id' => '4e605e49-3bbc-4bae-83fd-f1e7d7c76a77', 'other_thing_id' => '5a0f67ea-a290-4ef6-9ac5-0e85d967c4f9', 'translation' => 'Opel Zafira B is a child of Car'],
             // Computer Data → subclasses
             ['one_thing_id' => '4e3b5c5f-f347-42d9-9e93-3093b420d2f5', 'other_thing_id' => '4f76b1b0-9de4-4c60-8e52-53fa429faabe', 'translation' => 'Folder is subclass of Computer Data'],
             ['one_thing_id' => '4e3b5c5f-f347-42d9-9e93-3093b420d2f5', 'other_thing_id' => '5a626fa7-b69f-4042-9556-374f10df0a2c', 'translation' => 'File is subclass of Computer Data'],
@@ -249,7 +250,6 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => 'c0e229b8-6e56-45ee-b454-71e557cdb191', 'other_thing_id' => '2067c7bf-0f6f-491d-af2b-10105db4e8cc', 'translation' => 'This is child of Group'],
             ['one_thing_id' => 'c0e229b8-6e56-45ee-b454-71e557cdb191', 'other_thing_id' => 'caf05706-c73d-43e9-a496-6069f9aefc99', 'translation' => 'Music band is of class Group'],
             // List → subclasses
-            ['one_thing_id' => '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', 'other_thing_id' => '8ac2606d-d008-4588-8b9a-09a79ee5f44a', 'translation' => 'Music Performance Set list is a child of List'],
             // Live Being → subclasses
             ['one_thing_id' => '71e49073-503f-4faa-932d-68ab89662420', 'other_thing_id' => '4c8ee41a-9912-4dff-8b44-7779a66e4fcf', 'translation' => 'Human is subclass of Live Being'],
             // Character → subclasses
@@ -270,13 +270,8 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => '7bdf2d4a-5329-4603-9562-b5c656d45306', 'other_thing_id' => 'd6320bf5-ca8b-4e50-ad5c-873216d9fcf0', 'translation' => 'Yacht is a child of Vessel'],
             // Music equipment → subclasses
             ['one_thing_id' => '52e2b5ce-562b-46eb-98b7-48703ed62a7e', 'other_thing_id' => '934efd3c-9781-4f2a-bd51-716a75cf5874', 'translation' => 'This is child of Music Equipment'],
-            ['one_thing_id' => '52e2b5ce-562b-46eb-98b7-48703ed62a7e', 'other_thing_id' => 'dbd6eec5-9df1-473b-bf65-42e68f4e5d7b', 'translation' => 'This is child of Music equipment'],
             // Music Instrument → subclasses
             ['one_thing_id' => '934efd3c-9781-4f2a-bd51-716a75cf5874', 'other_thing_id' => '90d97b01-ee65-4be5-ae27-fb9bec2aeedf', 'translation' => 'This is child of Music Instrument'],
-            // Guitar → subclasses
-            ['one_thing_id' => '90d97b01-ee65-4be5-ae27-fb9bec2aeedf', 'other_thing_id' => '81aa3a58-1a61-4a83-9046-6f5ec836a347', 'translation' => 'Это гитара'],
-            // Guitar processor → subclasses
-            ['one_thing_id' => 'dbd6eec5-9df1-473b-bf65-42e68f4e5d7b', 'other_thing_id' => 'cf74b151-7161-4f80-b4e5-41b2de69c6ca', 'translation' => 'This is child of Guitar processor'],
             // Place → subclasses
             ['one_thing_id' => 'dc006cda-047a-4862-acf7-e215355b6890', 'other_thing_id' => '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee', 'translation' => 'This is child of Place'],
             ['one_thing_id' => 'dc006cda-047a-4862-acf7-e215355b6890', 'other_thing_id' => '20f6b1ae-86de-4221-bf0c-995be2687405', 'translation' => 'This is child of Place'],
