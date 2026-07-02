@@ -14,6 +14,7 @@ jobs:
       postgres:
         image: postgres:16
         env:
+          POSTGRES_USER: root
           POSTGRES_PASSWORD: securerootpassword
           POSTGRES_DB: factology_tmp_test
         ports:
