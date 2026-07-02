@@ -16,6 +16,7 @@ if [ ! -f .env ]; then
     sed -i 's|^DB_HOST=.*|DB_HOST=postgres|' .env
     sed -i 's|^DB_PORT=.*|DB_PORT=5432|' .env
     sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|' .env
+    sed -i 's|^SESSION_DRIVER=.*|SESSION_DRIVER=file|' .env
 fi
 
 # Generate APP_KEY if empty or placeholder
