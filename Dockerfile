@@ -27,8 +27,14 @@ RUN apt-get update -qq && apt-get install -y -qq \
   && docker-php-ext-install -j$(nproc) pdo_pgsql pdo_mysql gd zip bcmath intl mbstring \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Apache rewrite
-RUN a2enmod rewrite
+# 2. Apache rewrite + header size (cookie-heavy apps need larger limits)
+RUN a2enmod rewrite \
+  && { \
+       echo ""; \
+       echo "# Allow larger request headers (cookies, auth tokens)"; \
+       echo "LimitRequestFieldSize 16380"; \
+       echo "LimitRequestLine 16380"; \
+     } >> /etc/apache2/apache2.conf
 
 # 3. Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

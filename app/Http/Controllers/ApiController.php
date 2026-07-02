@@ -42,9 +42,10 @@ class ApiController extends BaseController
     public function get($id)
     {
         try {
+            $data = Anything::getDataById($id);
             return response()->json(
                 [
-                    'data'    => Anything::getDataById($id),
+                    'data'    => $data,
                     'success' => true
                 ]);
         } catch (\InvalidArgumentException $e) {

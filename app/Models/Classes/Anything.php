@@ -318,6 +318,13 @@ class Anything
             abort(404, 'Authorization required to access this resource');
         }
 
+        // Convert binary/resource values to strings (e.g. phash bytea from PostgreSQL)
+        foreach ($thing as $key => $value) {
+            if (is_resource($value)) {
+                $thing[$key] = stream_get_contents($value);
+            }
+        }
+
         // Decode JSON data column from PostgreSQL (returns as string via query builder)
         if (isset($thing['data']) && is_string($thing['data'])) {
             $thing['data'] = json_decode($thing['data'], true);
