@@ -311,13 +311,25 @@ class Anything
         }
     }
 
-    public static function  getClassSpecificDataById($id, $class): array
+    public static function getClassSpecificDataById($id, $class): array
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
             abort(404, 'Authorization required to access this resource');
         }
-        $thing['class'] = $class;
+
+        // Decode JSON data column from PostgreSQL (returns as string via query builder)
+        if (isset($thing['data']) && is_string($thing['data'])) {
+            $thing['data'] = json_decode($thing['data'], true);
+        }
+
+        // Clean up class object: extract just relevant info, excluding heavy json from c.data
+        $thing['class'] = $class ? [
+            'thing_id'   => $class->thing_id ?? null,
+            'class_name' => $class->class_name ?? null,
+            'name'       => $class->name ?? null,
+        ] : null;
+
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
@@ -336,7 +348,8 @@ class Anything
         $thing['links'] = $first
             ->union($second)
             ->orderBy('link_start')
-            ->get();
+            ->get()
+            ->toArray();
         return $thing;
     }
 

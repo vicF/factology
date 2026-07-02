@@ -79,7 +79,7 @@ class CreateAllTablesForPostgres extends Migration
                 $table->char('folder_id', 36)->comment('Links to folder containing this path');
                 $table->unsignedInteger('last_seen')->nullable();
                 $table->boolean('file_deleted')->default(false)->comment('This file was physically missing during the last scan');
-                $table->char('file_thing_id', 36)->nullable()->comment('Link to file object');
+                $table->uuid('file_thing_id')->nullable()->comment('Link to file object');
                 $table->unsignedInteger('ctime');
                 $table->unique('file_thing_id', 'photo_files_file_thing_id_unique');
                 $table->unique(['filename', 'path', 'folder_id'], 'photo_files_filename_path_folder_id_unique');

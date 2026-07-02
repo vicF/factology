@@ -41,11 +41,20 @@ class ApiController extends BaseController
      */
     public function get($id)
     {
-        return response()->json(
-            [
-                'data'    => Anything::getDataById($id),
-                'success' => true
-            ]);
+        try {
+            return response()->json(
+                [
+                    'data'    => Anything::getDataById($id),
+                    'success' => true
+                ]);
+        } catch (\InvalidArgumentException $e) {
+            Log::error('JSON encode failed for object ' . $id . ': ' . $e->getMessage());
+            return response()->json(
+                [
+                    'success' => false,
+                    'message' => 'Failed to serialize object data'
+                ], 500);
+        }
     }
 
 
