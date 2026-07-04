@@ -33,8 +33,8 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
 
     async function moveClassTo(className, newParentName) {
         I.say(`Moving ${className} to ${newParentName}`);
-        I.click(className);
-        I.waitForText(className, 20);
+        I.click(`//a[normalize-space()="${className}"]`);
+        I.waitForElement('.object-header', 15);
 
         I.click('[title="Edit this object"]');
         I.waitForElement('.modal', 10);
@@ -53,29 +53,34 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.waitForInvisible('.modal', 10);
         I.waitForInvisible('.modal-backdrop', 10);
 
-        I.click('Something');
+        I.click(`//a[normalize-space()="Something"]`);
         I.wait(1);
     }
 
 // Update the deleteClass function in create_delete_classes_test.js
     async function deleteClass(name) {
         I.say(`Deleting class: ${name}`);
-        I.click(name);
-        I.waitForText(name, 20);
+        I.click(`//a[normalize-space()="${name}"]`);
+        I.waitForElement('.object-header', 15);
 
-        // Try multiple possible selectors for delete button
-        // On the object detail page, the delete button might be a button with text "Delete"
+        // Verify delete button is present (authenticated view)
         I.waitForElement('button:has-text("Delete"), .btn-danger, [title="Delete"], .delete-btn', 15);
-        I.click('button:has-text("Delete")');
 
         I.amAcceptingPopups();
-        I.waitForDetached(`a:has-text("${name}")`, 20);
+        I.click('button:has-text("Delete")');
+        try {
+            I.acceptPopup();
+        } catch (e) {
+            // Popup may already be auto-accepted
+        }
+
+        I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
         I.dontSee(name);
     }
 
     // Wait for main content to load
     I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
-    I.waitForElement('.col-3 a:has-text("Something")', 15);
+    I.waitForElement(`//a[normalize-space()="Something"]`, 15);
 
     // 1. Build initial structure
     await createClass('Something', 'Material Object', 'Physical thing');
@@ -86,14 +91,14 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     // 2. Move Dog under Human being
     await moveClassTo('Dog', 'Human being');
 
-    I.click('Human being');
-    I.waitForElement(`a:has-text("Dog")`, 10);
+    I.click(`//a[normalize-space()="Human being"]`);
+    I.waitForElement(`//a[normalize-space()="Dog"]`, 10);
     I.see('Dog');
 
     // 3. Move Dog under Live being
     await moveClassTo('Dog', 'Live being');
 
-    I.click('Live being');
+    I.click(`//a[normalize-space()="Live being"]`);
     I.see('Dog');
 
     const humanBranch = locate('li').withText('Human being');

@@ -44,9 +44,9 @@ module.exports = function() {
         addChildTo(nodeName) {
             this.moveCursorTo(`a:has-text("${nodeName}")`);
             this.waitForElement('.add-subclass', 10);
-            this.wait(0.5);
+            this.wait(1);
             try {
-                this.click('.add-subclass');
+                this.click('.add-subclass', null, { force: true });
             } catch (e) {
                 console.log('Regular click failed, trying JS click');
                 this.executeScript(() => {
