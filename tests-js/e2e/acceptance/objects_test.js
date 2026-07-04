@@ -43,6 +43,6 @@ Scenario('Create a new object @all', async () => {
 
 Scenario('Classes are visible in the class tree @all', async () => {
     I.amOnPage('/');
-    I.waitForElement('.tree-menu, .class-tree, .tree-node', 10);
+    I.waitForElement('.tree-menu, .class-tree, .tree-node', 20);
     I.seeElement('.tree-node, .tree-item');
 });

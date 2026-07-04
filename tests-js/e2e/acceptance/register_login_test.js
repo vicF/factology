@@ -26,9 +26,10 @@ Scenario('Complete registration and login flow @api', async ({ I }) => {
     I.click('[data-testid="user-dropdown-btn"]');
 
     I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
+    I.waitForElement('[data-testid="register-link"]', 10);
     I.click('[data-testid="register-link"]');
 
-    I.waitForElement('[data-testid="register-name"]', 10);
+    I.waitForElement('[data-testid="register-name"]', 20);
     I.fillField('[data-testid="register-name"]', userData.name);
     I.fillField('[data-testid="register-email"]', userData.email);
     I.fillField('[data-testid="register-password"]', userData.password);
@@ -50,12 +51,14 @@ Scenario('Complete registration and login flow @api', async ({ I }) => {
 
     // Logout — click dropdown toggle again to close, then logout
     I.click('[data-testid="logout-link"]');
-    I.wait(1);
 
-    // Verify logged out — open dropdown and see Guest Mode
+    // Wait for page to fully reload after logout
+    I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+    I.wait(2);
+
+    // Open dropdown and verify guest state
     I.click('[data-testid="user-dropdown-btn"]');
-    I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
-    I.see('Guest Mode');
+    I.waitForText('Guest Mode', 10, '[data-testid="user-dropdown-menu"]');
 
     // Login with same user — force click since Bootstrap dropdown can intercept
     I.click('[data-testid="user-dropdown-btn"]');

@@ -104,10 +104,21 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     const humanBranch = locate('li').withText('Human being');
     I.dontSeeElement(locate('a').withText('Dog').inside(humanBranch));
 
-    // 4. Cleanup hierarchy
+    // 4. Cleanup hierarchy — navigate to root before each delete to avoid stale view
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 15);
     await deleteClass('Dog');
+
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 15);
     await deleteClass('Human being');
+
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 15);
     await deleteClass('Live being');
+
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 15);
     await deleteClass('Material Object');
 
     // 5. Final check
