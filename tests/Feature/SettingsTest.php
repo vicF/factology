@@ -191,7 +191,7 @@ class SettingsTest extends TestCase
         config(['app.public_objects_visibility' => 'everyone']);
 
         $response = $this->postJson(self::API_PREFIX . '/object', [
-            'search' => 'Anything',
+            'search' => 'Everything',
         ]);
 
         $response->assertStatus(200);

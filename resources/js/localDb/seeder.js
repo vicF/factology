@@ -17,8 +17,8 @@ export async function seedLocalDb() {
     const db = getDb();
 
     // Check if already seeded
-    const anything = await db.objects.get(UUID.ANYTHING);
-    if (anything) {
+    const everything = await db.objects.get(UUID.EVERYTHING);
+    if (everything) {
         return; // Already seeded
     }
 
@@ -27,7 +27,7 @@ export async function seedLocalDb() {
     // ── Bootstrap things (mirrors database/seeders/DatabaseSeeder.php) ──
     const bootThings = [
         {
-            thing_id: UUID.ANYTHING,
+            thing_id: UUID.EVERYTHING,
             name: 'Everything',
             description: 'base object for everything',
             type: UUID.G_CLASS,
@@ -131,9 +131,9 @@ export async function seedLocalDb() {
     // ── Bootstrap links (class hierarchy edges) ──
     // Order matters: Something, Link, System as children of Everything
     const bootLinks = [
-        { one: UUID.ANYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Everything"' },
-        { one: UUID.ANYTHING, other: UUID.LINK,           translation: '"Link" is subclass of "Everything"' },
-        { one: UUID.ANYTHING, other: UUID.SYSTEM,         translation: '"System" is subclass of "Everything"' },
+        { one: UUID.EVERYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Everything"' },
+        { one: UUID.EVERYTHING, other: UUID.LINK,           translation: '"Link" is subclass of "Everything"' },
+        { one: UUID.EVERYTHING, other: UUID.SYSTEM,         translation: '"System" is subclass of "Everything"' },
         { one: UUID.LINK,     other: UUID.LINK_TO_PARENT, translation: '"Parent" is subclass of "Link"' },
         { one: UUID.LINK,     other: UUID.LINK_TO_CLASS,  translation: '"Class of" is subclass of "Link"' },
         { one: UUID.SYSTEM,   other: UUID.USER,           translation: '"User" is subclass of "System"' },

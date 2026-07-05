@@ -84,8 +84,9 @@ router.afterEach(() => {
     document.documentElement.style.overflow = 'auto';
 });
 
-// Navigation guard: redirect from /register if registration is disabled
+// Navigation guard: show loading bar on route change
 router.beforeEach(async (to, from, next) => {
+    document.body.classList.add('page-loading');
     if (to.name === 'register') {
         const { useAuthStore } = await import('../stores/auth');
         const authStore = useAuthStore();
@@ -94,6 +95,10 @@ router.beforeEach(async (to, from, next) => {
         }
     }
     next();
+});
+
+router.afterEach(() => {
+    document.body.classList.remove('page-loading');
 });
 
 export default router

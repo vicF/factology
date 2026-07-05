@@ -11,7 +11,7 @@ namespace Tests\Unit;
 use App\Models\Classes\Everything;
 use Tests\TestCase;
 
-class AnythingTest extends TestCase
+class EverythingTest extends TestCase
 {
     public function testStartEnd()
     {

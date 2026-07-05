@@ -1,5 +1,7 @@
 <template>
     <div class="app-container">
+        <!-- Navigation loading bar -->
+        <div class="nav-loading-bar"></div>
         <!-- Main Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
             <div class="container-fluid">
@@ -997,5 +999,33 @@ form.mx-2 {
         transform: translateX(0);
         opacity: 1;
     }
+}
+/* Navigation loading bar — thin animated bar at top during route transitions */
+.nav-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #ffd700, #ff6b6b, #4ecdc4, #45b7d1);
+    background-size: 200% 100%;
+    z-index: 99999;
+    transition: width 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+body.page-loading .nav-loading-bar {
+    width: 60%;
+    opacity: 1;
+    animation: loading-slide 1.5s ease-in-out infinite;
+}
+@keyframes loading-slide {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+body:not(.page-loading) .nav-loading-bar {
+    width: 100%;
+    opacity: 0;
+    transition: width 0.2s ease, opacity 0.4s ease 0.1s;
 }
 </style>

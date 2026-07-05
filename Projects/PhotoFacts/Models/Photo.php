@@ -8,7 +8,7 @@
 namespace Fokin\PhotoFacts\Models;
 
 use App\UUID;
-use Facts\Classes\Anything;
+use Facts\Classes\Everything;
 
 
 /**

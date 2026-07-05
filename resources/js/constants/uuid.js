@@ -13,7 +13,7 @@ export const UUID = {
     G_SERVER: 6,
 
     // ── System objects (things with these UUIDs exist in every installation) ──
-    ANYTHING:       '939cd822-9e23-450c-8c5e-c23f67cca792',
+    EVERYTHING:     '939cd822-9e23-450c-8c5e-c23f67cca792',
     LINK:           '4b27fd0c-d8be-425c-a529-2186b2589e76',
     SOMETHING:      '3e15244c-a9e1-4a91-a0ca-1c65722a64df',
     LINK_TO_CLASS:  'c217c185-742f-4a9f-8e69-acea2b4f5aea',

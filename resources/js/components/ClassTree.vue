@@ -4,7 +4,7 @@
         <div v-if="rootNodes && rootNodes.length">
             <template v-for="root in rootNodes" :key="root.id">
                 <!-- If this is the "Anything" node, render its children directly -->
-                <template v-if="root.id === '939cd822-9e23-450c-8c5e-c23f67cca792' || root.name === 'Anything'">
+                <template v-if="root.id === '939cd822-9e23-450c-8c5e-c23f67cca792' || root.name === 'Everything'">
                     <TreeMenu
                         v-for="child in root.nodes"
                         :key="child.id"

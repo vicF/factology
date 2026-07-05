@@ -264,7 +264,7 @@ class Everything
      */
     public static function getClassNameFromClassdata($classData)
     {
-        return '\\App\\Models\\Classes\\' . ($classData?->class_name ?? 'Anything');
+        return '\\App\\Models\\Classes\\' . ($classData?->class_name ?? 'Everything');
     }
 
     /**

@@ -27,15 +27,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Blade::directive('thumb', static function ($varName) {
-            return "<?PHP echo \App\Models\Classes\Anything::getThumbPathById($varName); ?>";
+            return "<?PHP echo \App\Models\Classes\Everything::getThumbPathById($varName); ?>";
         });
 
         Blade::directive('start', static function ($varName) {
-            return "<?PHP echo \App\Models\Classes\Anything::echoDateWithVariety($varName); ?>";
+            return "<?PHP echo \App\Models\Classes\Everything::echoDateWithVariety($varName); ?>";
         });
 
         Blade::directive('end', static function ($varName) {
-            return "<?PHP echo \App\Models\Classes\Anything::echoDateWithVariety($varName, 'end'); ?>";
+            return "<?PHP echo \App\Models\Classes\Everything::echoDateWithVariety($varName, 'end'); ?>";
         });
 
         Blade::directive('edit', static function ($varName) {

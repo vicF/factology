@@ -86,7 +86,7 @@ permission model.
 Example system objects seeded on every install:
 | thing_id | Name | Type | Owner |
 |---|---|---|---|
-| `UUID::ANYTHING` | Everything | Class | System |
+| `UUID::EVERYTHING` | Everything | Class | System |
 | `UUID::SOMETHING` | General | Class | System |
 | `UUID::LINK` | Link | Link type | System |
 | `UUID::USER` | User | Class | System |
@@ -173,7 +173,7 @@ Enforced by a required link:
 Shipped via seeder, owned by UUID::SYSTEM:
 
 ```
-Everything (UUID::ANYTHING)
+Everything (UUID::EVERYTHING)
 └── Something (UUID::SOMETHING)     ← base class for all classes
     ├── Events (UUID::EVENTS)
     │   ├── Personal
