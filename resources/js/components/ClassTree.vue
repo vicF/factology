@@ -12,6 +12,7 @@
                         :name="child.name"
                         :nodes="child.nodes || []"
                         :depth="0"
+                        :public="child.public"
                     />
                 </template>
                 <!-- Otherwise render the node normally -->
@@ -21,6 +22,7 @@
                     :name="root.name"
                     :nodes="root.nodes || []"
                     :depth="0"
+                    :public="root.public"
                 />
             </template>
         </div>
