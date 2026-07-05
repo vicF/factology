@@ -59,7 +59,16 @@ module.exports = function() {
         addObjectTo(nodeName) {
             this.moveCursorTo(`a:has-text("${nodeName}")`);
             this.waitForElement('.add-object', 5);
-            this.click('.add-object');
+            this.wait(0.5);
+            try {
+                this.click('.add-object', null, { force: true });
+            } catch (e) {
+                console.log('Regular click failed, trying JS click');
+                this.executeScript(() => {
+                    const btn = document.querySelector('.add-object');
+                    if (btn) btn.click();
+                });
+            }
         },
 
         // ========== Class Creation Methods ==========

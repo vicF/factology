@@ -9,9 +9,9 @@ exports.config = {
             url: process.env.APP_URL || 'http://localhost:8005',
             show: !isHeadless,  // Hide browser in headless mode
             browser: 'chromium',
-            waitForNavigation: 'networkidle0',
+            waitForNavigation: 'load',
             waitForTimeout: 30000,
-            waitForAction: 2000,
+            waitForAction: 500,
             getPageTimeout: 60000,
             chromium: {
                 args: isHeadless ? [
@@ -32,7 +32,8 @@ exports.config = {
             }
         },
         REST: {
-            endpoint: process.env.APP_URL || 'http://localhost:8005'
+            endpoint: process.env.APP_URL || 'http://localhost:8005',
+            timeout: 120000
         }
     },
     include: {

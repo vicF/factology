@@ -56,16 +56,19 @@ const DB_HELPER = {
 
     async login(I, user) {
         I.amOnPage('/');
-        I.seeElement('[data-testid="home-link"]');
+        I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
         I.click('[data-testid="user-dropdown-btn"]');
         I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
-        I.click('[data-testid="login-link"]');
-        I.see('Log in');
-        I.fillField('[data-testid="login-email"]', user.email);
-        I.fillField('[data-testid="login-password"]', user.password);
-        I.click('[data-testid="login-submit-btn"]');
-        I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
-        I.wait(2);
+        const loginLinkCount = await I.grabNumberOfVisibleElements('[data-testid="login-link"]');
+        if (loginLinkCount > 0) {
+            I.click('[data-testid="login-link"]');
+            I.see('Log in');
+            I.fillField('[data-testid="login-email"]', user.email);
+            I.fillField('[data-testid="login-password"]', user.password);
+            I.click('[data-testid="login-submit-btn"]');
+            I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+            I.wait(2);
+        }
     },
 
     async logout(I) {

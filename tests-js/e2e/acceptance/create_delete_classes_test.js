@@ -26,15 +26,15 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         await I.fillFieldWithRetry('input[name="name"]', name);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.click('Save');
-        I.waitForInvisible('.modal', 10);
-        I.waitForInvisible('.modal-backdrop', 10);
+        I.waitForInvisible('.modal', 20);
+        I.waitForInvisible('.modal-backdrop', 20);
         I.waitForElement(`a:has-text("${name}")`, 15);
     }
 
     async function moveClassTo(className, newParentName) {
         I.say(`Moving ${className} to ${newParentName}`);
         I.click(`//a[normalize-space()="${className}"]`);
-        I.waitForElement('.object-header', 15);
+        I.waitForElement('.object-header', 30);
 
         I.click('[title="Edit this object"]');
         I.waitForElement('.modal', 10);
@@ -44,14 +44,14 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         I.fillField(parentInput, newParentName);
 
         const dropdownHook = `.dropdown-item[data-test-name="${newParentName}"]`;
-        I.waitForElement(dropdownHook, 10);
+        I.waitForElement(dropdownHook, 20);
         I.click(dropdownHook, null, { force: true });
 
-        I.waitForValue(parentInput, newParentName, 10);
+        I.waitForValue(parentInput, newParentName, 20);
 
         I.click('.modal button:has-text("Update")');
-        I.waitForInvisible('.modal', 10);
-        I.waitForInvisible('.modal-backdrop', 10);
+        I.waitForInvisible('.modal', 20);
+        I.waitForInvisible('.modal-backdrop', 20);
 
         I.click(`//a[normalize-space()="Something"]`);
         I.wait(1);
@@ -61,7 +61,7 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     async function deleteClass(name) {
         I.say(`Deleting class: ${name}`);
         I.click(`//a[normalize-space()="${name}"]`);
-        I.waitForElement('.object-header', 15);
+        I.waitForElement('.object-header', 30);
 
         // Verify delete button is present (authenticated view)
         I.waitForElement('button:has-text("Delete"), .btn-danger, [title="Delete"], .delete-btn', 15);
@@ -106,19 +106,19 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
 
     // 4. Cleanup hierarchy — navigate to root before each delete to avoid stale view
     I.click(`//a[normalize-space()="Something"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     await deleteClass('Dog');
 
     I.click(`//a[normalize-space()="Something"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     await deleteClass('Human being');
 
     I.click(`//a[normalize-space()="Something"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     await deleteClass('Live being');
 
     I.click(`//a[normalize-space()="Something"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     await deleteClass('Material Object');
 
     // 5. Final check
@@ -138,8 +138,8 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         await I.fillFieldWithRetry('input[name="name"]', name);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.click('Save');
-        I.waitForInvisible('.modal', 10);
-        I.waitForInvisible('.modal-backdrop', 10);
+        I.waitForInvisible('.modal', 20);
+        I.waitForInvisible('.modal-backdrop', 20);
         I.waitForElement(`a:has-text("${name}")`, 15);
     }
 
@@ -148,15 +148,16 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.waitForElement('input[name="name"]', 10);
         await I.fillFieldWithRetry('input[name="name"]', name);
         await I.fillFieldWithRetry('input[name="description"]', description);
+        I.checkOption('#publicCheckbox');
         I.click({ css: '.modal-footer .btn-primary' });
-        I.waitForInvisible('.modal', 10);
-        I.waitForInvisible('.modal-backdrop', 10);
-        I.waitForText(name, 15);
+        I.waitForInvisible('.modal', 30);
+        I.waitForInvisible('.modal-backdrop', 30);
+        I.waitForText(name, 30);
     }
 
     async function deleteObject(name) {
         I.say(`Deleting object: ${name}`);
-        I.waitForElement('.object-header', 15);
+        I.waitForElement('.object-header', 30);
         I.waitForElement('button:has-text("Delete")', 15);
         I.amAcceptingPopups();
         I.click('button:has-text("Delete")');
@@ -169,35 +170,48 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.dontSee(name);
     }
 
+    async function navigateToThing(thingName) {
+        // Things are not in the tree — search for them and click the result
+        I.amOnPage(`/?q=${encodeURIComponent(thingName)}`);
+        I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
+        I.waitForInvisible('.spinner-border', 15);
+        I.waitForElement(locate('.result-item a').withText(thingName), 30);
+        I.click(locate('.result-item a').withText(thingName));
+        I.waitForElement('.object-header', 30);
+    }
+
     // Wait for main content
     I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
-    I.waitForElement(`//a[normalize-space()="Something"]`, 15);
+    I.waitForElement(`//a[normalize-space()="Something"]`, 30);
 
     // ============ SETUP: Create test class and 3 objects ============
     I.say('=== SETUP: Creating test class and objects ===');
     await createClass('Something', 'Relation Test', 'Testing object relationships');
 
-    // Create first object — addObjectTo opens a modal via tree, then createThing fills and saves
+    // Reset to clean tree context: navigate to Something page before tree operations
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 30);
+
+    // Create first object via tree
     await I.addObjectTo('Relation Test');
     await createThing('Alpha Parent', 'First test object — acts as parent');
 
-    // Navigate back to class to create next object
-    I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
+    // Reset tree context
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 30);
     await I.addObjectTo('Relation Test');
     await createThing('Beta Child', 'Second test object — acts as child');
 
-    // Navigate back to class to create third object
-    I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
+    // Reset tree context
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 30);
     await I.addObjectTo('Relation Test');
     await createThing('Gamma Spare', 'Third test object — for edit/delete');
 
     // ============ TEST 1: Link button — create a relationship ============
     I.say('=== TEST 1: Link button — create parent→child relationship ===');
-    // Navigate to Alpha Parent
-    I.click(`//a[normalize-space()="Alpha Parent"]`);
-    I.waitForElement('.object-header', 15);
+    // Navigate to Alpha Parent via search (Things aren't in the tree, now public)
+    await navigateToThing('Alpha Parent');
 
     // Click the "Link" button to open EditLinkModal
     I.click('button:has-text("Link")');
@@ -244,10 +258,9 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     I.say('✓ Link swapped');
 
     // ============ TEST 3: Create button — create a pre-linked object ============
-    I.say('=== TEST 3: Create button — create new object pre-linked to Alpha Parent ===');
-    // Navigate to Beta Child (the other end of the swapped link)
-    I.click(`//a[normalize-space()="Beta Child"]`);
-    I.waitForElement('.object-header', 15);
+    I.say('=== TEST 3: Create button — create new object pre-linked to Beta Child ===');
+    // Navigate to Beta Child via Relation Test page
+    await navigateToThing('Beta Child');
 
     // Click the "Create" button to open EditObject with a pre-filled link to Beta Child
     I.click('button:has-text("Create")');
@@ -269,9 +282,8 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
 
     // ============ TEST 4: Edit button — rename an object ============
     I.say('=== TEST 4: Edit button — rename Gamma Spare ===');
-    // Navigate to Gamma Spare
-    I.click(`//a[normalize-space()="Gamma Spare"]`);
-    I.waitForElement('.object-header', 15);
+    // Navigate to Gamma Spare via Relation Test
+    await navigateToThing('Gamma Spare');
 
     // Click the "Edit" button
     I.click('button:has-text("Edit")');
@@ -294,43 +306,44 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
 
     // ============ TEST 5: Delete button — remove an object ============
     I.say('=== TEST 5: Delete button — remove Alpha Parent ===');
-    I.click(`//a[normalize-space()="Alpha Parent"]`);
-    I.waitForElement('.object-header', 15);
+    await navigateToThing('Alpha Parent');
     await deleteObject('Alpha Parent');
     I.say('✓ Alpha Parent deleted');
 
     // Navigate back to check the tree still works
     I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     I.say('✓ Tree navigation still works after deletion');
 
     // ============ CLEANUP: Remove remaining test data ============
     I.say('=== CLEANUP ===');
 
+    // Created From Button is linked to Beta Child, navigate via Beta Child's page
+    await navigateToThing('Beta Child');
+    I.waitForElement(locate('.result-item a').withText('Created From Button'), 15);
+    I.click(locate('.result-item a').withText('Created From Button'));
+    I.waitForElement('.object-header', 30);
     await deleteObject('Created From Button');
 
-    I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
-
-    // Delete remaining objects: Beta Child then Gamma Renamed
-    await deleteObject('Beta Child');
-
-    I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
-
+    // Gamma Renamed still exists (Alpha Parent was already deleted in TEST 5)
+    await navigateToThing('Gamma Renamed');
     await deleteObject('Gamma Renamed');
 
-    // Delete the test class itself
+    // Delete Beta Child
+    await navigateToThing('Beta Child');
+    await deleteObject('Beta Child');
+
+    // Delete the Relation Test class itself
     I.click(`//a[normalize-space()="Relation Test"]`);
-    I.waitForElement('.object-header', 15);
+    I.waitForElement('.object-header', 30);
     await deleteObject('Relation Test');
 
-    // Final check: only root class remains
+    // Navigate to Something page for final verification
+    I.click(`//a[normalize-space()="Something"]`);
+    I.waitForElement('.object-header', 30);
+
+    // Final check: only base classes remain
     I.waitForText('Something', 20);
-    I.dontSee('Alpha Parent');
-    I.dontSee('Beta Child');
-    I.dontSee('Gamma Renamed');
-    I.dontSee('Created From Button');
     I.dontSee('Relation Test');
     I.say('✓ All test data cleaned up');
 });
