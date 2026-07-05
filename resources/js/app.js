@@ -52,6 +52,18 @@ const apiBaseUrl = isCapacitor
     : '/api/v1';
 axios.defaults.baseURL = apiBaseUrl;
 
+// ── Error tracking setup ────────────────────────────────────
+import {
+    installVueErrorHandler,
+    installGlobalHandlers,
+    trackError,
+    reportToServer,
+    shouldIgnoreError as trackerShouldIgnore,
+} from './utils/errorTracker.js';
+
+installVueErrorHandler(app);
+installGlobalHandlers();
+
 // ── Standalone mode bootstrap ────────────────────────────────────────
 // In standalone (capacitor) mode, axios calls are intercepted by a custom
 // adapter that routes everything to the local Dexie DB.
@@ -78,6 +90,7 @@ if (isCapacitor && !apiBaseUrl) {
     axios.interceptors.response.use(
         response => response,
         error => {
+            // 401 → redirect to login (existing behavior)
             if (error.response?.status === 401) {
                 if (error.config?.noAuthRedirect) {
                     return Promise.reject(error);
@@ -89,7 +102,26 @@ if (isCapacitor && !apiBaseUrl) {
                         query: { redirect: router.currentRoute.value.fullPath || '/' }
                     });
                 }
+                return Promise.reject(error);
             }
+
+            // Attach parsed server error info for UI components
+            const serverData = error.response?.data
+            if (serverData?.error) {
+                error.serverErrorType = serverData.error.type
+                error.serverError = serverData.error.message
+                error.requestId = serverData.error.request_id
+                error.serverException = serverData.error.exception
+            }
+
+            // Track non-401 errors
+            trackError(error)
+
+            // Report 5xx errors to server
+            if ((error.response?.status ?? 500) >= 500) {
+                reportToServer(error)
+            }
+
             return Promise.reject(error);
         }
     );

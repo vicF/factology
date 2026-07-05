@@ -45,6 +45,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Slow Request Threshold (ms)
+    |--------------------------------------------------------------------------
+    |
+    | Requests taking longer than this threshold will be logged as warnings
+    | by the RequestLogger middleware.
+    |
+    */
+    'slow_request_threshold_ms' => env('SLOW_REQUEST_THRESHOLD_MS', 1000),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

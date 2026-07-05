@@ -53,8 +53,21 @@ return [
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            'channels' => array_values(array_filter([
+                'single',
+                env('JSON_LOG_ENABLED', false) ? 'json' : null,
+            ])),
             'ignore_exceptions' => false,
+        ],
+
+        'json' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/structured.json'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+            'formatter_with' => [
+                'includeStacktraces' => true,
+            ],
         ],
 
         'single' => [

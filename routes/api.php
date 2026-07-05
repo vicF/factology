@@ -55,6 +55,20 @@ Route::prefix('v1')->group(function () {
         Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
     });
 
+    // Client-side error reporting (no auth required)
+    Route::post('/client-error', function (Request $request) {
+        $validated = $request->validate([
+            'message'  => 'required|string',
+            'type'     => 'nullable|string',
+            'url'      => 'nullable|string',
+            'stack'    => 'nullable|string',
+            'status'   => 'nullable|integer',
+        ]);
+
+        \Illuminate\Support\Facades\Log::channel('json')->warning('client_error', $validated);
+        return response()->json(['success' => true]);
+    });
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update

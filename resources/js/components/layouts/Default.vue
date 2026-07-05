@@ -223,6 +223,7 @@ import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import { useObjectsStore } from '../../stores/objects'
+import { onError } from '../../utils/errorTracker.js'
 import axios from 'axios'
 
 // Provide getThumbUrl function for child components
@@ -469,28 +470,13 @@ const submitSearch = () => {
     router.push({ path: '/', query: { q: searchQuery.value } })
 }
 
-// ========== GLOBAL ERROR HANDLING (Development only, filters expected errors) ==========
-const isDevelopment = import.meta.env.DEV
+// ========== GLOBAL ERROR TOASTS ==========
 const errorMessages = ref([])
 
-// Helper: decide if an error should be ignored (no toast)
-const shouldIgnoreError = (message, statusCode = null, url = null) => {
-    const lowerMsg = (message || '').toLowerCase()
-    // Ignore 401 Unauthorized when user is not logged in
-    if (statusCode === 401) return true
-    // Ignore any message containing "unauthorized" or "unauthenticated"
-    if (lowerMsg.includes('unauthorized') || lowerMsg.includes('unauthenticated')) return true
-    // Ignore aborted requests (e.g., navigation cancellations)
-    if (lowerMsg.includes('aborted') || lowerMsg.includes('canceled')) return true
-    // Ignore network errors that are expected (like offline checks)
-    if (lowerMsg.includes('network error') && !navigator.onLine) return true
-    // Ignore harmless ResizeObserver loop warning (browser-level, no functional impact)
-    if (lowerMsg.includes('resizeobserver loop')) return true
-    return false
-}
-
 const addError = (message, statusCode = null, url = null) => {
-    if (shouldIgnoreError(message, statusCode, url)) return
+    // errorTracker.shouldIgnoreError is already applied by tracker before
+    // dispatching to subscribers, so only filter obviously empty messages here
+    if (!message) return
     const id = Date.now() + Math.random()
     errorMessages.value.push({ id, message, timestamp: Date.now() })
     setTimeout(() => removeError(id), 5000)
@@ -501,43 +487,18 @@ const removeError = (id) => {
     if (index !== -1) errorMessages.value.splice(index, 1)
 }
 
-// Listen to custom errors via eventBus
+// Listen to custom errors via eventBus (legacy support)
 eventBus.on('global-error', ({ message, statusCode, url }) => {
-    if (isDevelopment) addError(message, statusCode, url)
+    if (message) addError(message, statusCode, url)
 })
 
-// Global unhandled rejection handler
-window.addEventListener('unhandledrejection', (event) => {
-    if (isDevelopment) {
-        const error = event.reason
-        const statusCode = error?.response?.status
-        const message = error?.response?.data?.message || error?.message || event.reason || 'Unhandled Promise Rejection'
-        addError(message, statusCode)
-    }
+// Subscribe to unified errorTracker — works in all environments
+onError((error, context) => {
+    const statusCode = error.response?.status
+    const serverMsg = error.response?.data?.error?.message
+    const message = serverMsg || error.message || 'An error occurred'
+    addError(message, statusCode, error.config?.url)
 })
-
-// Global error handler
-const originalErrorHandler = window.onerror
-window.onerror = (message, source, lineno, colno, error) => {
-    if (isDevelopment) {
-        const statusCode = error?.response?.status
-        addError(error?.message || message, statusCode)
-    }
-    if (originalErrorHandler) originalErrorHandler(message, source, lineno, colno, error)
-}
-
-// Axios interceptor for errors
-axios.interceptors.response.use(
-    response => response,
-    error => {
-        if (isDevelopment) {
-            const statusCode = error.response?.status
-            const message = error.response?.data?.message || error.message || 'Network error'
-            addError(message, statusCode, error.config?.url)
-        }
-        return Promise.reject(error)
-    }
-)
 // ==============================================================
 
 // ---------------------------------------------------------------------------

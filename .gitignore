@@ -39,3 +39,4 @@ storage/logs/laravel.log
 database/Dumps/convert_cp866_to_utf8.py
 database/Dumps/convert_mysql2pgsql.php
 database/Dumps/restore_mysql.cmd
+storage/logs/
