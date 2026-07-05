@@ -14,6 +14,11 @@ class QueryBuilderMacroServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Builder::macro('auth', function ($table = 'things') {
+            // Admin users can see everything — bypass visibility filter
+            if (Auth::check() && Auth::user()->is_admin) {
+                return $this;
+            }
+
             $this->where(static function ($query) use ($table) {
                 // Public records are visible to everyone
                 $query->where($table . '.public', 1)
