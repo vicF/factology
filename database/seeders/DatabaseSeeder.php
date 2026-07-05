@@ -33,10 +33,10 @@ class DatabaseSeeder extends Seeder
             DB::table('things')->insert([
                 [
                     'thing_id'    => UUID::ANYTHING,
-                    'name'        => 'Anything',
+                    'name'        => 'Everything',
                     'description' => 'base object for everything',
                     'type'        => UUID::G_CLASS,
-                    'public'      => true,
+                    'public'      => false,
                 ],
                 [
                     'thing_id'    => UUID::LINK,
@@ -105,14 +105,27 @@ class DatabaseSeeder extends Seeder
         }
 
         // Bootstrap links (class hierarchy edges)
-        // Direction: one_thing_id is the PARENT, other_thing_id is the CHILD
+        // Order matters — children appear in this order in the class tree
+        // Top level: Something (user classes), Link (link types), System (infrastructure)
         if (DB::table('links')->count() === 0) {
             DB::table('links')->insert([
                 [
-                    'translation'    => '"Link" is subclass of "Anything"',
+                    'translation'    => '"Something" is subclass of "Everything"',
+                    'one_thing_id'   => UUID::ANYTHING,
+                    'link_type_id'   => UUID::LINK_TO_PARENT,
+                    'other_thing_id' => UUID::SOMETHING,
+                ],
+                [
+                    'translation'    => '"Link" is subclass of "Everything"',
                     'one_thing_id'   => UUID::ANYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::LINK,
+                ],
+                [
+                    'translation'    => '"System" is subclass of "Everything"',
+                    'one_thing_id'   => UUID::ANYTHING,
+                    'link_type_id'   => UUID::LINK_TO_PARENT,
+                    'other_thing_id' => UUID::SYSTEM,
                 ],
                 [
                     'translation'    => '"Parent" is subclass of "Link"',
@@ -125,12 +138,6 @@ class DatabaseSeeder extends Seeder
                     'one_thing_id'   => UUID::LINK,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::LINK_TO_CLASS,
-                ],
-                [
-                    'translation'    => '"Something" is subclass of "Anything"',
-                    'one_thing_id'   => UUID::ANYTHING,
-                    'link_type_id'   => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::SOMETHING,
                 ],
             ]);
         }
@@ -254,7 +261,6 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => '9f7436db-6253-4718-aa61-b4676faa90c7', 'translation' => 'This is child of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'baeb5e5f-2659-4cb0-8260-55af9fadbe13', 'translation' => 'Thing is subclass of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'dc006cda-047a-4862-acf7-e215355b6890', 'translation' => 'Place is subclass of Something'],
-            ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'translation' => 'System is subclass of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'f48ef10a-40f6-4190-bfae-2834e9781ad1', 'translation' => 'This is child of Something'],
             // Collection → subclasses
             ['one_thing_id' => '6a65dbf3-ad39-4446-8b8b-c0f539c1d53a', 'other_thing_id' => '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', 'translation' => 'List is a child of Collection'],

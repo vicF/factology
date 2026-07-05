@@ -28,10 +28,10 @@ export async function seedLocalDb() {
     const bootThings = [
         {
             thing_id: UUID.ANYTHING,
-            name: 'Anything',
+            name: 'Everything',
             description: 'base object for everything',
             type: UUID.G_CLASS,
-            public: true,
+            public: false,
             owner: UUID.VICTOR_FOKIN,
         },
         {
@@ -129,14 +129,14 @@ export async function seedLocalDb() {
     }
 
     // ── Bootstrap links (class hierarchy edges) ──
-    // Direction: one_thing_id is the PARENT, other_thing_id is the CHILD
+    // Order matters: Something, Link, System as children of Everything
     const bootLinks = [
-        { one: UUID.ANYTHING, other: UUID.LINK,          translation: '"Link" is subclass of "Anything"' },
+        { one: UUID.ANYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Everything"' },
+        { one: UUID.ANYTHING, other: UUID.LINK,           translation: '"Link" is subclass of "Everything"' },
+        { one: UUID.ANYTHING, other: UUID.SYSTEM,         translation: '"System" is subclass of "Everything"' },
         { one: UUID.LINK,     other: UUID.LINK_TO_PARENT, translation: '"Parent" is subclass of "Link"' },
         { one: UUID.LINK,     other: UUID.LINK_TO_CLASS,  translation: '"Class of" is subclass of "Link"' },
-        { one: UUID.ANYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Anything"' },
-        { one: UUID.SOMETHING, other: UUID.SYSTEM,        translation: '"System" is subclass of "Something"' },
-        { one: UUID.SYSTEM,   other: UUID.USER,          translation: '"User" is subclass of "System"' },
+        { one: UUID.SYSTEM,   other: UUID.USER,           translation: '"User" is subclass of "System"' },
         { one: UUID.SYSTEM,   other: UUID.GROUP_READ_ACCESS,        translation: '"Group read access" is subclass of "System"' },
         { one: UUID.SYSTEM,   other: UUID.BELONGS_TO_USER_GROUP,    translation: '"Belongs to user group" is subclass of "System"' },
     ];
