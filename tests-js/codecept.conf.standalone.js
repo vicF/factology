@@ -40,7 +40,7 @@ exports.config = {
         I: './steps_file.js'
     },
     plugins: {
-        screenshotOnFail: { enabled: true },
+        screenshot: { enabled: true },
         pauseOnFail: {
             enabled: !process.env.CI
         },
