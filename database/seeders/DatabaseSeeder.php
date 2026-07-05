@@ -71,21 +71,35 @@ class DatabaseSeeder extends Seeder
                     'name'        => 'User',
                     'description' => 'base class for user objects',
                     'type'        => UUID::G_CLASS,
-                    'public'      => false,
+                    'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::SYSTEM,
                     'name'        => 'System',
                     'description' => 'system class',
                     'type'        => UUID::G_CLASS,
-                    'public'      => false,
+                    'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::VICTOR_FOKIN,
-                    'name'        => 'System',
-                    'description' => 'default owner / system account',
+                    'name'        => 'Victor Fokin',
+                    'description' => 'System creator',
                     'type'        => UUID::GENERAL,
                     'public'      => false,
+                ],
+                [
+                    'thing_id'    => UUID::GROUP_READ_ACCESS,
+                    'name'        => 'Group read access',
+                    'description' => 'Link type for group-based read access control',
+                    'type'        => UUID::G_LINK,
+                    'public'      => true,
+                ],
+                [
+                    'thing_id'    => UUID::BELONGS_TO_USER_GROUP,
+                    'name'        => 'Belongs to user group',
+                    'description' => 'Link type for user-to-group membership',
+                    'type'        => UUID::G_LINK,
+                    'public'      => true,
                 ],
             ]);
         }
@@ -156,7 +170,6 @@ class DatabaseSeeder extends Seeder
             ['thing_id' => '4c8ee41a-9912-4dff-8b44-7779a66e4fcf', 'name' => 'Human',                   'description' => 'Человек',                                                                                                                             'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '97bcbb9c-31f6-4c3c-913c-dfa54bce03e4', 'name' => 'Illness',                  'description' => 'Болезнь, недомогание',                                                                                                               'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '4b22a805-f3e1-47b9-bb87-b7a9f6f68cc4', 'name' => 'Image',                    'description' => 'Цифровое изображение, Фотография, как факт его создания.',                                                                             'type' => UUID::G_CLASS, 'public' => true],
-            ['thing_id' => 'e1a1a54a-f072-472b-8a64-e0322c39f418', 'name' => 'Internal class',            'description' => 'Для внутреннего логгирования и сервиса.',                                                                                              'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => 'e5b4c1b6-019b-4ab4-9387-cd54ca67048c', 'name' => 'is a part of',             'description' => '',                                                                                                                                   'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '7d548ec2-69e9-4329-b122-acb83cd83325', 'name' => 'Lake',                     'description' => 'Озеро',                                                                                                                              'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', 'name' => 'List',                     'description' => '',                                                                                                                                   'type' => UUID::G_CLASS, 'public' => true],
@@ -241,6 +254,7 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => '9f7436db-6253-4718-aa61-b4676faa90c7', 'translation' => 'This is child of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'baeb5e5f-2659-4cb0-8260-55af9fadbe13', 'translation' => 'Thing is subclass of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'dc006cda-047a-4862-acf7-e215355b6890', 'translation' => 'Place is subclass of Something'],
+            ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'translation' => 'System is subclass of Something'],
             ['one_thing_id' => '3e15244c-a9e1-4a91-a0ca-1c65722a64df', 'other_thing_id' => 'f48ef10a-40f6-4190-bfae-2834e9781ad1', 'translation' => 'This is child of Something'],
             // Collection → subclasses
             ['one_thing_id' => '6a65dbf3-ad39-4446-8b8b-c0f539c1d53a', 'other_thing_id' => '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', 'translation' => 'List is a child of Collection'],
@@ -292,8 +306,11 @@ class DatabaseSeeder extends Seeder
             // Water area → subclasses
             ['one_thing_id' => 'f989e699-dc6f-45f8-a985-145d28f68ffd', 'other_thing_id' => '62e7ab56-4ebe-4002-a7f1-896e266b8078', 'translation' => 'This is child of Water area'],
             ['one_thing_id' => 'f989e699-dc6f-45f8-a985-145d28f68ffd', 'other_thing_id' => '7d548ec2-69e9-4329-b122-acb83cd83325', 'translation' => 'This is child of Water area'],
-            // Internal class → subclasses
-            ['one_thing_id' => 'e1a1a54a-f072-472b-8a64-e0322c39f418', 'other_thing_id' => 'c532f6ba-27b2-43ec-b4ec-30cbff78eed0', 'translation' => 'This is child of Internal class'],
+            // System → subclasses
+            ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => '664e746e-8f37-4f80-ba78-734424eab2a6', 'translation' => 'User is subclass of System'],
+            ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'c532f6ba-27b2-43ec-b4ec-30cbff78eed0', 'translation' => 'Access group is subclass of System'],
+            ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'ea206516-9e45-482f-89be-05313f52e5e3', 'translation' => 'Group read access is subclass of System'],
+            ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'e18d73eb-a5d3-47be-a785-106f6f185651', 'translation' => 'Belongs to user group is subclass of System'],
         ];
 
         foreach ($classLinks as $link) {

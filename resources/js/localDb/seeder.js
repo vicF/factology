@@ -71,7 +71,7 @@ export async function seedLocalDb() {
             name: 'User',
             description: 'base class for user objects',
             type: UUID.G_CLASS,
-            public: false,
+            public: true,
             owner: UUID.VICTOR_FOKIN,
         },
         {
@@ -79,15 +79,31 @@ export async function seedLocalDb() {
             name: 'System',
             description: 'system class',
             type: UUID.G_CLASS,
-            public: false,
+            public: true,
             owner: UUID.VICTOR_FOKIN,
         },
         {
             thing_id: UUID.VICTOR_FOKIN,
-            name: 'System',
-            description: 'default owner / system account',
+            name: 'Victor Fokin',
+            description: 'System creator',
             type: UUID.GENERAL,
             public: false,
+            owner: UUID.VICTOR_FOKIN,
+        },
+        {
+            thing_id: UUID.GROUP_READ_ACCESS,
+            name: 'Group read access',
+            description: 'Link type for group-based read access control',
+            type: UUID.G_LINK,
+            public: true,
+            owner: UUID.VICTOR_FOKIN,
+        },
+        {
+            thing_id: UUID.BELONGS_TO_USER_GROUP,
+            name: 'Belongs to user group',
+            description: 'Link type for user-to-group membership',
+            type: UUID.G_LINK,
+            public: true,
             owner: UUID.VICTOR_FOKIN,
         },
     ];
@@ -119,6 +135,10 @@ export async function seedLocalDb() {
         { one: UUID.LINK,     other: UUID.LINK_TO_PARENT, translation: '"Parent" is subclass of "Link"' },
         { one: UUID.LINK,     other: UUID.LINK_TO_CLASS,  translation: '"Class of" is subclass of "Link"' },
         { one: UUID.ANYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Anything"' },
+        { one: UUID.SOMETHING, other: UUID.SYSTEM,        translation: '"System" is subclass of "Something"' },
+        { one: UUID.SYSTEM,   other: UUID.USER,          translation: '"User" is subclass of "System"' },
+        { one: UUID.SYSTEM,   other: UUID.GROUP_READ_ACCESS,        translation: '"Group read access" is subclass of "System"' },
+        { one: UUID.SYSTEM,   other: UUID.BELONGS_TO_USER_GROUP,    translation: '"Belongs to user group" is subclass of "System"' },
     ];
 
     for (const l of bootLinks) {
