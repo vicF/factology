@@ -8,7 +8,7 @@
 namespace Tests\Unit;
 
 
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Tests\TestCase;
 
 //require_once(__DIR__ . '/../../filescanner/FileScanner.php');
@@ -35,7 +35,7 @@ class FileScannerTest extends TestCase
     {
         $this->markTestIncomplete();
         $date = \FileScanner::getDateFromFileName($name);
-        self::assertEquals($dateExpected, $date->format(Anything::TIME_FORMAT));
+        self::assertEquals($dateExpected, $date->format(Everything::TIME_FORMAT));
     }
 
     public static function getDateFromFileDataProvider()

@@ -31,13 +31,13 @@ use Illuminate\Support\Str;
  * @property string $start_date
  * @property string $end_date
  * @property boolean deleted
- * @method Anything thing_id($thing_id)
- * @method Anything name($name)
- * @method Anything description($description)
- * @method Anything start($start)
- * @method Anything end($end)
+ * @method Everything thing_id($thing_id)
+ * @method Everything name($name)
+ * @method Everything description($description)
+ * @method Everything start($start)
+ * @method Everything end($end)
  */
-class Anything
+class Everything
 {
     /**
      * @deprecaed use UUID constants
@@ -113,7 +113,7 @@ class Anything
      * Anything constructor.
      *
      * @param array|null $data
-     * @param Anything|null $class
+     * @param Everything|null $class
      */
     public function __construct(array $data = null, $class = null)
     {
@@ -269,7 +269,7 @@ class Anything
 
     /**
      * @param $id
-     * @return Anything
+     * @return Everything
      */
     public static function CreateFromId($id)
     {
@@ -278,7 +278,7 @@ class Anything
         $className = self::getClassNameFromClassdata($class); //'\\App\\Models\\Classes\\' . ($class->class_name ?? 'Anything');
         try {
             return new $className(['thing_id' => $id], $class);
-            /** @var Anything $className */
+            /** @var Everything $className */
             /*$thing = $className::_getRow($id)->first();
             // Keep date in db format to be able to compare
             return $className::CreateFromData(self::convertToArray($thing));*/
@@ -299,7 +299,7 @@ class Anything
         $className = self::getClassNameFromClassdata($class); //'\\App\\Models\\Classes\\' . ($class->class_name ?? 'Anything');
 
         try {
-            /** @var Anything $className */
+            /** @var Everything $className */
             return $className::getClassSpecificDataById($id, $class);
 
             /*$thing = $className::_getRow($id)->first();

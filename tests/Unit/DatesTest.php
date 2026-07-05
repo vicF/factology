@@ -9,7 +9,7 @@ namespace Tests\Unit;
 
 
 use Carbon\Carbon;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -33,8 +33,8 @@ class DatesTest extends TestCase
             ['2018-09-23 13:44', '20180923134400', 'UTC'],
             ['2018-09-23', '20180923000000', 'UTC'],
             ['1970-01-01 0' . $msk . ':00:00', 19700101000000 , 'Europe/Moscow'],
-            [$now->format(Anything::TIME_FORMAT), $nowUtc->format(Anything::DATABASE_TIME_FORMAT), 'UTC'],
-            [$now->format(Anything::TIME_FORMAT), $now->format(Anything::DATABASE_TIME_FORMAT), date_default_timezone_get()],
+            [$now->format(Everything::TIME_FORMAT), $nowUtc->format(Everything::DATABASE_TIME_FORMAT), 'UTC'],
+            [$now->format(Everything::TIME_FORMAT), $now->format(Everything::DATABASE_TIME_FORMAT), date_default_timezone_get()],
             ['9999999999-01-01 00:00:00', '99999999990101000000', 'UTC'],
             ['-9999999999-01-01 00:00:00', '-99999999990101235959', 'UTC'], // Hours, minutes, seconds are inverted for BC dates
             ['-9999999999', '-99999999990101235959', 'UTC'],
@@ -54,12 +54,12 @@ class DatesTest extends TestCase
      */
     public function testDates($date, $number, $timeZone)
     {
-        self::assertEquals(Anything::dateToDb($date, $timeZone), $number);
+        self::assertEquals(Everything::dateToDb($date, $timeZone), $number);
         if (($p = strpos($date, '.')) !== false) {
             $date = substr($date, 0, $p);  // Remove dot and milliseconds if present
         }
-        $dateFromDb = Anything::dateFromDb($number, $timeZone);
-        self::assertEquals(Anything::padDate($date), $dateFromDb);
+        $dateFromDb = Everything::dateFromDb($number, $timeZone);
+        self::assertEquals(Everything::padDate($date), $dateFromDb);
     }
 
 
@@ -87,7 +87,7 @@ class DatesTest extends TestCase
      */
     public function testDatesToNumber($date): void
     {
-        $this->assertEquals($date, Anything::dateFromDb(Anything::dateToDb($date)));
+        $this->assertEquals($date, Everything::dateFromDb(Everything::dateToDb($date)));
     }
 
     /**
@@ -97,14 +97,14 @@ class DatesTest extends TestCase
     public function testDatesToNumberWithTimezone($date): void
     {
 
-        $this->assertEquals($date, Anything::dateFromDb(Anything::dateToDb($date, 'UTC'), 'UTC'));
+        $this->assertEquals($date, Everything::dateFromDb(Everything::dateToDb($date, 'UTC'), 'UTC'));
     }
 
     public function testTimezone(): void
     {
         $date = '2020-01-01 03:01';
-        $dateUtc = Anything::dateToDb($date, 'UTC');
-        $dateSpb = Anything::dateToDb($date, 'Europe/Moscow');
+        $dateUtc = Everything::dateToDb($date, 'UTC');
+        $dateSpb = Everything::dateToDb($date, 'Europe/Moscow');
         $this->assertEquals(30000, $dateUtc - $dateSpb);
     }
 
@@ -131,8 +131,8 @@ class DatesTest extends TestCase
      */
     public function testCompareDates($less, $more)
     {
-        $lessDb = Anything::dateToDb($less);
-        $moreDb = Anything::dateToDb($more);
+        $lessDb = Everything::dateToDb($less);
+        $moreDb = Everything::dateToDb($more);
         $this->assertEquals(1, bccomp($moreDb, $lessDb),
             "Failed to assert that $lessDb as representation of date $less is less than $moreDb as representation of date $more");
     }
@@ -160,7 +160,7 @@ class DatesTest extends TestCase
      */
     public function testYearHas4Digits($date, $result)
     {
-        self::assertEquals($result, Anything::yearHasMoreThan4Digits($date));
+        self::assertEquals($result, Everything::yearHasMoreThan4Digits($date));
     }
 
     public static function padDateDataProvider()
@@ -184,7 +184,7 @@ class DatesTest extends TestCase
      */
     public function testPadDate($date, $expected)
     {
-        self::assertEquals($expected, Anything::padDate($date));
+        self::assertEquals($expected, Everything::padDate($date));
     }
 
     public static function correctBeforeBCDataProvider()
@@ -202,7 +202,7 @@ class DatesTest extends TestCase
      */
     public function testCorrectBeforeBC($input, $expected)
     {
-        $CorrectBeforeBCMethod = new ReflectionMethod(Anything::class, '_correctBeforeBC');
+        $CorrectBeforeBCMethod = new ReflectionMethod(Everything::class, '_correctBeforeBC');
         $CorrectBeforeBCMethod->setAccessible(true);
         self::assertEquals($expected, $CorrectBeforeBCMethod->invoke(null, $input));
     }

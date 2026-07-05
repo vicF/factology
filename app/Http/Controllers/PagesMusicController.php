@@ -8,7 +8,7 @@
 namespace App\Http\Controllers;
 
 
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Support\Facades\DB;
 
@@ -27,8 +27,8 @@ class PagesMusicController extends Controller
             ->orderBy('name')
             ->get()->toArray();
         array_walk($data, static function ($row) {
-            [$row->start_year] = explode('-', Anything::dateFromDb($row->start));
-            [$row->end_year] = explode('-', Anything::dateFromDb($row->end));
+            [$row->start_year] = explode('-', Everything::dateFromDb($row->start));
+            [$row->end_year] = explode('-', Everything::dateFromDb($row->end));
             return $row;
         });
         return view('pages.music.bands', ['data' => $data]);
@@ -36,7 +36,7 @@ class PagesMusicController extends Controller
 
     public function band($id)
     {
-        $data['band'] = Anything::createFromId($id);
+        $data['band'] = Everything::createFromId($id);
         $data['concerts'] = DB::table('links')
             ->where('links.link_type_id', UUID::PRESENT_AS_ACTOR)
             ->where('links.other_thing_id', $id)
@@ -47,8 +47,8 @@ class PagesMusicController extends Controller
             ->orderBy('start', 'desc')
             ->get()->toArray();
         array_walk($data['concerts'], static function ($row) {
-            $row->start_date = Anything::dateFromDb($row->start);
-            $row->end_date = Anything::dateFromDb($row->end);
+            $row->start_date = Everything::dateFromDb($row->start);
+            $row->end_date = Everything::dateFromDb($row->end);
             return $row;
         });
         $data['members'] = DB::table('links')
@@ -61,11 +61,11 @@ class PagesMusicController extends Controller
             ->orderBy('start', 'desc')
             ->get()->toArray();
         array_walk($data['members'], static function ($row) {
-            $row->start_year = Anything::dateFromDb($row->link_start);
-            $row->end_year = Anything::dateFromDb($row->link_end, null, 'Y');
+            $row->start_year = Everything::dateFromDb($row->link_start);
+            $row->end_year = Everything::dateFromDb($row->link_end, null, 'Y');
             return $row;
         });
-        $data['now'] = Anything::dateToDb((new \DateTime())->format(Anything::TIME_FORMAT));  // to compare
+        $data['now'] = Everything::dateToDb((new \DateTime())->format(Everything::TIME_FORMAT));  // to compare
         $data['upcoming'] = true;
         return view('pages.music.band', $data);
     }

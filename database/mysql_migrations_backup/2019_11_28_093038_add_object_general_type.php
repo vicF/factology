@@ -1,7 +1,7 @@
 <?php
 
 use App\Eloquent\Thing;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -24,10 +24,10 @@ class AddObjectGeneralType extends Migration
         }
 
         Schema::table('things', static function (Blueprint $table) {
-            $table->enum('type', [Anything::GENERAL, Anything::LINK, Anything::CLS, Anything::THING])
+            $table->enum('type', [Everything::GENERAL, Everything::LINK, Everything::CLS, Everything::THING])
                 ->after('name')
                 ->comment('Defines few global types of objects like thing, link, class')
-                ->default(Anything::GENERAL)
+                ->default(Everything::GENERAL)
                 ->nullable(false);
         });
 
@@ -36,7 +36,7 @@ class AddObjectGeneralType extends Migration
             ->where(Thing::ID, UUID::LINK_TO_PARENT)
             ->update(
                 [
-                    'type' => Anything::LINK,
+                    'type' => Everything::LINK,
                 ]
             );
 
@@ -45,7 +45,7 @@ class AddObjectGeneralType extends Migration
             ->where(Thing::ID, UUID::SOMETHING)
             ->update(
                 [
-                    'type' => Anything::CLS,
+                    'type' => Everything::CLS,
 
                 ]
             );
@@ -55,7 +55,7 @@ class AddObjectGeneralType extends Migration
         ->where(Thing::ID, UUID::LINK_TO_CLASS)
         ->update(
             [
-                'type' => Anything::LINK,
+                'type' => Everything::LINK,
             ]
         );
 
@@ -63,7 +63,7 @@ class AddObjectGeneralType extends Migration
             ->where(Thing::ID, UUID::LINK)
             ->update(
                 [
-                    'type' => Anything::LINK,
+                    'type' => Everything::LINK,
                 ]
             );
     }

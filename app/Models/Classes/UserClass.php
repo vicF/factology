@@ -8,7 +8,7 @@ use http\Exception\RuntimeException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-class UserClass extends Anything
+class UserClass extends Everything
 {
     protected $user;
     public $additionalParams =

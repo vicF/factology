@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Eloquent\Thing;
 use App\Models\User;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;

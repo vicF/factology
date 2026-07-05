@@ -7,7 +7,7 @@ use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
@@ -42,7 +42,7 @@ class ApiController extends BaseController
     public function get($id)
     {
         try {
-            $data = Anything::getDataById($id);
+            $data = Everything::getDataById($id);
             return response()->json(
                 [
                     'data'    => $data,
@@ -161,7 +161,7 @@ class ApiController extends BaseController
             'class.public' => ['nullable', 'integer', 'in:0,1'],
         ]);
         return DB::transaction(static function () use ($request) {
-            $model = new Anything($request->toArray());
+            $model = new Everything($request->toArray());
             try {
                 $model->save();
             } catch(\Throwable $e) {
@@ -294,7 +294,7 @@ class ApiController extends BaseController
      */
     public function delete($id)
     {
-        Anything::deleteById($id);
+        Everything::deleteById($id);
         return response()->json(['success' => true]);
     }
 
@@ -460,7 +460,7 @@ class ApiController extends BaseController
      */
     public function searchTree()
     {
-        $rootId = UUID::ANYTHING;
+        $rootId = UUID::EVERYTHING;
         $linkTypeParent = UUID::LINK_TO_PARENT;
         $classType = UUID::G_CLASS;
         $linkType = UUID::G_LINK;
@@ -576,7 +576,7 @@ class ApiController extends BaseController
                 $data[$node->other_thing_id]->children[] = &$data[$id];
             }
         }
-        return view('classes', ['class' => $data[UUID::ANYTHING]]);
+        return view('classes', ['class' => $data[UUID::EVERYTHING]]);
     }
 
     public function thumb() {

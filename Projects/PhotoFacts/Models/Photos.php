@@ -14,7 +14,7 @@ use App\Eloquent\PhotoMedia;
 use App\Eloquent\Thing;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -150,7 +150,7 @@ class Photos
         $ObjectData = $ObjectData->toArray();
         foreach ($ObjectData as &$row) {
             //$row->event_date = Anything::dateFromDb($row->event_date, 'Europe/Moscow');
-            $row->start_date = Anything::dateFromDb($row->start);
+            $row->start_date = Everything::dateFromDb($row->start);
         }
 
         $copiesData = DB::table('photo_files')
@@ -221,16 +221,16 @@ class Photos
             ->where('last_seen', '!=', $session)
             ->update(['deleted' => true]);
         DB::statement('
-            UPDATE photo_media 
-                SET deleted=1 
-                WHERE thing_id 
+            UPDATE photo_media
+                SET deleted=1
+                WHERE thing_id
                 IN (
-                    SELECT thing_id 
+                    SELECT thing_id
                     FROM (
-                        SELECT m.thing_id 
-                        FROM `photo_media` as m 
-                        LEFT JOIN photo_files on m.thing_id = photo_files.media_thing_id 
-                            AND photo_files.deleted = 0 
+                        SELECT m.thing_id
+                        FROM `photo_media` as m
+                        LEFT JOIN photo_files on m.thing_id = photo_files.media_thing_id
+                            AND photo_files.deleted = 0
                         WHERE photo_files.id IS NULL) as t)');
     }
 
@@ -264,16 +264,16 @@ class Photos
             /*if ($file['name'] == 'seravin.jpg') { // This file causes seg fault
                 echo '';
             }*/
-            $eventDate = Anything::dateToDb($file['event_date']['date'], $file['event_date']['timezone']);
+            $eventDate = Everything::dateToDb($file['event_date']['date'], $file['event_date']['timezone']);
             $file['event_date'] = $file['start'] = $eventDate;
             if (!empty($file['exif_date'])) {
-                $file['exif_date'] = Anything::dateToDb($file['exif_date']['date'], $file['exif_date']['timezone']);
+                $file['exif_date'] = Everything::dateToDb($file['exif_date']['date'], $file['exif_date']['timezone']);
             }
-            $file['file_date'] = Anything::dateToDb($file['file_date']['date'], $file['file_date']['timezone']);
+            $file['file_date'] = Everything::dateToDb($file['file_date']['date'], $file['file_date']['timezone']);
             $file['exif'] = self::clearExif($file['exif']);
             if (empty($file['description'])) {
                 if (@$folderId != $file['folder_id']) {
-                    $Folder = Anything::CreateFromId($file['folder_id']);
+                    $Folder = Everything::CreateFromId($file['folder_id']);
                     $folderName = $Folder->name;
                 }
                 [$mime1] = @explode('/', $file['mime']);
@@ -544,7 +544,7 @@ class Photos
         static $folderName;
         $log = [];
         $file['filename'] = $file['name'];
-        $dateTime = Anything::dateToDb($file['date']['date'], $file['date']['timezone']);
+        $dateTime = Everything::dateToDb($file['date']['date'], $file['date']['timezone']);
         $file['start'] = $dateTime;
 
         [$mime1] = @explode('/', $file['mime']);
@@ -565,7 +565,7 @@ class Photos
         /*if (count($mediaFilesFound) >= 1) {
             // System already knows about this file. No much action needed
             $fileThingId = $mediaFilesFound[0]->file_thing_id;
-            
+
             $mediaThingId = $mediaFilesFound[0]->thing_id;
         } else {
             // No matching file. Need to add record

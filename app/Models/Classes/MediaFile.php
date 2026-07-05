@@ -54,7 +54,7 @@ class MediaFile extends \App\Models\Classes\Thing
             $this->setLink(UUID::LINK_TO_SOURCE, $this->source_id, 'Copy of file "' . $this->getSource()->name . '"');
         }
         if (empty($this->getLinks(UUID::LINK_TO_STORAGE))) {
-            $Folder = Anything::createFromId($this->folder_id);
+            $Folder = Everything::createFromId($this->folder_id);
             $this->setLink(UUID::LINK_TO_STORAGE, $this->folder_id, 'File stored in  "' . $Folder->name . '"');
         }
     }

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use Fokin\Facts\Data\UUID;
@@ -62,7 +62,7 @@ class tmpGeneratePhotoHashes extends Command
                 case 'mpo':
                 case '':  // Some photos with empty extension
                     //$this->info($row->filename."\n");
-                    $thumbPath = Anything::getThumbPathById($row->thing_id, false);
+                    $thumbPath = Everything::getThumbPathById($row->thing_id, false);
                     if (is_file($thumbPath)) {
                         $hash = $hasher->hash($thumbPath);
                         //echo $hash->toHex() . "\n";

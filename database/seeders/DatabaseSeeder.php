@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
         if (DB::table('things')->count() === 0) {
             DB::table('things')->insert([
                 [
-                    'thing_id'    => UUID::ANYTHING,
+                    'thing_id'    => UUID::EVERYTHING,
                     'name'        => 'Everything',
                     'description' => 'base object for everything',
                     'type'        => UUID::G_CLASS,
@@ -111,19 +111,19 @@ class DatabaseSeeder extends Seeder
             DB::table('links')->insert([
                 [
                     'translation'    => '"Something" is subclass of "Everything"',
-                    'one_thing_id'   => UUID::ANYTHING,
+                    'one_thing_id'   => UUID::EVERYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::SOMETHING,
                 ],
                 [
                     'translation'    => '"Link" is subclass of "Everything"',
-                    'one_thing_id'   => UUID::ANYTHING,
+                    'one_thing_id'   => UUID::EVERYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::LINK,
                 ],
                 [
                     'translation'    => '"System" is subclass of "Everything"',
-                    'one_thing_id'   => UUID::ANYTHING,
+                    'one_thing_id'   => UUID::EVERYTHING,
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => UUID::SYSTEM,
                 ],

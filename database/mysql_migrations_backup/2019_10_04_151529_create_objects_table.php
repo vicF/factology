@@ -43,7 +43,7 @@ class CreateObjectsTable extends Migration
 
             $things->insert(
                 [
-                    Thing::ID     => UUID::ANYTHING,
+                    Thing::ID     => UUID::EVERYTHING,
                     'name'        => 'Anything',
                     'description' => 'base object for everything',
                 ]
@@ -88,7 +88,7 @@ class CreateObjectsTable extends Migration
                     Thing::ID        => UUID::LINK,   // LINK class is child of Anything
                     'translation'    => '"Link" is subclass of "Anything"',
                     Link::TYPE       => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::ANYTHING
+                    'other_thing_id' => UUID::EVERYTHING
                 ]
             );
 
@@ -115,7 +115,7 @@ class CreateObjectsTable extends Migration
                     Thing::ID        => UUID::SOMETHING,   // LINK_TO_CLASS is subclass of LINK
                     'translation'    => '"Something" is subclass of "Anything"',
                     Link::TYPE       => UUID::LINK_TO_PARENT,
-                    'other_thing_id' => UUID::ANYTHING
+                    'other_thing_id' => UUID::EVERYTHING
                 ]
             );
 

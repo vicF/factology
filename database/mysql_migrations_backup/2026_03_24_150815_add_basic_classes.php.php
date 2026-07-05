@@ -44,7 +44,7 @@ return new class extends Migration
                 'one_thing_id'        => UUID::SYSTEM,   // LINK class is child of Anything
                 'translation'    => '"System" is subclass of "Anything"',
                 Link::TYPE       => UUID::LINK_TO_PARENT,
-                'other_thing_id' => UUID::ANYTHING
+                'other_thing_id' => UUID::EVERYTHING
             ]
         );
 

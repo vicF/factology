@@ -10,7 +10,7 @@ namespace Fokin\PhotoFacts\Controllers;
 
 use App\Eloquent\Link;
 use App\Models\Classes\Media;
-use App\Models\Classes\Anything;
+use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Support\Facades\DB;
@@ -36,9 +36,9 @@ class PhotoController
                 if (!empty($event['name'])) {
                     // Create new event and assign photos to it
                     $event['type'] = UUID::G_THING;
-                    $event['start'] = Anything::dateToDb($event['start']);
-                    $event['end'] = Anything::dateToDb($event['end']);
-                    $EventObject = new Anything($event);
+                    $event['start'] = Everything::dateToDb($event['start']);
+                    $event['end'] = Everything::dateToDb($event['end']);
+                    $EventObject = new Everything($event);
                     $EventObject->save();
                     $EventObject->setClass($event['class']);
                     $EventObject->symlinkToThumb($event['photo'][0]);
@@ -53,7 +53,7 @@ class PhotoController
                     }
                 } elseif (!empty($event['assign_to'])) {
                     // Assign photos to existing event
-                    $existingEvent = Anything::CreateFromId($event['assign_to']);
+                    $existingEvent = Everything::CreateFromId($event['assign_to']);
                     //$event['start'] = $event['start'] ?: $existingEvent->start;
                     /** @noinspection NestedTernaryOperatorInspection */
                     //$event['end'] = ($event['end'] ?: $existingEvent->end) ?: $existingEvent->start;
@@ -81,12 +81,12 @@ class PhotoController
 
     public function duplicates()
     {
-        $res = DB::select(DB::raw('SELECT * 
+        $res = DB::select(DB::raw('SELECT *
                             FROM photo_media
        INNER JOIN (SELECT phash
                    FROM   photo_media
                 LEFT JOIN things on photo_media.thing_id = things.thing_id
-                   WHERE phash != 0x00000000000000000000000000000000 
+                   WHERE phash != 0x00000000000000000000000000000000
                         AND media_deleted = 0
                         AND things.deleted = 0
                    GROUP  BY phash

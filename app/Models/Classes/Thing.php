@@ -22,7 +22,7 @@ namespace App\Models\Classes;
  * @method Thing end($end)
  * @method Thing class_id($class_id)
  */
-class Thing extends Anything
+class Thing extends Everything
 {
     /**
      * @var array default values for model parameters
