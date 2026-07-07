@@ -30,6 +30,8 @@ class SettingsTest extends TestCase
             'email'                 => 'newuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response->assertStatus(201);
@@ -45,6 +47,8 @@ class SettingsTest extends TestCase
             'email'                 => 'blocked@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response->assertStatus(403);
