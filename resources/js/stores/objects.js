@@ -7,7 +7,7 @@ export const useObjectsStore = defineStore('objects', {
     state: () => ({
         rootNodes: [],        // array of top-level nodes (Something, link, system, ...)
         objects: [],
-        loading: false,
+        loading: true,
         searchText: '',
         processing: false,
         validationErrors: {}

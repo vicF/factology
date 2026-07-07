@@ -1,7 +1,14 @@
 <template>
     <div>
         Classes:
-        <div v-if="rootNodes && rootNodes.length">
+        <div v-if="loading && (!rootNodes || rootNodes.length === 0)" class="tree-loader">
+            <div class="loader-item" v-for="n in 5" :key="n">
+                <span class="loader-toggle"></span>
+                <span class="loader-checkbox"></span>
+                <span class="loader-text" :style="{ width: (60 + Math.random() * 30) + '%' }"></span>
+            </div>
+        </div>
+        <div v-else-if="rootNodes && rootNodes.length">
             <template v-for="root in rootNodes" :key="root.id">
                 <!-- If this is the "Anything" node, render its children directly -->
                 <template v-if="root.id === '939cd822-9e23-450c-8c5e-c23f67cca792' || root.name === 'Everything'">
@@ -41,8 +48,49 @@ const objectsStore = useObjectsStore();
 
 // Use rootNodes from the store (array of top-level nodes)
 const rootNodes = computed(() => objectsStore.rootNodes);
+const loading = computed(() => objectsStore.loading);
 
 onMounted(() => {
     objectsStore.loadClassTree();
 });
 </script>
+
+<style scoped>
+.tree-loader {
+    padding: 8px 0;
+}
+.loader-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    gap: 6px;
+}
+.loader-toggle {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.loader-checkbox {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.loader-text {
+    display: inline-block;
+    height: 14px;
+    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
