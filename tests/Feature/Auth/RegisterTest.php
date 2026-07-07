@@ -21,6 +21,8 @@ class RegisterTest extends TestCase
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response
@@ -57,6 +59,8 @@ class RegisterTest extends TestCase
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response
@@ -72,6 +76,8 @@ class RegisterTest extends TestCase
             'email'                 => 'not-an-email',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response
@@ -87,6 +93,8 @@ class RegisterTest extends TestCase
             'email'                 => 'testuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'different456',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response
@@ -107,6 +115,8 @@ class RegisterTest extends TestCase
             'email'                 => 'alreadyexists@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response
@@ -125,9 +135,70 @@ class RegisterTest extends TestCase
                 'email'                 => 'another@example.com',
                 'password'              => 'password123',
                 'password_confirmation' => 'password123',
+                'accepted_terms'        => 1,
+                'accepted_privacy'      => 1,
             ]);
 
         $response->assertStatus(302);
+    }
+
+    /** @test */
+    public function registration_fails_without_accepting_terms()
+    {
+        $response = $this->postJson(self::API_PREFIX . '/register', [
+            'name'                  => 'No Consent User',
+            'email'                 => 'noconsent@example.com',
+            'password'              => 'password123',
+            'password_confirmation' => 'password123',
+            'accepted_privacy'      => 1,
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['accepted_terms']);
+    }
+
+    /** @test */
+    public function registration_fails_without_accepting_privacy()
+    {
+        $response = $this->postJson(self::API_PREFIX . '/register', [
+            'name'                  => 'No Consent User',
+            'email'                 => 'noconsent@example.com',
+            'password'              => 'password123',
+            'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['accepted_privacy']);
+    }
+
+    /** @test */
+    public function registration_creates_legal_consent_records()
+    {
+        $response = $this->postJson(self::API_PREFIX . '/register', [
+            'name'                  => 'Consent Test User',
+            'email'                 => 'consenttest@example.com',
+            'password'              => 'password123',
+            'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
+        ]);
+
+        $response->assertStatus(201);
+        $user = User::where('email', 'consenttest@example.com')->first();
+
+        $this->assertNotNull($user);
+        $this->assertCount(2, $user->legalConsents);
+
+        $termsConsent = $user->legalConsents->where('document_type', 'terms')->first();
+        $this->assertNotNull($termsConsent);
+        $this->assertEquals('1.0.0', $termsConsent->document_version);
+
+        $privacyConsent = $user->legalConsents->where('document_type', 'privacy')->first();
+        $this->assertNotNull($privacyConsent);
+        $this->assertEquals('1.0.0', $privacyConsent->document_version);
     }
 
     // ────────────────────────────────────────────────
@@ -143,6 +214,8 @@ class RegisterTest extends TestCase
             'email'                 => 'loginuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         // Now attempt to login
@@ -180,6 +253,8 @@ class RegisterTest extends TestCase
             'email'                 => 'logoutuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $token = $registerResponse->json('token');

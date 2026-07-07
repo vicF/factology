@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\LegalController;
 use App\Http\Controllers\TestDatabaseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,10 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+
+    // Legal document routes (public)
+    Route::get('/legal', [LegalController::class, 'index'])->name('legal.index');
+    Route::get('/legal/{type}', [LegalController::class, 'show'])->name('legal.show');
 
     // Public authentication routes
     Route::post('/login',    [LoginController::class, 'login'])->name('login');

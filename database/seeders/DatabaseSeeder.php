@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
                     'name'        => 'Everything',
                     'description' => 'base object for everything',
                     'type'        => UUID::G_CLASS,
-                    'public'      => false,
+                    'public'      => true,
                 ],
                 [
                     'thing_id'    => UUID::LINK,
@@ -342,5 +342,8 @@ class DatabaseSeeder extends Seeder
         if (app()->environment('testing')) {
             $this->call(TestDatabaseSeeder::class);
         }
+
+        // Seed legal documents (placeholder content — admin must replace)
+        $this->call(LegalDocumentSeeder::class);
     }
 }

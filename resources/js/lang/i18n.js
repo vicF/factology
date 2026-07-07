@@ -6,6 +6,13 @@ const messages = {
         End: "End",
         Birth: "Birth",
         Death: "Death",
+        "I accept the": "I accept the",
+        "Terms of Service": "Terms of Service",
+        "I consent to the": "I consent to the",
+        "Privacy Policy": "Privacy Policy",
+        "and agree to the processing of my personal data": "and agree to the processing of my personal data",
+        Close: "Close",
+        "Failed to load document": "Failed to load document",
 
     },
     ru: {
@@ -22,7 +29,14 @@ const messages = {
         Access: "Доступ",
         Public:"Публичный",
         Private:"Приватный",
-        Description: "Описание"
+        Description: "Описание",
+        "I accept the": "Я принимаю",
+        "Terms of Service": "Пользовательское соглашение",
+        "I consent to the": "Я даю согласие на",
+        "Privacy Policy": "Политику конфиденциальности",
+        "and agree to the processing of my personal data": "и соглашаюсь на обработку моих персональных данных",
+        Close: "Закрыть",
+        "Failed to load document": "Не удалось загрузить документ"
     }
 };
 

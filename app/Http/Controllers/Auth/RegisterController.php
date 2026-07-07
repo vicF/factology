@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Classes\UserClass;
+use App\Models\LegalDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,8 @@ class RegisterController extends Controller
             'name'                  => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password'              => ['required', 'string', 'min:8', 'confirmed'],
+            'accepted_terms'        => ['required', 'accepted'],
+            'accepted_privacy'      => ['required', 'accepted'],
         ]);
 
 
@@ -79,6 +82,45 @@ class RegisterController extends Controller
         Log::info('Registration successful - token issued', [
             'user_id'  => $user->id,
             'token_id' => explode('|', $token)[0] ?? null
+        ]);
+
+        // Record legal consents
+        $countryCode = $request->header('CF-IPCountry') ?? '*';
+        $clientIp = $request->ip();
+        $userAgent = $request->userAgent();
+
+        $termsDoc = LegalDocument::where('type', 'terms')
+            ->where(function ($q) use ($countryCode) {
+                $q->where('country', $countryCode)->orWhere('country', '*');
+            })
+            ->where('locale', app()->getLocale())
+            ->orderBy('version', 'desc')
+            ->first();
+
+        $privacyDoc = LegalDocument::where('type', 'privacy')
+            ->where(function ($q) use ($countryCode) {
+                $q->where('country', $countryCode)->orWhere('country', '*');
+            })
+            ->where('locale', app()->getLocale())
+            ->orderBy('version', 'desc')
+            ->first();
+
+        $user->legalConsents()->create([
+            'document_type' => 'terms',
+            'document_version' => $termsDoc ? $termsDoc->version : '1.0.0',
+            'country_code' => $countryCode,
+            'ip_address' => $clientIp,
+            'user_agent' => $userAgent,
+            'agreed_at' => now(),
+        ]);
+
+        $user->legalConsents()->create([
+            'document_type' => 'privacy',
+            'document_version' => $privacyDoc ? $privacyDoc->version : '1.0.0',
+            'country_code' => $countryCode,
+            'ip_address' => $clientIp,
+            'user_agent' => $userAgent,
+            'agreed_at' => now(),
         ]);
 
         return response()->json([

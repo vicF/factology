@@ -42,4 +42,12 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Get the legal consents for the user.
+     */
+    public function legalConsents()
+    {
+        return $this->hasMany(LegalConsent::class);
+    }
 }

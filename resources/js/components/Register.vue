@@ -71,8 +71,26 @@
                                     data-testid="register-password-confirmation"
                                 >
                             </div>
+                            <div class="form-group col-12 mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" v-model="acceptedTerms" id="accepted_terms" class="form-check-input" required data-testid="register-accepted-terms">
+                                    <label class="form-check-label" for="accepted_terms">
+                                        {{ $t('I accept the') }}
+                                        <a href="#" @click.prevent="openLegalDocument('terms')" target="_blank">{{ $t('Terms of Service') }}</a>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" v-model="acceptedPrivacy" id="accepted_privacy" class="form-check-input" required data-testid="register-accepted-privacy">
+                                    <label class="form-check-label" for="accepted_privacy">
+                                        {{ $t('I consent to the') }}
+                                        <a href="#" @click.prevent="openLegalDocument('privacy')" target="_blank">{{ $t('Privacy Policy') }}</a>
+                                        {{ $t('and agree to the processing of my personal data') }}
+                                    </label>
+                                </div>
+                                <div v-if="legalDocError" class="text-danger small mt-1">{{ legalDocError }}</div>
+                            </div>
                             <div class="col-12 mb-3">
-                                <button type="submit" :disabled="processing" class="btn btn-primary btn-block w-100" data-testid="register-submit-btn">
+                                <button type="submit" :disabled="processing || !acceptedTerms || !acceptedPrivacy" class="btn btn-primary btn-block w-100" data-testid="register-submit-btn">
                                     {{ processing ? $t('Please wait') : $t('Register') }}
                                 </button>
                             </div>
@@ -82,6 +100,24 @@
                                 </label>
                             </div>
                         </form>
+
+                        <!-- Legal Document Modal -->
+                        <div v-if="showLegalModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">{{ legalDocTitle }}</h5>
+                                        <button type="button" class="close" @click="showLegalModal = false" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body" v-html="legalDocContent"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" @click="showLegalModal = false">{{ $t('Close') }}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -107,6 +143,13 @@ const user = ref({
     password_confirmation: ''
 });
 
+const acceptedTerms = ref(false);
+const acceptedPrivacy = ref(false);
+const showLegalModal = ref(false);
+const legalDocContent = ref('');
+const legalDocTitle = ref('');
+const legalDocError = ref('');
+
 const validationErrors = ref({});
 const processing = ref(false);
 
@@ -118,7 +161,11 @@ const register = async () => {
         console.log('Starting registration process');
 
         // ORIGINAL FUNCTIONALITY - Keep exactly as it was
-        const response = await axios.post('/register', user.value);
+        const response = await axios.post('/register', {
+            ...user.value,
+            accepted_terms: acceptedTerms.value ? 1 : 0,
+            accepted_privacy: acceptedPrivacy.value ? 1 : 0,
+        });
 
         console.log('Registration response:', response.data);
 
@@ -153,6 +200,22 @@ const register = async () => {
         }
     } finally {
         processing.value = false;
+    }
+};
+
+const openLegalDocument = async (type) => {
+    try {
+        legalDocError.value = '';
+        const locale = localStorage.getItem('locale') || 'en';
+        const response = await axios.get(`/legal/${type}`, {
+            params: { locale }
+        });
+        legalDocTitle.value = response.data.title;
+        legalDocContent.value = response.data.content;
+        showLegalModal.value = true;
+    } catch (error) {
+        legalDocError.value = t('Failed to load document');
+        console.error('Failed to load legal document:', error);
     }
 };
 
