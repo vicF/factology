@@ -68,7 +68,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'everyone']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -81,7 +81,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'registered_only']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(401);
         $response->assertJson([
@@ -98,7 +98,7 @@ class SettingsTest extends TestCase
         $user = $this->createTestUser()->getUser();
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
     }
@@ -211,7 +211,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'everyone']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
         $data = $response->json('data');

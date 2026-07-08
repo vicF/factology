@@ -36,7 +36,8 @@ Scenario('Search page loads and shows objects @all', async () => {
 Scenario('Open an object detail view @all', async () => {
     I.amOnPage('/');
     I.waitForInvisible('.spinner-border', 15);
-    // Click the first result link
+    // Wait for a result link to appear before clicking
+    I.waitForElement('.result-item a, .title-link, .result-title a', 10);
     I.click('.result-item a, .title-link, .result-title a');
     // Object page renders with .object-header
     I.waitForElement('.object-header, .object-title', 10);

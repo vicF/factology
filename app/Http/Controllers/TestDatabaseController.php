@@ -99,10 +99,16 @@ class TestDatabaseController extends Controller
     public function status()
     {
         try {
-            $tables = DB::select('SHOW TABLES');
-            $tableNames = array_map(function($table) {
-                return reset($table);
-            }, $tables);
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'pgsql') {
+                $tables = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'");
+                $tableNames = array_map(function($t) { return $t->table_name; }, $tables);
+            } else {
+                $tables = DB::select('SHOW TABLES');
+                $tableNames = array_map(function($table) {
+                    return reset($table);
+                }, $tables);
+            }
 
             return response()->json([
                 'success' => true,

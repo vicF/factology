@@ -14,6 +14,14 @@ BeforeSuite(async ({ I }) => {
 });
 
 Before(async ({ I }) => {
+    // Navigate to the app first so localStorage is available
+    I.amOnPage('/');
+    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
+    // Clear stale auth from localStorage (DB was just reset, old tokens are invalid)
+    I.executeScript(() => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+    });
     await DB_HELPER.login(I, TEST_USER);
 });
 

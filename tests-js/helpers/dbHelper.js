@@ -62,8 +62,8 @@ const DB_HELPER = {
         I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
         const loginLinkCount = await I.grabNumberOfVisibleElements('[data-testid="login-link"]');
         if (loginLinkCount > 0) {
-            I.click('[data-testid="login-link"]');
-            I.see('Log in');
+            I.click('[data-testid="login-link"]', null, { force: true });
+            I.waitForElement('[data-testid="login-form"]', 15);
             I.fillField('[data-testid="login-email"]', user.email);
             I.fillField('[data-testid="login-password"]', user.password);
             I.click('[data-testid="login-submit-btn"]');

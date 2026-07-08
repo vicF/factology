@@ -248,7 +248,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick, inject } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, inject, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -256,10 +256,11 @@ import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
-import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
+
+const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
