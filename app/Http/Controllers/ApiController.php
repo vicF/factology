@@ -480,7 +480,7 @@ class ApiController extends BaseController
             CAST(NULL AS VARCHAR(255)),
             c.public
         FROM things c
-        WHERE c.thing_id = ? $publicCondition
+        WHERE c.thing_id = ?
 
         UNION ALL
 
