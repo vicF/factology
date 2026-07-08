@@ -416,7 +416,7 @@ const addNewLinkedObject = () => {
         id: uuidv4(),
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
-        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+        link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
         translation: '',
         link_id: null,
     });
