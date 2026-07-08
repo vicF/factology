@@ -149,7 +149,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         await I.fillFieldWithRetry('input[name="name"]', name);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.checkOption('#publicCheckbox');
-        I.click({ css: '.modal-footer .btn-primary' });
+        I.click('Save', { css: '.modal-footer' });
         I.waitForInvisible('.modal', 30);
         I.waitForInvisible('.modal-backdrop', 30);
         I.waitForText(name, 30);
@@ -272,7 +272,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     await I.fillFieldWithRetry('input[name="description"]', 'Created via Create button on Beta Child page');
 
     // Save — creates the object and links it to Beta Child
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Save'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 
@@ -295,7 +295,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     I.fillField('input[name="name"]', 'Gamma Renamed');
 
     // Click Update (edit mode shows "Update", not "Save")
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Update'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 

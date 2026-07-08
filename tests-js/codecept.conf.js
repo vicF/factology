@@ -2,13 +2,14 @@
 const isHeadless = process.env.CI === 'true' || process.env.HEADLESS === 'true';
 
 exports.config = {
-    tests: './**/*_test.js',
+    tests: './e2e/**/*_test.js',
     output: './output',
     helpers: {
         Playwright: {
             url: process.env.APP_URL || 'http://localhost:8005',
             show: !isHeadless,  // Hide browser in headless mode
             browser: 'chromium',
+            windowSize: '1280x720',
             waitForNavigation: 'load',
             waitForTimeout: 30000,
             waitForAction: 500,

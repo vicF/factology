@@ -175,6 +175,65 @@ class TestDatabaseController extends Controller
     }
 
     /**
+     * Seed test classes and objects for acceptance tests
+     */
+    public function seedTestObjects()
+    {
+        try {
+            // These UUIDs are NOT stored in VCS — they are ephemeral per run
+            $testClassId = \Illuminate\Support\Str::uuid()->toString();
+            $testObjectId = \Illuminate\Support\Str::uuid()->toString();
+            $testObject2Id = \Illuminate\Support\Str::uuid()->toString();
+
+            // 1. Create a public test class under Something
+            DB::table('things')->insert([
+                'thing_id'    => $testClassId,
+                'name'        => 'Test Class',
+                'description' => 'Auto-created test class for acceptance tests',
+                'type'        => \Fokin\Facts\Data\UUID::G_CLASS,
+                'public'      => true,
+            ]);
+            DB::table('links')->insert([
+                'one_thing_id'   => \Fokin\Facts\Data\UUID::SOMETHING,
+                'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_PARENT,
+                'other_thing_id' => $testClassId,
+                'translation'    => '"Test Class" is subclass of "Something"',
+            ]);
+
+            // 2. Create public test objects of that class
+            DB::table('things')->insert([
+                ['thing_id' => $testObjectId,  'name' => 'Test Object Alpha', 'description' => 'First test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true],
+                ['thing_id' => $testObject2Id, 'name' => 'Test Object Beta',  'description' => 'Second test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true],
+            ]);
+            DB::table('links')->insert([
+                'one_thing_id'   => $testObjectId,
+                'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_CLASS,
+                'other_thing_id' => $testClassId,
+                'translation'    => '"Test Object Alpha" is of class "Test Class"',
+            ]);
+            DB::table('links')->insert([
+                'one_thing_id'   => $testObject2Id,
+                'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_CLASS,
+                'other_thing_id' => $testClassId,
+                'translation'    => '"Test Object Beta" is of class "Test Class"',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'class_id'  => $testClassId,
+                    'object_id' => $testObjectId,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Delete a test user
      */
     public function deleteUser($id)

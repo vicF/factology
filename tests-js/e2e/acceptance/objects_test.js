@@ -10,6 +10,19 @@ const { I } = inject();
 
 Feature('Objects');
 
+BeforeSuite(async ({ I }) => {
+    // Seed test objects via API (Web SPA mode). In standalone mode,
+    // the local DB has its own seed data so the API call will fail silently.
+    try {
+        const resp = await I.sendPostRequest('/api/test/seed-objects');
+        if (resp.status !== 200 && resp.status !== 201) {
+            console.log('[BeforeSuite] API seed not available (likely standalone mode)');
+        }
+    } catch (e) {
+        console.log('[BeforeSuite] API seed not available (likely standalone mode)');
+    }
+});
+
 Scenario('Search page loads and shows objects @all', async () => {
     I.amOnPage('/');
     // Desktop or mobile view is always present in the layout

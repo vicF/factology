@@ -98,5 +98,8 @@ if (app()->environment('testing')) {
         // User management
         Route::post('/create-user',    [TestDatabaseController::class, 'createUser']);
         Route::delete('/users/{id}',   [TestDatabaseController::class, 'deleteUser']);
+
+        // Seed test data for acceptance tests
+        Route::post('/seed-objects',   [TestDatabaseController::class, 'seedTestObjects']);
     });
 }

@@ -15,7 +15,6 @@ export default defineConfig({
         }
     },
     test: {
-        root: path.resolve(__dirname),
         pool: 'threads',
         globals: true,
         environment: 'jsdom',
@@ -24,7 +23,7 @@ export default defineConfig({
             path.resolve(__dirname, 'tests-vitest/setup.localDb.js'),
         ],
         include: [
-            path.resolve(__dirname, 'tests-vitest/**/*.{test,spec}.?(c|m)[jt]s?(x)'),
+            'tests-vitest/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
         ],
         server: {
             deps: {
