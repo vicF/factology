@@ -2,6 +2,9 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
     plugins: [vue()],
@@ -12,11 +15,15 @@ export default defineConfig({
         }
     },
     test: {
+        pool: 'threads',
         globals: true,
         environment: 'jsdom',
         setupFiles: [
-            './tests-vitest/setup.js',
-            './tests-vitest/setup.localDb.js',
+            path.resolve(__dirname, 'tests-vitest/setup.js'),
+            path.resolve(__dirname, 'tests-vitest/setup.localDb.js'),
+        ],
+        include: [
+            'tests-vitest/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
         ],
         server: {
             deps: {

@@ -14,6 +14,14 @@ BeforeSuite(async ({ I }) => {
 });
 
 Before(async ({ I }) => {
+    // Navigate to the app first so localStorage is available
+    I.amOnPage('/');
+    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
+    // Clear stale auth from localStorage (DB was just reset, old tokens are invalid)
+    I.executeScript(() => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+    });
     await DB_HELPER.login(I, TEST_USER);
 });
 
@@ -75,6 +83,7 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         }
 
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
+        I.wait(2);
         I.dontSee(name);
     }
 
@@ -149,7 +158,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         await I.fillFieldWithRetry('input[name="name"]', name);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.checkOption('#publicCheckbox');
-        I.click({ css: '.modal-footer .btn-primary' });
+        I.click('Save', { css: '.modal-footer' });
         I.waitForInvisible('.modal', 30);
         I.waitForInvisible('.modal-backdrop', 30);
         I.waitForText(name, 30);
@@ -167,6 +176,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
             // Popup may already be auto-accepted
         }
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
+        I.wait(2);
         I.dontSee(name);
     }
 
@@ -189,6 +199,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     await createClass('Something', 'Relation Test', 'Testing object relationships');
 
     // Reset to clean tree context: navigate to Something page before tree operations
+    I.wait(1);
     I.click(`//a[normalize-space()="Something"]`);
     I.waitForElement('.object-header', 30);
 
@@ -220,8 +231,8 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
 
     // The EditLinkModal shows 3 ObjectFields: First object (pre-filled), Link type, Second object.
     // We need to select Beta Child as the Second object.
-    // Click the 3rd .object-field's input to activate its dropdown
-    const secondObjectInput = locate('.form-control').inside(locate('.object-field').at(3));
+    // Click the 3rd .form-group's input to activate its dropdown (the "Second object" field)
+    const secondObjectInput = '.linked-object .form-group:nth-of-type(3) input.form-control';
     I.click(secondObjectInput);
     I.wait(0.5); // wait for dropdown to open
 
@@ -272,7 +283,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     await I.fillFieldWithRetry('input[name="description"]', 'Created via Create button on Beta Child page');
 
     // Save — creates the object and links it to Beta Child
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Save'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 
@@ -295,7 +306,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     I.fillField('input[name="name"]', 'Gamma Renamed');
 
     // Click Update (edit mode shows "Update", not "Save")
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Update'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 

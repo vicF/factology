@@ -437,8 +437,8 @@ const onTouchEnd = (e) => {
 const checkAuth = async () => {
     try {
         const response = await axios.get('user', { noAuthRedirect: true })
-        if (response.data && !authStore.authenticated) {
-            authStore.login(response.data)
+        if (response.data && !authStore.authenticated && authStore.token) {
+            authStore.login(response.data, authStore.token)
         }
         console.log('Authenticated:', authStore.authenticated)
         console.log('User:', authStore.user)

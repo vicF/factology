@@ -248,7 +248,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick, inject } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, inject, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -256,10 +256,11 @@ import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
-import Graph from './Graph.vue';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
+
+const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -297,7 +298,7 @@ const defaultLinkedObjects = computed(() => {
     if (object.value) {
         links.push({
             other_thing_id: object.value.thing_id,
-            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+            link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
             description: `Linked to ${object.value.name}`,
         });
     }
@@ -375,7 +376,7 @@ const openCreateLinkModal = () => {
     newLinkData.value = {
         one_thing_id: object.value.thing_id,
         other_thing_id: null,
-        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+        link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
         translation: '',
         link_id: null,
         link_start: null,

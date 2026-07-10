@@ -12,6 +12,7 @@ exports.config = {
             url: process.env.STANDALONE_URL || 'http://localhost:4173',
             show: !isHeadless,
             browser: 'chromium',
+            windowSize: '1280x720',
             waitForNavigation: 'load',
             waitForTimeout: 30000,
             waitForAction: 500,

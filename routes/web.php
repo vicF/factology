@@ -6,38 +6,7 @@ use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
 
 Route::get('/', function () {
-    $devUrl = env('VITE_DEV_SERVER_URL', 'http://localhost:5173');
-    $isDev = env('APP_ENV') === 'local' || file_exists(public_path('hot'));
-    if ($isDev) {
-        $head = '';
-        $body = <<<SCRIPTS
-        <script type="module" src="{$devUrl}/@vite/client"></script>
-        <script type="module" src="{$devUrl}/resources/js/app.js"></script>
-        SCRIPTS;
-    } else {
-        $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
-        $entry = $manifest['resources/js/app.js'] ?? [];
-        $body = '<script type="module" src="/build/' . ($entry['file'] ?? 'assets/app.js') . '"></script>';
-        $cssLinks = '';
-        foreach ($entry['css'] ?? [] as $css) {
-            $cssLinks .= "\n        " . '<link rel="stylesheet" href="/build/' . $css . '">';
-        }
-        $head = $cssLinks;
-    }
-    return <<<HTML
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Factology</title>{$head}
-    </head>
-    <body>
-        <div id="app"></div>
-        {$body}
-    </body>
-    </html>
-    HTML;
+    return view('welcome');
 });
 
 // ✅ Documentation routes FIRST (these will be handled by Laravel)
