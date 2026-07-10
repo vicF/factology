@@ -16,21 +16,25 @@ class DatabaseSeeder extends Seeder
         // referenced by the code (e.g. UUID::ANYTHING, UUID::USER).
         // ============================================================
 
+        // Get current server UUID for provenance tracking
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+
         // General types
-        if (DB::table('general_types')->count() === 0) {
-            DB::table('general_types')->insert([
-                ['id' => UUID::GENERAL,   'name' => 'GENERAL'],
-                ['id' => UUID::G_CLASS,   'name' => 'CLASS'],
-                ['id' => UUID::G_THING,   'name' => 'THING'],
-                ['id' => UUID::G_LINK,    'name' => 'LINK'],
-                ['id' => UUID::G_EXTERNAL,'name' => 'EXTERNAL'],
-                ['id' => UUID::G_SERVER,  'name' => 'SERVER'],
-            ]);
+        $generalTypes = [
+            ['id' => UUID::GENERAL,   'name' => 'GENERAL'],
+            ['id' => UUID::G_CLASS,   'name' => 'CLASS'],
+            ['id' => UUID::G_THING,   'name' => 'THING'],
+            ['id' => UUID::G_LINK,    'name' => 'LINK'],
+            ['id' => UUID::G_EXTERNAL,'name' => 'EXTERNAL'],
+            ['id' => UUID::G_SERVER,  'name' => 'SERVER'],
+        ];
+        foreach ($generalTypes as $gt) {
+            DB::table('general_types')->upsert($gt, 'id', ['name']);
         }
 
         // Bootstrap things (class hierarchy root nodes)
-        if (DB::table('things')->count() === 0) {
-            DB::table('things')->insert([
+        if (!DB::table('things')->where('thing_id', UUID::EVERYTHING)->exists()) {
+            $bootstrapThings = [
                 [
                     'thing_id'    => UUID::EVERYTHING,
                     'name'        => 'Everything',
@@ -101,13 +105,16 @@ class DatabaseSeeder extends Seeder
                     'type'        => UUID::G_LINK,
                     'public'      => true,
                 ],
-            ]);
+            ];
+            DB::table('things')->insert(
+                array_map(fn($t) => array_merge($t, ['server_uuid' => $serverUuid]), $bootstrapThings)
+            );
         }
 
         // Bootstrap links (class hierarchy edges)
         // Order matters — children appear in this order in the class tree
         // Top level: Something (user classes), Link (link types), System (infrastructure)
-        if (DB::table('links')->count() === 0) {
+        if (!DB::table('links')->where('link_type_id', UUID::LINK_TO_PARENT)->exists()) {
             DB::table('links')->insert([
                 [
                     'translation'    => '"Something" is subclass of "Everything"',
@@ -223,7 +230,11 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($classes as $class) {
-            DB::table('things')->upsert($class, ['thing_id'], ['name', 'description', 'public']);
+            DB::table('things')->upsert(
+                array_merge($class, ['server_uuid' => $serverUuid]),
+                ['thing_id'],
+                ['name', 'description', 'public', 'server_uuid']
+            );
         }
 
         // Class hierarchy links (LINK_TO_PARENT)

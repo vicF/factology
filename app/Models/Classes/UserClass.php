@@ -56,6 +56,7 @@ class UserClass extends Everything
                 'type'        => UUID::G_THING,
                 'owner'       => $this->thing_id,
                 'public'      => false,
+                'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
             ]);
             $this->user = User::create([
                 'name'     => $this->name,

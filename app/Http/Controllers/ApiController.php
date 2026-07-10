@@ -123,7 +123,7 @@ class ApiController extends BaseController
              * Type identifier
              * @example 3
              */
-            'type' => ['required', 'integer', 'min:1', 'max:5'],
+            'type' => ['required', 'integer', 'min:1', 'max:6'],
 
             /**
              * Class relationship data (optional)
@@ -165,11 +165,15 @@ class ApiController extends BaseController
             try {
                 $model->save();
             } catch(\Throwable $e) {
+                $statusCode = $e->getCode();
+                if ($statusCode < 100 || $statusCode > 599) {
+                    $statusCode = 500;
+                }
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to save the record',
+                    'message' => $e->getMessage() ?? 'Failed to save the record',
                     'errors' => $e->getMessage() ?? 'Unknown error occurred'
-                ], $e->getCode() ?:500);
+                ], $statusCode);
             }
             /*if ($request->parent_id) {
 

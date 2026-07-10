@@ -530,6 +530,7 @@ class ApiTest extends TestCase
     private function createUserThing(User $user): string
     {
         $thingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $thingId,
             'name'        => 'thing-' . $user->name,
@@ -537,6 +538,7 @@ class ApiTest extends TestCase
             'type'        => 3,
             'owner'       => $thingId,
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
         return $thingId;
     }

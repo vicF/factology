@@ -24,6 +24,11 @@ return new class extends Migration
             DB::transaction(function () {
                 $serverUuid = (string) Str::uuid();
 
+                DB::table('general_types')->upsert(
+                    ['id' => 6, 'name' => 'SERVER'],
+                    'id'
+                );
+
                 $firstAdmin = DB::table('users')->where('is_admin', true)->orderBy('id')->first();
                 $ownerUuid = $firstAdmin?->thing_id;
 
