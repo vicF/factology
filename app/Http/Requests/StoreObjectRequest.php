@@ -28,7 +28,7 @@ class StoreObjectRequest extends FormRequest
             ],
             'public' => ['required', 'integer', Rule::in([0, 1])],
             'parent_id' => ['nullable', 'string', 'uuid'],
-            'type' => ['required', 'integer', 'min:1', 'max:5'],
+            'type' => ['required', 'integer', 'min:1', 'max:6'],
 
             // Optional class relationship data
             'class' => ['sometimes', 'array'],

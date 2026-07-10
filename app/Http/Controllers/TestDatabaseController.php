@@ -198,6 +198,7 @@ class TestDatabaseController extends Controller
                 'description' => 'Auto-created test class for acceptance tests',
                 'type'        => \Fokin\Facts\Data\UUID::G_CLASS,
                 'public'      => true,
+                'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
             ]);
             DB::table('links')->insert([
                 'one_thing_id'   => \Fokin\Facts\Data\UUID::SOMETHING,
@@ -207,9 +208,10 @@ class TestDatabaseController extends Controller
             ]);
 
             // 2. Create public test objects of that class
+            $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
             DB::table('things')->insert([
-                ['thing_id' => $testObjectId,  'name' => 'Test Object Alpha', 'description' => 'First test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true],
-                ['thing_id' => $testObject2Id, 'name' => 'Test Object Beta',  'description' => 'Second test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true],
+                array_merge(['thing_id' => $testObjectId,  'name' => 'Test Object Alpha', 'description' => 'First test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true], ['server_uuid' => $serverUuid]),
+                array_merge(['thing_id' => $testObject2Id, 'name' => 'Test Object Beta',  'description' => 'Second test object', 'type' => \Fokin\Facts\Data\UUID::G_THING, 'public' => true], ['server_uuid' => $serverUuid]),
             ]);
             DB::table('links')->insert([
                 'one_thing_id'   => $testObjectId,

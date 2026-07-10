@@ -64,6 +64,7 @@ class Everything
         'LINK'     => UUID::G_LINK,
         'THING'    => UUID::G_THING,
         'EXTERNAL' => UUID::G_EXTERNAL,
+        'SERVER'   => UUID::G_SERVER,
     ];
 
     public const TIME_FORMAT = 'Y-m-d H:i:s';
@@ -87,7 +88,10 @@ class Everything
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
+
+    protected static ?string $_serverUuid = null;
 
     public $params = [
         'deleted',
@@ -105,6 +109,7 @@ class Everything
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
     public $defaults = ['end' => null, 'public' => 0];
     public $additionalParams = [];
@@ -527,7 +532,7 @@ class Everything
         }
         if (!isset($this->type)) {
             $errors[] = 'Empty type';
-        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL], true)) {
+        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
             $errors[] = 'Unknown type: ' . $this->type;
         }
         if (count($errors) === 0) {
@@ -553,6 +558,13 @@ class Everything
             $this->owner = auth()->user()->thing_id;
         }
         $this->_validate();
+        // Auto-set server_uuid for objects created on this server
+        if (empty($this->server_uuid)) {
+            if (self::$_serverUuid === null) {
+                self::$_serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+            }
+            $this->server_uuid = self::$_serverUuid;
+        }
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
         if (empty($this->thing_id)) {
@@ -574,6 +586,7 @@ class Everything
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],
                 'owner'          => $data['owner'],
+                'server_uuid'    => $data['server_uuid'] ?? self::$_serverUuid,
                 'record_updated' => now(),
             ];
 
@@ -1038,7 +1051,7 @@ class Everything
         if ($format === null) {
             $format = self::TIME_FORMAT;
         }
-        if ($number === null) {
+        if ($number === null || $number === '') {
             return null;
         }
         if ($timeZone === null) {
