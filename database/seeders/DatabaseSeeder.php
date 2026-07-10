@@ -206,6 +206,7 @@ class DatabaseSeeder extends Seeder
             ['thing_id' => 'a31e2319-d8e0-4e48-98c8-3f23d0a17d50', 'name' => 'Region',                  'description' => 'Регион, область, штат',                                                                                                               'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '602f1b6b-1383-442b-908c-1a027d7a8010', 'name' => 'Restaurant, club, bar',    'description' => 'Клуб, бар, ресторан.',                                                                                                                'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '62e7ab56-4ebe-4002-a7f1-896e266b8078', 'name' => 'Sea',                      'description' => 'Море',                                                                                                                               'type' => UUID::G_CLASS, 'public' => true],
+            ['thing_id' => UUID::G_SERVER_CLASS,                   'name' => 'Server',                   'description' => 'Сервер или другое устройство/приложение, работающее от имени этого сервера',                                                       'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '89539d56-fea3-4349-a3f2-f4cff229f879', 'name' => 'Service, repairment',      'description' => 'Починка, ремонт',                                                                                                                     'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => 'af6d4e0b-f452-442e-9fba-dcb60546b11d', 'name' => 'Sports activity',          'description' => '',                                                                                                                                   'type' => UUID::G_CLASS, 'public' => true],
             ['thing_id' => '8617d9c3-94fb-4f75-a983-1d8ba0822b0d', 'name' => 'Star system',              'description' => 'Звездная система',                                                                                                                    'type' => UUID::G_CLASS, 'public' => true],
@@ -328,6 +329,7 @@ class DatabaseSeeder extends Seeder
             ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'c532f6ba-27b2-43ec-b4ec-30cbff78eed0', 'translation' => 'Access group is subclass of System'],
             ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'ea206516-9e45-482f-89be-05313f52e5e3', 'translation' => 'Group read access is subclass of System'],
             ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => 'e18d73eb-a5d3-47be-a785-106f6f185651', 'translation' => 'Belongs to user group is subclass of System'],
+            ['one_thing_id' => 'c0b920d7-8b14-43a4-a28a-16115d0bee9e', 'other_thing_id' => UUID::G_SERVER_CLASS,                   'translation' => 'Server is subclass of System'],
         ];
 
         foreach ($classLinks as $link) {
@@ -343,6 +345,24 @@ class DatabaseSeeder extends Seeder
                     'link_type_id'   => UUID::LINK_TO_PARENT,
                     'other_thing_id' => $link['other_thing_id'],
                     'translation'    => $link['translation'],
+                ]);
+            }
+        }
+
+        // Link any existing server things to the Server class
+        $servers = DB::table('things')->where('type', UUID::G_SERVER)->get();
+        foreach ($servers as $server) {
+            $alreadyLinked = DB::table('links')
+                ->where('one_thing_id', $server->thing_id)
+                ->where('link_type_id', UUID::LINK_TO_CLASS)
+                ->exists();
+
+            if (!$alreadyLinked) {
+                DB::table('links')->insert([
+                    'one_thing_id'   => $server->thing_id,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::G_SERVER_CLASS,
+                    'translation'    => $server->name . ' is of class Server',
                 ]);
             }
         }
