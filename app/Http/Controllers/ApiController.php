@@ -15,6 +15,7 @@ use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ApiController extends BaseController
 {
@@ -224,6 +225,10 @@ class ApiController extends BaseController
                 ->where('link_id', $data['link_id'])
                 ->update($data);
         } else {
+            // Generate link_uuid for stable export/import matching if not provided
+            if (empty($data['link_uuid'])) {
+                $data['link_uuid'] = (string) Str::uuid();
+            }
             DB::table('links')
                 ->insert($data);
         }
@@ -432,7 +437,7 @@ class ApiController extends BaseController
                 $query->where('public', 0);
             }
         }
-        $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get()->keyBy('thing_id');
+        $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];

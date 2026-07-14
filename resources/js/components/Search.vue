@@ -7,12 +7,30 @@
                 </div>
             </div>
         </div>
-        <div v-else-if="objects.length === 0" class="row">
+        <!-- Admin toolbar: Export / Import -->
+        <div v-if="authStore.user?.is_admin" class="row mb-2">
+            <div class="col-md-10 offset-md-1">
+                <div class="admin-toolbar d-flex gap-2 align-items-center">
+                    <button class="btn btn-outline-secondary btn-sm" @click="exportData" :disabled="exporting">
+                        {{ exporting ? 'Exporting...' : 'Export' }}
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @click="showImportModal = true">
+                        Import
+                    </button>
+                    <label class="small text-muted mb-0 ms-2">
+                        <input type="checkbox" v-model="includeDeleted" />
+                        Include deleted
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="loaded && objects.length === 0" class="row">
             <div class="col text-center py-5">
                 <p class="text-muted">No results found</p>
             </div>
         </div>
-        <div v-else class="row">
+        <div v-if="loaded && objects.length > 0" class="row">
             <div class="col">
                 <div class="row mt-3">
                     <div class="col-md-10 offset-md-1">
@@ -111,6 +129,8 @@
                 </div>
             </div>
         </div>
+
+        <ImportModal v-if="showImportModal" @close="showImportModal = false" />
     </div>
 </template>
 
@@ -120,7 +140,9 @@ import { useRoute } from 'vue-router';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
+import { useAuthStore } from '../stores/auth';
 import Image from "./Image.vue";
+import ImportModal from "./ImportModal.vue";
 
 const props = defineProps({
     searchText: String,
@@ -132,11 +154,17 @@ defineOptions({ name: "Search" });
 
 const route = useRoute();
 const searchStore = useSearchStore();
+const authStore = useAuthStore();
 
 const objects = ref([]);
 const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
+
+// Export/Import state
+const exporting = ref(false);
+const includeDeleted = ref(false);
+const showImportModal = ref(false);
 
 if (props.typeThing !== undefined && props.typeThing !== null) {
     searchStore.setTypeThing(props.typeThing === 'true' || props.typeThing === true);
@@ -161,6 +189,33 @@ const formatDateShort = (dateString) => {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
+};
+
+const exportData = async () => {
+    exporting.value = true;
+    try {
+        const response = await axios.get('/export', {
+            params: { include_deleted: includeDeleted.value },
+            responseType: 'blob',
+        });
+
+        // Trigger browser download using raw blob (avoids double-encoding)
+        const blob = new Blob([response.data], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        a.download = `factology-export-${timestamp}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Export failed:', error);
+        alert('Export failed: ' + (error.response?.data?.message || error.message));
+    } finally {
+        exporting.value = false;
+    }
 };
 
 const getObjects = async () => {
