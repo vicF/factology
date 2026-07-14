@@ -348,6 +348,7 @@ class Everything
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
         $second = DB::table('links') // other way links
@@ -355,6 +356,7 @@ class Everything
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
         $thing['links'] = $first
