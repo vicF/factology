@@ -126,7 +126,10 @@ const importData = async () => {
             error.value = response.data.message || 'Import failed';
         }
     } catch (err) {
-        error.value = err.response?.data?.message || err.message || 'Import failed';
+        error.value = err.response?.data?.message
+            || (err.response?.status ? `Server error (${err.response.status})` : null)
+            || err.message
+            || 'Import failed';
         console.error('Import error:', err);
     } finally {
         importing.value = false;

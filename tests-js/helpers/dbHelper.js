@@ -57,8 +57,8 @@ const DB_HELPER = {
     async login(I, user) {
         I.amOnPage('/');
         I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
-        I.wait(1);
-        I.click('[data-testid="user-dropdown-btn"]', null, { force: true });
+        I.wait(2);
+        I.click('[data-testid="user-dropdown-btn"]');
         I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
         const loginLinkCount = await I.grabNumberOfVisibleElements('[data-testid="login-link"]');
         if (loginLinkCount > 0) {

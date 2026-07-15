@@ -9,7 +9,7 @@ class ImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file'           => 'nullable|file|mimes:json|max:51200', // 50MB max
+            'file'           => 'nullable|file|mimes:json|max:256000', // 250MB max
             'conflict_mode'  => 'nullable|string|in:latest_wins,keep_existing,overwrite',
         ];
     }
