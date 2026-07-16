@@ -12,24 +12,35 @@ use Illuminate\Support\Str;
 class ExportImportController extends BaseController
 {
     /**
-     * Export all things and links as JSON.
-     * Admin only.
+     * Export things and links as JSON.
+     * Admins export everything; regular users export only their own objects.
      */
     public function export(Request $request)
     {
-        if (!Auth::check() || !Auth::user()->is_admin) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
+        $isAdmin = Auth::check() && Auth::user()->is_admin;
+        $userThingId = Auth::user()->thing_id;
 
         $includeDeleted = $request->boolean('include_deleted', false);
 
-        // Count first — fast queries
         $thingsQuery = DB::table('things');
         $linksQuery = DB::table('links');
+
+        // Non-admin users see only their own things
+        if (!$isAdmin) {
+            $thingsQuery->where('owner', $userThingId);
+        }
 
         if (!$includeDeleted) {
             $thingsQuery->where('deleted', false);
             $linksQuery->where('deleted', false);
+        }
+
+        // For non-admin, also scope links to the user's things
+        if (!$isAdmin) {
+            $linksQuery->where(function ($q) use ($userThingId) {
+                $q->where('one_thing_id', $userThingId)
+                  ->orWhere('other_thing_id', $userThingId);
+            });
         }
 
         $totalThings = $thingsQuery->count();
@@ -37,8 +48,7 @@ class ExportImportController extends BaseController
         $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
 
         // Stream JSON response — chunked to avoid OOM with large datasets.
-        // JSON is built manually so we can interleave chunked DB results.
-        return response()->stream(function () use ($thingsQuery, $linksQuery, $totalThings, $totalLinks, $serverUuid, $includeDeleted) {
+        return response()->stream(function () use ($thingsQuery, $linksQuery, $totalThings, $totalLinks, $serverUuid, $includeDeleted, $isAdmin) {
             // Open JSON and write header fields
             echo '{';
             echo '"version":1,';
@@ -46,6 +56,7 @@ class ExportImportController extends BaseController
             echo '"server_uuid":' . json_encode($serverUuid) . ',';
             echo '"exported_by":' . json_encode(Auth::user()->thing_id) . ',';
             echo '"include_deleted":' . json_encode($includeDeleted) . ',';
+            echo '"export_scope":"' . ($isAdmin ? 'all' : 'own') . '",';
             echo '"stats":' . json_encode(['things' => $totalThings, 'links' => $totalLinks]) . ',';
 
             // ── Things ──────────────────────────────────────────────
@@ -92,13 +103,13 @@ class ExportImportController extends BaseController
 
     /**
      * Import things and links from JSON.
-     * Admin only.
+     * Admins import everything; regular users import only their own objects
+     * (owner is overridden to the importing user).
      */
     public function import(ImportRequest $request)
     {
-        if (!Auth::check() || !Auth::user()->is_admin) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
+        $isAdmin = Auth::check() && Auth::user()->is_admin;
+        $userThingId = Auth::user()->thing_id;
 
         // Parse input JSON (from file upload or request body)
         $jsonData = null;
@@ -124,6 +135,19 @@ class ExportImportController extends BaseController
         $conflictMode = $request->input('conflict_mode', 'latest_wins');
         $importData = $jsonData['data'];
 
+        // Validate server_uuid is present on every imported thing
+        if (!empty($importData['things'])) {
+            foreach ($importData['things'] as $i => $thing) {
+                if (empty($thing['server_uuid'])) {
+                    $id = $thing['thing_id'] ?? "(index {$i})";
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Thing {$id} is missing 'server_uuid'. All exported data includes server_uuid for provenance tracking.",
+                    ], 422);
+                }
+            }
+        }
+
         $result = [
             'imported' => ['things' => 0, 'links' => 0],
             'skipped'  => ['things' => 0, 'links' => 0],
@@ -132,11 +156,11 @@ class ExportImportController extends BaseController
         ];
 
         try {
-            DB::transaction(function () use ($importData, $conflictMode, &$result) {
+            DB::transaction(function () use ($importData, $conflictMode, &$result, $isAdmin, $userThingId) {
                 // Import things first (links reference them)
                 if (!empty($importData['things'])) {
                     foreach ($importData['things'] as $thing) {
-                        $this->importThing($thing, $conflictMode, $result);
+                        $this->importThing($thing, $conflictMode, $result, $isAdmin, $userThingId);
                     }
                 }
 
@@ -164,7 +188,7 @@ class ExportImportController extends BaseController
     /**
      * Import a single thing record.
      */
-    private function importThing(array $thing, string $conflictMode, array &$result): void
+    private function importThing(array $thing, string $conflictMode, array &$result, bool $isAdmin, string $userThingId): void
     {
         if (empty($thing['thing_id'])) {
             $result['errors'][] = 'Thing missing thing_id, skipping';
@@ -174,6 +198,12 @@ class ExportImportController extends BaseController
         $existingThing = DB::table('things')->where('thing_id', $thing['thing_id'])->first();
 
         if ($existingThing) {
+            // Non-admin users can only update their own things
+            if (!$isAdmin && $existingThing->owner !== $userThingId) {
+                $result['skipped']['things']++;
+                return;
+            }
+
             // Thing exists — apply conflict resolution
             if ($conflictMode === 'keep_existing') {
                 $result['skipped']['things']++;
@@ -201,7 +231,7 @@ class ExportImportController extends BaseController
             DB::table('things')->where('thing_id', $thing['thing_id'])->update($updateData);
             $result['imported']['things']++;
         } else {
-            // New thing — insert with all fields preserved (including owner)
+            // New thing — insert
             if (!empty($thing['deleted'])) {
                 // Skip inserting soft-deleted things that don't exist locally
                 $result['skipped']['things']++;
@@ -209,11 +239,15 @@ class ExportImportController extends BaseController
             }
 
             $insertData = $this->buildThingData($thing);
-            $insertData['thing_id'] = $thing['thing_id'];
-            // Preserve original owner — do NOT assign importing user as owner
-            if (empty($insertData['owner'])) {
-                $insertData['owner'] = $thing['owner'] ?? Auth::user()->thing_id;
+
+            if (!$isAdmin) {
+                // Non-admin: own all imported things
+                $insertData['owner'] = $userThingId;
+            } elseif (empty($insertData['owner'])) {
+                $insertData['owner'] = $thing['owner'] ?? $userThingId;
             }
+
+            $insertData['thing_id'] = $thing['thing_id'];
             // Set record_created for new records
             if (empty($insertData['record_created'])) {
                 $insertData['record_created'] = now();
