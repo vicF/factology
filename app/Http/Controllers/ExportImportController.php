@@ -95,7 +95,7 @@ class ExportImportController extends BaseController
             });
 
             // Close JSON structure
-            echo ']}';
+            echo ']}}';
         }, 200, [
             'Content-Type' => 'application/json',
         ]);
@@ -157,17 +157,164 @@ class ExportImportController extends BaseController
 
         try {
             DB::transaction(function () use ($importData, $conflictMode, &$result, $isAdmin, $userThingId) {
-                // Import things first (links reference them)
+                // ── Things ────────────────────────────────────────
                 if (!empty($importData['things'])) {
+                    // Pre-load existing thing IDs (chunked to avoid PostgreSQL 65535 param limit)
+                    $allIds = array_map('strval', array_column($importData['things'], 'thing_id'));
+                    $allIds = array_values(array_unique(array_filter($allIds)));
+
+                    $existingMap = [];
+                    if (!empty($allIds)) {
+                        foreach (array_chunk($allIds, 1000) as $idChunk) {
+                            $existingRows = DB::table('things')
+                                ->whereIn('thing_id', $idChunk)
+                                ->get(['thing_id', 'record_updated', 'owner']);
+                            foreach ($existingRows as $row) {
+                                $existingMap[$row->thing_id] = $row;
+                            }
+                        }
+                    }
+
+                    // Split into new (batch insert) and existing (conflict resolution)
+                    $newBatch = [];
                     foreach ($importData['things'] as $thing) {
-                        $this->importThing($thing, $conflictMode, $result, $isAdmin, $userThingId);
+                        $tid = $thing['thing_id'];
+                        if (isset($existingMap[$tid])) {
+                            // Existing — process individually
+                            $this->importThing($thing, $conflictMode, $result, $isAdmin, $userThingId, $existingMap[$tid]);
+                        } else {
+                            // New thing — skip if soft-deleted
+                            if (!empty($thing['deleted'])) {
+                                $result['skipped']['things']++;
+                                continue;
+                            }
+
+                            $insertData = $this->buildThingData($thing);
+
+                            if (!$isAdmin) {
+                                $insertData['owner'] = $userThingId;
+                            } elseif (empty($insertData['owner'])) {
+                                $insertData['owner'] = $thing['owner'] ?? $userThingId;
+                            }
+
+                            $insertData['thing_id'] = $tid;
+                            $insertData['record_created'] = $thing['record_created'] ?? now();
+                            $insertData['record_updated'] = now();
+
+                            $newBatch[] = $insertData;
+
+                            // Flush batch every 500 rows
+                            if (count($newBatch) >= 500) {
+                                DB::table('things')->insert($newBatch);
+                                $result['imported']['things'] += count($newBatch);
+                                $newBatch = [];
+                            }
+                        }
+                    }
+
+                    // Insert remaining new things
+                    if (!empty($newBatch)) {
+                        DB::table('things')->insert($newBatch);
+                        $result['imported']['things'] += count($newBatch);
                     }
                 }
 
-                // Import links
+                // ── Links ────────────────────────────────────────
                 if (!empty($importData['links'])) {
+                    // Pre-load existing link UUIDs in a single query
+                    $linkUuids = array_map('strval', array_column(
+                        array_filter($importData['links'], fn($l) => !empty($l['link_uuid'])),
+                        'link_uuid'
+                    ));
+
+                    $existingLinkMap = [];
+                    if (!empty($linkUuids)) {
+                        foreach (array_chunk($linkUuids, 1000) as $uuidChunk) {
+                            $existingLinks = DB::table('links')
+                                ->whereIn('link_uuid', $uuidChunk)
+                                ->get(['link_id', 'link_uuid']);
+                            foreach ($existingLinks as $row) {
+                                $existingLinkMap[$row->link_uuid] = $row;
+                            }
+                        }
+                    }
+
+                    $newLinkBatch = [];
                     foreach ($importData['links'] as $link) {
-                        $this->importLink($link, $conflictMode, $result);
+                        $matched = null;
+
+                        // Match by link_uuid first
+                        if (!empty($link['link_uuid']) && isset($existingLinkMap[$link['link_uuid']])) {
+                            $matched = $existingLinkMap[$link['link_uuid']];
+                        }
+
+                        // Fall back to unique constraint match
+                        if (!$matched
+                            && !empty($link['one_thing_id'])
+                            && !empty($link['other_thing_id'])
+                            && !empty($link['link_type_id'])
+                        ) {
+                            $matched = DB::table('links')
+                                ->where('one_thing_id', $link['one_thing_id'])
+                                ->where('other_thing_id', $link['other_thing_id'])
+                                ->where('link_type_id', $link['link_type_id'])
+                                ->first();
+                        }
+
+                        if ($matched) {
+                            // Existing link — conflict resolution
+                            if (!empty($link['deleted'])) {
+                                DB::table('links')->where('link_id', $matched->link_id)->update(['deleted' => true]);
+                                $result['deleted']['links']++;
+                            } elseif ($conflictMode === 'overwrite') {
+                                $updateData = $this->buildLinkData($link);
+                                DB::table('links')->where('link_id', $matched->link_id)->update($updateData);
+                                $result['imported']['links']++;
+                            } else {
+                                $result['skipped']['links']++;
+                            }
+                        } else {
+                            // New link
+                            if (!empty($link['deleted'])) {
+                                $result['skipped']['links']++;
+                                continue;
+                            }
+
+                            // Verify referenced things exist (FK constraint)
+                            if (!empty($link['one_thing_id']) && !empty($link['other_thing_id'])) {
+                                $refIds = array_unique([$link['one_thing_id'], $link['other_thing_id']]);
+                                $existingRefs = DB::table('things')
+                                    ->whereIn('thing_id', $refIds)
+                                    ->pluck('thing_id')
+                                    ->all();
+                                $missing = array_diff($refIds, $existingRefs);
+                                if (!empty($missing)) {
+                                    $result['skipped']['links']++;
+                                    continue;
+                                }
+                            }
+
+                            $insertData = $this->buildLinkData($link);
+                            if (empty($insertData['link_uuid']) && !empty($link['link_uuid'])) {
+                                $insertData['link_uuid'] = $link['link_uuid'];
+                            }
+                            if (empty($insertData['link_uuid'])) {
+                                $insertData['link_uuid'] = (string) Str::uuid();
+                            }
+
+                            $newLinkBatch[] = $insertData;
+
+                            if (count($newLinkBatch) >= 1000) {
+                                DB::table('links')->insert($newLinkBatch);
+                                $result['imported']['links'] += count($newLinkBatch);
+                                $newLinkBatch = [];
+                            }
+                        }
+                    }
+
+                    if (!empty($newLinkBatch)) {
+                        DB::table('links')->insert($newLinkBatch);
+                        $result['imported']['links'] += count($newLinkBatch);
                     }
                 }
             });
@@ -186,139 +333,56 @@ class ExportImportController extends BaseController
     }
 
     /**
-     * Import a single thing record.
+     * Import a single thing record (conflict resolution for existing records).
      */
-    private function importThing(array $thing, string $conflictMode, array &$result, bool $isAdmin, string $userThingId): void
+    private function importThing(array $thing, string $conflictMode, array &$result, bool $isAdmin, string $userThingId, ?\stdClass $existingThing = null): void
     {
         if (empty($thing['thing_id'])) {
             $result['errors'][] = 'Thing missing thing_id, skipping';
             return;
         }
 
-        $existingThing = DB::table('things')->where('thing_id', $thing['thing_id'])->first();
+        if (!$existingThing) {
+            $existingThing = DB::table('things')->where('thing_id', $thing['thing_id'])->first();
+        }
 
-        if ($existingThing) {
-            // Non-admin users can only update their own things
-            if (!$isAdmin && $existingThing->owner !== $userThingId) {
+        if (!$existingThing) {
+            $result['errors'][] = 'Thing ' . $thing['thing_id'] . ' not found for conflict resolution, skipping';
+            return;
+        }
+
+        // Non-admin users can only update their own things
+        if (!$isAdmin && $existingThing->owner !== $userThingId) {
+            $result['skipped']['things']++;
+            return;
+        }
+
+        // Thing exists — apply conflict resolution
+        if ($conflictMode === 'keep_existing') {
+            $result['skipped']['things']++;
+            return;
+        }
+
+        if ($conflictMode === 'latest_wins' && isset($thing['record_updated'], $existingThing->record_updated)) {
+            $importTime = strtotime($thing['record_updated']);
+            $existingTime = strtotime($existingThing->record_updated);
+            if ($existingTime >= $importTime) {
                 $result['skipped']['things']++;
                 return;
             }
-
-            // Thing exists — apply conflict resolution
-            if ($conflictMode === 'keep_existing') {
-                $result['skipped']['things']++;
-                return;
-            }
-
-            if ($conflictMode === 'latest_wins' && isset($thing['record_updated'], $existingThing->record_updated)) {
-                $importTime = strtotime($thing['record_updated']);
-                $existingTime = strtotime($existingThing->record_updated);
-                if ($existingTime >= $importTime) {
-                    $result['skipped']['things']++;
-                    return;
-                }
-            }
-
-            // Handle deletion
-            if (!empty($thing['deleted'])) {
-                DB::table('things')->where('thing_id', $thing['thing_id'])->update(['deleted' => true]);
-                $result['deleted']['things']++;
-                return;
-            }
-
-            // Overwrite (mode = overwrite, or latest_wins with newer import data)
-            $updateData = $this->buildThingData($thing);
-            DB::table('things')->where('thing_id', $thing['thing_id'])->update($updateData);
-            $result['imported']['things']++;
-        } else {
-            // New thing — insert
-            if (!empty($thing['deleted'])) {
-                // Skip inserting soft-deleted things that don't exist locally
-                $result['skipped']['things']++;
-                return;
-            }
-
-            $insertData = $this->buildThingData($thing);
-
-            if (!$isAdmin) {
-                // Non-admin: own all imported things
-                $insertData['owner'] = $userThingId;
-            } elseif (empty($insertData['owner'])) {
-                $insertData['owner'] = $thing['owner'] ?? $userThingId;
-            }
-
-            $insertData['thing_id'] = $thing['thing_id'];
-            // Set record_created for new records
-            if (empty($insertData['record_created'])) {
-                $insertData['record_created'] = now();
-            }
-            $insertData['record_updated'] = now();
-
-            DB::table('things')->insert($insertData);
-            $result['imported']['things']++;
-        }
-    }
-
-    /**
-     * Import a single link record.
-     */
-    private function importLink(array $link, string $conflictMode, array &$result): void
-    {
-        // Try matching by link_uuid first, then by unique constraint
-        $existingLink = null;
-
-        if (!empty($link['link_uuid'])) {
-            $existingLink = DB::table('links')->where('link_uuid', $link['link_uuid'])->first();
         }
 
-        if (!$existingLink && !empty($link['one_thing_id']) && !empty($link['other_thing_id']) && !empty($link['link_type_id'])) {
-            $existingLink = DB::table('links')
-                ->where('one_thing_id', $link['one_thing_id'])
-                ->where('other_thing_id', $link['other_thing_id'])
-                ->where('link_type_id', $link['link_type_id'])
-                ->first();
+        // Handle deletion
+        if (!empty($thing['deleted'])) {
+            DB::table('things')->where('thing_id', $thing['thing_id'])->update(['deleted' => true]);
+            $result['deleted']['things']++;
+            return;
         }
 
-        if ($existingLink) {
-            // Link exists — apply conflict resolution
-            if ($conflictMode === 'keep_existing') {
-                $result['skipped']['links']++;
-                return;
-            }
-
-            // Handle deletion
-            if (!empty($link['deleted'])) {
-                DB::table('links')->where('link_id', $existingLink->link_id)->update(['deleted' => true]);
-                $result['deleted']['links']++;
-                return;
-            }
-
-            if ($conflictMode === 'overwrite') {
-                $updateData = $this->buildLinkData($link);
-                DB::table('links')->where('link_id', $existingLink->link_id)->update($updateData);
-                $result['imported']['links']++;
-            } else {
-                // latest_wins — links don't have record_updated, so always keep existing
-                $result['skipped']['links']++;
-            }
-        } else {
-            // New link — insert
-            if (!empty($link['deleted'])) {
-                $result['skipped']['links']++;
-                return;
-            }
-
-            $insertData = $this->buildLinkData($link);
-            if (empty($insertData['link_uuid']) && !empty($link['link_uuid'])) {
-                $insertData['link_uuid'] = $link['link_uuid'];
-            }
-            if (empty($insertData['link_uuid'])) {
-                $insertData['link_uuid'] = (string) Str::uuid();
-            }
-
-            DB::table('links')->insert($insertData);
-            $result['imported']['links']++;
-        }
+        // Overwrite (mode = overwrite, or latest_wins with newer import data)
+        $updateData = $this->buildThingData($thing);
+        DB::table('things')->where('thing_id', $thing['thing_id'])->update($updateData);
+        $result['imported']['things']++;
     }
 
     /**

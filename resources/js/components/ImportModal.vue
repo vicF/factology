@@ -126,11 +126,18 @@ const importData = async () => {
             error.value = response.data.message || 'Import failed';
         }
     } catch (err) {
-        error.value = err.response?.data?.message
-            || (err.response?.status ? `Server error (${err.response.status})` : null)
-            || err.message
-            || 'Import failed';
-        console.error('Import error:', err);
+        console.error('Import error (full):', err);
+        const status = err.response?.status;
+        const serverMsg = err.response?.data?.message || err.response?.data?.error?.message;
+        if (serverMsg) {
+            error.value = serverMsg;
+        } else if (status) {
+            error.value = `Server returned ${status} with no details. Check console (F12).`;
+        } else if (err.message) {
+            error.value = `Request failed: ${err.message}. Check console (F12).`;
+        } else {
+            error.value = 'Import failed (unknown cause). Check console (F12).';
+        }
     } finally {
         importing.value = false;
     }
