@@ -728,16 +728,28 @@ class Everything
             $link['other_thing_id'] = $this->thing_id;
         }
 
-        return DB::table('links')->updateOrInsert(
-            [
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-            ],
-            [
-                'translation'    => $link['translation'],
-            ]
-        );
+        // Check if link already exists by unique constraint
+        $existing = DB::table('links')
+            ->where('one_thing_id', $link['one_thing_id'])
+            ->where('link_type_id', $link['link_type_id'])
+            ->where('other_thing_id', $link['other_thing_id'])
+            ->first();
+
+        if ($existing) {
+            // Update existing — preserve link_uuid
+            return DB::table('links')
+                ->where('link_id', $existing->link_id)
+                ->update(['translation' => $link['translation']]) > 0;
+        }
+
+        // Insert new link with generated UUID
+        return DB::table('links')->insert([
+            'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
+            'one_thing_id'  => $link['one_thing_id'],
+            'link_type_id'  => $link['link_type_id'],
+            'other_thing_id'=> $link['other_thing_id'],
+            'translation'   => $link['translation'],
+        ]);
     }
 
     public function setAsChildOf($parentClass): bool

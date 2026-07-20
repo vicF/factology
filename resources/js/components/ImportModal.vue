@@ -5,7 +5,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Import Data</h5>
-                        <button type="button" class="btn-close" @click="close"></button>
+                        <button type="button" class="btn-close" :disabled="importing" @click="close"></button>
                     </div>
                     <div class="modal-body">
                         <div v-if="importResult" class="mb-3">
@@ -45,7 +45,7 @@
                             <button class="btn btn-primary" @click="importResult = null">Import Another</button>
                         </div>
 
-                        <div v-else>
+                        <div v-else-if="!importing">
                             <div class="mb-3">
                                 <label class="form-label">JSON File</label>
                                 <input type="file" class="form-control" accept=".json" @change="onFileChange" />
@@ -62,9 +62,23 @@
 
                             <div v-if="error" class="alert alert-danger">{{ error }}</div>
                         </div>
+
+                        <div v-else class="text-center py-4">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="fw-bold mb-1">Importing {{ fileInfo.things }} things and {{ fileInfo.links }} links...</p>
+                            <p class="text-muted small mb-0">
+                                This may take several minutes for large files.
+                                Please do not close this window.
+                            </p>
+                            <div class="progress mt-3" style="height: 6px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @click="close">
+                        <button type="button" class="btn btn-secondary" :disabled="importing" @click="close">
                             Cancel
                         </button>
                         <button
@@ -95,11 +109,39 @@ const conflictMode = ref('latest_wins');
 const importing = ref(false);
 const importResult = ref(null);
 const error = ref('');
+const fileInfo = ref({ things: '...', links: '...' });
 
-const onFileChange = (event) => {
-    selectedFile.value = event.target.files[0] || null;
+const onFileChange = async (event) => {
+    const file = event.target.files[0] || null;
+    selectedFile.value = file;
     error.value = '';
     importResult.value = null;
+
+    // Read file header to extract stats before importing
+    if (file) {
+        try {
+            const header = await readFileSlice(file, 0, 3000);
+            const statsMatch = header.match(/"stats":\s*\{[^}]+}/);
+            if (statsMatch) {
+                const parsed = JSON.parse('{' + statsMatch[0] + '}');
+                fileInfo.value = {
+                    things: parsed.stats?.things ?? '?',
+                    links: parsed.stats?.links ?? '?',
+                };
+            }
+        } catch (e) {
+            fileInfo.value = { things: '?', links: '?' };
+        }
+    }
+};
+
+const readFileSlice = (file, start, end) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsText(file.slice(start, end));
+    });
 };
 
 const importData = async () => {
@@ -144,6 +186,8 @@ const importData = async () => {
 };
 
 const close = () => {
-    emit('close');
+    if (!importing.value) {
+        emit('close');
+    }
 };
 </script>

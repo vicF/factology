@@ -118,11 +118,13 @@ class ExportImportController extends BaseController
             $file = $request->file('file');
             $contents = file_get_contents($file->getRealPath());
             $jsonData = json_decode($contents, true);
+            unset($contents); // Free 230MB+ of raw JSON memory immediately
         } elseif ($request->isJson()) {
             $jsonData = $request->json()->all();
         } else {
             $contents = $request->getContent();
             $jsonData = json_decode($contents, true);
+            unset($contents);
         }
 
         if (empty($jsonData) || !isset($jsonData['data'])) {
@@ -134,6 +136,7 @@ class ExportImportController extends BaseController
 
         $conflictMode = $request->input('conflict_mode', 'latest_wins');
         $importData = $jsonData['data'];
+        unset($jsonData); // Free the top-level array (contains copies of things/links)
 
         // Validate server_uuid is present on every imported thing
         if (!empty($importData['things'])) {
@@ -199,7 +202,8 @@ class ExportImportController extends BaseController
 
                             $insertData['thing_id'] = $tid;
                             $insertData['record_created'] = $thing['record_created'] ?? now();
-                            $insertData['record_updated'] = now();
+                            $insertData['record_updated'] = $thing['record_updated'] ?? now();
+                            $insertData['imported_at'] = now();
 
                             $newBatch[] = $insertData;
 
@@ -221,6 +225,14 @@ class ExportImportController extends BaseController
 
                 // ── Links ────────────────────────────────────────
                 if (!empty($importData['links'])) {
+                    // Pre-load ALL thing IDs for O(1) FK validation
+                    $allThingIds = [];
+                    DB::table('things')->orderBy('thing_id')->chunk(1000, function ($chunk) use (&$allThingIds) {
+                        foreach ($chunk as $row) {
+                            $allThingIds[$row->thing_id] = true;
+                        }
+                    });
+
                     // Pre-load existing link UUIDs in a single query
                     $linkUuids = array_map('strval', array_column(
                         array_filter($importData['links'], fn($l) => !empty($l['link_uuid'])),
@@ -302,6 +314,8 @@ class ExportImportController extends BaseController
                                 $insertData['link_uuid'] = (string) Str::uuid();
                             }
 
+                            $insertData['imported_at'] = now();
+
                             $newLinkBatch[] = $insertData;
 
                             if (count($newLinkBatch) >= 1000) {
@@ -381,6 +395,8 @@ class ExportImportController extends BaseController
 
         // Overwrite (mode = overwrite, or latest_wins with newer import data)
         $updateData = $this->buildThingData($thing);
+        $updateData['record_updated'] = now();
+        $updateData['imported_at'] = now();
         DB::table('things')->where('thing_id', $thing['thing_id'])->update($updateData);
         $result['imported']['things']++;
     }
@@ -405,7 +421,7 @@ class ExportImportController extends BaseController
             }
         }
 
-        $data['record_updated'] = now();
+        $data['record_updated'] = $thing['record_updated'] ?? now();
 
         return $data;
     }
