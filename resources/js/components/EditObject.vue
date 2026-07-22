@@ -104,6 +104,7 @@
                             <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
                             <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
                             <div v-else-if="formData.type == 5" class="mb-3">External</div>
+                            <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">Server</div>
                             <div v-else class="mb-3">!Unknown type!</div>
 
                             <!-- Top action buttons (same style and order as footer) -->
@@ -187,6 +188,14 @@
                 </div>
             </div>
         </div>
+        <!-- Error modal -->
+        <ErrorModal
+            title="Save Failed"
+            :message="errorMessage"
+            :details="errorDetails"
+            :show="showError"
+            @close="showError = false; errorMessage = ''; errorDetails = ''"
+        />
     </Teleport>
 </template>
 
@@ -203,8 +212,9 @@ import TextField from './Fields/TextField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 
-import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, THING_TYPE } from "../constants.js";
+import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
+import ErrorModal from "./ErrorModal.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 
@@ -239,6 +249,10 @@ const formData = ref({
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
 });
+
+const showError = ref(false);
+const errorMessage = ref('');
+const errorDetails = ref('');
 
 // Cache new UUID immediately so ObjectField doesn't try to fetch a non-existent object
 const cacheStore = useObjectCacheStore();
@@ -568,7 +582,10 @@ const submitForm = async () => {
         }, 300);
     } catch (error) {
         console.error('Submit error:', error.response || error);
-        alert(t('Failed') + ': ' + (error.response?.data?.message || error.message));
+        const resp = error.response?.data || {};
+        errorMessage.value = resp.message || error.message || 'Unknown error';
+        errorDetails.value = resp.errors || '';
+        showError.value = true;
         isSubmitting = false;
     }
 };

@@ -139,7 +139,7 @@
                                                 <Image
                                                     :node-id="getLinkTargetId(link)"
                                                     :type="link.type"
-                                                    :is-private="!link.public"
+                                                    :is-private="!link.target_public"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -152,6 +152,7 @@
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
                                                         {{ link.name }}
                                                     </RouterLink>
+                                                    <IconPrivate v-if="!link.target_public" class="private-icon-link" />
                                                 </div>
                                             </div>
 
@@ -259,6 +260,7 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
+import IconPrivate from './icons/IconPrivate.vue';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 
@@ -664,6 +666,11 @@ watch(() => object.value, (newObject) => {
 .private-icon-header {
     font-size: 1rem;
     vertical-align: middle;
+}
+.private-icon-link {
+    font-size: 0.85rem;
+    vertical-align: middle;
+    margin-left: 4px;
 }
 .object-actions {
     display: flex;

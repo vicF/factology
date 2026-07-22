@@ -131,6 +131,7 @@ class SettingsTest extends TestCase
         // Create a private object (public = false)
         $thingId = uuid_create();
         $ownerThingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $thingId,
             'name'        => 'Private Test Object',
@@ -138,6 +139,7 @@ class SettingsTest extends TestCase
             'type'        => UUID::G_THING,
             'owner'       => $ownerThingId,
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
 
         $response = $this->getJson(self::API_PREFIX . '/object/' . $thingId);
@@ -154,12 +156,14 @@ class SettingsTest extends TestCase
 
         // Create the things record for the user FIRST (FK constraint)
         $userThingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $userThingId,
             'name'        => 'thing-' . $user->name,
             'type'        => UUID::G_THING,
             'owner'       => uuid_create(),
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
 
         // Set the user's thing_id to match the things record
@@ -175,6 +179,7 @@ class SettingsTest extends TestCase
             'type'        => UUID::G_THING,
             'owner'       => $user->thing_id,
             'public'      => false,
+            'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
         ]);
 
         Sanctum::actingAs($user, ['*']);

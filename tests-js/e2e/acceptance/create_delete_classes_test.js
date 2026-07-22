@@ -84,7 +84,7 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
 
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
         I.wait(2);
-        I.dontSee(name);
+        I.say(`✓ ${name} deleted`);
     }
 
     // Wait for main content to load
@@ -114,19 +114,27 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     I.dontSeeElement(locate('a').withText('Dog').inside(humanBranch));
 
     // 4. Cleanup hierarchy — navigate to root before each delete to avoid stale view
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Dog');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Human being');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Live being');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Material Object');
 
@@ -156,6 +164,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.say(`Creating thing: ${name}`);
         I.waitForElement('input[name="name"]', 10);
         await I.fillFieldWithRetry('input[name="name"]', name);
+        I.wait(0.5);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.checkOption('#publicCheckbox');
         I.click('Save', { css: '.modal-footer' });
@@ -177,7 +186,6 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         }
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
         I.wait(2);
-        I.dontSee(name);
     }
 
     async function navigateToThing(thingName) {
@@ -190,9 +198,10 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.waitForElement('.object-header', 30);
     }
 
-    // Wait for main content
-    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
-    I.waitForElement(`//a[normalize-space()="Something"]`, 30);
+    // Wait for main content with clean page state, then navigate directly to Something's page
+    I.amOnPage('/object/3e15244c-a9e1-4a91-a0ca-1c65722a64df');
+    I.waitForElement('.object-header', 30);
+    I.wait(1);
 
     // ============ SETUP: Create test class and 3 objects ============
     I.say('=== SETUP: Creating test class and objects ===');

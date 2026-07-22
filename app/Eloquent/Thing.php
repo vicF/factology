@@ -41,7 +41,8 @@ class Thing extends Model
         'end',
         'end_variety',
         'public',
-        'owner'];
+        'owner',
+        'server_uuid'];
 
     /**
      *

@@ -64,6 +64,7 @@ class Everything
         'LINK'     => UUID::G_LINK,
         'THING'    => UUID::G_THING,
         'EXTERNAL' => UUID::G_EXTERNAL,
+        'SERVER'   => UUID::G_SERVER,
     ];
 
     public const TIME_FORMAT = 'Y-m-d H:i:s';
@@ -87,7 +88,10 @@ class Everything
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
+
+    protected static ?string $_serverUuid = null;
 
     public $params = [
         'deleted',
@@ -105,6 +109,7 @@ class Everything
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
     public $defaults = ['end' => null, 'public' => 0];
     public $additionalParams = [];
@@ -343,6 +348,7 @@ class Everything
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
         $second = DB::table('links') // other way links
@@ -350,6 +356,7 @@ class Everything
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
         $thing['links'] = $first
@@ -527,7 +534,7 @@ class Everything
         }
         if (!isset($this->type)) {
             $errors[] = 'Empty type';
-        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL], true)) {
+        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
             $errors[] = 'Unknown type: ' . $this->type;
         }
         if (count($errors) === 0) {
@@ -553,6 +560,13 @@ class Everything
             $this->owner = auth()->user()->thing_id;
         }
         $this->_validate();
+        // Auto-set server_uuid for objects created on this server
+        if (empty($this->server_uuid)) {
+            if (self::$_serverUuid === null) {
+                self::$_serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+            }
+            $this->server_uuid = self::$_serverUuid;
+        }
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
         if (empty($this->thing_id)) {
@@ -574,6 +588,7 @@ class Everything
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],
                 'owner'          => $data['owner'],
+                'server_uuid'    => $data['server_uuid'] ?? self::$_serverUuid,
                 'record_updated' => now(),
             ];
 
@@ -713,16 +728,28 @@ class Everything
             $link['other_thing_id'] = $this->thing_id;
         }
 
-        return DB::table('links')->updateOrInsert(
-            [
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-            ],
-            [
-                'translation'    => $link['translation'],
-            ]
-        );
+        // Check if link already exists by unique constraint
+        $existing = DB::table('links')
+            ->where('one_thing_id', $link['one_thing_id'])
+            ->where('link_type_id', $link['link_type_id'])
+            ->where('other_thing_id', $link['other_thing_id'])
+            ->first();
+
+        if ($existing) {
+            // Update existing — preserve link_uuid
+            return DB::table('links')
+                ->where('link_id', $existing->link_id)
+                ->update(['translation' => $link['translation']]) > 0;
+        }
+
+        // Insert new link with generated UUID
+        return DB::table('links')->insert([
+            'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
+            'one_thing_id'  => $link['one_thing_id'],
+            'link_type_id'  => $link['link_type_id'],
+            'other_thing_id'=> $link['other_thing_id'],
+            'translation'   => $link['translation'],
+        ]);
     }
 
     public function setAsChildOf($parentClass): bool
@@ -1038,7 +1065,7 @@ class Everything
         if ($format === null) {
             $format = self::TIME_FORMAT;
         }
-        if ($number === null) {
+        if ($number === null || $number === '') {
             return null;
         }
         if ($timeZone === null) {
