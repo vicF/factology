@@ -72,7 +72,9 @@ installGlobalHandlers();
 if (isCapacitor && !apiBaseUrl) {
     // Await the standalone bootstrap so the adapter is registered before
     // any Vue components mount and make axios calls.
-    await import('./localDb/standaloneBootstrap');
+    (async () => {
+        await import('./localDb/standaloneBootstrap');
+    })();
 } else {
     // WEB / HYBRID MODE: standard axios behavior.
     // Note: when a server API is configured (apiBaseUrl set), requests go
@@ -129,9 +131,11 @@ if (isCapacitor && !apiBaseUrl) {
 
 app.config.globalProperties.$dateFromDb = dateFromDb;
 
-const authStore = useAuthStore();
-await authStore.checkAuth();
-// Fetch public settings (registration status, etc.)
-await authStore.fetchSettings();
+(async () => {
+    const authStore = useAuthStore();
+    await authStore.checkAuth();
+    // Fetch public settings (registration status, etc.)
+    await authStore.fetchSettings();
 
-app.mount('#app');
+    app.mount('#app');
+})();
