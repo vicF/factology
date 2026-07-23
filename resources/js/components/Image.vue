@@ -7,10 +7,16 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="isPrivate" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
+            <div v-if="isPrivate && authenticated" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
                 <IconPrivate />
             </div>
-            <div v-else-if="nodeId" class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
+            <div v-else-if="isPrivate" class="icon-item private-icon" title="Private">
+                <IconPrivate />
+            </div>
+            <div v-else-if="nodeId && authenticated" class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
+                <IconPublic />
+            </div>
+            <div v-else-if="nodeId" class="icon-item public-icon" title="Public">
                 <IconPublic />
             </div>
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
@@ -44,6 +50,7 @@ const props = defineProps({
     type: { type: Number, default: null },
     showTypeLabel: { type: Boolean, default: true },
     isPrivate: { type: Boolean, default: false },
+    authenticated: { type: Boolean, default: true },
     sideBar: { type: String, default: null }
 })
 

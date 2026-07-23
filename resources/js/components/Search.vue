@@ -48,6 +48,7 @@
                                                 :node-id="thing.thing_id"
                                                 :type="thing.type"
                                                 :is-private="!thing.public"
+                                                :authenticated="authStore?.authenticated"
                                                 width="48px"
                                                 side-bar="right"
                                                 @toggle-visibility="(id) => handleToggleVisibility(id, thingIndex)"

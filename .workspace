@@ -1,0 +1,7 @@
+# Workspace configuration — read by Langcli for auto-detection
+WORKSPACE=edit-privacy
+APP_PORT=8166
+TEST_PORT=8168
+WORKTREE_PATH=/d/Users/Victor/Projects/factology-docker/factology-edit-privacy
+COMPOSE_FILE=/d/Users/Victor/Projects/factology-docker/docker-compose.edit-privacy.yml
+COMPOSE_PROJECT=factology-edit-privacy

@@ -48,8 +48,10 @@
                         <div class="object-header">
                             <h1 class="object-title">
                                 {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="!object.public" class="private-icon-header" @click="toggleObjectVisibility(true)" />
-                                <IconPublic v-else class="public-icon-header" @click="toggleObjectVisibility(false)" />
+                                <IconPrivate v-if="!object.public && authenticated" class="private-icon-header" @click="toggleObjectVisibility(true)" />
+                                <IconPrivate v-else-if="!object.public" class="private-icon-header" />
+                                <IconPublic v-if="object.public && authenticated" class="public-icon-header" @click="toggleObjectVisibility(false)" />
+                                <IconPublic v-else-if="object.public" class="public-icon-header" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -86,6 +88,7 @@
                                                     :node-id="object.thing_id"
                                                     :type="object.type"
                                                     :is-private="!object.public"
+                                                    :authenticated="authenticated"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -141,6 +144,7 @@
                                                     :node-id="getLinkTargetId(link)"
                                                     :type="link.type"
                                                     :is-private="!link.target_public"
+                                                    :authenticated="authenticated"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -153,8 +157,10 @@
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
                                                         {{ link.name }}
                                                     </RouterLink>
-                                                    <IconPrivate v-if="!link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
-                                                    <IconPublic v-else class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
+                                                    <IconPrivate v-if="!link.target_public && authenticated" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
+                                                    <IconPrivate v-else-if="!link.target_public" class="private-icon-link" />
+                                                    <IconPublic v-if="link.target_public && authenticated" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
+                                                    <IconPublic v-else-if="link.target_public" class="public-icon-link" />
                                                 </div>
                                             </div>
 
