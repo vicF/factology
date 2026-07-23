@@ -7,8 +7,11 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="isPrivate" class="icon-item private-icon" title="Private">
+            <div v-if="isPrivate" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
                 <IconPrivate />
+            </div>
+            <div v-else-if="nodeId" class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
+                <IconPublic />
             </div>
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
@@ -25,10 +28,13 @@
 import { ref, computed, watch, inject } from 'vue'
 import * as jdenticon from 'jdenticon'
 import IconPrivate from './icons/IconPrivate.vue'
+import IconPublic from './icons/IconPublic.vue'
 import IconClass from './icons/IconClass.vue'
 import IconLink from './icons/IconLink.vue'
 import IconThing from './icons/IconThing.vue'
 import IconExternal from './icons/IconExternal.vue'
+
+const emit = defineEmits(['toggle-visibility'])
 
 const props = defineProps({
     nodeId: { type: String, default: null },
@@ -66,7 +72,7 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
-const hasAnyIcon = computed(() => props.isPrivate || shouldShowTypeLabel.value)
+const hasAnyIcon = computed(() => props.isPrivate || props.nodeId || shouldShowTypeLabel.value)
 
 const imageUrls = computed(() => {
     const urls = []
@@ -190,6 +196,8 @@ const placeholderStyle = computed(() => ({
 }
 .private-icon { background: rgba(220, 53, 69, 0.9); }
 .private-icon:hover { background: rgba(220, 53, 69, 1); transform: scale(1.05); }
+.public-icon { background: rgba(40, 167, 69, 0.9); }
+.public-icon:hover { background: rgba(40, 167, 69, 1); transform: scale(1.05); }
 .type-class { background: rgba(13, 110, 253, 0.9); }
 .type-class:hover { background: rgba(13, 110, 253, 1); transform: scale(1.05); }
 .type-link { background: rgba(111, 66, 193, 0.9); }

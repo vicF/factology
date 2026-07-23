@@ -307,6 +307,43 @@ class ApiController extends BaseController
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Toggle object visibility (public/private)
+     *
+     * Lightweight endpoint — only updates the `public` field.
+     * Full object edit still requires PUT /object/{id}.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleVisibility(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'public' => ['required', 'integer', 'in:0,1'],
+        ]);
+
+        $updated = DB::table('things')
+            ->where('thing_id', $id)
+            ->where('owner', auth()->user()->thing_id)
+            ->update([
+                'public'         => $validated['public'],
+                'record_updated' => now(),
+            ]);
+
+        if ($updated === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Object not found or you do not have permission',
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['public' => (bool) $validated['public']],
+        ]);
+    }
+
 
     /**
      * Delete link

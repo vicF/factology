@@ -48,7 +48,8 @@
                         <div class="object-header">
                             <h1 class="object-title">
                                 {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="!object.public" class="private-icon-header" />
+                                <IconPrivate v-if="!object.public" class="private-icon-header" @click="toggleObjectVisibility(true)" />
+                                <IconPublic v-else class="public-icon-header" @click="toggleObjectVisibility(false)" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -152,7 +153,8 @@
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
                                                         {{ link.name }}
                                                     </RouterLink>
-                                                    <IconPrivate v-if="!link.target_public" class="private-icon-link" />
+                                                    <IconPrivate v-if="!link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
+                                                    <IconPublic v-else class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
                                                 </div>
                                             </div>
 
@@ -245,6 +247,15 @@
             @save="handleNewLinkSave"
             @close="showCreateLinkModal = false"
         />
+        <ConfirmModal
+            :show="showConfirmModal"
+            :title="confirmTitle"
+            :message="confirmMessage"
+            :confirm-text="confirmButtonText"
+            :variant="confirmVariant"
+            @confirm="handleConfirm"
+            @cancel="showConfirmModal = false"
+        />
     </div>
 </template>
 
@@ -261,6 +272,8 @@ import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
 import IconPrivate from './icons/IconPrivate.vue';
+import IconPublic from './icons/IconPublic.vue';
+import ConfirmModal from './ConfirmModal.vue';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 
@@ -277,6 +290,68 @@ const objectsStore = useObjectsStore();
 const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
+
+// ─── Quick visibility toggle state ─────────────────────────────────
+let quickMode = false;
+const showConfirmModal = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmButtonText = ref('');
+const confirmVariant = ref('primary');
+let pendingToggle = null;
+
+const toggleObjectVisibility = (makePublic) => {
+    if (!object.value) return;
+    doToggle(object.value.thing_id, makePublic, () => {
+        object.value.public = makePublic ? 1 : 0;
+    });
+};
+
+const toggleLinkVisibility = (link, makePublic) => {
+    if (!link) return;
+    const linkId = getLinkTargetId(link);
+    doToggle(linkId, makePublic, () => {
+        link.target_public = makePublic ? 1 : 0;
+    });
+};
+
+const doToggle = (thingId, makePublic, onSuccess) => {
+    if (quickMode) {
+        executeToggle(thingId, makePublic, onSuccess);
+        return;
+    }
+    if (makePublic) {
+        confirmTitle.value = 'Make Public';
+        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
+        confirmButtonText.value = 'Make Public';
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = 'Make Private';
+        confirmMessage.value = 'Make this object private? Only you and group members will be able to see it.';
+        confirmButtonText.value = 'Make Private';
+        confirmVariant.value = 'danger';
+    }
+    pendingToggle = { thingId, makePublic, onSuccess };
+    showConfirmModal.value = true;
+};
+
+const handleConfirm = () => {
+    showConfirmModal.value = false;
+    if (!pendingToggle) return;
+    const { thingId, makePublic, onSuccess } = pendingToggle;
+    pendingToggle = null;
+    quickMode = true;
+    executeToggle(thingId, makePublic, onSuccess);
+};
+
+const executeToggle = async (thingId, makePublic, onSuccess) => {
+    try {
+        await axios.patch(`/object/${thingId}/visibility`, { public: makePublic ? 1 : 0 });
+        if (onSuccess) onSuccess();
+    } catch (error) {
+        console.error('Failed to toggle visibility:', error);
+    }
+};
 
 const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
 
@@ -667,7 +742,16 @@ watch(() => object.value, (newObject) => {
     font-size: 1rem;
     vertical-align: middle;
 }
+.public-icon-header {
+    font-size: 1rem;
+    vertical-align: middle;
+}
 .private-icon-link {
+    font-size: 0.85rem;
+    vertical-align: middle;
+    margin-left: 4px;
+}
+.public-icon-link {
     font-size: 0.85rem;
     vertical-align: middle;
     margin-left: 4px;

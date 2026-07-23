@@ -35,6 +35,10 @@ Scenario('Complete registration and login flow @api', async ({ I }) => {
     I.fillField('[data-testid="register-password"]', userData.password);
     I.fillField('[data-testid="register-password-confirmation"]', userData.password);
 
+    // Accept terms and privacy policy to enable the submit button
+    I.checkOption('[data-testid="register-accepted-terms"]');
+    I.checkOption('[data-testid="register-accepted-privacy"]');
+
     I.click('[data-testid="register-submit-btn"]');
 
     // After registration, wait for redirect to home page

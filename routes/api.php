@@ -85,6 +85,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
+        Route::patch('/object/{id}/visibility', [ApiController::class, 'toggleVisibility']);
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
         Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
         Route::put('/link/{id}',              [ApiController::class, 'storeLink']);     // update

@@ -50,6 +50,7 @@
                                                 :is-private="!thing.public"
                                                 width="48px"
                                                 side-bar="right"
+                                                @toggle-visibility="(id) => handleToggleVisibility(id, thingIndex)"
                                             />
                                         </RouterLink>
                                     </div>
@@ -131,6 +132,15 @@
         </div>
 
         <ImportModal v-if="showImportModal" @close="showImportModal = false" />
+        <ConfirmModal
+            :show="showConfirmModal"
+            :title="confirmTitle"
+            :message="confirmMessage"
+            :confirm-text="confirmButtonText"
+            :variant="confirmVariant"
+            @confirm="handleToggleConfirm"
+            @cancel="showConfirmModal = false"
+        />
     </div>
 </template>
 
@@ -143,6 +153,7 @@ import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
+import ConfirmModal from './ConfirmModal.vue';
 
 const props = defineProps({
     searchText: String,
@@ -160,6 +171,54 @@ const objects = ref([]);
 const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
+
+// ─── Quick visibility toggle state ─────────────────────────────────
+let quickMode = false;
+const showConfirmModal = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmButtonText = ref('');
+const confirmVariant = ref('primary');
+let pendingToggle = null;
+
+const handleToggleVisibility = (thingId, thingIndex) => {
+    const thing = objects.value[thingIndex];
+    if (!thing) return;
+    const makePublic = !thing.public;
+    const doToggle = () => {
+        axios.patch(`/object/${thingId}/visibility`, { public: makePublic ? 1 : 0 }).then(() => {
+            thing.public = makePublic ? 1 : 0;
+        }).catch((error) => {
+            console.error('Failed to toggle visibility:', error);
+        });
+    };
+    if (quickMode) {
+        doToggle();
+        return;
+    }
+    if (makePublic) {
+        confirmTitle.value = 'Make Public';
+        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
+        confirmButtonText.value = 'Make Public';
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = 'Make Private';
+        confirmMessage.value = 'Make this object private? Only you and group members will be able to see it.';
+        confirmButtonText.value = 'Make Private';
+        confirmVariant.value = 'danger';
+    }
+    pendingToggle = doToggle;
+    showConfirmModal.value = true;
+};
+
+const handleToggleConfirm = () => {
+    showConfirmModal.value = false;
+    if (!pendingToggle) return;
+    const fn = pendingToggle;
+    pendingToggle = null;
+    quickMode = true;
+    fn();
+};
 
 // Export/Import state
 const exporting = ref(false);

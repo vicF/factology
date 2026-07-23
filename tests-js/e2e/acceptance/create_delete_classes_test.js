@@ -167,7 +167,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.wait(0.5);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.checkOption('#publicCheckbox');
-        I.click('Save', { css: '.modal-footer' });
+        I.click(locate('.modal-footer button').withText('Save'));
         I.waitForInvisible('.modal', 30);
         I.waitForInvisible('.modal-backdrop', 30);
         I.waitForText(name, 30);

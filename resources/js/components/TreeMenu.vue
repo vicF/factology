@@ -20,7 +20,8 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ name }}</router-link>
-                    <span v-if="isPrivate" class="private-icon" title="Private"><IconPrivate v-if="isPrivate" /></span>
+                    <span v-if="!nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
+                    <span v-else class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
@@ -28,6 +29,15 @@
                 </span>
             </div>
         </div>
+        <ConfirmModal
+            :show="showConfirmModal"
+            :title="confirmTitle"
+            :message="confirmMessage"
+            :confirm-text="confirmButtonText"
+            :variant="confirmVariant"
+            @confirm="handleToggleConfirm"
+            @cancel="showConfirmModal = false"
+        />
         <div class="children" v-if="showChildren">
             <tree-menu
                 v-for="node in nodes"
@@ -45,13 +55,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import axios from 'axios';
 import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
 import Image from "./Image.vue";
-import {IconPrivate} from "./icons";
+import {IconPrivate, IconPublic} from "./icons";
+import ConfirmModal from './ConfirmModal.vue';
 
 const authStore = useAuthStore();
 const authenticated = computed(() => authStore.authenticated);
@@ -95,11 +107,61 @@ const store = useSearchStore();
 const showChildren = ref(true);
 const showIcons = ref(false);
 
+// ─── Quick visibility toggle state ─────────────────────────────────
+let quickMode = false;
+const showConfirmModal = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmButtonText = ref('');
+const confirmVariant = ref('primary');
+let pendingToggle = null;
+
+// Local copy of public state for toggle UI feedback
+const nodePublic = ref(!!props.public);
+watch(() => props.public, (val) => { nodePublic.value = !!val; });
+
+const toggleVisibility = (makePublic) => {
+    if (quickMode) {
+        executeToggle(makePublic);
+        return;
+    }
+    if (makePublic) {
+        confirmTitle.value = 'Make Public';
+        confirmMessage.value = 'Make this class visible to everyone?';
+        confirmButtonText.value = 'Make Public';
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = 'Make Private';
+        confirmMessage.value = 'Make this class private? Only you and group members will be able to see it.';
+        confirmButtonText.value = 'Make Private';
+        confirmVariant.value = 'danger';
+    }
+    pendingToggle = makePublic;
+    showConfirmModal.value = true;
+};
+
+const handleToggleConfirm = () => {
+    showConfirmModal.value = false;
+    if (pendingToggle === null) return;
+    const makePublic = pendingToggle;
+    pendingToggle = null;
+    quickMode = true;
+    executeToggle(makePublic);
+};
+
+const executeToggle = async (makePublic) => {
+    try {
+        await axios.patch(`/object/${props.id}/visibility`, { public: makePublic ? 1 : 0 });
+        nodePublic.value = makePublic;
+    } catch (error) {
+        console.error('Failed to toggle visibility:', error);
+    }
+};
+
 // Computed
 const isChecked = computed(() => store.checkedItems.includes(props.id));
 const showToggle = computed(() => props.nodes && props.nodes.length > 0);
 const indent = computed(() => ({ marginLeft: `${props.depth * 15}px` }));
-const isPrivate = computed(() => !props.public);
 
 // Methods
 const toggleChildren = () => {
@@ -226,6 +288,14 @@ input[type="checkbox"] {
 }
 .add-subclass:hover, .add-object:hover {
     color: #007bff;
+}
+.private-icon {
+    display: inline-flex;
+    vertical-align: middle;
+}
+.public-icon {
+    display: inline-flex;
+    vertical-align: middle;
 }
 .children {
     padding-left: 0;
