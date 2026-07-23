@@ -7,18 +7,14 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="isPrivate && authenticated" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
-                <IconPrivate />
-            </div>
-            <div v-else-if="isPrivate" class="icon-item private-icon" title="Private">
-                <IconPrivate />
-            </div>
-            <div v-else-if="nodeId && authenticated" class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
-                <IconPublic />
-            </div>
-            <div v-else-if="nodeId" class="icon-item public-icon" title="Public">
-                <IconPublic />
-            </div>
+            <template v-if="authenticated">
+                <div v-if="isPrivate" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
+                    <IconPrivate />
+                </div>
+                <div v-else class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
+                    <IconPublic />
+                </div>
+            </template>
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
                 <IconLink v-else-if="type === 4" />
@@ -79,7 +75,7 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
-const hasAnyIcon = computed(() => props.isPrivate || props.nodeId || shouldShowTypeLabel.value)
+const hasAnyIcon = computed(() => (props.authenticated && props.nodeId) || shouldShowTypeLabel.value)
 
 const imageUrls = computed(() => {
     const urls = []

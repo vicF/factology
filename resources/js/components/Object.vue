@@ -46,12 +46,12 @@
 
                         <!-- Header -->
                         <div class="object-header">
-                            <h1 class="object-title">
+                            <h1 class="object-title"
+                                @mouseenter="headerHover = true"
+                                @mouseleave="headerHover = false">
                                 {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="!object.public && authenticated" class="private-icon-header" @click="toggleObjectVisibility(true)" />
-                                <IconPrivate v-else-if="!object.public" class="private-icon-header" />
-                                <IconPublic v-if="object.public && authenticated" class="public-icon-header" @click="toggleObjectVisibility(false)" />
-                                <IconPublic v-else-if="object.public" class="public-icon-header" />
+                                <IconPrivate v-if="authenticated && !object.public" class="private-icon-header" @click="toggleObjectVisibility(true)" />
+                                <IconPublic v-if="authenticated && object.public && headerHover" class="public-icon-header" @click="toggleObjectVisibility(false)" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -136,7 +136,10 @@
                                 <div v-if="object.links && object.links.length" class="result-separator"></div>
 
                                 <!-- Links list -->
-                                <div v-for="link in (object.links || [])" :key="link.link_id" class="result-item">
+                                <div v-for="(link, linkIndex) in (object.links || [])" :key="link.link_id"
+                                    class="result-item"
+                                    @mouseenter="hoveredLink = linkIndex"
+                                    @mouseleave="hoveredLink = null">
                                     <div class="result-content">
                                         <div class="result-icon-section">
                                             <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="icon-link">
@@ -157,10 +160,8 @@
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
                                                         {{ link.name }}
                                                     </RouterLink>
-                                                    <IconPrivate v-if="!link.target_public && authenticated" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
-                                                    <IconPrivate v-else-if="!link.target_public" class="private-icon-link" />
-                                                    <IconPublic v-if="link.target_public && authenticated" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
-                                                    <IconPublic v-else-if="link.target_public" class="public-icon-link" />
+                                                    <IconPrivate v-if="authenticated && !link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
+                                                    <IconPublic v-if="authenticated && link.target_public && hoveredLink === linkIndex" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
                                                 </div>
                                             </div>
 
@@ -298,6 +299,8 @@ const loaded = ref(false);
 const serverError = ref(false);
 
 // ─── Quick visibility toggle state ─────────────────────────────────
+const headerHover = ref(false);
+const hoveredLink = ref(null);
 let quickMode = false;
 const showConfirmModal = ref(false);
 const confirmTitle = ref('');
@@ -333,7 +336,7 @@ const doToggle = (thingId, makePublic, onSuccess) => {
         confirmVariant.value = 'success';
     } else {
         confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you and group members will be able to see it.';
+        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
         confirmButtonText.value = 'Make Private';
         confirmVariant.value = 'danger';
     }
