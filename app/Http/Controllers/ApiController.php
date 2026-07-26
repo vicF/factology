@@ -370,6 +370,74 @@ class ApiController extends BaseController
     }
 
     /**
+     * Suggest objects commonly linked together via the same link type (across all users).
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function suggestLinks(Request $request)
+    {
+        $validated = $request->validate([
+            'one_thing_id' => ['required', 'string', 'uuid'],
+            'link_type_id' => ['required', 'string', 'uuid'],
+            'limit'        => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $limit = $validated['limit'] ?? 12;
+
+        $results = DB::table('links')
+            ->select('other_thing_id', DB::raw('COUNT(*) as frequency'))
+            ->where('link_type_id', $validated['link_type_id'])
+            ->whereNotNull('other_thing_id')
+            ->groupBy('other_thing_id')
+            ->orderByDesc('frequency')
+            ->limit($limit)
+            ->get()
+            ->pluck('other_thing_id');
+
+        return response()->json([
+            'data'    => $results,
+            'success' => true,
+        ]);
+    }
+
+    /**
+     * Toggle favorite status for an object.
+     *
+     * Creates or deletes a MY_FAVORITE link between the current user and the target object.
+     *
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleFavorite(string $id)
+    {
+        $userThingId = auth()->user()->thing_id;
+        $linkTypeId = UUID::MY_FAVORITE;
+
+        $existing = DB::table('links')
+            ->where('one_thing_id', $userThingId)
+            ->where('link_type_id', $linkTypeId)
+            ->where('other_thing_id', $id)
+            ->first();
+
+        if ($existing) {
+            DB::table('links')->where('link_id', $existing->link_id)->delete();
+            return response()->json(['favorite' => false, 'success' => true]);
+        }
+
+        DB::table('links')->insert([
+            'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
+            'one_thing_id'  => $userThingId,
+            'link_type_id'  => $linkTypeId,
+            'other_thing_id'=> $id,
+            'translation'   => 'Favorite',
+            'public'        => 0,
+        ]);
+
+        return response()->json(['favorite' => true, 'success' => true]);
+    }
+
+    /**
      * Retrieve photos
      *
      * @param \Illuminate\Http\Request $request
@@ -473,6 +541,14 @@ class ApiController extends BaseController
             } else {
                 $query->where('public', 0);
             }
+        }
+        // Favorites filter: return objects favorited by the current user
+        if (!empty($requestBody['favorites']) && Auth::check()) {
+            $query->join('links as fav_links', function ($join) {
+                $join->on('things.thing_id', '=', 'fav_links.other_thing_id')
+                    ->where('fav_links.link_type_id', '=', UUID::MY_FAVORITE)
+                    ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
+            });
         }
         $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get();
 

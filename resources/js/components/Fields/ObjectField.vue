@@ -87,7 +87,12 @@
                                     <IconThing v-else-if="obj.type === THING_TYPE" width="1.1em" height="1.1em" class="flex-shrink-0" />
                                     <IconLink v-else width="1.1em" height="1.1em" class="flex-shrink-0" />
                                     <div class="flex-grow-1 text-truncate text-start">
-                                        <div>{{ obj.name || 'Unnamed' }}</div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span>{{ obj.name || 'Unnamed' }}</span>
+                                            <small v-if="obj._suggestionType" class="suggestion-tag">
+                                                {{ suggestionLabel(obj._suggestionType) }}
+                                            </small>
+                                        </div>
                                         <small v-if="obj.description" class="text-muted d-block text-truncate">
                                             {{ obj.description }}
                                         </small>
@@ -114,6 +119,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
+import { useObjectHistoryStore } from '@/stores/objectHistory.js'
 import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
 import axios from 'axios';
 
@@ -148,12 +154,26 @@ const props = defineProps({
     excludeUuid: {
         type: String,
         default: null
-    }
+    },
+    // ── Context props for history/recommendations ──
+    contextObjectType: {
+        type: Number,
+        default: null,
+    },
+    contextLinkTypeId: {
+        type: String,
+        default: null,
+    },
+    contextOneThingId: {
+        type: String,
+        default: null,
+    },
 })
 
 const emit = defineEmits(['update:modelValue'])
 
 const cacheStore = useObjectCacheStore()
+const historyStore = useObjectHistoryStore()
 
 const searchText = ref('')
 const isOpen = ref(false)
@@ -167,6 +187,8 @@ const previousDisplay = ref('')
 const searchResults = ref([])
 const dropdownStyles = ref({})
 const isClickingDropdown = ref(false)
+const pendingSuggestions = ref([])
+const suggestionsLoaded = ref(false)
 
 // Debounce timer
 let debounceTimer = null
@@ -187,7 +209,7 @@ const filteredObjects = computed(() => {
     if (searchResults.value.length > 0) {
         results = searchResults.value;
     } else if (!searchText.value.trim()) {
-        results = cacheStore.getRecent(props.type, props.maxResults) || [];
+        results = pendingSuggestions.value.length > 0 ? pendingSuggestions.value : (cacheStore.getRecent(props.type, props.maxResults) || []);
     } else {
         const term = searchText.value.toLowerCase().trim()
         results = cacheStore.searchCached('object', term, props.maxResults) || [];
@@ -232,6 +254,9 @@ const openDropdown = async () => {
     previousDisplay.value = displayValue.value || ''
     isOpen.value = true
     searchText.value = ''
+    // Load suggestions asynchronously
+    suggestionsLoaded.value = false
+    loadSuggestions()
     await nextTick()
     calculateDropdownPosition()
     inputRef.value?.focus()
@@ -319,6 +344,25 @@ async function loadObjectByUuid(uuid) {
     }
 }
 
+async function loadSuggestions() {
+    try {
+        await historyStore.hydrate();
+        const results = await historyStore.getSuggestions(
+            props.type,
+            props.contextObjectType,
+            props.contextLinkTypeId,
+            props.contextOneThingId,
+            props.maxResults
+        );
+        pendingSuggestions.value = results;
+    } catch (e) {
+        console.warn('Failed to load suggestions:', e);
+        pendingSuggestions.value = cacheStore.getRecent(props.type, props.maxResults) || [];
+    } finally {
+        suggestionsLoaded.value = true;
+    }
+}
+
 function selectObject(obj, event) {
     if (event) {
         event.stopPropagation();
@@ -328,6 +372,13 @@ function selectObject(obj, event) {
     isClickingDropdown.value = true
     selectedObject.value = obj
     emit('update:modelValue', obj.thing_id)
+    // Record in history
+    historyStore.recordSelection(
+        obj.thing_id,
+        obj.type || props.type,
+        props.contextObjectType,
+        props.contextLinkTypeId
+    );
     closeDropdown()
     setTimeout(() => { isClickingDropdown.value = false }, 100)
 }
@@ -336,6 +387,18 @@ function clearSelection() {
     selectedObject.value = null
     emit('update:modelValue', null)
     searchText.value = ''
+}
+
+function suggestionLabel(type) {
+    const labels = {
+        favorite: '★',
+        current_user: 'you',
+        context: 'suggested',
+        frequent: 'frequent',
+        global: 'popular',
+        recent: 'recent',
+    };
+    return labels[type] || '';
 }
 
 function debouncedSearch(val) {
@@ -452,4 +515,12 @@ function handleDropdownMouseDown(e) {
 .object-field-dropdown .alert { margin-bottom: 0; }
 .object-field-dropdown,
 .object-field-dropdown * { box-sizing: border-box; }
+.suggestion-tag {
+    font-size: 0.6rem;
+    opacity: 0.6;
+    background: #e9ecef;
+    padding: 0 4px;
+    border-radius: 3px;
+    line-height: 1.4;
+}
 </style>
