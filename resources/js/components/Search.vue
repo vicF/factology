@@ -51,7 +51,6 @@
                                                 :authenticated="authStore?.authenticated"
                                                 width="48px"
                                                 side-bar="right"
-                                                @toggle-visibility="(id) => handleToggleVisibility(id, thingIndex)"
                                             />
                                         </RouterLink>
                                     </div>
