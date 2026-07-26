@@ -48,9 +48,9 @@
                                                 :node-id="thing.thing_id"
                                                 :type="thing.type"
                                                 :is-private="!thing.public"
+                                                :authenticated="authStore?.authenticated"
                                                 width="48px"
                                                 side-bar="right"
-                                                @toggle-visibility="(id) => handleToggleVisibility(id, thingIndex)"
                                             />
                                         </RouterLink>
                                     </div>
@@ -203,7 +203,7 @@ const handleToggleVisibility = (thingId, thingIndex) => {
         confirmVariant.value = 'success';
     } else {
         confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you and group members will be able to see it.';
+        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
         confirmButtonText.value = 'Make Private';
         confirmVariant.value = 'danger';
     }

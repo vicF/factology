@@ -20,8 +20,8 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ name }}</router-link>
-                    <span v-if="!nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
-                    <span v-else class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
+                    <span v-if="authenticated && !nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
+                    <span v-if="authenticated && nodePublic && showIcons" class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
@@ -132,7 +132,7 @@ const toggleVisibility = (makePublic) => {
         confirmVariant.value = 'success';
     } else {
         confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this class private? Only you and group members will be able to see it.';
+        confirmMessage.value = 'Make this class private? Only you will be able to see it.';
         confirmButtonText.value = 'Make Private';
         confirmVariant.value = 'danger';
     }

@@ -359,6 +359,24 @@ class Everything
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
+        // Only filter linked objects by visibility for non-admin users
+        if (!Auth::check() || !Auth::user()->is_admin) {
+            $first->where(function ($q) {
+                $q->where('other_thing.public', 1)
+                    ->orWhereNull('other_thing.public');
+                if (Auth::check()) {
+                    $q->orWhere('other_thing.owner', Auth::user()->thing_id);
+                }
+            });
+            $second->where(function ($q) {
+                $q->where('one_thing.public', 1)
+                    ->orWhereNull('one_thing.public');
+                if (Auth::check()) {
+                    $q->orWhere('one_thing.owner', Auth::user()->thing_id);
+                }
+            });
+        }
+
         $thing['links'] = $first
             ->union($second)
             ->orderBy('link_start')

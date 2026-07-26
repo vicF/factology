@@ -7,11 +7,8 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="isPrivate" class="icon-item private-icon" title="Private" @click.stop="$emit('toggle-visibility', nodeId)">
+            <div v-if="authenticated && isPrivate" class="icon-item private-icon" title="Private">
                 <IconPrivate />
-            </div>
-            <div v-else-if="nodeId" class="icon-item public-icon" title="Public" @click.stop="$emit('toggle-visibility', nodeId)">
-                <IconPublic />
             </div>
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
@@ -28,13 +25,10 @@
 import { ref, computed, watch, inject } from 'vue'
 import * as jdenticon from 'jdenticon'
 import IconPrivate from './icons/IconPrivate.vue'
-import IconPublic from './icons/IconPublic.vue'
 import IconClass from './icons/IconClass.vue'
 import IconLink from './icons/IconLink.vue'
 import IconThing from './icons/IconThing.vue'
 import IconExternal from './icons/IconExternal.vue'
-
-const emit = defineEmits(['toggle-visibility'])
 
 const props = defineProps({
     nodeId: { type: String, default: null },
@@ -44,6 +38,7 @@ const props = defineProps({
     type: { type: Number, default: null },
     showTypeLabel: { type: Boolean, default: true },
     isPrivate: { type: Boolean, default: false },
+    authenticated: { type: Boolean, default: true },
     sideBar: { type: String, default: null }
 })
 
@@ -72,7 +67,7 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
-const hasAnyIcon = computed(() => props.isPrivate || props.nodeId || shouldShowTypeLabel.value)
+const hasAnyIcon = computed(() => (props.authenticated && props.isPrivate) || shouldShowTypeLabel.value)
 
 const imageUrls = computed(() => {
     const urls = []
