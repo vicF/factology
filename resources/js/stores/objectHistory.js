@@ -9,7 +9,8 @@ import { storage } from '@/utils/storage.js';
 import { useAuthStore } from './auth';
 import { useObjectCacheStore } from './objectCache';
 import axios from 'axios';
-import { UUID, THING_TYPE } from '@/constants.js';
+import { UUID } from '@/constants/uuid.js';
+import { THING_TYPE } from '@/constants.js';
 
 const STORAGE_PREFIX = 'objectHistory';
 const MAX_RECENT = 200;
