@@ -9,12 +9,19 @@ class SearchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search'   => 'nullable|string|max:255',
-            'type'     => 'nullable|array',
-            'type.*'   => 'integer|in:1,2,3,4,5',
-            'classes'  => 'nullable|array',
-            'classes.*'=> 'string|uuid',
-            'tree'     => 'nullable|boolean',
+            'search'     => 'nullable|string|max:255',
+            'type'       => 'nullable|array',
+            'type.*'     => 'integer|in:1,2,3,4,5',
+            'classes'    => 'nullable|array',
+            'classes.*'  => 'string|uuid',
+            'tree'       => 'nullable|boolean',
+            'sort_by'    => 'nullable|string|in:updated,created,start,name',
+            'sort_order' => 'nullable|string|in:asc,desc',
+            'visibility' => 'nullable|string|in:all,public,private,group',
+            'date_from'  => 'nullable|date',
+            'date_to'    => 'nullable|date|after_or_equal:date_from',
+            'owner'      => 'nullable|string|max:255',
+            'server'     => 'nullable|string|max:255',
         ];
     }
 

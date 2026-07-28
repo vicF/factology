@@ -14,11 +14,22 @@
                         </li>
                     </ul>
 
-                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
+                    <form class="d-flex flex-grow-1 mx-2 position-relative" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
                         <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="button" @click="toggleFilters" title="Filters" style="display: flex; align-items: center; justify-content: center; margin-right: 4px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="6" x2="20" y2="6"></line>
+                                <line x1="8" y1="12" x2="20" y2="12"></line>
+                                <line x1="12" y1="18" x2="20" y2="18"></line>
+                                <circle cx="6" cy="6" r="1.5" fill="currentColor"></circle>
+                                <circle cx="10" cy="12" r="1.5" fill="currentColor"></circle>
+                                <circle cx="14" cy="18" r="1.5" fill="currentColor"></circle>
+                            </svg>
+                        </button>
                         <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
                             <IconSearch class="icon-md" />
                         </button>
+                        <SearchFilterPanel />
                     </form>
 
                     <div class="d-flex flex-shrink-0 align-items-center" style="gap: 0.5rem;">
@@ -218,6 +229,7 @@ import { useRouter, useRoute } from 'vue-router'
 
 import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
+import SearchFilterPanel from "../SearchFilterPanel.vue"
 
 import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
@@ -466,8 +478,16 @@ const searchQuery = computed({
 
 const submitSearch = () => {
     console.log('default.vue - Emitting trigger-search')
+    const query = { q: searchQuery.value };
+    const filterParams = searchStore.getFilterParams();
+    Object.assign(query, filterParams);
+    if (!query.q) delete query.q;
     eventBus.emit('trigger-search')
-    router.push({ path: '/', query: { q: searchQuery.value } })
+    router.push({ path: '/', query })
+}
+
+const toggleFilters = () => {
+    searchStore.toggleFilters();
 }
 
 // ========== GLOBAL ERROR TOASTS ==========

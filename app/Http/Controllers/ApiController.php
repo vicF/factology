@@ -535,6 +535,29 @@ class ApiController extends BaseController
                 }
             });
         }
+        // Visibility filter (new structured filter)
+        if (!empty($requestBody['visibility']) && $requestBody['visibility'] !== 'all') {
+            if ($requestBody['visibility'] === 'public') {
+                $query->where('public', 1);
+            } elseif ($requestBody['visibility'] === 'private') {
+                $query->where('public', 0);
+            } elseif ($requestBody['visibility'] === 'group' && Auth::check()) {
+                // Group access: objects linked to groups the current user belongs to
+                $userThingId = Auth::user()->thing_id;
+                $query->whereExists(function ($sub) use ($userThingId) {
+                    $sub->select(DB::raw(1))
+                        ->from('links as grp_link')
+                        ->join('links as user_link', function ($join) {
+                            $join->on('grp_link.one_thing_id', '=', 'user_link.other_thing_id')
+                                ->where('user_link.link_type_id', '=', UUID::BELONGS_TO_USER_GROUP)
+                                ->where('user_link.one_thing_id', '=', DB::raw("'$userThingId'"));
+                        })
+                        ->whereColumn('grp_link.other_thing_id', 'things.thing_id')
+                        ->where('grp_link.link_type_id', '=', UUID::GROUP_READ_ACCESS);
+                });
+            }
+        }
+        // Legacy public/private filter (keep for backward compatibility)
         if (@$_POST['public'] != @$_POST['private']) {
             if (@$_POST['public']) {
                 $query->where('public', 1);
@@ -550,7 +573,31 @@ class ApiController extends BaseController
                     ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
             });
         }
-        $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get();
+        // Date range filter
+        if (!empty($requestBody['date_from'])) {
+            $query->where('start', '>=', $requestBody['date_from']);
+        }
+        if (!empty($requestBody['date_to'])) {
+            $query->where('start', '<=', $requestBody['date_to']);
+        }
+        // Owner filter
+        if (!empty($requestBody['owner'])) {
+            $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+        }
+        // Server filter
+        if (!empty($requestBody['server'])) {
+            $query->where('things.server_uuid', $requestBody['server']);
+        }
+        // Dynamic sort
+        $sortMap = [
+            'updated' => 'record_updated',
+            'created' => 'record_created',
+            'start'   => 'start',
+            'name'    => 'name',
+        ];
+        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
+        $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $data = $query->orderBy($sortCol, $sortDir)->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];

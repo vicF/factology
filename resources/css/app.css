@@ -455,6 +455,49 @@
 }
 
 /* ==========================================================================
+   Filter Panel
+   ========================================================================== */
+
+.filter-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    animation: filter-slide-down 0.15s ease-out;
+}
+
+.filter-panel-inner {
+    padding: 12px;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+@keyframes filter-slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================================================
    Object page specifics
    ========================================================================== */
 

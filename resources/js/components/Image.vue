@@ -7,9 +7,6 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="authenticated && isPrivate" class="icon-item private-icon" title="Private">
-                <IconPrivate />
-            </div>
             <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
                 <IconClass v-if="type === 2" />
                 <IconLink v-else-if="type === 4" />
@@ -24,7 +21,6 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
 import * as jdenticon from 'jdenticon'
-import IconPrivate from './icons/IconPrivate.vue'
 import IconClass from './icons/IconClass.vue'
 import IconLink from './icons/IconLink.vue'
 import IconThing from './icons/IconThing.vue'
@@ -67,7 +63,7 @@ const shouldShowTypeLabel = computed(() => {
     return props.type !== null && props.type !== 3 && typeLabel.value !== ''
 })
 
-const hasAnyIcon = computed(() => (props.authenticated && props.isPrivate) || shouldShowTypeLabel.value)
+const hasAnyIcon = computed(() => shouldShowTypeLabel.value)
 
 const imageUrls = computed(() => {
     const urls = []

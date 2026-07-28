@@ -172,6 +172,9 @@ const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
 
+// Filter param keys for URL sync
+const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+
 // ─── Quick visibility toggle state ─────────────────────────────────
 let quickMode = false;
 const showConfirmModal = ref(false);
@@ -287,11 +290,28 @@ const getObjects = async () => {
 
     try {
         const searchQuery = searchStore.searchQuery || props.searchText || route.query.q || '';
-        const response = await axios.post('/object', {
+
+        // Build filter params from URL/store
+        const body = {
             search: searchQuery,
             type: type,
             classes: searchStore.checkedItems,
-        });
+        };
+
+        // Read filter params from URL (or store defaults)
+        const filterParams = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+        const paramMap = {
+            sort: 'sort_by',
+            order: 'sort_order',
+        };
+        for (const key of filterParams) {
+            const val = route.query[key];
+            if (val) {
+                body[paramMap[key] || key] = val;
+            }
+        }
+
+        const response = await axios.post('/object', body);
 
         validationErrors.value = {};
 
@@ -320,12 +340,30 @@ const getObjects = async () => {
 
 const triggerSearchHandler = () => { getObjects(); };
 
-watch(() => route.query.q, (newQuery, oldQuery) => {
-    if (newQuery !== oldQuery) {
-        searchStore.setSearchQuery(newQuery || '');
-        getObjects();
+// Sync filter params from URL to store
+const syncFiltersFromRoute = () => {
+    const q = route.query.q;
+    searchStore.setSearchQuery(q || '');
+    // Only sync filter params on actual route changes (not on our own pushes)
+    const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+    for (const key of filterKeys) {
+        const val = route.query[key];
+        if (val !== undefined) {
+            searchStore.setFilter(key, val);
+        }
     }
-});
+};
+
+watch(() => route.query, (newQuery, oldQuery) => {
+    const qChanged = newQuery.q !== oldQuery.q;
+    const filtersChanged = filterKeys.some(k => newQuery[k] !== oldQuery[k]);
+    if (qChanged || filtersChanged) {
+        syncFiltersFromRoute();
+        if (qChanged || filtersChanged) {
+            getObjects();
+        }
+    }
+}, { deep: true });
 
 watch(() => searchStore.checkedItems, () => {
     getObjects();
@@ -333,6 +371,7 @@ watch(() => searchStore.checkedItems, () => {
 
 onMounted(() => {
     eventBus.on('trigger-search', triggerSearchHandler);
+    syncFiltersFromRoute();
     getObjects();
 });
 
