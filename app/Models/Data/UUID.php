@@ -69,6 +69,10 @@ class UUID
     public const GROUP_READ_ACCESS = 'ea206516-9e45-482f-89be-05313f52e5e3';
     public const BELONGS_TO_USER_GROUP = 'e18d73eb-a5d3-47be-a785-106f6f185651';
 
+    // ── User preference / history link types ──
+    public const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';
+    public const RECENTLY_VIEWED = 'f0f0f0f0-0002-4000-a000-000000000002';
+
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,

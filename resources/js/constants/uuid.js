@@ -76,4 +76,8 @@ export const UUID = {
     // ── Server storage link ──
     // Links a thing to a server it's stored on (same UUID as LINK_TO_STORAGE)
     STORED_ON:         '1dcb897e-0f64-499f-b80d-2cac4a025ed4',
+
+    // ── User preference / history link types ──
+    MY_FAVORITE:       'f0f0f0f0-0001-4000-a000-000000000001',
+    RECENTLY_VIEWED:   'f0f0f0f0-0002-4000-a000-000000000002',
 };

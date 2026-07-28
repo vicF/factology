@@ -94,6 +94,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/check_photos',          [ApiController::class, 'checkPhotos']);
         Route::post('/photos/thumbs_upload',  [ApiController::class, 'upload']);
 
+        // History / favorites
+        Route::post('/suggest/links',         [ApiController::class, 'suggestLinks']);
+        Route::post('/object/{id}/favorite',  [ApiController::class, 'toggleFavorite']);
+
         // Export/Import (admin-only, enforced in controller)
         Route::get('/export',                 [ExportImportController::class, 'export']);
         Route::post('/import',                [ExportImportController::class, 'import']);

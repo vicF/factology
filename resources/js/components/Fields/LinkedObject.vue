@@ -9,6 +9,9 @@
                     :isEditable="true"
                     name="First object"
                     :type="effectiveObjectType"
+                    :contextObjectType="contextObjectType"
+                    :contextLinkTypeId="contextLinkTypeId"
+                    :contextOneThingId="contextOneThingId"
                     required
                 />
             </div>
@@ -39,6 +42,9 @@
                     :isEditable="true"
                     name="Second object"
                     :type="effectiveObjectType"
+                    :contextObjectType="contextObjectType"
+                    :contextLinkTypeId="contextLinkTypeId"
+                    :contextOneThingId="contextOneThingId"
                     required
                     class="flex-field"
                 />
@@ -86,6 +92,9 @@
                 :isEditable="true"
                 :label="targetLabel"
                 :type="CLASS_TYPE"
+                :contextObjectType="contextObjectType"
+                :contextLinkTypeId="contextLinkTypeId"
+                :contextOneThingId="contextOneThingId"
                 required
                 class="flex-field"
             />
@@ -119,6 +128,18 @@ const effectiveObjectType = computed(() => {
     if (props.objectType !== null) return props.objectType;
     if (props.currentObject?.type === CLASS_TYPE) return CLASS_TYPE;
     return THING_TYPE;
+});
+
+const contextObjectType = computed(() => {
+    return effectiveObjectType.value;
+});
+
+const contextLinkTypeId = computed(() => {
+    return link.value.link_type_id || props.fixedLinkTypeUuid;
+});
+
+const contextOneThingId = computed(() => {
+    return link.value.one_thing_id || props.currentObject?.thing_id;
 });
 
 const link = ref({ ...props.link });
