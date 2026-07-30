@@ -33,8 +33,6 @@ const props = defineProps({
     alternativeUuids: { type: Array, default: () => [] },
     type: { type: Number, default: null },
     showTypeLabel: { type: Boolean, default: true },
-    isPrivate: { type: Boolean, default: false },
-    authenticated: { type: Boolean, default: true },
     sideBar: { type: String, default: null }
 })
 

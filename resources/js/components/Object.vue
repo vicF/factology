@@ -87,8 +87,6 @@
                                                 <Image
                                                     :node-id="object.thing_id"
                                                     :type="object.type"
-                                                    :is-private="!object.public"
-                                                    :authenticated="authenticated"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -146,8 +144,6 @@
                                                 <Image
                                                     :node-id="getLinkTargetId(link)"
                                                     :type="link.type"
-                                                    :is-private="!link.target_public"
-                                                    :authenticated="authenticated"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
