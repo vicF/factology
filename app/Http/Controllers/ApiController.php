@@ -580,9 +580,13 @@ class ApiController extends BaseController
         if (!empty($requestBody['date_to'])) {
             $query->where('start', '<=', $requestBody['date_to']);
         }
-        // Owner filter
+        // Owner filter — exact UUID match when possible, ILIKE fallback
         if (!empty($requestBody['owner'])) {
-            $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+            if (Str::isUuid($requestBody['owner'])) {
+                $query->where('things.owner', $requestBody['owner']);
+            } else {
+                $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+            }
         }
         // Server filter
         if (!empty($requestBody['server'])) {
