@@ -33,12 +33,12 @@
                 <!-- Owner -->
                 <div class="col-lg-3 col-6">
                     <label class="filter-label">Owner</label>
-                    <ObjectField v-model="ownerValue" :type="THING_TYPE" placeholder="Search owner..." :max-results="8" />
+                    <ObjectField v-model="ownerValue" :type="THING_TYPE" filter-type="owner" placeholder="Search owner..." :max-results="10" />
                 </div>
                 <!-- Server -->
                 <div class="col-lg-3 col-6">
                     <label class="filter-label">Server</label>
-                    <ObjectField v-model="serverValue" :type="SERVER_TYPE" placeholder="Search server..." :max-results="8" />
+                    <ObjectField v-model="serverValue" :type="SERVER_TYPE" filter-type="server" placeholder="Search server..." :max-results="10" />
                 </div>
             </div>
             <div class="row g-2 mt-1">

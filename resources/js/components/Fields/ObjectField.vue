@@ -155,6 +155,12 @@ const props = defineProps({
         type: String,
         default: null
     },
+    // When set ('owner' | 'server'), search is scoped to only things that are
+    // actually referenced as owner / server by other things (filter panel).
+    filterType: {
+        type: String,
+        default: null,
+    },
     // ── Context props for history/recommendations ──
     contextObjectType: {
         type: Number,
@@ -345,6 +351,21 @@ async function loadObjectByUuid(uuid) {
 }
 
 async function loadSuggestions() {
+    // For filter-scoped searches (owner/server), pre-fill with the real
+    // owners/servers that actually have objects assigned.
+    if (props.filterType) {
+        try {
+            const res = await axios.get('/search/options')
+            const key = props.filterType === 'owner' ? 'owners' : 'servers'
+            pendingSuggestions.value = (res.data[key] || []).slice(0, props.maxResults)
+        } catch (e) {
+            console.warn('Failed to load filter options:', e)
+            pendingSuggestions.value = []
+        } finally {
+            suggestionsLoaded.value = true
+        }
+        return
+    }
     try {
         await historyStore.hydrate();
         const results = await historyStore.getSuggestions(
@@ -408,7 +429,9 @@ function debouncedSearch(val) {
         let type = []
         if (props.type === 3) type.push(3)
         if (props.type === 2) type.push(2)
-        axios.post('/object', { search: searchTerm, type, classes: [] })
+        const body = { search: searchTerm, type, classes: [] }
+        if (props.filterType) body.filter_type = props.filterType
+        axios.post('/object', body)
             .then(response => {
                 let results = []
                 if (typeof response.data === 'string') {

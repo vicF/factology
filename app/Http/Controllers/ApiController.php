@@ -512,6 +512,27 @@ class ApiController extends BaseController
             ->auth()
             ->where('things.deleted', 0);
 
+        // Reference-type filter: restrict results to only things that are
+        // actually referenced as an owner or server by other things.
+        if (!empty($requestBody['filter_type'])) {
+            if ($requestBody['filter_type'] === 'owner') {
+                // things.owner is char(36), so cast to uuid for the comparison
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select(DB::raw('o.owner::uuid'))
+                        ->from('things as o')
+                        ->whereNotNull('o.owner')
+                        ->where('o.deleted', 0);
+                });
+            } elseif ($requestBody['filter_type'] === 'server') {
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select('o.server_uuid')
+                        ->from('things as o')
+                        ->whereNotNull('o.server_uuid')
+                        ->where('o.deleted', 0);
+                });
+            }
+        }
+
         if (!empty($requestBody['classes'])) {
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
@@ -624,6 +645,43 @@ class ApiController extends BaseController
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Get available filter options (owners and servers) for the search filter panel.
+     * Returns only owners/servers that actually have objects assigned.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchOptions(): \Illuminate\Http\JsonResponse
+    {
+        // Distinct owners with names and object counts.
+        // things.owner is char(36), so cast to uuid for the join.
+        $owners = DB::table('things as o')
+            ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+            ->leftJoin('things as t', DB::raw('o.owner::uuid'), '=', 't.thing_id')
+            ->where('o.deleted', 0)
+            ->whereNotNull('o.owner')
+            ->groupBy('o.owner', 't.name', 't.type')
+            ->orderByDesc(DB::raw('COUNT(*)'))
+            ->limit(100)
+            ->get();
+
+        // Distinct server UUIDs with names and object counts
+        $servers = DB::table('things as o')
+            ->select('o.server_uuid as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+            ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
+            ->where('o.deleted', 0)
+            ->whereNotNull('o.server_uuid')
+            ->groupBy('o.server_uuid', 't.name', 't.type')
+            ->orderByDesc(DB::raw('COUNT(*)'))
+            ->limit(100)
+            ->get();
+
+        return response()->json([
+            'owners' => $owners,
+            'servers' => $servers,
+        ]);
     }
 
     /**

@@ -22,6 +22,7 @@ class SearchRequest extends FormRequest
             'date_to'    => 'nullable|date|after_or_equal:date_from',
             'owner'      => 'nullable|string|max:255',
             'server'     => 'nullable|string|max:255',
+            'filter_type' => 'nullable|string|in:owner,server',
         ];
     }
 
