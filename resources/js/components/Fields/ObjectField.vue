@@ -41,6 +41,16 @@
                     />
 
                     <button
+                        v-if="allowClear && modelValue"
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        @click.stop="clearSelection"
+                        title="Clear selection"
+                    >
+                        <IconClose width="14" height="14" />
+                    </button>
+
+                    <button
                         class="btn btn-outline-secondary"
                         type="button"
                         @click="isOpen ? closeDropdown() : openDropdown()"
@@ -160,6 +170,13 @@ const props = defineProps({
     filterType: {
         type: String,
         default: null,
+    },
+    // Show a clear (×) button when a value is selected. Optional filters
+    // (e.g. owner/server in the search panel) enable this; required fields
+    // that must always have an object selected leave it off.
+    allowClear: {
+        type: Boolean,
+        default: false,
     },
     // ── Context props for history/recommendations ──
     contextObjectType: {
@@ -354,6 +371,7 @@ async function loadSuggestions() {
     // For filter-scoped searches (owner/server), pre-fill with the real
     // owners/servers that actually have objects assigned.
     if (props.filterType) {
+        loading.value = true
         try {
             const res = await axios.get('/search/options')
             const key = props.filterType === 'owner' ? 'owners' : 'servers'
@@ -362,6 +380,7 @@ async function loadSuggestions() {
             console.warn('Failed to load filter options:', e)
             pendingSuggestions.value = []
         } finally {
+            loading.value = false
             suggestionsLoaded.value = true
         }
         return
@@ -408,6 +427,7 @@ function clearSelection() {
     selectedObject.value = null
     emit('update:modelValue', null)
     searchText.value = ''
+    isOpen.value = false
 }
 
 function suggestionLabel(type) {
