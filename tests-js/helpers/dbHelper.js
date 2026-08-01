@@ -21,7 +21,22 @@ const DB_HELPER = {
                 console.log('\n🔄 Running database reset...');
             }
 
-            const resetResponse = await I.sendPostRequest('/api/test/reset');
+            // The test API can transiently reset the connection right after a
+            // heavy phase (e.g. PHPUnit). Retry a few times before giving up.
+            let resetResponse = null;
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    resetResponse = await I.sendPostRequest('/api/test/reset');
+                    break;
+                } catch (err) {
+                    if (attempt === maxAttempts) {
+                        throw err;
+                    }
+                    console.log(`⚠️  Reset attempt ${attempt} failed (${err.message}), retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
 
             if (resetResponse.data.success) {
                 if (!silent) {
