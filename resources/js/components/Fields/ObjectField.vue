@@ -218,6 +218,7 @@ let debounceTimer = null
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
+    if (selectedObject.value?.name) return selectedObject.value.name
     if (!props.modelValue) return ''
 
     const cached = cacheStore.getCachedObject(props.modelValue)
@@ -277,6 +278,7 @@ const openDropdown = async () => {
     previousDisplay.value = displayValue.value || ''
     isOpen.value = true
     searchText.value = ''
+    error.value = null
     // Load suggestions asynchronously
     suggestionsLoaded.value = false
     loadSuggestions()
@@ -335,6 +337,15 @@ onUnmounted(() => {
 watch(() => props.modelValue, async (newUuid) => {
     if (!newUuid) {
         selectedObject.value = null
+        return
+    }
+    // Filter-scoped fields (owner/server) resolve the object from the cache
+    // (populated on selection). Do not fetch the object: the referenced owner
+    // or server may be private / not visible to this user, and a failed fetch
+    // would surface a spurious "Object not found" error in the dropdown.
+    if (props.filterType) {
+        error.value = null
+        selectedObject.value = cacheStore.getCachedObject(newUuid) || selectedObject.value || null
         return
     }
     if (cacheStore.hasCachedObject(newUuid)) {
@@ -411,6 +422,9 @@ function selectObject(obj, event) {
     if (!obj?.thing_id) return
     isClickingDropdown.value = true
     selectedObject.value = obj
+    // Cache the object so displayValue can resolve its name (suggestions from
+    // /search/options are not otherwise in the object cache).
+    cacheStore.cacheObject(obj.thing_id, obj, obj.type || props.type)
     emit('update:modelValue', obj.thing_id)
     // Record in history
     historyStore.recordSelection(

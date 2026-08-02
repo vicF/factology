@@ -16,6 +16,7 @@ vi.mock('@/stores/objectCache', () => ({
         fetchOrGetObject: vi.fn(),
         getRecent: vi.fn(() => []),
         searchCached: vi.fn(() => []),
+        cacheObject: vi.fn(),
     })),
 }))
 

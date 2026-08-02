@@ -23,6 +23,7 @@ describe('LinkedObject', () => {
             fetchOrGetObject: vi.fn(),
             getRecent: vi.fn(() => []),
             searchCached: vi.fn(() => []),
+            cacheObject: vi.fn(),
         }
 
         // Ensure useObjectCacheStore returns our mock object

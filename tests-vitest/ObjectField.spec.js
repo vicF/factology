@@ -23,6 +23,7 @@ describe('ObjectField', () => {
             getCachedObject: vi.fn(),
             fetchOrGetObject: vi.fn(),
             searchCached: vi.fn(() => []),
+            cacheObject: vi.fn(),
         }
 
         useObjectCacheStore.mockReturnValue(mockStore)

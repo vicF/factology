@@ -649,7 +649,8 @@ class ApiController extends BaseController
 
     /**
      * Get available filter options (owners and servers) for the search filter panel.
-     * Returns only owners/servers that actually have objects assigned.
+     * Returns only owners/servers that actually have visible objects assigned,
+     * so a user never sees filter values for objects they have no access to.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -662,6 +663,7 @@ class ApiController extends BaseController
             ->leftJoin('things as t', DB::raw('o.owner::uuid'), '=', 't.thing_id')
             ->where('o.deleted', 0)
             ->whereNotNull('o.owner')
+            ->where($this->visibleObjectsScope('o'))
             ->groupBy('o.owner', 't.name', 't.type')
             ->orderByDesc(DB::raw('COUNT(*)'))
             ->limit(100)
@@ -673,6 +675,7 @@ class ApiController extends BaseController
             ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
             ->where('o.deleted', 0)
             ->whereNotNull('o.server_uuid')
+            ->where($this->visibleObjectsScope('o'))
             ->groupBy('o.server_uuid', 't.name', 't.type')
             ->orderByDesc(DB::raw('COUNT(*)'))
             ->limit(100)
@@ -682,6 +685,38 @@ class ApiController extends BaseController
             'owners' => $owners,
             'servers' => $servers,
         ]);
+    }
+
+    /**
+     * Closure restricting a things query (aliased) to records the current user
+     * may see: public (or null), the user's own, and group-accessible. Mirrors
+     * the auth() query builder macro, but for a configurable table alias so it
+     * can be applied to the referencing side of the options query.
+     */
+    private function visibleObjectsScope(string $alias = 'o'): \Closure
+    {
+        return function ($query) use ($alias) {
+            $query->where($alias . '.public', 1)
+                ->orWhereNull($alias . '.public');
+
+            if (Auth::check()) {
+                $userThingId = Auth::user()->thing_id;
+
+                // Objects the user owns
+                $query->orWhere($alias . '.owner', $userThingId);
+
+                // Group-based access: visible via GROUP_READ_ACCESS links to
+                // a group the user belongs to (BELONGS_TO_USER_GROUP)
+                $query->orWhereIn($alias . '.thing_id', function ($sub) use ($userThingId) {
+                    $sub->select('gl.one_thing_id')
+                        ->from('links as gl')
+                        ->join('links as ug', 'ug.other_thing_id', '=', 'gl.other_thing_id')
+                        ->where('gl.link_type_id', UUID::GROUP_READ_ACCESS)
+                        ->where('ug.link_type_id', UUID::BELONGS_TO_USER_GROUP)
+                        ->where('ug.one_thing_id', $userThingId);
+                });
+            }
+        };
     }
 
     /**
