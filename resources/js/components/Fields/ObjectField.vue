@@ -236,7 +236,7 @@ const filteredObjects = computed(() => {
         results = pendingSuggestions.value.length > 0 ? pendingSuggestions.value : (cacheStore.getRecent(props.type, props.maxResults) || []);
     } else {
         const term = searchText.value.toLowerCase().trim()
-        results = cacheStore.searchCached('object', term, props.maxResults) || [];
+        results = cacheStore.searchCached(props.type, term, props.maxResults) || [];
     }
     if (props.excludeUuid && results.length) {
         results = results.filter(obj => obj.thing_id !== props.excludeUuid);
@@ -461,8 +461,10 @@ function debouncedSearch(val) {
         loading.value = true
         const searchTerm = val
         let type = []
-        if (props.type === 3) type.push(3)
-        if (props.type === 2) type.push(2)
+        // Restrict results to the field's object type. Types 2–5 (class, thing,
+        // link, external) are accepted by the backend validation; server fields
+        // (type 6) rely on filter_type instead of a numeric type filter.
+        if (props.type >= 2 && props.type <= 5) type.push(props.type)
         const body = { search: searchTerm, type, classes: [] }
         if (props.filterType) body.filter_type = props.filterType
         axios.post('/object', body)
