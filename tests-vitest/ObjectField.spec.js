@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest' // Explicit imports
 import ObjectField from '@/components/Fields/ObjectField.vue'
 import { useObjectCacheStore } from '@/stores/objectCache'
+import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from '@/constants'
 import axios from 'axios'
 
 // 1. Mock dependencies at the top level
@@ -23,6 +24,7 @@ describe('ObjectField', () => {
             getCachedObject: vi.fn(),
             fetchOrGetObject: vi.fn(),
             searchCached: vi.fn(() => []),
+            cacheObject: vi.fn(),
         }
 
         useObjectCacheStore.mockReturnValue(mockStore)
@@ -56,5 +58,27 @@ describe('ObjectField', () => {
         const emitted = wrapper.emitted('update:modelValue')
         expect(emitted).toBeTruthy()
         expect(emitted[0]).toEqual(['123'])
+    })
+
+    it('sends the field type as a search filter for class/thing/link fields', async () => {
+        for (const type of [CLASS_TYPE, THING_TYPE, LINK_TYPE]) {
+            axios.post.mockResolvedValue({ data: { things: [] } })
+            const wrapper = mount(ObjectField, { props: { modelValue: null, type } })
+            await wrapper.vm.debouncedSearch('something')
+            expect(axios.post).toHaveBeenCalledWith(
+                '/object',
+                expect.objectContaining({ type: [type] })
+            )
+        }
+    })
+
+    it('does not send a type filter for server fields (they use filter_type)', async () => {
+        axios.post.mockResolvedValue({ data: { things: [] } })
+        const wrapper = mount(ObjectField, { props: { modelValue: null, type: 6, filterType: 'server' } })
+        await wrapper.vm.debouncedSearch('something')
+        expect(axios.post).toHaveBeenCalledWith(
+            '/object',
+            expect.objectContaining({ type: [], filter_type: 'server' })
+        )
     })
 })

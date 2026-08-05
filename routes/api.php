@@ -62,10 +62,11 @@ Route::prefix('v1')->group(function () {
     // ────────────────────────────────────────────────────────────────────────────────
 
     Route::middleware('check.public.access')->group(function () {
-        Route::get('/object',     [ApiController::class, 'list']);
-        Route::post('/object',    [ApiController::class, 'search']);
-        Route::get('/object/{id}', [ApiController::class, 'get']);
+        Route::get('/object',       [ApiController::class, 'list']);
+        Route::post('/object',      [ApiController::class, 'search']);
+        Route::get('/object/{id}',  [ApiController::class, 'get']);
         Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
+        Route::get('/search/options', [ApiController::class, 'searchOptions']);
     });
 
     // Client-side error reporting (no auth required)

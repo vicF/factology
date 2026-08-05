@@ -16,6 +16,16 @@ vi.mock('@/stores/objectCache', () => ({
         fetchOrGetObject: vi.fn(),
         getRecent: vi.fn(() => []),
         searchCached: vi.fn(() => []),
+        cacheObject: vi.fn(),
+    })),
+}))
+
+// Mock the object history store (needs no active Pinia in unit tests)
+vi.mock('@/stores/objectHistory', () => ({
+    useObjectHistoryStore: vi.fn(() => ({
+        hydrate: vi.fn(),
+        getSuggestions: vi.fn(() => []),
+        recordSelection: vi.fn(),
     })),
 }))
 

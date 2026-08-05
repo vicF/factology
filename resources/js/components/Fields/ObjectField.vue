@@ -41,6 +41,16 @@
                     />
 
                     <button
+                        v-if="allowClear && modelValue"
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        @click.stop="clearSelection"
+                        title="Clear selection"
+                    >
+                        <IconClose width="14" height="14" />
+                    </button>
+
+                    <button
                         class="btn btn-outline-secondary"
                         type="button"
                         @click="isOpen ? closeDropdown() : openDropdown()"
@@ -155,6 +165,19 @@ const props = defineProps({
         type: String,
         default: null
     },
+    // When set ('owner' | 'server'), search is scoped to only things that are
+    // actually referenced as owner / server by other things (filter panel).
+    filterType: {
+        type: String,
+        default: null,
+    },
+    // Show a clear (×) button when a value is selected. Optional filters
+    // (e.g. owner/server in the search panel) enable this; required fields
+    // that must always have an object selected leave it off.
+    allowClear: {
+        type: Boolean,
+        default: false,
+    },
     // ── Context props for history/recommendations ──
     contextObjectType: {
         type: Number,
@@ -195,6 +218,7 @@ let debounceTimer = null
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
+    if (selectedObject.value?.name) return selectedObject.value.name
     if (!props.modelValue) return ''
 
     const cached = cacheStore.getCachedObject(props.modelValue)
@@ -212,7 +236,7 @@ const filteredObjects = computed(() => {
         results = pendingSuggestions.value.length > 0 ? pendingSuggestions.value : (cacheStore.getRecent(props.type, props.maxResults) || []);
     } else {
         const term = searchText.value.toLowerCase().trim()
-        results = cacheStore.searchCached('object', term, props.maxResults) || [];
+        results = cacheStore.searchCached(props.type, term, props.maxResults) || [];
     }
     if (props.excludeUuid && results.length) {
         results = results.filter(obj => obj.thing_id !== props.excludeUuid);
@@ -254,6 +278,7 @@ const openDropdown = async () => {
     previousDisplay.value = displayValue.value || ''
     isOpen.value = true
     searchText.value = ''
+    error.value = null
     // Load suggestions asynchronously
     suggestionsLoaded.value = false
     loadSuggestions()
@@ -314,6 +339,15 @@ watch(() => props.modelValue, async (newUuid) => {
         selectedObject.value = null
         return
     }
+    // Filter-scoped fields (owner/server) resolve the object from the cache
+    // (populated on selection). Do not fetch the object: the referenced owner
+    // or server may be private / not visible to this user, and a failed fetch
+    // would surface a spurious "Object not found" error in the dropdown.
+    if (props.filterType) {
+        error.value = null
+        selectedObject.value = cacheStore.getCachedObject(newUuid) || selectedObject.value || null
+        return
+    }
     if (cacheStore.hasCachedObject(newUuid)) {
         selectedObject.value = cacheStore.getCachedObject(newUuid)
     } else if (cacheStore.missing?.has?.(newUuid)) {
@@ -345,6 +379,23 @@ async function loadObjectByUuid(uuid) {
 }
 
 async function loadSuggestions() {
+    // For filter-scoped searches (owner/server), pre-fill with the real
+    // owners/servers that actually have objects assigned.
+    if (props.filterType) {
+        loading.value = true
+        try {
+            const res = await axios.get('/search/options')
+            const key = props.filterType === 'owner' ? 'owners' : 'servers'
+            pendingSuggestions.value = (res.data[key] || []).slice(0, props.maxResults)
+        } catch (e) {
+            console.warn('Failed to load filter options:', e)
+            pendingSuggestions.value = []
+        } finally {
+            loading.value = false
+            suggestionsLoaded.value = true
+        }
+        return
+    }
     try {
         await historyStore.hydrate();
         const results = await historyStore.getSuggestions(
@@ -371,6 +422,9 @@ function selectObject(obj, event) {
     if (!obj?.thing_id) return
     isClickingDropdown.value = true
     selectedObject.value = obj
+    // Cache the object so displayValue can resolve its name (suggestions from
+    // /search/options are not otherwise in the object cache).
+    cacheStore.cacheObject(obj.thing_id, obj, obj.type || props.type)
     emit('update:modelValue', obj.thing_id)
     // Record in history
     historyStore.recordSelection(
@@ -387,6 +441,7 @@ function clearSelection() {
     selectedObject.value = null
     emit('update:modelValue', null)
     searchText.value = ''
+    isOpen.value = false
 }
 
 function suggestionLabel(type) {
@@ -406,9 +461,13 @@ function debouncedSearch(val) {
         loading.value = true
         const searchTerm = val
         let type = []
-        if (props.type === 3) type.push(3)
-        if (props.type === 2) type.push(2)
-        axios.post('/object', { search: searchTerm, type, classes: [] })
+        // Restrict results to the field's object type. Types 2–5 (class, thing,
+        // link, external) are accepted by the backend validation; server fields
+        // (type 6) rely on filter_type instead of a numeric type filter.
+        if (props.type >= 2 && props.type <= 5) type.push(props.type)
+        const body = { search: searchTerm, type, classes: [] }
+        if (props.filterType) body.filter_type = props.filterType
+        axios.post('/object', body)
             .then(response => {
                 let results = []
                 if (typeof response.data === 'string') {

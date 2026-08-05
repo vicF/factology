@@ -512,6 +512,27 @@ class ApiController extends BaseController
             ->auth()
             ->where('things.deleted', 0);
 
+        // Reference-type filter: restrict results to only things that are
+        // actually referenced as an owner or server by other things.
+        if (!empty($requestBody['filter_type'])) {
+            if ($requestBody['filter_type'] === 'owner') {
+                // things.owner is char(36), so cast to uuid for the comparison
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select(DB::raw('o.owner::uuid'))
+                        ->from('things as o')
+                        ->whereNotNull('o.owner')
+                        ->where('o.deleted', 0);
+                });
+            } elseif ($requestBody['filter_type'] === 'server') {
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select('o.server_uuid')
+                        ->from('things as o')
+                        ->whereNotNull('o.server_uuid')
+                        ->where('o.deleted', 0);
+                });
+            }
+        }
+
         if (!empty($requestBody['classes'])) {
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
@@ -580,9 +601,13 @@ class ApiController extends BaseController
         if (!empty($requestBody['date_to'])) {
             $query->where('start', '<=', $requestBody['date_to']);
         }
-        // Owner filter
+        // Owner filter — exact UUID match when possible, ILIKE fallback
         if (!empty($requestBody['owner'])) {
-            $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+            if (Str::isUuid($requestBody['owner'])) {
+                $query->where('things.owner', $requestBody['owner']);
+            } else {
+                $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+            }
         }
         // Server filter
         if (!empty($requestBody['server'])) {
@@ -620,6 +645,78 @@ class ApiController extends BaseController
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Get available filter options (owners and servers) for the search filter panel.
+     * Returns only owners/servers that actually have visible objects assigned,
+     * so a user never sees filter values for objects they have no access to.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchOptions(): \Illuminate\Http\JsonResponse
+    {
+        // Distinct owners with names and object counts.
+        // things.owner is char(36), so cast to uuid for the join.
+        $owners = DB::table('things as o')
+            ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+            ->leftJoin('things as t', DB::raw('o.owner::uuid'), '=', 't.thing_id')
+            ->where('o.deleted', 0)
+            ->whereNotNull('o.owner')
+            ->where($this->visibleObjectsScope('o'))
+            ->groupBy('o.owner', 't.name', 't.type')
+            ->orderByDesc(DB::raw('COUNT(*)'))
+            ->limit(100)
+            ->get();
+
+        // Distinct server UUIDs with names and object counts
+        $servers = DB::table('things as o')
+            ->select('o.server_uuid as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+            ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
+            ->where('o.deleted', 0)
+            ->whereNotNull('o.server_uuid')
+            ->where($this->visibleObjectsScope('o'))
+            ->groupBy('o.server_uuid', 't.name', 't.type')
+            ->orderByDesc(DB::raw('COUNT(*)'))
+            ->limit(100)
+            ->get();
+
+        return response()->json([
+            'owners' => $owners,
+            'servers' => $servers,
+        ]);
+    }
+
+    /**
+     * Closure restricting a things query (aliased) to records the current user
+     * may see: public (or null), the user's own, and group-accessible. Mirrors
+     * the auth() query builder macro, but for a configurable table alias so it
+     * can be applied to the referencing side of the options query.
+     */
+    private function visibleObjectsScope(string $alias = 'o'): \Closure
+    {
+        return function ($query) use ($alias) {
+            $query->where($alias . '.public', 1)
+                ->orWhereNull($alias . '.public');
+
+            if (Auth::check()) {
+                $userThingId = Auth::user()->thing_id;
+
+                // Objects the user owns
+                $query->orWhere($alias . '.owner', $userThingId);
+
+                // Group-based access: visible via GROUP_READ_ACCESS links to
+                // a group the user belongs to (BELONGS_TO_USER_GROUP)
+                $query->orWhereIn($alias . '.thing_id', function ($sub) use ($userThingId) {
+                    $sub->select('gl.one_thing_id')
+                        ->from('links as gl')
+                        ->join('links as ug', 'ug.other_thing_id', '=', 'gl.other_thing_id')
+                        ->where('gl.link_type_id', UUID::GROUP_READ_ACCESS)
+                        ->where('ug.link_type_id', UUID::BELONGS_TO_USER_GROUP)
+                        ->where('ug.one_thing_id', $userThingId);
+                });
+            }
+        };
     }
 
     /**
