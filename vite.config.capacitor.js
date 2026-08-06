@@ -30,6 +30,9 @@ export default defineConfig({
         outDir: 'dist-capacitor',
         emptyOutDir: true,
         sourcemap: false,
+        // The SPA uses top-level await (localDb/standaloneBootstrap.js) and runs
+        // inside a modern Chromium WebView, so target the latest browsers.
+        target: 'esnext',
         rollupOptions: {
             input: path.resolve(__dirname, 'index.capacitor.html'),
         },
@@ -39,6 +42,9 @@ export default defineConfig({
     envPrefix: 'VITE_',
     define: {
         'import.meta.env.VITE_TARGET': JSON.stringify('capacitor'),
+        // Injected at build time by build-android.sh. Empty string => standalone
+        // Dexie mode; non-empty => remote server mode (see resources/js/app.js).
+        'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL ?? ''),
     },
     server: {
         host: '0.0.0.0',

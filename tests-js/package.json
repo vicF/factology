@@ -1,0 +1,15 @@
+{
+    "name": "factology-tests-js",
+    "private": true,
+    "version": "0.1.0",
+    "description": "Browser (CodeceptJS) and mobile (Appium) E2E tests for Factology.",
+    "scripts": {
+        "test:mobile": "codeceptjs run --config codecept.mobile.conf.js --steps --grep '@smoke'"
+    },
+    "devDependencies": {
+        "appium": "^2.16.0",
+        "appium-uiautomator2-driver": "^3.10.0",
+        "codeceptjs": "^3.7.1",
+        "webdriverio": "^8.42.0"
+    }
+}
