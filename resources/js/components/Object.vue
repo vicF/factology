@@ -46,12 +46,8 @@
 
                         <!-- Header -->
                         <div class="object-header">
-                            <h1 class="object-title"
-                                @mouseenter="headerHover = true"
-                                @mouseleave="headerHover = false">
+                            <h1 class="object-title">
                                 {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="authenticated && !object.public" class="private-icon-header" @click="toggleObjectVisibility(true)" />
-                                <IconPublic v-if="authenticated && object.public && headerHover" class="public-icon-header" @click="toggleObjectVisibility(false)" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -77,64 +73,69 @@
 
                         <!-- Details -->
                         <div v-show="activeTab === 'details'">
-                            <div class="results-list">
 
-                                <!-- Main object card -->
-                                <div class="result-item">
-                                    <div class="result-content">
-                                        <div class="result-icon-section">
-                                            <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }" class="icon-link">
-                                                <Image
-                                                    :node-id="object.thing_id"
-                                                    :type="object.type"
-                                                    width="48px"
-                                                    side-bar="right"
-                                                />
+                            <!-- Main object details (title lives in the header above) -->
+                            <div class="result-item">
+                                <div class="result-content">
+                                    <div class="result-icon-section">
+                                        <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }" class="icon-link">
+                                            <Image
+                                                :node-id="object.thing_id"
+                                                :type="object.type"
+                                                width="48px"
+                                                side-bar="right"
+                                            />
+                                        </RouterLink>
+                                    </div>
+
+                                    <div class="result-info-section">
+                                        <div v-if="authenticated" class="visibility-badge"
+                                            :class="object.public ? 'is-public' : 'is-private'"
+                                            @click="toggleObjectVisibility(object.public ? false : true)"
+                                            :title="$t('Toggle visibility')">
+                                            <IconPublic v-if="object.public" class="visibility-icon" />
+                                            <IconPrivate v-else class="visibility-icon" />
+                                            <span>{{ object.public ? $t('Public') : $t('Private') }}</span>
+                                        </div>
+
+                                        <div v-if="object.class" class="class-badge">
+                                            <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
+                                                {{ object.class.name }}
                                             </RouterLink>
                                         </div>
 
-                                        <div class="result-info-section">
-                                            <div class="result-header">
-                                                <div class="result-title">{{ object.name }}</div>
-                                            </div>
-
-                                            <div v-if="object.class" class="class-badge">
-                                                <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
-                                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                    {{ object.class.name }}
-                                                </RouterLink>
-                                            </div>
-
-                                            <div v-if="object.start || object.end || object.description" class="result-description">
-                                                <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
-                                                        <template v-if="object.start && object.end"> → </template>
-                                                        <template v-else-if="object.end">{{ $t('until') }} </template>
-                                                        <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
-                                                    </span>
+                                        <div v-if="object.start || object.end || object.description" class="result-description">
+                                            <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
+                                                <span class="date-badge">
+                                                    📅
+                                                    <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
+                                                    <template v-if="object.start && object.end"> → </template>
+                                                    <template v-else-if="object.end">{{ $t('until') }} </template>
+                                                    <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
                                                 </span>
-                                                <span v-if="object.description">{{ object.description }}</span>
-                                            </div>
+                                            </span>
+                                            <span v-if="object.description">{{ object.description }}</span>
+                                        </div>
 
-                                            <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
-                                                <span v-if="object.record_created" class="result-meta-row">
-                                                    {{ $t('Created') }}: {{ object.record_created }}
-                                                </span>
-                                                <span v-if="object.record_updated" class="result-meta-row">
-                                                    {{ $t('Updated') }}: {{ object.record_updated }}
-                                                </span>
-                                            </div>
+                                        <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
+                                            <span v-if="object.record_created" class="result-meta-row">
+                                                {{ $t('Created') }}: {{ object.record_created }}
+                                            </span>
+                                            <span v-if="object.record_updated" class="result-meta-row">
+                                                {{ $t('Updated') }}: {{ object.record_updated }}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <!-- Separator before links -->
-                                <div v-if="object.links && object.links.length" class="result-separator"></div>
+                            <!-- Separator before links -->
+                            <div v-if="object.links && object.links.length" class="result-separator"></div>
 
-                                <!-- Links list -->
-                                <div v-for="(link, linkIndex) in (object.links || [])" :key="link.link_id"
+                            <!-- Links list -->
+                            <div v-if="object.links && object.links.length" class="results-list">
+                                <div v-for="(link, linkIndex) in object.links" :key="link.link_id"
                                     class="result-item"
                                     @mouseenter="hoveredLink = linkIndex"
                                     @mouseleave="hoveredLink = null">
@@ -295,7 +296,6 @@ const loaded = ref(false);
 const serverError = ref(false);
 
 // ─── Quick visibility toggle state ─────────────────────────────────
-const headerHover = ref(false);
 const hoveredLink = ref(null);
 let quickMode = false;
 const showConfirmModal = ref(false);
@@ -737,19 +737,32 @@ watch(() => object.value, (newObject) => {
     margin-bottom: 20px;
 }
 .object-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
     font-size: 2rem;
     font-weight: 600;
 }
-.private-icon-header {
-    font-size: 1rem;
-    vertical-align: middle;
+.visibility-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
+    user-select: none;
 }
-.public-icon-header {
-    font-size: 1rem;
-    vertical-align: middle;
+.visibility-badge.is-public {
+    background: #d4edda;
+    color: #155724;
+}
+.visibility-badge.is-private {
+    background: #f8d7da;
+    color: #721c24;
+}
+.visibility-badge:hover {
+    filter: brightness(0.95);
 }
 .private-icon-link {
     font-size: 0.85rem;
