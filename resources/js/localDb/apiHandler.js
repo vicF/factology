@@ -101,8 +101,10 @@ async function handleSearch(body) {
 
     let results;
     if (params.tree) {
-        // Return class tree built from objects + parent-child links
-        const things = await listObjects({ type: [UUID.G_CLASS], includeDeleted: false });
+        // Return class tree built from objects + parent-child links.
+        // Mirrors the server (searchTree): classes AND link types that
+        // descend from Everything via "is a parent of" links.
+        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
         const tree = await buildClassTree(things);
         return {
             data: { things: tree },
@@ -122,7 +124,10 @@ async function handleSearch(body) {
     // Enrich with links
     const thingsWithLinks = [];
     for (const obj of results) {
-        const links = await listLinksForThing(obj.thing_id);
+        const links = await enrichLinks(
+            await listLinksForThing(obj.thing_id),
+            obj.thing_id,
+        );
         thingsWithLinks.push({
             ...obj,
             links: links.length > 0 ? links : undefined,
@@ -141,7 +146,7 @@ async function handleGet(id) {
         throw { response: { status: 404, data: { message: 'Not found' } } };
     }
 
-    const links = await listLinksForThing(id);
+    const links = await enrichLinks(await listLinksForThing(id), id);
 
     return {
         data: {
@@ -215,9 +220,57 @@ export async function handleLocalLinkCall(method, url, data = null) {
 }
 
 /**
- * Build a class tree from flat list of class objects + parent-child links.
+ * Enrich raw link records with endpoint display names, mirroring what the
+ * server does (LinkResource: links joined with `things.name` and
+ * `link_types.name as link_name`). Without this, LinkDescription renders
+ * "Unknown" for every link endpoint in standalone mode.
  *
- * @param {Array} classObjects - Things with type=G_CLASS
+ * @param {Array} links - Raw links from the local DB
+ * @param {string} currentThingId - The object these links belong to
+ * @returns {Promise<Array>} Links with name/link_name/type/target_public
+ */
+async function enrichLinks(links, currentThingId) {
+    if (!links || links.length === 0) return links;
+    const db = getDb();
+
+    // Collect every endpoint UUID we need to resolve
+    const ids = new Set();
+    for (const link of links) {
+        if (link.one_thing_id !== currentThingId) ids.add(link.one_thing_id);
+        if (link.other_thing_id !== currentThingId) ids.add(link.other_thing_id);
+        ids.add(link.link_type_id);
+    }
+
+    const found = await db.objects.bulkGet([...ids]);
+    const byId = {};
+    for (const o of found) {
+        if (o) byId[o.thing_id] = o;
+    }
+
+    return links.map(link => {
+        // The "name" the UI shows is the link's opposite endpoint
+        const targetId = link.one_thing_id === currentThingId
+            ? link.other_thing_id
+            : link.one_thing_id;
+        const target = byId[targetId];
+        const linkType = byId[link.link_type_id];
+
+        return {
+            ...link,
+            name: target?.name ?? link.name ?? null,
+            link_name: linkType?.name ?? link.link_name ?? null,
+            type: target?.type ?? link.type,
+            target_public: target?.public ?? link.target_public,
+        };
+    });
+}
+
+/**
+ * Build a class tree from flat list of class/link-type objects + the
+ * parent-child links. Mirrors the server (searchTree recursive CTE):
+ * the tree starts at Everything and descends via "is a parent of" links.
+ *
+ * @param {Array} classObjects - Things with type=G_CLASS or G_LINK
  * @returns {Array} Tree structure with nodes, level, parent_id
  */
 async function buildClassTree(classObjects) {
@@ -246,6 +299,7 @@ async function buildClassTree(classObjects) {
 
     // Recursively build tree
     function buildNode(thingId, level) {
+        if (level > 10) return null; // mirrors the server's depth limit
         const obj = thingMap[thingId];
         if (!obj) return null;
 
@@ -274,12 +328,7 @@ async function buildClassTree(classObjects) {
         };
     }
 
-    // Roots = classes that have no parent link (parent not found in link data)
-    const linkedChildren = new Set(allLinks.map(l => l.other_thing_id));
-    const roots = classObjects
-        .filter(obj => !linkedChildren.has(obj.thing_id))
-        .map(obj => buildNode(obj.thing_id, 1))
-        .filter(Boolean);
-
-    return roots;
+    // Single root: Everything (mirrors the server's `WHERE c.thing_id = ?`)
+    const root = buildNode(UUID.EVERYTHING, 1);
+    return root ? [root] : [];
 }

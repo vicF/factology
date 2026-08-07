@@ -21,8 +21,12 @@ Scenario('app launches and renders the dashboard with local data', ({ I }) => {
     // #search is only present after Vue mounts and the router renders the
     // dashboard (default route '/').
     I.waitForElement('#search', 45);
-    // The standalone seeder populates demo data on first run; the dashboard
-    // results list proves the local Dexie data layer works end to end.
+    // The standalone seeder populates the same classes as the web app; the
+    // dashboard results list proves the local Dexie data layer works end to end.
     I.waitForElement('.result-item', 60);
-    I.say('✓ App launched, WebView loaded, Vue mounted, local data rendered');
+    // Seeded classes from DatabaseSeeder.php are visible in the dashboard.
+    // (waitForFunction is more reliable in the webview than waitForText.)
+    I.waitForFunction(() => document.body.innerText.includes('Everything'), [], 20);
+    I.waitForFunction(() => document.body.innerText.includes('Vehicle'), [], 20);
+    I.say('✓ App launched, WebView loaded, seeded class list rendered');
 }).tag('@smoke');

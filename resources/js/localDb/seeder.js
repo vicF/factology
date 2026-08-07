@@ -1,220 +1,111 @@
 // resources/js/localDb/seeder.js
 //
-// Seeds the local IndexedDB with bootstrap objects.
-// Source of truth: database/seeders/DatabaseSeeder.php
+// Seeds the local IndexedDB with the same default objects as the web
+// application (source of truth: database/seeders/DatabaseSeeder.php).
 //
-// Bootstrap objects are infrastructure records referenced by the code
-// (e.g. UUID::ANYTHING, UUID::USER). They are NOT user data.
+// The seed data itself lives in ./seedData.js so it can be shared and
+// tested independently (tests-vitest/localDb/seederParity.test.js).
 
 import { UUID } from '../constants/uuid';
-import { getDb, SYNC_STATUS, createObject } from './index';
+import { getDb, SYNC_STATUS } from './index';
+import {
+    BOOTSTRAP_THINGS,
+    BOOTSTRAP_LINKS,
+    CLASSES,
+    CLASS_LINKS,
+} from './seedData';
+
+const makeObject = (t) => ({
+    thing_id: t.thing_id,
+    name: t.name,
+    type: t.type,
+    description: t.description || null,
+    start: null,
+    end: null,
+    public: t.public ? 1 : 0,
+    owner: t.owner ?? UUID.VICTOR_FOKIN,
+    data: null,
+    _syncStatus: SYNC_STATUS.SYNCED,
+    _localRevision: 0,
+    _serverRevision: 0,
+    _serverId: null,
+    _createdAt: Date.now(),
+    _updatedAt: Date.now(),
+});
+
+const makeLink = (l) => ({
+    link_id: `seed-${l.one}-${l.other}`,
+    translation: l.translation,
+    one_thing_id: l.one,
+    link_type_id: UUID.LINK_TO_PARENT,
+    other_thing_id: l.other,
+    public: 1,
+    _syncStatus: SYNC_STATUS.SYNCED,
+    _localRevision: 0,
+    _serverRevision: 0,
+    _serverId: null,
+});
+
+// Sentinel class id — presence proves the class list has been seeded.
+const CITY_CLASS_ID = '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee';
+
+// Legacy pre-parity demo objects (from the old standalone seeder).
+const LEGACY_DEMO_IDS = [
+    'a0000000-0000-0000-0000-000000000001',
+    'a0000000-0000-0000-0000-000000000002',
+    'a0000000-0000-0000-0000-000000000003',
+];
+
+// Remove demo objects and any seed-* links created by the pre-parity seeder.
+async function removeLegacySeedData(db) {
+    for (const id of LEGACY_DEMO_IDS) {
+        await db.objects.delete(id);
+        await db.links.delete(`seed-class-${id}`);
+    }
+    const legacyLinks = await db.links
+        .filter(l => l.link_id?.startsWith('seed-'))
+        .toArray();
+    if (legacyLinks.length > 0) {
+        await db.links.bulkDelete(legacyLinks.map(l => l.link_id));
+    }
+}
 
 /**
- * Seed the local DB with bootstrap system objects.
- * Runs only once per DB lifetime (checks for UUID::ANYTHING).
+ * Seed the local DB with the same bootstrap objects and class hierarchy
+ * as the web application. Handles both fresh installs and upgrades from
+ * the pre-parity seeder (which only had bootstrap things + demo objects).
  */
 export async function seedLocalDb() {
     const db = getDb();
 
-    // Check if already seeded
     const everything = await db.objects.get(UUID.EVERYTHING);
-    if (everything) {
-        return; // Already seeded
+    const cityClass = await db.objects.get(CITY_CLASS_ID);
+    if (everything && cityClass) {
+        return; // Fully seeded
     }
 
-    console.log('[Seeder] Seeding bootstrap objects...');
+    await removeLegacySeedData(db);
 
-    // ── Bootstrap things (mirrors database/seeders/DatabaseSeeder.php) ──
-    const bootThings = [
-        {
-            thing_id: UUID.EVERYTHING,
-            name: 'Everything',
-            description: 'base object for everything',
-            type: UUID.G_CLASS,
-            public: false,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.LINK,
-            name: 'Link',
-            description: 'base object for links',
-            type: UUID.G_LINK,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.LINK_TO_PARENT,
-            name: 'is a parent of',
-            description: 'Type of parent link whatever it can mean',
-            type: UUID.G_LINK,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.LINK_TO_CLASS,
-            name: 'is of class',
-            description: 'Link to a class of an object',
-            type: UUID.G_LINK,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.SOMETHING,
-            name: 'Something',
-            description: 'base class for all other classes',
-            type: UUID.G_CLASS,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.USER,
-            name: 'User',
-            description: 'base class for user objects',
-            type: UUID.G_CLASS,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.SYSTEM,
-            name: 'System',
-            description: 'system class',
-            type: UUID.G_CLASS,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.VICTOR_FOKIN,
-            name: 'Victor Fokin',
-            description: 'System creator',
-            type: UUID.GENERAL,
-            public: false,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.GROUP_READ_ACCESS,
-            name: 'Group read access',
-            description: 'Link type for group-based read access control',
-            type: UUID.G_LINK,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-        {
-            thing_id: UUID.BELONGS_TO_USER_GROUP,
-            name: 'Belongs to user group',
-            description: 'Link type for user-to-group membership',
-            type: UUID.G_LINK,
-            public: true,
-            owner: UUID.VICTOR_FOKIN,
-        },
-    ];
+    const allLinks = [...BOOTSTRAP_LINKS, ...CLASS_LINKS];
 
-    for (const t of bootThings) {
-        await db.objects.put({
-            thing_id: t.thing_id,
-            name: t.name,
-            type: t.type,
-            description: t.description || null,
-            start: null,
-            end: null,
-            public: t.public ? 1 : 0,
-            owner: t.owner,
-            data: null,
-            _syncStatus: SYNC_STATUS.SYNCED,
-            _localRevision: 0,
-            _serverRevision: 0,
-            _serverId: null,
-            _createdAt: Date.now(),
-            _updatedAt: Date.now(),
-        });
+    if (!everything) {
+        // Fresh install: bootstrap things + classes + hierarchy links
+        for (const t of BOOTSTRAP_THINGS) {
+            await db.objects.put(makeObject(t));
+        }
+        console.log('[Seeder] Seeding bootstrap objects...');
+    } else {
+        // Upgrade: bootstrap things already exist, add classes + links
+        console.log('[Seeder] Upgrading: adding web class hierarchy...');
     }
 
-    // ── Bootstrap links (class hierarchy edges) ──
-    // Order matters: Something, Link, System as children of Everything
-    const bootLinks = [
-        { one: UUID.EVERYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Everything"' },
-        { one: UUID.EVERYTHING, other: UUID.LINK,           translation: '"Link" is subclass of "Everything"' },
-        { one: UUID.EVERYTHING, other: UUID.SYSTEM,         translation: '"System" is subclass of "Everything"' },
-        { one: UUID.LINK,     other: UUID.LINK_TO_PARENT, translation: '"Parent" is subclass of "Link"' },
-        { one: UUID.LINK,     other: UUID.LINK_TO_CLASS,  translation: '"Class of" is subclass of "Link"' },
-        { one: UUID.SYSTEM,   other: UUID.USER,           translation: '"User" is subclass of "System"' },
-        { one: UUID.SYSTEM,   other: UUID.GROUP_READ_ACCESS,        translation: '"Group read access" is subclass of "System"' },
-        { one: UUID.SYSTEM,   other: UUID.BELONGS_TO_USER_GROUP,    translation: '"Belongs to user group" is subclass of "System"' },
-    ];
-
-    for (const l of bootLinks) {
-        await db.links.put({
-            link_id: `seed-boot-${l.one}-${l.other}`,
-            translation: l.translation,
-            one_thing_id: l.one,
-            link_type_id: UUID.LINK_TO_PARENT,
-            other_thing_id: l.other,
-            public: 1,
-            _syncStatus: SYNC_STATUS.SYNCED,
-            _localRevision: 0,
-            _serverRevision: 0,
-            _serverId: null,
-        });
+    for (const c of CLASSES) {
+        await db.objects.put(makeObject(c));
+    }
+    for (const l of allLinks) {
+        await db.links.put(makeLink(l));
     }
 
-    // ── Demo data (for standalone offline experience) ──
-    const demoObjects = [
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000001',
-            name: 'Welcome to Factology',
-            type: UUID.G_THING,
-            description: 'This is a demo object stored locally on your device. Everything works offline!',
-            public: 1,
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000002',
-            name: 'Offline Note',
-            type: UUID.G_THING,
-            description: 'Objects you create are stored locally by default.',
-            public: 0,
-        },
-        {
-            thing_id: 'a0000000-0000-0000-0000-000000000003',
-            name: 'Try Editing Me',
-            type: UUID.G_THING,
-            description: 'Tap the edit button to change this object.',
-            public: 1,
-        },
-    ];
-
-    for (const obj of demoObjects) {
-        await db.objects.put({
-            thing_id: obj.thing_id,
-            name: obj.name,
-            type: obj.type,
-            description: obj.description || null,
-            start: null,
-            end: null,
-            public: obj.public ?? 1,
-            owner: UUID.VICTOR_FOKIN,
-            data: null,
-            _syncStatus: SYNC_STATUS.LOCAL_ONLY,
-            _localRevision: 1,
-            _serverRevision: 0,
-            _serverId: null,
-            _createdAt: Date.now(),
-            _updatedAt: Date.now(),
-        });
-
-        // Link demo objects to "Something" class
-        await db.links.put({
-            link_id: `seed-class-${obj.thing_id}`,
-            translation: `"${obj.name}" is of class "Something"`,
-            one_thing_id: obj.thing_id,
-            link_type_id: UUID.LINK_TO_CLASS,
-            other_thing_id: UUID.SOMETHING,
-            public: 1,
-            _syncStatus: SYNC_STATUS.LOCAL_ONLY,
-            _localRevision: 1,
-            _serverRevision: 0,
-            _serverId: null,
-        });
-    }
-
-    console.log('[Seeder] Bootstrap seeded:', bootThings.length, 'things,',
-        bootLinks.length, 'links,', demoObjects.length, 'demo objects');
+    console.log('[Seeder] Seeded:', BOOTSTRAP_THINGS.length, 'bootstrap things,',
+        CLASSES.length, 'classes,', allLinks.length, 'links');
 }

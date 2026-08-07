@@ -87,7 +87,7 @@ image.sysdir.1=system-images/android-37.0/google_apis_playstore_ps16k/x86_64/
 tag.display=Google APIs PlayStore, Page Size 16KB, AI Glasses Compatible
 tag.id=google_apis_playstore_ps16k
 hw.cpu.arch=x86_64
-hw.ramSize=2048
+hw.ramSize=3072
 hw.device.name=pixel_6
 disk.dataPartition.size=6G
 EOF
