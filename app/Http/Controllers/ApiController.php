@@ -160,6 +160,14 @@ class ApiController extends BaseController
              * @example 1
              */
             'class.public' => ['nullable', 'integer', 'in:0,1'],
+
+            /**
+             * External links (annotations pointing to URLs).
+             * Full desired list — the backend diffs it against existing rows.
+             */
+            'external_links' => ['nullable', 'array'],
+            'external_links.*.id'  => ['nullable', 'string', 'uuid'],
+            'external_links.*.url' => ['nullable', 'string', 'max:2048'],
         ]);
         return DB::transaction(static function () use ($request) {
             $model = new Everything($request->toArray());
@@ -202,6 +210,9 @@ class ApiController extends BaseController
                 foreach ($request['links_to_update'] as $link) {
                     $model->updateLink($link);
                 }
+            }
+            if (array_key_exists('external_links', $request->all())) {
+                $model->saveExternalLinks(['elink' => $request->input('external_links', [])]);
             }
             return response()->json(
                 [

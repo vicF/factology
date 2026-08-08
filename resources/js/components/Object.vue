@@ -199,6 +199,49 @@
                                 </div>
 
                             </div>
+
+                            <!-- Separator before external links -->
+                            <div v-if="object.external_links && object.external_links.length" class="result-separator"></div>
+
+                            <!-- External links list -->
+                            <div v-for="el in (object.external_links || [])" :key="el.id"
+                                class="result-item">
+                                <div class="result-content">
+                                    <div class="result-icon-section">
+                                        <img v-if="!el._faviconError" :src="faviconUrl(el.url)" :alt="getExternalLinkMeta(el.url).domain"
+                                            width="48" height="48" class="external-link-favicon"
+                                            @error="el._faviconError = true" />
+                                        <span v-else class="external-link-icon-wrap">
+                                            <IconExternal class="external-link-icon" />
+                                        </span>
+                                    </div>
+
+                                    <div class="result-info-section">
+                                        <div class="result-header">
+                                            <div class="result-title">
+                                                <a v-if="!isInternalUrl(el.url)" :href="el.url" target="_blank"
+                                                    rel="noopener noreferrer" class="title-link external-link-title">
+                                                    {{ getExternalLinkMeta(el.url).label }}
+                                                </a>
+                                                <RouterLink v-else :to="el.url" class="title-link">
+                                                    {{ getExternalLinkMeta(el.url).label }}
+                                                </RouterLink>
+                                            </div>
+                                        </div>
+
+                                        <div class="result-description">
+                                            <a v-if="!isInternalUrl(el.url)" :href="el.url" target="_blank"
+                                                rel="noopener noreferrer" class="external-link-url">
+                                                {{ el.url }}
+                                            </a>
+                                            <RouterLink v-else :to="el.url" class="external-link-url">
+                                                {{ el.url }}
+                                            </RouterLink>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
 
                         <!-- Graph -->
@@ -274,6 +317,8 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import Image from "./Image.vue";
+import IconExternal from './icons/IconExternal.vue';
+import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
@@ -820,5 +865,32 @@ watch(() => object.value, (newObject) => {
 .spinner-border {
     width: 2rem;
     height: 2rem;
+}
+/* ========== external links ========== */
+.external-link-favicon {
+    border-radius: 6px;
+    background: #f8f9fa;
+    object-fit: contain;
+    padding: 4px;
+}
+.external-link-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    color: #198754;
+}
+.external-link-icon {
+    width: 28px;
+    height: 28px;
+}
+.external-link-title {
+    color: #0d6efd;
+}
+.external-link-url {
+    font-size: 0.85rem;
+    color: #6c757d;
+    word-break: break-all;
 }
 </style>
