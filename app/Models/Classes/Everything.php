@@ -382,6 +382,13 @@ class Everything
             ->orderBy('link_start')
             ->get()
             ->toArray();
+
+        // Annotations pointing to URLs instead of internal objects.
+        // The whole list is returned; the frontend diffs it on save.
+        $thing['external_links'] = DB::table('external_links')
+            ->where('thing_id', $thing['thing_id'])
+            ->get()
+            ->toArray();
         return $thing;
     }
 
@@ -790,7 +797,7 @@ class Everything
         $query = DB::table('external_links')->where('thing_id', $this->thing_id);
         $res = $query->get()->toArray();
         if (empty($res)) {
-            $res = [[]];
+            $res = [];
         }
         return $res;
     }
@@ -898,21 +905,19 @@ class Everything
     }
 
     /**
-     * @param $data
+     * Save the full desired list of external links for this object.
+     * Diffes against the currently stored rows: inserts new ones,
+     * updates ones with an id, deletes ones not present in the list.
+     *
+     * @param array $input expects ['elink' => [['id' => ?, 'url' => ?], ...]]
      */
     public function saveExternalLinks($input)
     {
-        if (empty($input['elink'])) {
+        if (!array_key_exists('elink', $input) || !is_array($input['elink'])) {
             return;
         }
         $oldLinks = collect($this->getExternalLinks())->keyBy('id')->toArray();
-        $data = [];
-        foreach (array_keys($input['elink']) as $fieldKey) {
-            foreach ($input['elink'][$fieldKey] as $key => $value) {
-                $data[$key][$fieldKey] = $value;
-            }
-        }
-        foreach ($data as $link) {
+        foreach ($input['elink'] as $link) {
             if (empty($link['url'])) {
                 continue; // Just an empty form
             }

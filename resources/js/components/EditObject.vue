@@ -107,46 +107,85 @@
                             <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">Server</div>
                             <div v-else class="mb-3">!Unknown type!</div>
 
-                            <!-- Top action buttons (same style and order as footer) -->
-                            <div class="d-flex gap-2 mb-3 justify-content-end" v-if="regularLinks.length > 0">
-                                <button
-                                    type="button"
-                                    class="btn btn-secondary"
-                                    data-bs-dismiss="modal"
-                                >
-                                    {{ $t('Close') }}
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    {{ isEditMode ? $t('Update') : $t('Save') }}
-                                </button>
+                            <!-- Top action row: all links sit between this and the bottom row -->
+                            <div
+                                v-if="regularLinks.length > 0 || externalLinks.length > 0"
+                                class="d-flex justify-content-between align-items-center mb-3"
+                            >
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+                                        {{ $t('Add Link') }}
+                                    </button>
+                                    <button type="button" class="btn btn-primary" @click="addExternalLink">
+                                        {{ $t('Add External Link') }}
+                                    </button>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button
+                                        type="button"
+                                        class="btn btn-secondary"
+                                        data-bs-dismiss="modal"
+                                    >
+                                        {{ $t('Close') }}
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        {{ isEditMode ? $t('Update') : $t('Save') }}
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Display regular links (not special ones) -->
-                            <div v-for="(item, idx) in regularLinks" :key="item.id" class="linked-object-form">
-                                <LinkedObject
-                                    :link="{
-                                        one_thing_id: formData.thing_id,
-                                        other_thing_id: item.other_thing_id,
-                                        link_type_id: item.link_type_id,
-                                        translation: item.translation,
-                                        link_id: item.link_id
-                                    }"
-                                    :currentObject="{
-                                        thing_id: formData.thing_id,
-                                        name: formData.name
-                                    }"
-                                    :index="idx"
-                                    :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                    @update="updateItem"
-                                    @remove="removeItem"
-                                />
+                            <LinkedObject
+                                v-for="(item, idx) in regularLinks"
+                                :key="item.id"
+                                :ref="(el) => setLinkedObjectRef(idx, el)"
+                                :link="{
+                                    one_thing_id: formData.thing_id,
+                                    other_thing_id: item.other_thing_id,
+                                    link_type_id: item.link_type_id,
+                                    translation: item.translation,
+                                    link_id: item.link_id
+                                }"
+                                :currentObject="{
+                                    thing_id: formData.thing_id,
+                                    name: formData.name
+                                }"
+                                :index="idx"
+                                :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
+                                @update="updateItem"
+                                @remove="removeItem"
+                            />
+
+                            <!-- External links -->
+                            <div v-if="externalLinks.length" class="mb-1">
+                                <label class="form-label mb-0">{{ $t('External Links') }}</label>
                             </div>
-
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
-                                    {{ $t('Add Link') }}
+                            <div v-for="(el, idx) in externalLinks" :key="el._key" class="d-flex gap-2 mb-2">
+                                <input
+                                    :ref="(node) => setExternalLinkRef(el._key, node)"
+                                    type="url"
+                                    class="form-control"
+                                    v-model="el.url"
+                                    :placeholder="$t('https://example.com/...')"
+                                />
+                                <button type="button" class="btn btn-outline-danger" @click="removeExternalLink(idx)">
+                                    {{ $t('Remove') }}
                                 </button>
+                            </div>
+                            <small v-if="externalLinks.length" class="form-text text-muted d-block mb-3">
+                                {{ $t('External links point to URLs instead of other objects.') }}
+                            </small>
 
+                            <!-- Bottom action row: the same buttons duplicated below the links -->
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-primary" @click="addNewLinkedObject">
+                                        {{ $t('Add Link') }}
+                                    </button>
+                                    <button type="button" class="btn btn-primary" @click="addExternalLink">
+                                        {{ $t('Add External Link') }}
+                                    </button>
+                                </div>
                                 <div class="modal-footer border-0 p-0 m-0">
                                     <button
                                         type="button"
@@ -282,6 +321,11 @@ const parentLinkData = ref({
 });
 
 const linkedObjects = ref([]); // regular links (excluding class and parent)
+const externalLinks = ref([]); // external links (annotations pointing to URLs)
+
+// Template refs so we can focus a newly added link row
+const linkedObjectRefs = ref({});
+const externalLinkInputs = ref({});
 
 let modalInstance = null;
 let confirmModalInstance = null;
@@ -293,6 +337,7 @@ const originalFormData = ref({});
 const originalLinkedObjects = ref([]);
 const originalClassLink = ref(null);
 const originalParentLink = ref(null);
+const originalExternalLinks = ref([]);
 
 const hasUnsavedChanges = computed(() => {
     if (isSubmitting) return false;
@@ -306,8 +351,9 @@ const hasUnsavedChanges = computed(() => {
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
     const classLinkChanged = JSON.stringify(originalClassLink.value) !== JSON.stringify(classLinkData.value);
     const parentLinkChanged = JSON.stringify(originalParentLink.value) !== JSON.stringify(parentLinkData.value);
+    const externalLinksChanged = JSON.stringify(originalExternalLinks.value) !== JSON.stringify(externalLinks.value);
 
-    return formChanged || linksChanged || classLinkChanged || parentLinkChanged;
+    return formChanged || linksChanged || classLinkChanged || parentLinkChanged || externalLinksChanged;
 });
 
 // Regular links (all links except class and parent)
@@ -344,6 +390,7 @@ const initializeData = () => {
     isInitializing.value = true;
 
     linkedObjects.value = [];
+    externalLinks.value = [];
 
     // Reset special links
     classLinkData.value = {
@@ -411,6 +458,15 @@ const initializeData = () => {
                 console.log('[EditObject] parentLinkData updated from existing links:', JSON.parse(JSON.stringify(parentLinkData.value)));
             }
         }
+
+        // For edit mode, also load existing external links
+        if (Array.isArray(props.object.external_links)) {
+            externalLinks.value = props.object.external_links.map(el => ({
+                id: el.id || null,
+                _key: el.id || uuidv4(), // stable frontend-only key for v-for
+                url: el.url || '',
+            }));
+        }
     }
 
     // Store original state
@@ -418,6 +474,7 @@ const initializeData = () => {
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
     originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
     originalParentLink.value = JSON.parse(JSON.stringify(parentLinkData.value));
+    originalExternalLinks.value = JSON.parse(JSON.stringify(externalLinks.value));
 
     isInitializing.value = false;
 };
@@ -425,7 +482,12 @@ const initializeData = () => {
 initializeData();
 
 // Helper methods
-const addNewLinkedObject = () => {
+const setLinkedObjectRef = (index, el) => {
+    if (el) linkedObjectRefs.value[index] = el;
+    else delete linkedObjectRefs.value[index];
+};
+
+const addNewLinkedObject = async () => {
     linkedObjects.value.push({
         id: uuidv4(),
         one_thing_id: formData.value.thing_id,
@@ -434,6 +496,10 @@ const addNewLinkedObject = () => {
         translation: '',
         link_id: null,
     });
+    await nextTick();
+    const el = linkedObjectRefs.value[linkedObjects.value.length - 1];
+    const input = el?.$el?.querySelector('input');
+    if (input) input.focus();
 };
 
 const updateItem = ({ index, data }) => {
@@ -442,6 +508,26 @@ const updateItem = ({ index, data }) => {
 
 const removeItem = (index) => {
     linkedObjects.value.splice(index, 1);
+};
+
+const setExternalLinkRef = (key, node) => {
+    if (node) externalLinkInputs.value[key] = node;
+    else delete externalLinkInputs.value[key];
+};
+
+const addExternalLink = async () => {
+    const key = uuidv4();
+    externalLinks.value.push({
+        id: null, // stays null for new rows so the backend inserts instead of updating
+        _key: key, // stable frontend-only key for v-for
+        url: '',
+    });
+    await nextTick();
+    externalLinkInputs.value[key]?.focus();
+};
+
+const removeExternalLink = (index) => {
+    externalLinks.value.splice(index, 1);
 };
 
 const confirmClose = () => {
@@ -536,6 +622,11 @@ const submitForm = async () => {
                 .map(orig => orig.link_id);
             if (linksToDelete.length > 0) payload.links_to_delete = linksToDelete;
         }
+
+        // Full desired external-links list — the backend diffs it against existing rows.
+        payload.external_links = externalLinks.value
+            .map(el => ({ id: el.id || undefined, url: (el.url || '').trim() }))
+            .filter(el => el.url);
 
         console.log('[EditObject] Final payload:', JSON.parse(JSON.stringify(payload)));
 
@@ -657,11 +748,6 @@ watch(() => props.object, (newObject, oldObject) => {
         overflow-y: auto;
     }
 
-    .linked-object-form {
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-
     .btn-primary, .btn-secondary {
         padding: 8px 16px;
         font-size: 14px;
@@ -671,10 +757,6 @@ watch(() => props.object, (newObject, oldObject) => {
 @media (max-width: 480px) {
     .modal-body {
         padding: 0.75rem;
-    }
-
-    .linked-object-form {
-        padding: 8px;
     }
 
     .modal-footer {
@@ -721,13 +803,6 @@ watch(() => props.object, (newObject, oldObject) => {
 .btn-danger:hover {
     background-color: #c82333;
 }
-.linked-object-form {
-    border: 1px solid #ddd;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 4px;
-}
-
 /* Public checkbox styling */
 .form-check {
     padding-left: 1.8em;
