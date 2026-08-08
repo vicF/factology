@@ -27,6 +27,7 @@
                     class="flex-field"
                 />
                 <button
+                    type="button"
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
                     :disabled="!link.one_thing_id || !link.other_thing_id"
@@ -48,7 +49,7 @@
                     required
                     class="flex-field"
                 />
-                <button class="btn btn-primary flex-button" @click="openCreateObjectModal">
+                <button type="button" class="btn btn-primary flex-button" @click="openCreateObjectModal">
                     Create
                 </button>
             </div>
@@ -79,7 +80,7 @@
             </div>
 
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-danger" @click="removeSelf">Delete</button>
+                <button type="button" class="btn btn-danger" @click="removeSelf">Delete</button>
             </div>
         </div>
     </template>
