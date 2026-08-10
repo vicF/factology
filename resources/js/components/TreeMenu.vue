@@ -63,6 +63,7 @@ import { eventBus } from '../eventBus';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
 import { fieldText } from '../utils/localized.js';
+import { useTreeState } from "../composables/useTreeState";
 import Image from "./Image.vue";
 import {IconPrivate, IconPublic} from "./icons";
 import ConfirmModal from './ConfirmModal.vue';
@@ -113,7 +114,8 @@ defineOptions({ name: 'tree-menu' });
 const store = useSearchStore();
 
 // State
-const showChildren = ref(true);
+const treeState = useTreeState();
+const showChildren = ref(treeState.isOpen(props.id, props.depth));
 const showIcons = ref(false);
 
 // ─── Quick visibility toggle state ─────────────────────────────────
@@ -175,6 +177,7 @@ const indent = computed(() => ({ marginLeft: `${props.depth * 15}px` }));
 // Methods
 const toggleChildren = () => {
     showChildren.value = !showChildren.value;
+    treeState.setOpen(props.id, showChildren.value);
 };
 
 const onCheckboxChange = () => {
