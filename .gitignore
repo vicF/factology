@@ -34,6 +34,12 @@ dist-capacitor/
 /android/
 /electron/
 .env.capacitor
+
+# Output of build-android.sh (keep .gitkeep)
+dist-android/
+
+# Node dependencies (nested toolchains, e.g. tests-js)
+node_modules/
 storage/logs/laravel.log
 .claude/settings.local.json
 database/Dumps/convert_cp866_to_utf8.py

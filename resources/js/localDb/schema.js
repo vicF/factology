@@ -2,8 +2,8 @@
 
 import Dexie from 'dexie';
 
-const DB_NAME = 'factology_local';
-const DB_VERSION = 1;
+export const DB_NAME = 'factology_local';
+export const DB_VERSION = 1;
 
 /**
  * Define the local IndexedDB schema via Dexie.
@@ -13,66 +13,83 @@ const DB_VERSION = 1;
  *  - _localRevision: integer, bumped on every local write
  *  - _serverRevision: integer, last known server revision after successful sync
  *  - _serverId: UUID of the server this record belongs to (null = local-only)
+ *
+ * Schema migrations follow Dexie's version() chain. DB_VERSION is the ONLY
+ * number to bump for a new migration; then add a new db.version(n) block in
+ * createDatabase() below. Every version() must carry the full latest store
+ * schema, and the upgrade() callback (optional) migrates existing data.
  */
+const STORE_V1 = {
+    // things table mirror
+    objects: `
+        &thing_id,
+        type,
+        owner,
+        public,
+        deleted,
+        start,
+        end,
+        _syncStatus,
+        _serverId,
+        *tags
+    `,
+
+    // links table mirror
+    links: `
+        &link_id,
+        one_thing_id,
+        link_type_id,
+        other_thing_id,
+        public,
+        [one_thing_id+link_type_id+other_thing_id],
+        _syncStatus,
+        _serverId
+    `,
+
+    // photo_media + photo_files merged for local use
+    media: `
+        &thing_id,
+        filename,
+        size,
+        crc,
+        folder_id,
+        _syncStatus,
+        _serverId
+    `,
+
+    // Queue of changes to push to server(s)
+    // Fields: id (auto), operation, table, recordId, payload (JSON), serverId, timestamp
+    pendingChanges: `
+        ++id,
+        operation,
+        table,
+        recordId,
+        serverId,
+        timestamp
+    `,
+
+    // Track last sync state per server
+    syncMetadata: `
+        &serverId,
+        lastPullTimestamp,
+        lastPushTimestamp
+    `,
+};
+
 export function createDatabase() {
     const db = new Dexie(DB_NAME);
 
-    db.version(DB_VERSION).stores({
-        // things table mirror
-        objects: `
-            &thing_id,
-            type,
-            owner,
-            public,
-            deleted,
-            start,
-            end,
-            _syncStatus,
-            _serverId,
-            *tags
-        `,
+    // Baseline schema.
+    db.version(1).stores(STORE_V1);
 
-        // links table mirror
-        links: `
-            &link_id,
-            one_thing_id,
-            link_type_id,
-            other_thing_id,
-            public,
-            [one_thing_id+link_type_id+other_thing_id],
-            _syncStatus,
-            _serverId
-        `,
-
-        // photo_media + photo_files merged for local use
-        media: `
-            &thing_id,
-            filename,
-            size,
-            crc,
-            folder_id,
-            _syncStatus,
-            _serverId
-        `,
-
-        // Queue of changes to push to server(s)
-        // Fields: id (auto), operation, table, recordId, payload (JSON), serverId, timestamp
-        pendingChanges: `
-            ++id,
-            operation,
-            table,
-            recordId,
-            serverId,
-            timestamp
-        `,
-
-        // Track last sync state per server
-        syncMetadata: `
-            &serverId,
-            lastPullTimestamp,
-            lastPushTimestamp
-        `,
-    });
+    // FUTURE MIGRATIONS — add new blocks here and bump DB_VERSION:
+    //
+    // db.version(2).stores({ ...STORE_V2 }).upgrade(async (tx) => {
+    //     // e.g. backfill a new column for all existing rows
+    //     await tx.table('objects').toCollection().modify((obj) => {
+    //         obj.newField = null;
+    //     });
+    // });
 
     return db;
 }

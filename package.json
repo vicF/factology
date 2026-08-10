@@ -3,6 +3,8 @@
     "scripts": {
         "dev": "vite --host=0.0.0.0 --port=5173",
         "build": "vite build",
+        "build:capacitor": "vite build --config vite.config.capacitor.js --mode capacitor",
+        "build:android": "bash build-android.sh",
         "test:vitest": "vitest run --config vitest.config.js",
         "test:vitest-watch": "vitest --config vitest.config.js"
     },
@@ -22,6 +24,8 @@
         "vue-router": "^4.6.4"
     },
     "devDependencies": {
+        "@capacitor/android": "^8.0.1",
+        "@capacitor/cli": "^8.0.1",
         "@capacitor/preferences": "^8.0.1",
         "@vitejs/plugin-vue": "^5.2.4",
         "@vue/test-utils": "^2.4.11",
@@ -29,6 +33,7 @@
         "jsdom": "^29.0.2",
         "laravel-vite-plugin": "^1.2.0",
         "sass": "^1.99.0",
+        "typescript": "^7.0.2",
         "vitest": "^4.1.4"
     }
 }
