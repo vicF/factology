@@ -98,6 +98,23 @@
                                 </small>
                             </div>
 
+                            <!-- Owner (system ownership / reassignment) — admins only -->
+                            <div class="mb-3" v-if="isAdmin">
+                                <label class="form-label" for="ownerSelect">
+                                    {{ $t('Owner') }}
+                                </label>
+                                <select id="ownerSelect" class="form-select" v-model="formData.owner">
+                                    <option value="">—</option>
+                                    <option :value="UUID.SYSTEM_OWNER">System Owner</option>
+                                    <option v-for="o in ownerOptions" :key="o.thing_id" :value="o.thing_id">
+                                        {{ o.name || o.thing_id }}
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted d-block">
+                                    {{ $t('Assigning "System Owner" marks this object as a system object included in the default export') }}
+                                </small>
+                            </div>
+
                             <!-- Object type indicator -->
                             <div v-if="formData.type == 1" class="mb-3">General</div>
                             <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
@@ -256,8 +273,11 @@ import { eventBus } from "../eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { useAuthStore } from '@/stores/auth';
+import { UUID } from '../constants/uuid';
 
 const objectsStore = useObjectsStore();
+const authStore = useAuthStore();
 
 // Props definition
 const props = defineProps({
@@ -287,7 +307,21 @@ const formData = ref({
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
+    owner: isEditMode.value ? (props.object.owner || '') : '',
 });
+
+// Owner options for the admin-only Owner select (from /search/options)
+const ownerOptions = ref([]);
+const isAdmin = computed(() => !!authStore.user?.is_admin);
+
+const loadOwnerOptions = async () => {
+    try {
+        const res = await axios.get('/search/options');
+        ownerOptions.value = res.data?.owners || [];
+    } catch (e) {
+        ownerOptions.value = [];
+    }
+};
 
 const showError = ref(false);
 const errorMessage = ref('');
@@ -581,6 +615,11 @@ const submitForm = async () => {
             type: formData.value.type,
         };
 
+        // Owner (system ownership / reassignment) — admins only
+        if (isAdmin.value) {
+            payload.owner = formData.value.owner || undefined;
+        }
+
         if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
             payload.class = {
                 one_thing_id: formData.value.thing_id,
@@ -683,6 +722,7 @@ const submitForm = async () => {
 
 onMounted(async () => {
     await nextTick();
+    if (isAdmin.value) loadOwnerOptions();
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
     if (modalElement) {
@@ -720,6 +760,7 @@ watch(() => props.object, (newObject, oldObject) => {
         end: newObject.end || '',
         public: newObject.public ? 1 : 0,
         type: props.params.type || 3,
+        owner: newObject.owner || '',
     };
     initializeData();
 }, { deep: false });

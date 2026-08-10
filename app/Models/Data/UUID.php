@@ -68,6 +68,7 @@ class UUID
     public const MEMBER_OF = '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf';
     public const GROUP_READ_ACCESS = 'ea206516-9e45-482f-89be-05313f52e5e3';
     public const BELONGS_TO_USER_GROUP = 'e18d73eb-a5d3-47be-a785-106f6f185651';
+    public const SYSTEM_OWNER = 'aaaaaaaa-0000-4000-a000-00000000000a';
 
     // ── User preference / history link types ──
     public const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';

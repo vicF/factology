@@ -325,6 +325,8 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('description', $json['data']);
         $this->assertArrayHasKey('start', $json['data']);
         $this->assertArrayHasKey('end', $json['data']);
+        $this->assertArrayHasKey('owner', $json['data']);
+        $this->assertArrayHasKey('owner_name', $json['data']);
     }
 
     /**

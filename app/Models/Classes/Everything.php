@@ -342,6 +342,12 @@ class Everything
             'name'       => $class->name ?? null,
         ] : null;
 
+        // Resolve the owner's display name (owner references a things.thing_id)
+        $thing['owner_name'] = null;
+        if (!empty($thing['owner'])) {
+            $thing['owner_name'] = DB::table('things')->where('thing_id', $thing['owner'])->value('name');
+        }
+
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
@@ -577,12 +583,17 @@ class Everything
             ->where('thing_id', $this->thing_id)
             ->first();
 
-        // Check ownership
-        if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
+        // Check ownership — admins may save/reassign any object (system ownership, re-owning).
+        // Guarded so internal flows without an auth user (e.g. UserClass seeding) still work.
+        $authUser = auth()->user();
+        $isAdmin = $authUser ? (bool) $authUser->is_admin : false;
+        if (!empty($existingRecord) && !$isAdmin && $authUser && $existingRecord->owner != $authUser->thing_id) {
             throw new \Exception('You do not have permission to update this record', 403);
             // Or return response with 403 Forbidden status
         } elseif (empty($this->owner)) {
-            $this->owner = auth()->user()->thing_id;
+            if ($authUser) {
+                $this->owner = $authUser->thing_id;
+            }
         }
         $this->_validate();
         // Auto-set server_uuid for objects created on this server

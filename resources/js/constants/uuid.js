@@ -64,6 +64,7 @@ export const UUID = {
     MEMBER_OF:      '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf',
     GROUP_READ_ACCESS: 'ea206516-9e45-482f-89be-05313f52e5e3',
     BELONGS_TO_USER_GROUP: 'e18d73eb-a5d3-47be-a785-106f6f185651',
+    SYSTEM_OWNER:     'aaaaaaaa-0000-4000-a000-00000000000a',
 
     // ── Link type UUIDs (things of type G_LINK = 4) ──
     LINK_TYPE_CLASS:   'c217c185-742f-4a9f-8e69-acea2b4f5aea',

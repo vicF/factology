@@ -118,12 +118,23 @@
                                             <span v-if="object.description">{{ object.description }}</span>
                                         </div>
 
-                                        <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
+                                        <div v-if="object.record_created || object.record_updated || object.owner" class="result-meta mt-1">
                                             <span v-if="object.record_created" class="result-meta-row">
                                                 {{ $t('Created') }}: {{ object.record_created }}
                                             </span>
                                             <span v-if="object.record_updated" class="result-meta-row">
                                                 {{ $t('Updated') }}: {{ object.record_updated }}
+                                            </span>
+                                            <span v-if="object.owner" class="result-meta-row">
+                                                {{ $t('Owner') }}:
+                                                <RouterLink
+                                                    v-if="object.owner_name"
+                                                    :to="{ name: 'object', params: { uid: object.owner } }"
+                                                    class="owner-link"
+                                                >
+                                                    {{ object.owner_name }}
+                                                </RouterLink>
+                                                <template v-else>{{ object.owner }}</template>
                                             </span>
                                         </div>
                                     </div>
@@ -759,6 +770,13 @@ watch(() => object.value, (newObject) => {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+.owner-link {
+    color: #adb5bd;
+    text-decoration: underline;
+}
+.owner-link:hover {
+    color: #6c757d;
 }
 .link-translation {
     font-size: 0.75rem;

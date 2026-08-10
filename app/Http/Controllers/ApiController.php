@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ApiController extends BaseController
 {
@@ -115,6 +116,13 @@ class ApiController extends BaseController
             'public' => ['required', 'integer', 'in:0,1'],
 
             /**
+             * Owner (thing UUID) — admins only. Lets an admin mark an object as
+             * system-owned (owner = UUID::SYSTEM_OWNER) or reassign it.
+             * @example "aaaaaaaa-0000-4000-a000-00000000000a"
+             */
+            'owner' => ['sometimes', 'string', 'uuid'],
+
+            /**
              * UUID of parent object (if any)
              * @example null
              */
@@ -169,6 +177,13 @@ class ApiController extends BaseController
             'external_links.*.id'  => ['nullable', 'string', 'uuid'],
             'external_links.*.url' => ['nullable', 'string', 'max:2048'],
         ]);
+
+        // Only admins may change an object's owner (system ownership / reassignment).
+        // Non-admins never send it — the model defaults to their own thing_id.
+        if ($request->has('owner') && !Auth::user()->is_admin) {
+            throw ValidationException::withMessages(['owner' => 'Only admins can change ownership.']);
+        }
+
         return DB::transaction(static function () use ($request) {
             $model = new Everything($request->toArray());
             try {
@@ -334,13 +349,14 @@ class ApiController extends BaseController
             'public' => ['required', 'integer', 'in:0,1'],
         ]);
 
-        $updated = DB::table('things')
-            ->where('thing_id', $id)
-            ->where('owner', auth()->user()->thing_id)
-            ->update([
-                'public'         => $validated['public'],
-                'record_updated' => now(),
-            ]);
+        $query = DB::table('things')->where('thing_id', $id);
+        if (!auth()->user()->is_admin) {
+            $query->where('owner', auth()->user()->thing_id);
+        }
+        $updated = $query->update([
+            'public'         => $validated['public'],
+            'record_updated' => now(),
+        ]);
 
         if ($updated === 0) {
             return response()->json([
@@ -527,9 +543,8 @@ class ApiController extends BaseController
         // actually referenced as an owner or server by other things.
         if (!empty($requestBody['filter_type'])) {
             if ($requestBody['filter_type'] === 'owner') {
-                // things.owner is char(36), so cast to uuid for the comparison
                 $query->whereIn('things.thing_id', function ($sub) {
-                    $sub->select(DB::raw('o.owner::uuid'))
+                    $sub->select('o.owner')
                         ->from('things as o')
                         ->whereNotNull('o.owner')
                         ->where('o.deleted', 0);
@@ -668,10 +683,9 @@ class ApiController extends BaseController
     public function searchOptions(): \Illuminate\Http\JsonResponse
     {
         // Distinct owners with names and object counts.
-        // things.owner is char(36), so cast to uuid for the join.
         $owners = DB::table('things as o')
             ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
-            ->leftJoin('things as t', DB::raw('o.owner::uuid'), '=', 't.thing_id')
+            ->leftJoin('things as t', 'o.owner', '=', 't.thing_id')
             ->where('o.deleted', 0)
             ->whereNotNull('o.owner')
             ->where($this->visibleObjectsScope('o'))
