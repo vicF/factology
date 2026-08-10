@@ -834,7 +834,7 @@ class ApiController extends BaseController
         JOIN things c ON l.other_thing_id = c.thing_id
         WHERE (c.type = ? OR c.type = ?) AND d.level < 10 $publicCondition
     )
-    SELECT * FROM descendants ORDER BY level;
+    SELECT * FROM descendants ORDER BY level, name;
     ";
 
         $results = DB::select($rawSql, [

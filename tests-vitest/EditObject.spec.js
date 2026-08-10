@@ -43,9 +43,10 @@ vi.mock('vue-router', () => ({
 // The merged component imports the real i18n module transitively (via
 // utils/localized.js), which calls createI18n — the mock must provide it so
 // the module loads, while useI18n keeps the form's t() trivial.
+const i18nState = vi.hoisted(() => ({ locale: { value: 'en' } }))
 vi.mock('vue-i18n', () => {
     const composer = {
-        locale: { value: 'en' },
+        locale: i18nState.locale,
         t: (key) => key,
     }
     return {
@@ -59,9 +60,8 @@ vi.mock('vue-i18n', () => {
 
 vi.mock('@/stores/objects', () => ({
     useObjectsStore: () => ({
-        moveClassInTree: vi.fn(),
-        updateClassInTree: vi.fn(),
         addClassToTree: vi.fn(),
+        loadClassTree: vi.fn(),
     }),
 }))
 
@@ -391,5 +391,28 @@ describe('EditObject field language attribute', () => {
         const payload = wrapper.vm.buildFieldPayload('description')
         expect(payload.plain).toBe('Описание фестиваля')
         expect(payload.translations).toEqual({ lang: 'ru', en: 'A festival description' })
+    })
+
+    it('suggests the UI locale as an addable language when the object source differs', async () => {
+        // UI is Russian, but the object's content is in English (source 'en')
+        // with no Russian translation yet. The Translations "Add language…"
+        // dropdown must still offer Russian — excluding only the source language.
+        i18nState.locale.value = 'ru'
+        try {
+            const wrapper = await mountEditor({
+                thing_id: '222',
+                name: 'English only object',
+                description: 'desc',
+                name_translations: { lang: 'en' },
+                description_translations: { lang: 'en' },
+                data: { properties: {} },
+                type: 3,
+                public: 0,
+            })
+            expect(wrapper.vm.nameSourceLang).toBe('en')
+            expect(wrapper.vm.remainingLanguages.map(l => l.code)).toContain('ru')
+        } finally {
+            i18nState.locale.value = 'en'
+        }
     })
 })

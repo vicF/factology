@@ -54,7 +54,7 @@
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
                                 <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
-                                <button class="btn btn-danger" @click="deleteObject" :disabled="!canEdit" :title="canEdit ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
+                                <button class="btn btn-danger" @click="deleteObject" :disabled="!canDelete" :title="canDelete ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
                         </div>
 
@@ -447,10 +447,20 @@ const defaultLinkedObjects = computed(() => {
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
 
-// Whether the current user may edit this object's own fields (only its owner).
+// Whether the current user may edit this object's own fields. Admins may edit
+// any object (system-owned ones included); everyone else only their own.
 // Links are always editable by authenticated users, so the Link/Create buttons
 // and the per-link Edit/Delete actions stay enabled regardless.
 const canEdit = computed(() => {
+    if (!authenticated.value) return false;
+    if (authStore.user?.is_admin) return true;
+    const uid = object.value?.owner;
+    return !!uid && authStore.user?.thing_id === uid;
+});
+
+// Delete stays owner-only in both UI and backend (the DELETE endpoint has no
+// admin override).
+const canDelete = computed(() => {
     const uid = object.value?.owner;
     return authenticated.value && !!uid && authStore.user?.thing_id === uid;
 });

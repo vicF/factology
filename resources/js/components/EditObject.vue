@@ -439,8 +439,11 @@ function seedExtraLanguages() {
         ...Object.keys(nameTranslations.value),
         ...Object.keys(descriptionTranslations.value),
     ]);
+    // A language can be a translation for one field even when it is the source
+    // of the other (e.g. an English description translation when the name is
+    // English), so any language with content is shown here.
     for (const l of availableLanguages.value) {
-        if (l.code !== locale && withContent.has(l.code) && !extraLanguages.value.some((e) => e.code === l.code)) {
+        if (withContent.has(l.code) && !extraLanguages.value.some((e) => e.code === l.code)) {
             extraLanguages.value.push({ ...l });
         }
     }
@@ -510,10 +513,17 @@ function switchFieldLanguage(field, code) {
     seedExtraLanguages();
 }
 
+// Languages offered by the "Add language…" dropdown. The current UI language is
+// included too (you may want a translation in your own language); only languages
+// that are the source of BOTH fields are excluded, since adding them would give
+// a block with no editable inputs.
 const remainingLanguages = computed(() =>
-    availableLanguages.value.filter(
-        (l) => l.code !== locale && !extraLanguages.value.some((e) => e.code === l.code)
-    )
+    availableLanguages.value.filter((l) => {
+        if (extraLanguages.value.some((e) => e.code === l.code)) return false;
+        const isNameSource = l.code === nameSourceLang.value;
+        const isDescSource = l.code === descriptionSourceLang.value;
+        return !(isNameSource && isDescSource);
+    })
 );
 
 // The Translations section only edits non-source languages (the main fields
@@ -933,12 +943,9 @@ const submitForm = async () => {
             cacheStore.cacheObject(formData.value.thing_id, response.data.data || response.data, formData.value.type);
             emit('object-updated', response.data);
             if (formData.value.type === CLASS_TYPE) {
-                const oldParentId = props.object?.parent_id;
-                const newParentId = parentLinkData.value.other_thing_id;
-                if (oldParentId !== newParentId) {
-                    objectsStore.moveClassInTree(formData.value.thing_id, newParentId);
-                }
-                objectsStore.updateClassInTree(formData.value.thing_id, formData.value.name);
+                // Reload the authoritative class tree so renames and new
+                // translations (localized display names) show in the sidebar.
+                objectsStore.loadClassTree();
             }
         } else {
             response = await axios.post(`/object/${formData.value.thing_id}`, payload);
