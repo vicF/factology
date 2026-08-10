@@ -52,9 +52,9 @@
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
-                                <button class="btn btn-primary" @click="openEditModal" :title="$t('Edit this object')">{{ $t('Edit') }}</button>
+                                <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
-                                <button class="btn btn-danger" @click="deleteObject" :title="$t('Delete this object')">{{ $t('Delete') }}</button>
+                                <button class="btn btn-danger" @click="deleteObject" :disabled="!canEdit" :title="canEdit ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
                         </div>
 
@@ -90,7 +90,7 @@
                                     </div>
 
                                     <div class="result-info-section">
-                                        <div v-if="authenticated" class="visibility-badge"
+                                        <div v-if="canEdit" class="visibility-badge"
                                             :class="object.public ? 'is-public' : 'is-private'"
                                             @click="toggleObjectVisibility(object.public ? false : true)"
                                             :title="$t('Toggle visibility')">
@@ -390,6 +390,14 @@ const defaultLinkedObjects = computed(() => {
 
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
+
+// Whether the current user may edit this object's own fields (only its owner).
+// Links are always editable by authenticated users, so the Link/Create buttons
+// and the per-link Edit/Delete actions stay enabled regardless.
+const canEdit = computed(() => {
+    const uid = object.value?.owner;
+    return authenticated.value && !!uid && authStore.user?.thing_id === uid;
+});
 
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;

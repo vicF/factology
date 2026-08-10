@@ -320,6 +320,13 @@ class ApiController extends BaseController
      */
     public function delete($id)
     {
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || $existing->owner !== auth()->user()->thing_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to delete this record',
+            ], 403);
+        }
         Everything::deleteById($id);
         return response()->json(['success' => true]);
     }
