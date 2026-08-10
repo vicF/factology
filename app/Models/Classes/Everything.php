@@ -342,6 +342,12 @@ class Everything
             'name'       => $class->name ?? null,
         ] : null;
 
+        // Resolve the owner's display name (owner references a things.thing_id)
+        $thing['owner_name'] = null;
+        if (!empty($thing['owner'])) {
+            $thing['owner_name'] = DB::table('things')->where('thing_id', $thing['owner'])->value('name');
+        }
+
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
