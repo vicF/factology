@@ -230,6 +230,7 @@ import { useRouter, useRoute } from 'vue-router'
 import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
 import SearchFilterPanel from "../SearchFilterPanel.vue"
+import { setLanguage } from '../../lang/i18n.js'
 
 import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
@@ -275,7 +276,7 @@ const pullStartY = ref(0)
 const wasAtTop = ref(false)
 
 // Language switcher data
-const currentLocale = ref('en')
+const currentLocale = ref(localStorage.getItem('locale') || 'en')
 const availableLocales = [
     { code: 'en', name: 'English' },
     { code: 'ru', name: 'Русский' },
@@ -285,6 +286,10 @@ const availableLocales = [
 ]
 
 const switchLanguage = (locale) => {
+    // Persist to localStorage and reload via the real i18n setter — otherwise
+    // only the local ref changes and neither the UI chrome nor the object
+    // content is re-rendered in the new language.
+    setLanguage(locale)
     currentLocale.value = locale
     console.log('Language switched to:', locale)
 }

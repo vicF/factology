@@ -91,6 +91,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed legal documents (placeholder content — admin must replace)
         $this->call(LegalDocumentSeeder::class);
+
+        // Seed localization system objects (Property/Language classes + languages)
+        $this->call(LocalizationSeeder::class);
     }
 
     /**

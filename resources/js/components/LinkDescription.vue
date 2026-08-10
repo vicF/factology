@@ -8,6 +8,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { objectName } from '../utils/localized.js';
 
 const props = defineProps({
     link: {
@@ -32,10 +33,10 @@ const props = defineProps({
 const cacheStore = useObjectCacheStore();
 
 const resolveName = (id, fallback) => {
-    if (fallback) return fallback;
     if (!id) return 'Unknown';
     const cached = cacheStore.getCachedObject(id);
-    return cached?.name || 'Unknown';
+    if (cached) return objectName(cached) || 'Unknown';
+    return fallback || 'Unknown';
 };
 
 const generateLinkDescription = (link, object) => {
@@ -46,12 +47,12 @@ const generateLinkDescription = (link, object) => {
     const objectIsOne = object.thing_id === link.one_thing_id;
 
     const oneName = objectIsOne
-        ? resolveName(link.one_thing_id, object.name)
+        ? resolveName(link.one_thing_id, objectName(object))
         : resolveName(link.one_thing_id, link.name);
 
     const otherName = objectIsOne
         ? resolveName(link.other_thing_id, link.name)
-        : resolveName(link.other_thing_id, object.name);
+        : resolveName(link.other_thing_id, objectName(object));
 
     const linkTypeName = resolveName(link.link_type_id, link.link_name);
 

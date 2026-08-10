@@ -176,6 +176,23 @@ class ApiController extends BaseController
             'external_links' => ['nullable', 'array'],
             'external_links.*.id'  => ['nullable', 'string', 'uuid'],
             'external_links.*.url' => ['nullable', 'string', 'max:2048'],
+
+            /**
+             * Localized name variants: { "lang": <code of name's language>, <code>: <text>, ... }
+             * @example {"lang":"ru","en":"island"}
+             */
+            'name_translations' => ['nullable', 'array'],
+
+            /**
+             * Localized description variants (same shape as name_translations)
+             */
+            'description_translations' => ['nullable', 'array'],
+
+            /**
+             * Object metadata: { "properties": { <propertyThingId>: <value> } }
+             */
+            'data' => ['nullable', 'array'],
+            'data.properties' => ['nullable', 'array'],
         ]);
 
         // Only admins may change an object's owner (system ownership / reassignment).
@@ -329,6 +346,13 @@ class ApiController extends BaseController
      */
     public function delete($id)
     {
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || $existing->owner !== auth()->user()->thing_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to delete this record',
+            ], 403);
+        }
         Everything::deleteById($id);
         return response()->json(['success' => true]);
     }
@@ -530,7 +554,14 @@ class ApiController extends BaseController
     public function search(SearchRequest $request): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validated();
-        $requestBody = json_decode(file_get_contents('php://input'), true);
+        // Read the raw body first (works for string JSON bodies without a
+        // Content-Type header, e.g. axios JSON.stringify payloads), then fall
+        // back to $request->input() for Laravel feature tests where php://input
+        // is empty. Relying on $request->input() alone would mis-parse those
+        // requests and silently disable every search filter.
+        $requestBody = json_decode(file_get_contents('php://input'), true)
+            ?: $request->input()
+            ?: [];
         if (@$requestBody['tree']) {
             return $this->searchTree();
         }
@@ -568,12 +599,25 @@ class ApiController extends BaseController
         }
 
         if (@$requestBody['search']) {
-            $query->where(function ($query) use ($requestBody) {
-                $query->where('name', 'ilike', '%' . $requestBody['search'] . '%')
-                    ->orWhere('description', 'ilike', '%' . $requestBody['search'] . '%');
+            $term = '%' . $requestBody['search'] . '%';
+            $query->where(function ($query) use ($term) {
+                $query->where('name', 'ilike', $term)
+                    ->orWhere('description', 'ilike', $term)
+                    // Match text inside the translation JSON columns too
+                    // (skip the reserved "lang" metadata key, which only holds a language code).
+                    ->orWhereExists(function ($sub) use ($term) {
+                        $sub->selectRaw('1')
+                            ->fromRaw('jsonb_each_text(COALESCE(things.name_translations, \'{}\'::jsonb)) as kv')
+                            ->whereRaw('kv.key <> \'lang\' AND kv.value ILIKE ?', [$term]);
+                    })
+                    ->orWhereExists(function ($sub) use ($term) {
+                        $sub->selectRaw('1')
+                            ->fromRaw('jsonb_each_text(COALESCE(things.description_translations, \'{}\'::jsonb)) as kv')
+                            ->whereRaw('kv.key <> \'lang\' AND kv.value ILIKE ?', [$term]);
+                    });
             });
-            // Sort name matches above description-only matches
-            $query->orderByRaw('CASE WHEN name ILIKE ? THEN 0 ELSE 1 END', ['%' . $requestBody['search'] . '%']);
+            // Sort source-language name/description matches above translation-only matches
+            $query->orderByRaw('CASE WHEN name ILIKE ? OR description ILIKE ? THEN 0 ELSE 1 END', [$term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {
@@ -761,7 +805,7 @@ class ApiController extends BaseController
         $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
         $rawSql = "
-    WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public, name_translations) AS (
         SELECT
             c.name,
             1,
@@ -769,7 +813,8 @@ class ApiController extends BaseController
             CAST(NULL AS UUID),
             c.description,
             CAST(NULL AS VARCHAR(255)),
-            c.public
+            c.public,
+            c.name_translations
         FROM things c
         WHERE c.thing_id = ?
 
@@ -782,7 +827,8 @@ class ApiController extends BaseController
             l.one_thing_id,
             c.description,
             CAST(l.translation AS VARCHAR(255)),
-            c.public
+            c.public,
+            c.name_translations
         FROM descendants d
         JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
         JOIN things c ON l.other_thing_id = c.thing_id
@@ -812,6 +858,9 @@ class ApiController extends BaseController
         foreach ($results as $row) {
             if (isset($row->public)) {
                 $row->public = $row->public === true || $row->public === 't' ? 1 : 0;
+            }
+            if (isset($row->name_translations) && is_string($row->name_translations)) {
+                $row->name_translations = json_decode($row->name_translations, true);
             }
         }
 

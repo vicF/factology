@@ -28,6 +28,7 @@ import RelationGraph from 'relation-graph-vue3'
 import { inject, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { objectName } from '../utils/localized.js'
 import Image from './Image.vue'
 
 const getThumbUrl = inject('getThumbUrl');
@@ -95,7 +96,7 @@ const buildGraphData = (object) => {
     // Главный узел
     nodes.push({
         id: object.thing_id,
-        text: object.name || t('Unnamed'),
+        text: objectName(object) || t('Unnamed'),
         color: '#4a6bff',
         borderColor: '#1e3b8a',
         fontColor: '#ffffff',
@@ -111,7 +112,7 @@ const buildGraphData = (object) => {
         if (!nodeIds.has(object.class.thing_id)) {
             nodes.push({
                 id: object.class.thing_id,
-                text: object.class.name || t('Class'),
+                text: objectName(object.class) || t('Class'),
                 color: '#6c757d',
                 borderColor: '#495057',
                 fontColor: '#ffffff',
@@ -138,7 +139,7 @@ const buildGraphData = (object) => {
             if (!nodeIds.has(link.one_thing_id)) {
                 nodes.push({
                     id: link.one_thing_id,
-                    text: link.name || t('Class'),
+                    text: objectName(link) || t('Class'),
                     color: '#6c757d',
                     borderColor: '#495057',
                     fontColor: '#ffffff',
@@ -150,7 +151,7 @@ const buildGraphData = (object) => {
             if (!nodeIds.has(link.other_thing_id)) {
                 nodes.push({
                     id: link.other_thing_id,
-                    text: link.name || t('Linked object'),
+                    text: objectName(link) || t('Linked object'),
                     color: '#28a745',
                     borderColor: '#1e7e34',
                     fontColor: '#ffffff',

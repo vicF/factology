@@ -47,13 +47,14 @@
                         <!-- Header -->
                         <div class="object-header">
                             <h1 class="object-title">
-                                {{ object.name || $t('Unnamed') }}
+                                {{ $objectName(object) || $t('Unnamed') }}
+                                <TranslatedBadge :translations="object.name_translations" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
-                                <button class="btn btn-primary" @click="openEditModal" :title="$t('Edit this object')">{{ $t('Edit') }}</button>
+                                <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
-                                <button class="btn btn-danger" @click="deleteObject" :title="$t('Delete this object')">{{ $t('Delete') }}</button>
+                                <button class="btn btn-danger" @click="deleteObject" :disabled="!canEdit" :title="canEdit ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
                         </div>
 
@@ -89,7 +90,7 @@
                                     </div>
 
                                     <div class="result-info-section">
-                                        <div v-if="authenticated" class="visibility-badge"
+                                        <div v-if="canEdit" class="visibility-badge"
                                             :class="object.public ? 'is-public' : 'is-private'"
                                             @click="toggleObjectVisibility(object.public ? false : true)"
                                             :title="$t('Toggle visibility')">
@@ -101,7 +102,7 @@
                                         <div v-if="object.class" class="class-badge">
                                             <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
                                             <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                {{ object.class.name }}
+                                                {{ $objectName(object.class) }}
                                             </RouterLink>
                                         </div>
 
@@ -115,7 +116,7 @@
                                                     <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
                                                 </span>
                                             </span>
-                                            <span v-if="object.description">{{ object.description }}</span>
+                                            <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
                                         </div>
 
                                         <div v-if="object.record_created || object.record_updated || object.owner" class="result-meta mt-1">
@@ -445,6 +446,14 @@ const defaultLinkedObjects = computed(() => {
 
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
+
+// Whether the current user may edit this object's own fields (only its owner).
+// Links are always editable by authenticated users, so the Link/Create buttons
+// and the per-link Edit/Delete actions stay enabled regardless.
+const canEdit = computed(() => {
+    const uid = object.value?.owner;
+    return authenticated.value && !!uid && authStore.user?.thing_id === uid;
+});
 
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;

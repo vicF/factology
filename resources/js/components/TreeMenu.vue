@@ -19,13 +19,13 @@
             />
             <div class="node-content">
                 <span class="node-name">
-                    <router-link class="dropdown-item" :to="`/object/${id}`">{{ name }}</router-link>
+                    <router-link class="dropdown-item" :to="`/object/${id}`">{{ displayName }}</router-link>
                     <span v-if="authenticated && !nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
                     <span v-if="authenticated && nodePublic && showIcons" class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && showIcons }">
-                    <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${name}&quot;`">+</span>
-                    <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${name}&quot;`">📦</span>
+                    <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${displayName}&quot;`">+</span>
+                    <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${displayName}&quot;`">📦</span>
                 </span>
             </div>
         </div>
@@ -45,6 +45,7 @@
                 :id="node.id"
                 :nodes="node.nodes"
                 :name="node.name"
+                :translations="node.name_translations"
                 :depth="depth + 1"
                 :checked-items="checkedItems"
                 :public="node.public"
@@ -61,6 +62,7 @@ import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
+import { fieldText } from '../utils/localized.js';
 import Image from "./Image.vue";
 import {IconPrivate, IconPublic} from "./icons";
 import ConfirmModal from './ConfirmModal.vue';
@@ -93,11 +95,18 @@ const props = defineProps({
     public: {
         type: Number,
         default: 1          // 1 = public, 0 = private
+    },
+    translations: {
+        type: Object,
+        default: null
     }
 });
 
 // Emits definition
 const emit = defineEmits(['update-checked']);
+
+// Resolve the class name in the current UI language
+const displayName = computed(() => fieldText(props.name, props.translations));
 
 defineOptions({ name: 'tree-menu' });
 
