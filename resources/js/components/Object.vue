@@ -47,7 +47,8 @@
                         <!-- Header -->
                         <div class="object-header">
                             <h1 class="object-title">
-                                {{ object.name || $t('Unnamed') }}
+                                {{ $objectName(object) || $t('Unnamed') }}
+                                <TranslatedBadge :translations="object.name_translations" />
                             </h1>
                             <div v-if="authenticated" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -101,7 +102,7 @@
                                         <div v-if="object.class" class="class-badge">
                                             <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
                                             <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                {{ object.class.name }}
+                                                {{ $objectName(object.class) }}
                                             </RouterLink>
                                         </div>
 
@@ -115,7 +116,7 @@
                                                     <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
                                                 </span>
                                             </span>
-                                            <span v-if="object.description">{{ object.description }}</span>
+                                            <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
                                         </div>
 
                                         <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">

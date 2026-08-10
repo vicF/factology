@@ -73,6 +73,13 @@ class UUID
     public const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';
     public const RECENTLY_VIEWED = 'f0f0f0f0-0002-4000-a000-000000000002';
 
+    // ── Localization system objects (Property/Language classes, languages) ──
+    public const PROPERTY_CLASS = 'b1b1b1b1-0001-4000-8000-000000000001';
+    public const LANGUAGE_CLASS = 'b1b1b1b1-0002-4000-8000-000000000001';
+    public const PROPERTY_APPLIES_TO = 'b1b1b1b1-0003-4000-8000-000000000001';
+    public const LANG_EN = 'b1b1b1b1-0011-4000-8000-000000000001';
+    public const LANG_RU = 'b1b1b1b1-0012-4000-8000-000000000001';
+
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,

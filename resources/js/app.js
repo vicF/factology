@@ -12,6 +12,7 @@ import App from './components/App.vue';
 import router from './router';
 import i18n from './lang/i18n';
 import LinkDescription from './components/LinkDescription.vue';
+import TranslatedBadge from './components/TranslatedBadge.vue';
 
 // Import all icons
 import * as Icons from './components/icons';
@@ -28,6 +29,7 @@ Object.entries(Icons).forEach(([name, component]) => {
 });
 
 app.component('LinkDescription', LinkDescription);
+app.component('TranslatedBadge', TranslatedBadge);
 
 app.config.globalProperties.$truncateText = function(text, length) {
     if (text.length <= length) {
@@ -130,6 +132,14 @@ if (isCapacitor && !apiBaseUrl) {
 }
 
 app.config.globalProperties.$dateFromDb = dateFromDb;
+
+// Localized-data resolution helpers (templates can use $objectName(...), etc.)
+import * as localized from './utils/localized.js';
+app.config.globalProperties.$objectName = localized.objectName;
+app.config.globalProperties.$objectDescription = localized.objectDescription;
+app.config.globalProperties.$fieldText = localized.fieldText;
+app.config.globalProperties.$resolveLocalized = localized.resolveLocalized;
+app.config.globalProperties.$hasOtherTranslations = localized.hasOtherTranslations;
 
 (async () => {
     const authStore = useAuthStore();

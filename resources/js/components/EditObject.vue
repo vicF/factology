@@ -46,22 +46,90 @@
                             </div>
 
                             <!-- rest of the form (name, description, dates, etc.) -->
-                            <div class="mb-3">
-                                <TextField
-                                    fieldName="name"
-                                    v-model="formData.name"
-                                    :isEditable="true"
-                                    :label="$t('Name')"
-                                    required
-                                />
+                            <!-- The main name/description fields edit the plain (original) value.
+                                 A small badge shows its declared language; hovering the field
+                                 reveals a selector to change that language attribute (the text
+                                 stays — used to correct mislabeled legacy fields). -->
+                            <div class="mb-3 localized-field" @mouseenter="showNameLang = true" @mouseleave="showNameLang = false">
+                                <div class="localized-field-row">
+                                    <TextField
+                                        fieldName="name"
+                                        v-model="formData.name"
+                                        :isEditable="true"
+                                        :label="$t('Name')"
+                                        required
+                                    />
+                                    <span v-if="!showNameLang" class="field-lang-badge">{{ nameSourceLang.toUpperCase() }}</span>
+                                    <FieldLanguageSelect
+                                        v-if="showNameLang"
+                                        :model-value="nameSourceLang"
+                                        :options="langOptions"
+                                        @update:model-value="switchFieldLanguage('name', $event)"
+                                    />
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <TextField
-                                    fieldName="description"
-                                    v-model="formData.description"
-                                    :isEditable="true"
-                                    :label="$t('Description')"
-                                />
+                            <div class="mb-3 localized-field" @mouseenter="showDescLang = true" @mouseleave="showDescLang = false">
+                                <div class="localized-field-row">
+                                    <TextField
+                                        fieldName="description"
+                                        v-model="formData.description"
+                                        :isEditable="true"
+                                        :label="$t('Description')"
+                                    />
+                                    <span v-if="!showDescLang" class="field-lang-badge">{{ descriptionSourceLang.toUpperCase() }}</span>
+                                    <FieldLanguageSelect
+                                        v-if="showDescLang"
+                                        :model-value="descriptionSourceLang"
+                                        :options="langOptions"
+                                        @update:model-value="switchFieldLanguage('description', $event)"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Additional languages (translations) -->
+                            <div v-if="extraLanguages.length || remainingLanguages.length" class="mb-3">
+                                <label class="form-label d-block">{{ $t('Translations') }}</label>
+                                <div
+                                    v-for="lang in extraLanguages"
+                                    :key="lang.code"
+                                    class="border rounded p-2 mb-2 bg-light"
+                                >
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge bg-secondary text-white">{{ lang.name }} <small>({{ lang.code }})</small></span>
+                                        <button type="button" class="btn-close btn-sm" @click="removeExtraLanguage(lang.code)"></button>
+                                    </div>
+                                    <div v-if="lang.code !== nameSourceLang" class="mb-1">
+                                        <label class="form-label small mb-1">{{ $t('Name') }}</label>
+                                        <input
+                                            class="form-control form-control-sm"
+                                            :value="getTranslationValue('name', lang.code)"
+                                            @input="setTranslationValue('name', lang.code, $event.target.value)"
+                                            :placeholder="$t('Name translation')"
+                                        />
+                                    </div>
+                                    <div v-else class="small text-muted mb-1">
+                                        {{ $t('Name is already in this language — edit it in the field above.') }}
+                                    </div>
+                                    <div v-if="lang.code !== descriptionSourceLang">
+                                        <label class="form-label small mb-1">{{ $t('Description') }}</label>
+                                        <input
+                                            class="form-control form-control-sm"
+                                            :value="getTranslationValue('description', lang.code)"
+                                            @input="setTranslationValue('description', lang.code, $event.target.value)"
+                                            :placeholder="$t('Description translation')"
+                                        />
+                                    </div>
+                                    <div v-else class="small text-muted">
+                                        {{ $t('Description is already in this language — edit it in the field above.') }}
+                                    </div>
+                                </div>
+                                <div v-if="remainingLanguages.length" class="d-flex align-items-center gap-2">
+                                    <select class="form-select form-select-sm w-auto" v-model="pendingExtraLang">
+                                        <option :value="null" disabled>{{ $t('Add language…') }}</option>
+                                        <option v-for="l in remainingLanguages" :key="l.code" :value="l.code">{{ l.name }}</option>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="addExtraLanguage">{{ $t('Add') }}</button>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <DateField
@@ -211,12 +279,15 @@ import { useI18n } from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import DateField from './Fields/DateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
+import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { currentLocale, changeSourceLang } from '../utils/localized.js';
+import { loadLanguages } from '../localization/languageCatalog.js';
 
 const objectsStore = useObjectsStore();
 
@@ -242,13 +313,190 @@ const isEditMode = computed(() => !!props.object);
 // Refs
 const formData = ref({
     thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
-    name: isEditMode.value ? props.object.name || '' : '',
-    description: isEditMode.value ? props.object.description || '' : '',
+    name: '',        // current-locale text (filled by initLocalization)
+    description: '', // current-locale text (filled by initLocalization)
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
+    data: isEditMode.value && props.object.data && typeof props.object.data === 'object'
+        ? { ...props.object.data, properties: props.object.data.properties || {} }
+        : { properties: {} },
 });
+
+// ── Localized text editing state ─────────────────────────────────
+// The main name/description fields edit the PLAIN (original) value
+// (formData.name/description). Each field's declared language lives in
+// *SourceLang (name_translations.lang). Other languages live in
+// *Translations[code] and are edited in the Translations section.
+// Changing a field's language via the hover selector only re-tags the text
+// (or promotes an existing translation) — it never discards content.
+const locale = currentLocale();
+const nameSourceLang = ref(locale);
+const descriptionSourceLang = ref(locale);
+const nameTranslations = ref({});
+const descriptionTranslations = ref({});
+const extraLanguages = ref([]);      // [{ code, name }] shown in the translations section
+const pendingExtraLang = ref(null);
+const availableLanguages = ref([]);
+const showNameLang = ref(false);     // hover state for the per-field language selectors
+const showDescLang = ref(false);
+let originalLocalization = '';
+
+function parseTranslations(v) {
+    if (!v) return {};
+    if (typeof v === 'string') {
+        try { return JSON.parse(v) || {}; } catch { return {}; }
+    }
+    if (typeof v === 'object' && !Array.isArray(v)) return v;
+    return {};
+}
+
+function pickExtraTranslations(map, source) {
+    const out = {};
+    for (const [k, v] of Object.entries(map || {})) {
+        if (k === 'lang' || k === source) continue;
+        if (v != null && String(v).trim() !== '') out[k] = v;
+    }
+    return out;
+}
+
+function seedExtraLanguages() {
+    const withContent = new Set([
+        ...Object.keys(nameTranslations.value),
+        ...Object.keys(descriptionTranslations.value),
+    ]);
+    for (const l of availableLanguages.value) {
+        if (l.code !== locale && withContent.has(l.code) && !extraLanguages.value.some((e) => e.code === l.code)) {
+            extraLanguages.value.push({ ...l });
+        }
+    }
+}
+
+function initLocalization(object) {
+    const o = object || {};
+    const nl = parseTranslations(o.name_translations);
+    const dl = parseTranslations(o.description_translations);
+    nameSourceLang.value = nl.lang || locale;
+    descriptionSourceLang.value = dl.lang || locale;
+    formData.value.name = o.name || '';
+    formData.value.description = o.description || '';
+    nameTranslations.value = pickExtraTranslations(nl, nameSourceLang.value);
+    descriptionTranslations.value = pickExtraTranslations(dl, descriptionSourceLang.value);
+    seedExtraLanguages();
+    originalLocalization = localizationSnapshot();
+}
+
+// Languages offered by the per-field selectors: the seeded catalog plus the
+// current UI locale and each field's source language (they may be missing
+// from the catalog, e.g. legacy data).
+const langOptions = computed(() => {
+    const opts = availableLanguages.value.map((l) => ({ ...l }));
+    const add = (code) => {
+        if (code && !opts.some((l) => l.code === code)) opts.push({ code, name: code });
+    };
+    add(locale);
+    add(nameSourceLang.value);
+    add(descriptionSourceLang.value);
+    return opts;
+});
+
+/**
+ * Change a field's declared language. The text stays (this is for correcting
+ * mislabeled legacy fields); if the new language already has a translation,
+ * that translation becomes the plain value and the old plain moves into the
+ * translations map — all content is preserved.
+ */
+function switchFieldLanguage(field, code) {
+    if (field === 'name') {
+        if (code === nameSourceLang.value) return;
+        const res = changeSourceLang({
+            plain: formData.value.name,
+            translations: nameTranslations.value,
+            oldLang: nameSourceLang.value,
+            newLang: code,
+        });
+        formData.value.name = res.plain;
+        nameTranslations.value = res.translations;
+        nameSourceLang.value = code;
+    } else {
+        if (code === descriptionSourceLang.value) return;
+        const res = changeSourceLang({
+            plain: formData.value.description,
+            translations: descriptionTranslations.value,
+            oldLang: descriptionSourceLang.value,
+            newLang: code,
+        });
+        formData.value.description = res.plain;
+        descriptionTranslations.value = res.translations;
+        descriptionSourceLang.value = code;
+    }
+    // The newly-selected source language is handled by the main field; remove
+    // it from the section and re-add any language that gained content.
+    extraLanguages.value = extraLanguages.value.filter((l) => l.code !== code);
+    seedExtraLanguages();
+}
+
+const remainingLanguages = computed(() =>
+    availableLanguages.value.filter(
+        (l) => l.code !== locale && !extraLanguages.value.some((e) => e.code === l.code)
+    )
+);
+
+// The Translations section only edits non-source languages (the main fields
+// own the source language), so these read/write the translations maps directly.
+function getTranslationValue(field, code) {
+    const map = field === 'name' ? nameTranslations.value : descriptionTranslations.value;
+    return map[code] || '';
+}
+
+function setTranslationValue(field, code, value) {
+    const map = field === 'name' ? nameTranslations.value : descriptionTranslations.value;
+    map[code] = value;
+}
+
+function addExtraLanguage() {
+    const l = availableLanguages.value.find((x) => x.code === pendingExtraLang.value);
+    if (l && !extraLanguages.value.some((e) => e.code === l.code)) {
+        extraLanguages.value.push({ ...l });
+    }
+    pendingExtraLang.value = null;
+}
+
+function removeExtraLanguage(code) {
+    extraLanguages.value = extraLanguages.value.filter((l) => l.code !== code);
+}
+
+/**
+ * Build the plain value + translations map for a field. The plain value is
+ * the main-field text; the translations map always carries the field's
+ * declared language (`lang`) plus the other-language entries.
+ */
+function buildFieldPayload(field) {
+    const isName = field === 'name';
+    const plain = isName ? (formData.value.name || '') : (formData.value.description || '');
+    const lang = isName ? nameSourceLang.value : descriptionSourceLang.value;
+    const out = { lang };
+    const source = isName ? nameTranslations.value : descriptionTranslations.value;
+    for (const [k, v] of Object.entries(source)) {
+        if (v != null && String(v).trim() !== '') out[k] = v;
+    }
+    return { plain, translations: out };
+}
+
+function localizationSnapshot() {
+    return JSON.stringify({
+        name: formData.value.name,
+        description: formData.value.description,
+        nameSourceLang: nameSourceLang.value,
+        descriptionSourceLang: descriptionSourceLang.value,
+        nameTranslations: nameTranslations.value,
+        descriptionTranslations: descriptionTranslations.value,
+        extraLanguages: extraLanguages.value,
+    });
+}
+
+initLocalization(isEditMode.value ? props.object : null);
 
 const showError = ref(false);
 const errorMessage = ref('');
@@ -298,16 +546,21 @@ const hasUnsavedChanges = computed(() => {
     if (isSubmitting) return false;
 
     const formChanged = Object.keys(originalFormData.value).some(key => {
-        const original = originalFormData.value[key] || '';
-        const current = formData.value[key] || '';
-        return original !== current;
+        const original = originalFormData.value[key];
+        const current = formData.value[key];
+        if (original === current) return false;
+        if (typeof original === 'object' && typeof current === 'object') {
+            return JSON.stringify(original) !== JSON.stringify(current);
+        }
+        return (original || '') !== (current || '');
     });
 
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
     const classLinkChanged = JSON.stringify(originalClassLink.value) !== JSON.stringify(classLinkData.value);
     const parentLinkChanged = JSON.stringify(originalParentLink.value) !== JSON.stringify(parentLinkData.value);
+    const localizationChanged = originalLocalization !== localizationSnapshot();
 
-    return formChanged || linksChanged || classLinkChanged || parentLinkChanged;
+    return formChanged || linksChanged || classLinkChanged || parentLinkChanged || localizationChanged;
 });
 
 // Regular links (all links except class and parent)
@@ -485,14 +738,19 @@ const submitForm = async () => {
                 public: 0,
             }));
 
+        const namePayload = buildFieldPayload('name');
+        const descPayload = buildFieldPayload('description');
         const payload = {
             thing_id: formData.value.thing_id,
-            name: formData.value.name,
-            description: formData.value.description,
+            name: namePayload.plain,
+            name_translations: namePayload.translations,
+            description: descPayload.plain,
+            description_translations: descPayload.translations,
             start: formData.value.start || null,
             end: formData.value.end || null,
             public: formData.value.public,
             type: formData.value.type,
+            data: formData.value.data,
         };
 
         if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
@@ -591,6 +849,8 @@ const submitForm = async () => {
 };
 
 onMounted(async () => {
+    availableLanguages.value = await loadLanguages();
+    seedExtraLanguages();
     await nextTick();
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
@@ -623,13 +883,17 @@ watch(() => props.object, (newObject, oldObject) => {
 
     formData.value = {
         thing_id: newObject.thing_id || newObject.id || uuidv4(),
-        name: newObject.name || '',
-        description: newObject.description || '',
+        name: '',
+        description: '',
         start: newObject.start || '',
         end: newObject.end || '',
         public: newObject.public ? 1 : 0,
         type: props.params.type || 3,
+        data: newObject.data && typeof newObject.data === 'object'
+            ? { ...newObject.data, properties: newObject.data.properties || {} }
+            : { properties: {} },
     };
+    initLocalization(newObject);
     initializeData();
 }, { deep: false });
 </script>
@@ -637,6 +901,35 @@ watch(() => props.object, (newObject, oldObject) => {
 <style scoped>
 .modal-dialog {
     max-width: 800px;
+}
+
+/* Per-field language selector: hidden until the field is hovered, then
+   overlaid on the right edge of the input. */
+.localized-field-row {
+    position: relative;
+}
+.localized-field-row :deep(.field-lang-select) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 5;
+    max-width: 150px;
+    width: auto;
+}
+.field-lang-badge {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    z-index: 5;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: #495057;
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    padding: 1px 5px;
+    pointer-events: none;
 }
 
 /* Mobile responsive styles */

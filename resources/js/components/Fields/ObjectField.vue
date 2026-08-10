@@ -98,13 +98,13 @@
                                     <IconLink v-else width="1.1em" height="1.1em" class="flex-shrink-0" />
                                     <div class="flex-grow-1 text-truncate text-start">
                                         <div class="d-flex align-items-center gap-1">
-                                            <span>{{ obj.name || 'Unnamed' }}</span>
+                                            <span>{{ objectName(obj) || 'Unnamed' }}</span>
                                             <small v-if="obj._suggestionType" class="suggestion-tag">
                                                 {{ suggestionLabel(obj._suggestionType) }}
                                             </small>
                                         </div>
-                                        <small v-if="obj.description" class="text-muted d-block text-truncate">
-                                            {{ obj.description }}
+                                        <small v-if="objectDescription(obj)" class="text-muted d-block text-truncate">
+                                            {{ objectDescription(obj) }}
                                         </small>
                                     </div>
                                     <small class="text-muted ms-auto font-monospace">
@@ -131,6 +131,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useObjectHistoryStore } from '@/stores/objectHistory.js'
 import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
+import { objectName, objectDescription } from "../../utils/localized.js";
 import axios from 'axios';
 
 // Icon components are globally registered, no need to import
@@ -218,11 +219,11 @@ let debounceTimer = null
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
-    if (selectedObject.value?.name) return selectedObject.value.name
+    if (selectedObject.value) return objectName(selectedObject.value)
     if (!props.modelValue) return ''
 
     const cached = cacheStore.getCachedObject(props.modelValue)
-    if (cached) return cached.name
+    if (cached) return objectName(cached)
     return props.name || props.modelValue
 })
 

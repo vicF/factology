@@ -80,4 +80,11 @@ export const UUID = {
     // ── User preference / history link types ──
     MY_FAVORITE:       'f0f0f0f0-0001-4000-a000-000000000001',
     RECENTLY_VIEWED:   'f0f0f0f0-0002-4000-a000-000000000002',
+
+    // ── Localization system objects (Property/Language classes, languages) ──
+    PROPERTY_CLASS:    'b1b1b1b1-0001-4000-8000-000000000001',
+    LANGUAGE_CLASS:    'b1b1b1b1-0002-4000-8000-000000000001',
+    PROPERTY_APPLIES_TO: 'b1b1b1b1-0003-4000-8000-000000000001',
+    LANG_EN:           'b1b1b1b1-0011-4000-8000-000000000001',
+    LANG_RU:           'b1b1b1b1-0012-4000-8000-000000000001',
 };

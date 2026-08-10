@@ -17,6 +17,7 @@
                         :key="child.id"
                         :id="child.id"
                         :name="child.name"
+                        :translations="child.name_translations"
                         :nodes="child.nodes || []"
                         :depth="0"
                         :public="child.public"
@@ -27,6 +28,7 @@
                     v-else
                     :id="root.id"
                     :name="root.name"
+                    :translations="root.name_translations"
                     :nodes="root.nodes || []"
                     :depth="0"
                     :public="root.public"

@@ -85,9 +85,18 @@ i18n.global.tc = function(key, contextId) {
 };
 
 export function setLanguage(lang) {
-    i18n.global.locale = lang;
+    // i18n.global.locale is a ref (WritableComputedRef) — set `.value`.
+    // Assigning `i18n.global.locale = lang` would replace the ref with a plain
+    // string (or throw on a frozen composer), breaking currentLocale()/locale.value.
+    if (i18n.global.locale && typeof i18n.global.locale === 'object' && 'value' in i18n.global.locale) {
+        i18n.global.locale.value = lang;
+    } else {
+        i18n.global.locale = lang;
+    }
     localStorage.setItem("locale", lang);
     window.location.reload();
 }
+
+export { i18n };
 
 export default i18n;

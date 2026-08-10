@@ -9,6 +9,7 @@ namespace App\Models\Classes;
 
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
+use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
 use http\Exception\InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
@@ -79,9 +80,12 @@ class Everything
     protected $_tableFields = [
         'deleted',
         'description',
+        'description_translations',
+        'data',
         'end',
         'end_variety',
         'name',
+        'name_translations',
         'public',
         'start',
         'start_variety',
@@ -96,10 +100,13 @@ class Everything
     public $params = [
         'deleted',
         'description',
+        'description_translations',
+        'data',
         'end',
         'end_date',
         'end_variety',
         'name',
+        'name_translations',
         'public',
         'record_created',
         'record_updated',
@@ -330,9 +337,11 @@ class Everything
             }
         }
 
-        // Decode JSON data column from PostgreSQL (returns as string via query builder)
-        if (isset($thing['data']) && is_string($thing['data'])) {
-            $thing['data'] = json_decode($thing['data'], true);
+        // Decode JSON columns from PostgreSQL (query builder returns them as strings)
+        foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+            if (isset($thing[$jsonField]) && is_string($thing[$jsonField])) {
+                $thing[$jsonField] = json_decode($thing[$jsonField], true);
+            }
         }
 
         // Clean up class object: extract just relevant info, excluding heavy json from c.data
@@ -587,6 +596,29 @@ class Everything
         }
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
+
+        // Localization JSON columns (json/jsonb): encode arrays/objects into JSON strings,
+        // storing null for empty structures so the column stays `null` rather than `[]`.
+        // Guard: if a client sends translations without a `lang` key, default it from
+        // the corresponding plain field's script (so lang-less data is never persisted).
+        foreach (['name_translations' => 'name', 'description_translations' => 'description'] as $jsonField => $plainField) {
+            if (array_key_exists($jsonField, $data)
+                && is_array($data[$jsonField])
+                && count($data[$jsonField]) > 0
+                && !array_key_exists('lang', $data[$jsonField])) {
+                $data[$jsonField]['lang'] = FieldLanguage::detect($data[$plainField] ?? null);
+            }
+        }
+        foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+            if (array_key_exists($jsonField, $data)) {
+                $value = $data[$jsonField];
+                if (is_array($value) || is_object($value)) {
+                    $encoded = json_encode($value);
+                    $data[$jsonField] = ($encoded === '[]' || $encoded === '{}') ? null : $encoded;
+                }
+            }
+        }
+
         if (empty($this->thing_id)) {
             // generating new UUID for the object
             $data['thing_id'] = $this->thing_id = (string)Str::uuid();
@@ -609,6 +641,14 @@ class Everything
                 'server_uuid'    => $data['server_uuid'] ?? self::$_serverUuid,
                 'record_updated' => now(),
             ];
+
+            // Localization JSON columns are only written when present in the request,
+            // so an update that omits them never wipes existing translations/data.
+            foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+                if (array_key_exists($jsonField, $data)) {
+                    $upsertData[$jsonField] = $data[$jsonField];
+                }
+            }
 
             // Perform upsert
             DB::table('things')->upsert(

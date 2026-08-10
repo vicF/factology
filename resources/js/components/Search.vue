@@ -60,7 +60,7 @@
                                         <div class="result-header">
                                             <div class="result-title">
                                                 <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }" class="title-link">
-                                                    {{ thing.name }}
+                                                    {{ $objectName(thing) }}
                                                 </RouterLink>
                                             </div>
                                         </div>
@@ -68,7 +68,7 @@
                                         <div v-if="thing.type === 3 && thing.class" class="class-badge">
                                             <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
                                             <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
-                                                {{ thing.class.name }}
+                                                {{ $objectName(thing.class) }}
                                             </RouterLink>
                                         </div>
 
@@ -86,7 +86,7 @@
                                                 <template v-else-if="thing.end">until </template>
                                                 <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
                                             </span>
-                                            <span v-if="thing.description">{{ truncateText(thing.description, 120) }}</span>
+                                            <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
                                     </div>
 
