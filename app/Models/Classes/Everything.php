@@ -577,12 +577,17 @@ class Everything
             ->where('thing_id', $this->thing_id)
             ->first();
 
-        // Check ownership
-        if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
+        // Check ownership — admins may save/reassign any object (system ownership, re-owning).
+        // Guarded so internal flows without an auth user (e.g. UserClass seeding) still work.
+        $authUser = auth()->user();
+        $isAdmin = $authUser ? (bool) $authUser->is_admin : false;
+        if (!empty($existingRecord) && !$isAdmin && $authUser && $existingRecord->owner != $authUser->thing_id) {
             throw new \Exception('You do not have permission to update this record', 403);
             // Or return response with 403 Forbidden status
         } elseif (empty($this->owner)) {
-            $this->owner = auth()->user()->thing_id;
+            if ($authUser) {
+                $this->owner = $authUser->thing_id;
+            }
         }
         $this->_validate();
         // Auto-set server_uuid for objects created on this server

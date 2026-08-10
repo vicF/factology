@@ -50,6 +50,11 @@ vi.mock('@/stores/objects', () => ({
     }),
 }))
 
+const authState = vi.hoisted(() => ({ user: null }))
+vi.mock('@/stores/auth', () => ({
+    useAuthStore: () => ({ user: authState.user, authenticated: false }),
+}))
+
 const EDIT_ID = 'existing-object-id'
 const NEW_OBJECT_ID = 'brand-new-object-id'
 const DEFAULT_LINK_TYPE = '4b27fd0c-d8be-425c-a529-2186b2589e76'
@@ -87,6 +92,7 @@ const mountEditObject = async (props = {}) => {
 beforeEach(() => {
     Object.keys(busHandlers).forEach(k => delete busHandlers[k])
     vi.clearAllMocks()
+    authState.user = null
     axios.put.mockResolvedValue({ data: {} })
     axios.post.mockResolvedValue({ data: {} })
 })
@@ -221,5 +227,36 @@ describe('EditObject', () => {
         await flushPromises()
 
         expect(document.activeElement).toBe(mainForm().querySelector('input[type="url"]'))
+    })
+
+    // ── Owner (system ownership) — admins only ──
+
+    it('hides the Owner select for non-admins', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        expect(document.querySelector('#ownerSelect')).toBeNull()
+    })
+
+    it('shows the Owner select for admins and sends owner in the payload', async () => {
+        authState.user = { is_admin: true }
+        await mountEditObject({ object: OBJECT })
+
+        const ownerSelect = document.querySelector('#ownerSelect')
+        expect(ownerSelect).toBeTruthy()
+
+        // The "System Owner" reserved option is always offered.
+        const values = [...ownerSelect.options].map(o => o.value)
+        expect(values).toContain('aaaaaaaa-0000-4000-a000-00000000000a')
+
+        ownerSelect.value = 'aaaaaaaa-0000-4000-a000-00000000000a'
+        ownerSelect.dispatchEvent(new Event('change'))
+        await nextTick()
+
+        submitForm()
+        await flushPromises()
+
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const [, body] = axios.put.mock.calls[0]
+        expect(body.owner).toBe('aaaaaaaa-0000-4000-a000-00000000000a')
     })
 })
