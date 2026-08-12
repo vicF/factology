@@ -799,19 +799,24 @@ class ApiController extends BaseController
         $linkTypeParent = UUID::LINK_TO_PARENT;
         $classType = UUID::G_CLASS;
         $linkType = UUID::G_LINK;
+        $systemId = UUID::SYSTEM;
         $isAuthenticated = Auth::check();
 
         // Only filter by public if user is not authenticated
         $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
+        // Sort siblings so classes come first, then link types, and "System" last
+        $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type = ? THEN 0 ELSE 1 END';
+
         $rawSql = "
-    WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public, name_translations) AS (
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, translation, public, name_translations) AS (
         SELECT
             c.name,
             1,
             c.thing_id,
             CAST(NULL AS UUID),
             c.description,
+            c.type,
             CAST(NULL AS VARCHAR(255)),
             c.public,
             c.name_translations
@@ -826,6 +831,7 @@ class ApiController extends BaseController
             c.thing_id,
             l.one_thing_id,
             c.description,
+            c.type,
             CAST(l.translation AS VARCHAR(255)),
             c.public,
             c.name_translations
@@ -834,7 +840,8 @@ class ApiController extends BaseController
         JOIN things c ON l.other_thing_id = c.thing_id
         WHERE (c.type = ? OR c.type = ?) AND d.level < 10 $publicCondition
     )
-    SELECT * FROM descendants ORDER BY level, name;
+    SELECT * FROM descendants
+    ORDER BY level, $sortPriority, name;
     ";
 
         $results = DB::select($rawSql, [
@@ -842,6 +849,8 @@ class ApiController extends BaseController
             $linkTypeParent,
             $classType,
             $linkType,
+            $systemId,
+            $classType,
         ]);
 
         // Remove duplicate nodes, keep the one with the smallest level

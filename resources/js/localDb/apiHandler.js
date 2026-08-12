@@ -307,6 +307,11 @@ async function buildClassTree(classObjects) {
             .map(childId => buildNode(childId, level + 1))
             .filter(Boolean);
 
+        // Sort siblings to match the server (searchTree): classes first,
+        // then link types, and "System" last.
+        const sortPriority = node => node.id === UUID.SYSTEM ? 2 : (node.type === UUID.G_CLASS ? 0 : 1);
+        children.sort((a, b) => sortPriority(a) - sortPriority(b) || a.name.localeCompare(b.name));
+
         // Find parent
         let parentId = null;
         for (const link of allLinks) {
@@ -321,6 +326,7 @@ async function buildClassTree(classObjects) {
             name: obj.name,
             level,
             description: obj.description || null,
+            type: obj.type,
             public: obj.public || 0,
             nodes: children,
             translation: null,

@@ -65,6 +65,13 @@ describe('Local API class tree (mirrors server searchTree)', () => {
         expect(tree[0].nodes.length).toBeGreaterThan(0);
     });
 
+    it('sorts top-level siblings: classes first, link types, System last', async () => {
+        const res = await handleLocalApiCall('post', '/object', JSON.stringify({ tree: true }));
+        const topNames = res.data.things[0].nodes.map(n => n.name);
+        expect(topNames.indexOf('Something')).toBeLessThan(topNames.indexOf('Link'));
+        expect(topNames.indexOf('Link')).toBeLessThan(topNames.indexOf('System'));
+    });
+
     it('includes the full web class hierarchy', async () => {
         const res = await handleLocalApiCall('post', '/object', JSON.stringify({ tree: true }));
         const names = [];
