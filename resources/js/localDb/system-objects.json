@@ -2542,19 +2542,6 @@
                 "deleted": false
             },
             {
-                "translation": "is of class is related to Link",
-                "one_thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_start_variety": null,
-                "link_end_variety": null,
-                "link_uuid": "76943517-e656-4b28-bb24-8b9332b5022e",
-                "deleted": false
-            },
-            {
                 "translation": "Group read access is subclass of System",
                 "one_thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",

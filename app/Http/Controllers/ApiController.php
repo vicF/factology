@@ -268,6 +268,38 @@ class ApiController extends BaseController
                 ->where('link_id', $data['link_id'])
                 ->update($data);
         } else {
+            // Prevent reversed duplicates: the endpoint pair is matched in EITHER
+            // direction. If the same pair+type already exists, reuse that row
+            // instead of inserting a new one.
+            if (!empty($data['one_thing_id']) && !empty($data['other_thing_id']) && !empty($data['link_type_id'])) {
+                $existing = DB::table('links')
+                    ->where('link_type_id', $data['link_type_id'])
+                    ->where(function ($query) use ($data) {
+                        $query->where('one_thing_id', $data['one_thing_id'])
+                            ->where('other_thing_id', $data['other_thing_id'])
+                            ->orWhere(function ($query) use ($data) {
+                                $query->where('one_thing_id', $data['other_thing_id'])
+                                    ->where('other_thing_id', $data['one_thing_id']);
+                            });
+                    })
+                    ->first();
+
+                if ($existing) {
+                    $sameDirection = $existing->one_thing_id === $data['one_thing_id']
+                        && $existing->other_thing_id === $data['other_thing_id'];
+                    if ($sameDirection && !empty($data['translation'])) {
+                        DB::table('links')
+                            ->where('link_id', $existing->link_id)
+                            ->update(['translation' => $data['translation']]);
+                    }
+                    $data['link_id'] = $existing->link_id;
+                    return response()->json(
+                        [
+                            'data'    => $data,
+                            'success' => true
+                        ]);
+                }
+            }
             // Generate link_uuid for stable export/import matching if not provided
             if (empty($data['link_uuid'])) {
                 $data['link_uuid'] = (string) Str::uuid();
