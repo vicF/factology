@@ -31,6 +31,7 @@
                         ref="inputRef"
                         type="text"
                         class="form-control"
+                        :data-field-name="fieldName"
                         :value="isOpen ? searchText : displayValue"
                         :readonly="!isOpen"
                         :placeholder="isOpen ? placeholder : (displayValue || placeholder)"
@@ -146,6 +147,13 @@ const props = defineProps({
     },
     label: String,
     name: String,
+    // Overrides the displayed value (e.g. a read-only "current object" slot
+    // that shows the live name of the object being created). When set, the
+    // cache/suggestion lookups are skipped for display purposes.
+    displayName: {
+        type: String,
+        default: null
+    },
     placeholder: {
         type: String,
         default: 'Search or paste UUID...'
@@ -219,6 +227,7 @@ let debounceTimer = null
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
+    if (props.displayName) return props.displayName
     if (selectedObject.value) return objectName(selectedObject.value)
     if (!props.modelValue) return ''
 
@@ -421,6 +430,9 @@ function selectObject(obj, event) {
         event.preventDefault();
     }
     if (!obj?.thing_id) return
+    // Self-link guard: never allow selecting the object this field is told to
+    // exclude (e.g. the current object in a link's second-object selector).
+    if (props.excludeUuid && obj.thing_id === props.excludeUuid) return
     isClickingDropdown.value = true
     selectedObject.value = obj
     // Cache the object so displayValue can resolve its name (suggestions from
@@ -507,6 +519,13 @@ function onInput(e) {
 function handleDropdownMouseDown(e) {
     e.preventDefault()
 }
+
+// Allow parent components (e.g. LinkedObject) to programmatically focus the
+// visible input — focusing it also opens the dropdown via @focus="openDropdown".
+defineExpose({
+    focus: () => inputRef.value?.focus(),
+    inputRef,
+})
 </script>
 
 <style scoped>

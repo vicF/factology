@@ -150,6 +150,77 @@ describe('EditObject', () => {
         expect(formButtons().filter(b => b.textContent.trim() === 'Add Link').length).toBe(2)
     })
 
+    it('focuses the second-object selector (not the fixed first one) when a link is added', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await flushPromises()
+
+        const secondInput = document.querySelector('.linked-object input[data-field-name="other_thing"]')
+        expect(secondInput).toBeTruthy()
+        expect(document.activeElement).toBe(secondInput)
+    })
+
+    it('shows the <current object> placeholder and a not-saved badge for the first selector when creating', async () => {
+        await mountEditObject() // create mode — the object has no name yet
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const display = document.querySelector('.linked-object .form-control-plaintext')
+        expect(display.textContent).toContain('<current object>')
+        expect(document.querySelector('.linked-object .badge-unsaved')).toBeTruthy()
+    })
+
+    it('shows the object name in the first selector and no badge when editing', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const display = document.querySelector('.linked-object .form-control-plaintext')
+        expect(display.textContent).toContain('Existing Object')
+        expect(document.querySelector('.linked-object .badge-unsaved')).toBeNull()
+    })
+
+    it('updates the fixed first selector live as the user types the name', async () => {
+        await mountEditObject() // create mode — the object starts unnamed
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const display = () => document.querySelector('.linked-object .form-control-plaintext')
+        expect(display().textContent).toContain('<current object>')
+
+        wrapper.vm.formData.name = 'My Festival'
+        await nextTick()
+
+        expect(display().textContent).toContain('My Festival')
+        // Still unsaved — the badge remains.
+        expect(document.querySelector('.linked-object .badge-unsaved')).toBeTruthy()
+    })
+
+    it('makes the first object selector read-only in the link row', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        // The locked slot renders no editable input (nor a hidden one).
+        expect(document.querySelector('.linked-object input[data-field-name="one_thing"]')).toBeNull()
+        expect(document.querySelector('.linked-object input[name="one_thing"]')).toBeNull()
+    })
+
+    it('does not offer Swap in the object edit form (prevents self-links)', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const buttons = [...document.querySelectorAll('.linked-object button')]
+        expect(buttons.some(b => b.textContent.trim() === 'Swap')).toBe(false)
+    })
+
     it('fills a link with a newly created object instead of an existing one', async () => {
         await mountEditObject({ object: OBJECT })
 
