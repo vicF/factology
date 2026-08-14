@@ -40,6 +40,10 @@ export async function bootstrapStandalone() {
         const method = config.method?.toLowerCase() || 'get';
         const data = config.data;
 
+        // Mirror the server: a newly created object is owned by the current
+        // user, so pass their thing_id down to the local API handler.
+        const context = { userThingId: authStore.user?.thing_id || null };
+
         let result;
         if (url === '/user' || url === 'user') {
             result = await handleLocalUserCall();
@@ -61,7 +65,7 @@ export async function bootstrapStandalone() {
         } else if (url.startsWith('/link')) {
             result = await handleLocalLinkCall(method, url, data);
         } else {
-            result = await handleLocalApiCall(method, url, data);
+            result = await handleLocalApiCall(method, url, data, context);
         }
 
         return {

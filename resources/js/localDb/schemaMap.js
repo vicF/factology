@@ -22,6 +22,7 @@ export const schemaMap = {
             'thing_id', 'name', 'type', 'description', 'start', 'end',
             'start_variety', 'end_variety', 'record_created', 'record_updated',
             'owner', 'public', 'deleted', 'data', 'server_uuid', 'imported_at',
+            'name_translations', 'description_translations',
         ],
     },
 

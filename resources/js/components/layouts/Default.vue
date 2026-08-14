@@ -3,7 +3,7 @@
         <!-- Navigation loading bar -->
         <div class="nav-loading-bar"></div>
         <!-- Main Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
+        <nav class="navbar navbar-expand-lg navbar-dark" :style="navbarStyle">
             <div class="container-fluid">
                 <div class="collapse navbar-collapse d-flex justify-content-between align-items-center" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-2">
@@ -69,16 +69,19 @@
                                 aria-expanded="false"
                                 data-testid="user-dropdown-btn"
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
-                                :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
+                                :title="authenticated && user ? `Logged in as ${user.name}${isAdmin ? ' (Admin)' : ''}` : 'Not logged in'"
                             >
                                 <div class="user-icon-container">
-                                    <IconUser class="icon-lg" />
-                                    <div v-if="authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
+                                    <IconAdmin v-if="isAdmin" class="icon-lg" data-testid="admin-icon" />
+                                    <IconUser v-else class="icon-lg" />
+                                    <!-- In admin mode the red bar + admin icon already signal the
+                                         state, so the status dot is hidden (it would overlap the gear). -->
+                                    <div v-if="!isAdmin && authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
                                         </svg>
                                     </div>
-                                    <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
+                                    <div v-else-if="!isAdmin" class="status-indicator logged-out" data-testid="logged-out-indicator">
                                         <IconUser class="icon-xs" />
                                     </div>
                                 </div>
@@ -103,6 +106,7 @@
                                     <li class="dropdown-header text-muted small">
                                         <IconCheck class="icon-xs me-1" />
                                         Logged in as
+                                        <span v-if="isAdmin" class="admin-role-badge" data-testid="admin-role-badge">Admin</span>
                                     </li>
                                     <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
                                         <IconUser class="icon-sm me-2" />
@@ -597,6 +601,14 @@ watch(isMobile, (newVal) => {
 const user = computed(() => authStore.user || null)
 const authenticated = computed(() => authStore.authenticated)
 
+// Admin mode — logged in as an administrator (is_admin flag from the server).
+// The account is meant for special operations only, so the UI clearly signals
+// that the user is NOT in normal mode: red top bar + admin icon/badge.
+const isAdmin = computed(() => !!user.value?.is_admin)
+const navbarStyle = computed(() => ({
+    backgroundColor: isAdmin.value ? '#b02a37' : '#0d6efd',
+}))
+
 // ---------------------------------------------------------------------------
 
 const logout = async () => {
@@ -741,6 +753,20 @@ form.mx-2 {
 
 .status-indicator.logged-out {
     background-color: #dc3545;
+}
+
+/* Admin role label inside the user dropdown header */
+.admin-role-badge {
+    background-color: #b02a37;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 1px 6px;
+    margin-left: 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    vertical-align: middle;
 }
 
 /* Fix for mobile dropdowns */
