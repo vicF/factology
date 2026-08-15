@@ -68,20 +68,17 @@ installGlobalHandlers();
 
 // ── Standalone mode bootstrap ────────────────────────────────────────
 // In standalone (capacitor) mode, axios calls are intercepted by a custom
-// adapter that routes everything to the local Dexie DB.
-// The adapter lives in a separate module loaded via dynamic import, so
-// Rollup cannot tree-shake it even during dead-code elimination.
-if (isCapacitor && !apiBaseUrl) {
-    // Await the standalone bootstrap so the adapter is registered before
-    // any Vue components mount and make axios calls.
-    (async () => {
-        await import('./localDb/standaloneBootstrap');
-    })();
-} else {
-    // WEB / HYBRID MODE: standard axios behavior.
-    // Note: when a server API is configured (apiBaseUrl set), requests go
-    // directly to the server. Offline fallback for Capacitor+server mode
-    // is not yet wired here.
+// adapter that routes everything to the local Dexie DB. That adapter is loaded
+// by the capacitor entry (main.capacitor.js) via a STATIC import — a dynamic
+// import here would create a circular chunk reference (Rollup inlines the
+// module into the main bundle and the dynamic import hits the const before
+// initialization), breaking app boot. So standalone mode needs no axios
+// interception code in this file.
+// WEB / HYBRID MODE: standard axios behavior.
+// Note: when a server API is configured (apiBaseUrl set), requests go
+// directly to the server. Offline fallback for Capacitor+server mode
+// is not yet wired here.
+if (!(isCapacitor && !apiBaseUrl)) {
     axios.interceptors.request.use(async config => {
         const authStore = useAuthStore(pinia);
         await authStore.restoreAuth();

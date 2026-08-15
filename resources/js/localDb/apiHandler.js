@@ -30,6 +30,13 @@ import { saveLink, deleteLink, getLink, listLinksForThing } from './links';
 import { seedLocalDb } from './seeder';
 import { UUID } from '../constants/uuid';
 
+/** Generate a unique id for locally-created links (crypto.randomUUID is
+ *  available in the Android WebView and Node — avoids bundling the `uuid` npm
+ *  package into the dynamically-imported local API chunk). */
+function newLinkId() {
+    return `link-${crypto.randomUUID()}`;
+}
+
 /** Base path to strip from URLs */
 const API_PREFIX = '/object';
 
@@ -65,7 +72,7 @@ export async function seedDemoData() {
  * @param {object|null} data - Request body (for post/put)
  * @returns {object} { data: {...}, status: 200 } or throws
  */
-export async function handleLocalApiCall(method, url, data = null) {
+export async function handleLocalApiCall(method, url, data = null, context = {}) {
     const normalizedUrl = url.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
@@ -82,11 +89,11 @@ export async function handleLocalApiCall(method, url, data = null) {
     }
 
     if (method === 'post') {
-        return handleCreate(id, data);
+        return handleCreate(id, data, context);
     }
 
     if (method === 'put') {
-        return handleUpdate(id, data);
+        return handleUpdate(id, data, context);
     }
 
     if (method === 'delete') {
@@ -121,7 +128,43 @@ async function handleSearch(body) {
         results = results.filter(o => params.type.includes(o.type));
     }
 
-    // Enrich with links
+    // Filter by checked classes (things linked to any of the selected classes)
+    if (params.classes && params.classes.length > 0) {
+        const classIds = new Set(params.classes);
+        const filtered = [];
+        for (const obj of results) {
+            const links = await listLinksForThing(obj.thing_id);
+            const hasClassLink = links.some(l =>
+                l.one_thing_id === obj.thing_id && classIds.has(l.other_thing_id));
+            if (hasClassLink) filtered.push(obj);
+        }
+        results = filtered;
+    }
+
+    // Apply sorting (mirror server ApiController::search):
+    //   default sort_by=updated → _updatedAt, default order desc
+    const sortMap = {
+        updated: '_updatedAt',
+        created: '_createdAt',
+        start: 'start',
+        name: 'name',
+    };
+    const sortBy = params.sort_by || 'updated';
+    const sortDir = (params.sort_order || 'desc') === 'asc' ? 1 : -1;
+    const sortKey = sortMap[sortBy] || '_updatedAt';
+    results.sort((a, b) => {
+        const va = a[sortKey];
+        const vb = b[sortKey];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'number' && typeof vb === 'number') {
+            return (va - vb) * sortDir;
+        }
+        return String(va).localeCompare(String(vb)) * sortDir;
+    });
+
+    // Enrich with links + resolved class info
     const thingsWithLinks = [];
     for (const obj of results) {
         const links = await enrichLinks(
@@ -130,6 +173,7 @@ async function handleSearch(body) {
         );
         thingsWithLinks.push({
             ...obj,
+            class: await resolveClassInfo(obj.thing_id),
             links: links.length > 0 ? links : undefined,
         });
     }
@@ -137,6 +181,32 @@ async function handleSearch(body) {
     return {
         data: { things: thingsWithLinks },
         status: 200,
+    };
+}
+
+/**
+ * Resolve the class of a thing (mirrors the server's class lookup that sets
+ * `thing.class = { thing_id, name }`). Classes come from a LINK_TO_CLASS link
+ * where one_thing_id is the object and other_thing_id is the class.
+ *
+ * @param {string} thingId
+ * @returns {Promise<object|null>} { thing_id, name } or null
+ */
+async function resolveClassInfo(thingId) {
+    const db = getDb();
+    const classLink = await db.links
+        .where('one_thing_id')
+        .equals(thingId)
+        .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+        .first();
+    if (!classLink?.other_thing_id) return null;
+
+    const classObj = await getObject(classLink.other_thing_id);
+    if (!classObj) return null;
+
+    return {
+        thing_id: classObj.thing_id,
+        name: classObj.name,
     };
 }
 
@@ -150,36 +220,139 @@ async function handleGet(id) {
 
     return {
         data: {
-            data: { ...obj, links: links.length > 0 ? links : undefined },
+            data: {
+                ...obj,
+                class: await resolveClassInfo(id),
+                links: links.length > 0 ? links : undefined,
+            },
             success: true,
         },
         status: 200,
     };
 }
 
-async function handleCreate(id, body) {
+/** Link-related payload keys — processed separately, never stored on the object row. */
+const LINK_PAYLOAD_KEYS = [
+    'class', 'parent', 'links_to_add', 'links_to_update', 'links_to_delete', 'external_links',
+];
+
+async function handleCreate(id, body, context = {}) {
     const data = typeof body === 'string' ? JSON.parse(body) : body;
-    const objData = { ...data, thing_id: id };
+
+    // Strip link-payload keys so they don't pollute the object record
+    // (mirrors the server model's _tableFields whitelist).
+    const objFields = { ...data, thing_id: id };
+    for (const key of LINK_PAYLOAD_KEYS) {
+        delete objFields[key];
+    }
+
+    const objData = {
+        ...objFields,
+        // Mirror the server (Everything::save): a newly created object is
+        // owned by the current user unless the client explicitly sets owner.
+        owner: data.owner || context.userThingId || null,
+    };
 
     await createObject(objData, { skipChangeLog: true });
 
+    // Process special + regular links (mirror server store())
+    await processLinksForObject(id, data);
+
+    const created = await getObject(id);
     return {
-        data: { data: objData, success: true },
+        data: { data: created || objData, success: true },
         status: 200,
     };
 }
 
-async function handleUpdate(id, body) {
+async function handleUpdate(id, body, context = {}) {
     const data = typeof body === 'string' ? JSON.parse(body) : body;
-    const { thing_id, ...changes } = data;
+
+    // Only scalar object fields are persisted; link payloads are handled below.
+    const changes = { ...data };
+    delete changes.thing_id;
+    for (const key of LINK_PAYLOAD_KEYS) {
+        delete changes[key];
+    }
 
     await updateObject(id, changes, { skipChangeLog: true });
+
+    // Process special + regular links (mirror server store())
+    await processLinksForObject(id, data);
 
     const updated = await getObject(id);
     return {
         data: { data: updated, success: true },
         status: 200,
     };
+}
+
+/**
+ * Mirror the server's store() link handling for create/update payloads:
+ *   parent             → LINK_TO_PARENT link (class hierarchy)
+ *   class              → LINK_TO_CLASS link (thing membership)
+ *   links_to_add       → create each link
+ *   links_to_update    → update each link (by link_id)
+ *   links_to_delete    → delete each link (by link_id)
+ *
+ * @param {string} thingId - The object being created/updated
+ * @param {object} data - The raw request payload
+ */
+async function processLinksForObject(thingId, data) {
+    // ── class / parent special links ────────────────────────────────
+    if (data.class && data.class.other_thing_id) {
+        const cls = data.class;
+        await saveLink({
+            link_id: cls.link_id || newLinkId(),
+            one_thing_id: thingId,
+            link_type_id: UUID.LINK_TO_CLASS,
+            other_thing_id: cls.other_thing_id,
+            translation: cls.description || cls.translation || '',
+            public: cls.public ?? 1,
+        }, { skipChangeLog: true });
+    }
+
+    if (data.parent && data.parent.one_thing_id) {
+        const parent = data.parent;
+        // Parent link is stored as one_thing_id=parent, other_thing_id=child
+        // (mirrors the server's setParent() and buildClassTree).
+        await saveLink({
+            link_id: parent.link_id || newLinkId(),
+            one_thing_id: parent.one_thing_id,
+            link_type_id: UUID.LINK_TO_PARENT,
+            other_thing_id: parent.other_thing_id || thingId,
+            translation: parent.description || parent.translation || '',
+            public: parent.public ?? 1,
+        }, { skipChangeLog: true });
+    }
+
+    // ── regular links ───────────────────────────────────────────────
+    for (const link of data.links_to_add || []) {
+        await saveLink({
+            link_id: link.link_id || newLinkId(),
+            one_thing_id: link.one_thing_id || thingId,
+            link_type_id: link.link_type_id,
+            other_thing_id: link.other_thing_id,
+            translation: link.description || link.translation || '',
+            public: link.public ?? 0,
+        }, { skipChangeLog: true });
+    }
+
+    for (const link of data.links_to_update || []) {
+        if (!link.link_id) continue;
+        await saveLink({
+            link_id: link.link_id,
+            one_thing_id: link.one_thing_id || thingId,
+            link_type_id: link.link_type_id,
+            other_thing_id: link.other_thing_id,
+            translation: link.description || link.translation || '',
+            public: link.public ?? 0,
+        }, { skipChangeLog: true });
+    }
+
+    for (const linkId of data.links_to_delete || []) {
+        await deleteLink(linkId, { skipChangeLog: true });
+    }
 }
 
 async function handleDelete(id) {
@@ -199,7 +372,10 @@ export async function handleLocalLinkCall(method, url, data = null) {
     const body = typeof data === 'string' ? JSON.parse(data) : (data || {});
 
     if (method === 'post') {
-        const linkData = { ...body, link_id: linkId || body.link_id };
+        const linkData = {
+            ...body,
+            link_id: linkId || body.link_id || newLinkId(),
+        };
         await saveLink(linkData, { skipChangeLog: true });
         return { data: { data: linkData, success: true }, status: 200 };
     }
