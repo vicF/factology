@@ -11,7 +11,7 @@
             <span class="toggle" @click="toggleChildren">
                 {{ showToggle ? (showChildren ? '−' : '+') : ' ' }}
             </span>
-            <input type="checkbox" :value="id" :checked="isChecked" @change="onCheckboxChange" />
+            <input type="checkbox" :value="id" :checked="isChecked" :indeterminate="isSemi" @change="onCheckboxChange" />
             <Image
                 :node-id="id"
                 width="18px"
@@ -64,6 +64,7 @@ import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../consta
 import { useAuthStore } from "../stores/auth";
 import { useUiStore } from '../stores/ui';
 import { fieldText } from '../utils/localized.js';
+import { collectSubtreeIds, nodeSelectionState } from '../utils/classTree';
 import { useTreeState } from "../composables/useTreeState";
 import Image from "./Image.vue";
 import {IconPrivate, IconPublic} from "./icons";
@@ -173,7 +174,10 @@ const executeToggle = async (makePublic) => {
 };
 
 // Computed
-const isChecked = computed(() => store.checkedItems.includes(props.id));
+const subtreeIds = computed(() => [props.id, ...collectSubtreeIds(props.nodes)]);
+const nodeState = computed(() => nodeSelectionState(props.id, props.nodes, store.checkedItems));
+const isChecked = computed(() => nodeState.value === 'checked' || nodeState.value === 'semi');
+const isSemi = computed(() => nodeState.value === 'semi');
 const showToggle = computed(() => props.nodes && props.nodes.length > 0);
 const indent = computed(() => ({ marginLeft: `${props.depth * 15}px` }));
 
@@ -184,7 +188,15 @@ const toggleChildren = () => {
 };
 
 const onCheckboxChange = () => {
-    store.toggleItem(props.id);
+    // Branch on the derived state, not event.target.checked: clicking a
+    // semi (indeterminate) checkbox reports checked=true natively.
+    if (nodeState.value === 'semi') {
+        store.checkSubtree(subtreeIds.value);
+    } else if (nodeState.value === 'checked') {
+        store.uncheckSubtree(subtreeIds.value);
+    } else {
+        store.checkSubtree(subtreeIds.value);
+    }
     emit('update-checked', store.checkedItems);
     eventBus.emit('trigger-search');
 };

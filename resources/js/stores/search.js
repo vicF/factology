@@ -21,13 +21,17 @@ export const useSearchStore = defineStore('search', () => {
         searchQuery.value = query;
     }
 
-    function toggleItem(id) {
-        const index = checkedItems.value.indexOf(id);
-        if (index === -1) {
-            checkedItems.value.push(id);
-        } else {
-            checkedItems.value.splice(index, 1);
-        }
+    // Add a set of class ids (a node + its whole subtree) to the selection.
+    function checkSubtree(ids) {
+        const set = new Set(checkedItems.value);
+        for (const id of ids) set.add(id);
+        checkedItems.value = [...set];
+    }
+
+    // Remove a set of class ids (a node + its whole subtree) from the selection.
+    function uncheckSubtree(ids) {
+        const set = new Set(ids);
+        checkedItems.value = checkedItems.value.filter(id => !set.has(id));
     }
 
     function setTypeThing(value) {
@@ -79,7 +83,7 @@ export const useSearchStore = defineStore('search', () => {
     return {
         searchQuery, checkedItems, typeThing, typeClass,
         sortBy, sortOrder, visibility, dateFrom, dateTo, owner, server, filtersVisible,
-        setSearchQuery, toggleItem, setTypeThing, setTypeClass,
+        setSearchQuery, checkSubtree, uncheckSubtree, setTypeThing, setTypeClass,
         setFilter, resetFilters, toggleFilters, getFilterParams,
     };
 });

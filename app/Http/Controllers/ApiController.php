@@ -740,7 +740,13 @@ class ApiController extends BaseController
         ];
         $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $data = $query->orderBy($sortCol, $sortDir)->limit(100)->get();
+        // groupBy(thing_id): the class filter (and favorites join) can match
+        // an object through several links at once; group by the PK so each
+        // object appears exactly once. (Postgres accepts selecting the other
+        // columns because they are functionally dependent on the PK, and it
+        // works even though things.data is plain `json`, which DISTINCT can't
+        // dedupe.)
+        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
