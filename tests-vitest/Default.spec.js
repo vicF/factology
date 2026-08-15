@@ -44,6 +44,16 @@ vi.mock('@/stores/objects', () => ({
     }),
 }))
 
+// Mutable ui-store state so each test can mount with edit mode on/off.
+const uiState = vi.hoisted(() => ({
+    editMode: false,
+    toggleEditMode: vi.fn(),
+}))
+
+vi.mock('@/stores/ui', () => ({
+    useUiStore: () => uiState,
+}))
+
 vi.mock('@/lang/i18n', () => ({
     setLanguage: vi.fn(),
 }))
@@ -60,6 +70,9 @@ function mountLayout(user = null) {
                 ClassTree: true,
                 SearchFilterPanel: true,
             },
+            mocks: {
+                $t: (key) => key,
+            },
         },
     })
 }
@@ -67,6 +80,8 @@ function mountLayout(user = null) {
 describe('Default layout — admin mode indicator', () => {
     beforeEach(() => {
         axios.get.mockResolvedValue({ data: { id: 1, name: 'Alice', is_admin: false } })
+        uiState.editMode = false
+        uiState.toggleEditMode.mockClear()
     })
 
     it('shows no admin indicator for a regular logged-in user', () => {
@@ -105,5 +120,45 @@ describe('Default layout — admin mode indicator', () => {
         const wrapper = mountLayout({ id: 1, name: 'Alice', is_admin: false })
 
         expect(wrapper.find('[data-testid="logged-in-indicator"]').exists()).toBe(true)
+    })
+})
+
+describe('Default layout — edit mode toggle', () => {
+    beforeEach(() => {
+        axios.get.mockResolvedValue({ data: { id: 1, name: 'Alice', is_admin: false } })
+        uiState.editMode = false
+        uiState.toggleEditMode.mockClear()
+    })
+
+    it('hides the edit-mode toggle for guests', () => {
+        const wrapper = mountLayout(null)
+
+        expect(wrapper.find('[data-testid="edit-mode-toggle"]').exists()).toBe(false)
+    })
+
+    it('shows the edit-mode toggle for a logged-in user (off by default)', () => {
+        const wrapper = mountLayout({ id: 1, name: 'Alice', is_admin: false })
+
+        const toggle = wrapper.find('[data-testid="edit-mode-toggle"]')
+        expect(toggle.exists()).toBe(true)
+        expect(toggle.classes()).not.toContain('active')
+        expect(wrapper.find('[data-testid="edit-mode-active-dot"]').exists()).toBe(false)
+    })
+
+    it('marks the toggle as active and shows the dot when edit mode is on', () => {
+        uiState.editMode = true
+        const wrapper = mountLayout({ id: 1, name: 'Alice', is_admin: false })
+
+        const toggle = wrapper.find('[data-testid="edit-mode-toggle"]')
+        expect(toggle.classes()).toContain('active')
+        expect(wrapper.find('[data-testid="edit-mode-active-dot"]').exists()).toBe(true)
+    })
+
+    it('calls toggleEditMode when clicked', async () => {
+        const wrapper = mountLayout({ id: 1, name: 'Alice', is_admin: false })
+
+        await wrapper.find('[data-testid="edit-mode-toggle"]').trigger('click')
+
+        expect(uiState.toggleEditMode).toHaveBeenCalled()
     })
 })

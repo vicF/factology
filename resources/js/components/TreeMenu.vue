@@ -20,10 +20,10 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ displayName }}</router-link>
-                    <span v-if="authenticated && !nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
-                    <span v-if="authenticated && nodePublic && showIcons" class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
+                    <span v-if="authenticated && editMode && !nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
+                    <span v-if="authenticated && editMode && nodePublic && showIcons" class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
                 </span>
-                <span class="action-icons" :class="{ 'visible': authenticated && showIcons }">
+                <span class="action-icons" :class="{ 'visible': authenticated && editMode && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${displayName}&quot;`">+</span>
                     <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${displayName}&quot;`">📦</span>
                 </span>
@@ -62,6 +62,7 @@ import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
+import { useUiStore } from '../stores/ui';
 import { fieldText } from '../utils/localized.js';
 import { useTreeState } from "../composables/useTreeState";
 import Image from "./Image.vue";
@@ -70,6 +71,8 @@ import ConfirmModal from './ConfirmModal.vue';
 
 const authStore = useAuthStore();
 const authenticated = computed(() => authStore.authenticated);
+const uiStore = useUiStore();
+const editMode = computed(() => uiStore.editMode);
 
 // Props definition
 const props = defineProps({

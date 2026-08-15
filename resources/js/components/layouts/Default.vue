@@ -33,6 +33,21 @@
                     </form>
 
                     <div class="d-flex flex-shrink-0 align-items-center" style="gap: 0.5rem;">
+                        <!-- Edit Mode Toggle (authenticated only) -->
+                        <button
+                            v-if="authenticated"
+                            class="btn btn-link nav-link d-flex align-items-center edit-mode-toggle"
+                            :class="{ 'active': uiStore.editMode }"
+                            type="button"
+                            data-testid="edit-mode-toggle"
+                            @click="uiStore.toggleEditMode()"
+                            :title="uiStore.editMode ? $t('Edit mode is on — click to switch to view mode') : $t('View mode is on — click to switch to edit mode')"
+                            style="color: white; text-decoration: none; padding: 0.5rem 0;"
+                        >
+                            <IconEdit class="icon-md" />
+                            <span v-if="uiStore.editMode" class="edit-mode-dot" data-testid="edit-mode-active-dot"></span>
+                        </button>
+
                         <!-- Compact Language Switcher -->
                         <div class="language-switcher" data-testid="language-switcher">
                             <button
@@ -240,6 +255,7 @@ import { eventBus } from '../../eventBus.js'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import { useObjectsStore } from '../../stores/objects'
+import { useUiStore } from '../../stores/ui'
 import { onError } from '../../utils/errorTracker.js'
 import axios from 'axios'
 
@@ -256,6 +272,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const searchStore = useSearchStore()
 const objectsStore = useObjectsStore()
+const uiStore = useUiStore()
 const showModal    = ref(false)
 const selectedType = ref('')
 
@@ -662,6 +679,21 @@ onUnmounted(() => {
 .icon-md { width: 20px; height: 20px; }
 .icon-lg { width: 24px; height: 24px; }
 .icon-xl { width: 28px; height: 28px; }
+
+/* Edit mode toggle active state */
+.edit-mode-toggle.active {
+    color: #ffd75e !important;
+}
+.edit-mode-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffd75e;
+    margin-left: 2px;
+    position: relative;
+    top: -6px;
+    left: -4px;
+}
 
 .me-1 { margin-right: 0.25rem; }
 .me-2 { margin-right: 0.5rem; }

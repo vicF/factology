@@ -13,6 +13,8 @@ const messages = {
         "and agree to the processing of my personal data": "and agree to the processing of my personal data",
         Close: "Close",
         "Failed to load document": "Failed to load document",
+        "Edit mode is on — click to switch to view mode": "Edit mode is on — click to switch to view mode",
+        "View mode is on — click to switch to edit mode": "View mode is on — click to switch to edit mode",
 
     },
     ru: {
@@ -36,7 +38,9 @@ const messages = {
         "Privacy Policy": "Политику конфиденциальности",
         "and agree to the processing of my personal data": "и соглашаюсь на обработку моих персональных данных",
         Close: "Закрыть",
-        "Failed to load document": "Не удалось загрузить документ"
+        "Failed to load document": "Не удалось загрузить документ",
+        "Edit mode is on — click to switch to view mode": "Режим редактирования включен — нажмите, чтобы переключиться в режим просмотра",
+        "View mode is on — click to switch to edit mode": "Режим просмотра включен — нажмите, чтобы переключиться в режим редактирования"
     }
 };
 

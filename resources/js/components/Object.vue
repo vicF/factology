@@ -50,7 +50,7 @@
                                 {{ $objectName(object) || $t('Unnamed') }}
                                 <TranslatedBadge :translations="object.name_translations" />
                             </h1>
-                            <div v-if="authenticated" class="object-actions">
+                            <div v-if="authenticated && editMode" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
                                 <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
@@ -90,7 +90,7 @@
                                     </div>
 
                                     <div class="result-info-section">
-                                        <div v-if="canEdit" class="visibility-badge"
+                                        <div v-if="canEdit && editMode" class="visibility-badge"
                                             :class="object.public ? 'is-public' : 'is-private'"
                                             @click="toggleObjectVisibility(object.public ? false : true)"
                                             :title="$t('Toggle visibility')">
@@ -203,7 +203,7 @@
                                                 {{ link.translation }}
                                             </div>
 
-                                            <div v-if="authenticated" class="link-actions">
+                                            <div v-if="authenticated && editMode" class="link-actions">
                                                 <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
                                                 <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
                                             </div>
@@ -329,6 +329,7 @@ import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
+import { useUiStore } from '../stores/ui';
 import Image from "./Image.vue";
 import IconExternal from './icons/IconExternal.vue';
 import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
@@ -347,6 +348,8 @@ const { t } = useI18n();
 const authStore = useAuthStore();
 const cacheStore = useObjectCacheStore();
 const objectsStore = useObjectsStore();
+const uiStore = useUiStore();
+const editMode = computed(() => uiStore.editMode);
 
 const object = ref(null);
 const loaded = ref(false);
