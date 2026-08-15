@@ -1,7 +1,7 @@
 {
     "version": 1,
     "scope": "system",
-    "exported_at": "2026-08-10T07:55:43+00:00",
+    "exported_at": "2026-08-14T15:23:04+00:00",
     "general_types": [
         {
             "id": 1,
@@ -44,7 +44,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "095c70ee-3e6a-4016-8dcd-d7b01710338a",
@@ -60,7 +61,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
@@ -76,7 +78,8 @@
                 "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
                 "public": false,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "0eed3b56-bdd6-47f0-9413-d9640a9dcafc",
@@ -92,7 +95,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "11544624-be5c-4cdc-8fe1-701c09391464",
@@ -108,7 +112,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee",
@@ -124,7 +129,42 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
+            },
+            {
+                "thing_id": "16414472-da4b-427d-8886-b7c75d133750",
+                "name": "Equivalence",
+                "type": 4,
+                "description": "Тождество, синонимия и дубликаты",
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-14 14:59:08",
+                "record_updated": "2026-08-14 14:59:08",
+                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "abstract": true
+            },
+            {
+                "thing_id": "1858e752-8df2-43ef-86c3-0d3581e522a8",
+                "name": "Time",
+                "type": 4,
+                "description": "Временной порядок и одновременность",
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-14 14:59:08",
+                "record_updated": "2026-08-14 14:59:08",
+                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "abstract": true
             },
             {
                 "thing_id": "1fdf78e0-aa61-4e52-bbed-4ce157da78ab",
@@ -140,7 +180,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "20408326-23ce-4382-b522-912aaa7b62d7",
@@ -156,7 +197,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "2067c7bf-0f6f-491d-af2b-10105db4e8cc",
@@ -172,7 +214,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "20f6b1ae-86de-4221-bf0c-995be2687405",
@@ -188,7 +231,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "26570302-457d-4282-a949-9a9917515de3",
@@ -204,7 +248,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "2922e0c4-e82b-45e3-b85a-17619d75c37f",
@@ -220,7 +265,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "298496fb-142b-4fc7-a844-7cb3fe9f9100",
@@ -236,7 +282,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
@@ -252,7 +299,8 @@
                 "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "36255438-6a10-4036-8df3-7894801b2759",
@@ -268,7 +316,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "3c7d2abc-3f31-4c73-bbbd-3e7b2e620630",
@@ -284,7 +333,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "3e15244c-a9e1-4a91-a0ca-1c65722a64df",
@@ -296,11 +346,31 @@
                 "start_variety": null,
                 "end_variety": null,
                 "record_created": "2020-05-28 20:54:22",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 19:27:29",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
+            },
+            {
+                "thing_id": "41211efa-61fd-422d-b07f-7041289bc8aa",
+                "name": "followed by",
+                "type": 4,
+                "description": "Происходит позже по времени",
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-14 14:59:08",
+                "record_updated": "2026-08-14 14:59:08",
+                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "48140ccc-d6c4-456b-bc2b-793778e74465",
@@ -316,7 +386,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4b22a805-f3e1-47b9-bb87-b7a9f6f68cc4",
@@ -332,7 +403,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
@@ -348,7 +420,8 @@
                 "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4c8ee41a-9912-4dff-8b44-7779a66e4fcf",
@@ -364,7 +437,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4cc9a0fd-1ac2-4bc2-9f10-4fac1f90f376",
@@ -380,7 +454,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4e3b5c5f-f347-42d9-9e93-3093b420d2f5",
@@ -396,7 +471,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4e605e49-3bbc-4bae-83fd-f1e7d7c76a77",
@@ -412,7 +488,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4ec0a490-9a24-491c-b0d7-c994d58fc468",
@@ -428,7 +505,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8",
@@ -444,7 +522,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4f76b1b0-9de4-4c60-8e52-53fa429faabe",
@@ -460,7 +539,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "4fdcbd06-3233-4dcc-8259-fd6150cce007",
@@ -476,7 +556,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "52e2b5ce-562b-46eb-98b7-48703ed62a7e",
@@ -492,7 +573,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "5787ef00-3f6b-46fe-9e93-d32c9ebdeab4",
@@ -508,7 +590,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "5a0f67ea-a290-4ef6-9ac5-0e85d967c4f9",
@@ -524,7 +607,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "5a626fa7-b69f-4042-9556-374f10df0a2c",
@@ -540,7 +624,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "602f1b6b-1383-442b-908c-1a027d7a8010",
@@ -556,7 +641,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "6170d4e4-aab7-443b-baa1-f77dabc0e201",
@@ -572,7 +658,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "62e7ab56-4ebe-4002-a7f1-896e266b8078",
@@ -588,7 +675,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "664e746e-8f37-4f80-ba78-734424eab2a6",
@@ -604,7 +692,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "69087526-c024-43a8-81bc-c067487e11bb",
@@ -620,7 +709,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "6a65dbf3-ad39-4446-8b8b-c0f539c1d53a",
@@ -636,7 +726,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "71e49073-503f-4faa-932d-68ab89662420",
@@ -652,7 +743,25 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
+            },
+            {
+                "thing_id": "733112a1-9e87-47ee-8a86-81cc38e77a41",
+                "name": "Kind",
+                "type": 4,
+                "description": "Отношения классификации (род-вид, экземпляр-класс)",
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-14 14:59:08",
+                "record_updated": "2026-08-14 14:59:08",
+                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "abstract": true
             },
             {
                 "thing_id": "73482bbe-d377-4e01-9efb-de135916c94a",
@@ -668,7 +777,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "770b8c20-fb65-4896-9de6-21cecc03a332",
@@ -684,7 +794,25 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
+            },
+            {
+                "thing_id": "79762fd7-e52d-4401-8010-fda9a7e81aa0",
+                "name": "Containment",
+                "type": 4,
+                "description": "Отношения часть-целое и пространственное включение",
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-14 14:59:08",
+                "record_updated": "2026-08-14 14:59:08",
+                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "abstract": true
             },
             {
                 "thing_id": "7bdf2d4a-5329-4603-9562-b5c656d45306",
@@ -700,7 +828,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "7d548ec2-69e9-4329-b122-acb83cd83325",
@@ -716,7 +845,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "7faa08e2-d882-4aa2-af0c-28c7d381030a",
@@ -732,7 +862,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "81aa3a58-1a61-4a83-9046-6f5ec836a347",
@@ -748,7 +879,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "860dd2fe-b70f-42b2-a446-20528245eeff",
@@ -760,11 +892,14 @@
                 "start_variety": "0",
                 "end_variety": "0",
                 "record_created": "2021-03-26 18:57:33",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 20:07:15",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "8617d9c3-94fb-4f75-a983-1d8ba0822b0d",
@@ -780,7 +915,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "89539d56-fea3-4349-a3f2-f4cff229f879",
@@ -796,7 +932,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "8ac2606d-d008-4588-8b9a-09a79ee5f44a",
@@ -812,7 +949,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "90d97b01-ee65-4be5-ae27-fb9bec2aeedf",
@@ -828,7 +966,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "934efd3c-9781-4f2a-bd51-716a75cf5874",
@@ -844,7 +983,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "939cd822-9e23-450c-8c5e-c23f67cca792",
@@ -860,7 +1000,8 @@
                 "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
                 "public": false,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "960e0074-5945-4163-a9ba-576a09ced6da",
@@ -876,7 +1017,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "97bcbb9c-31f6-4c3c-913c-dfa54bce03e4",
@@ -892,7 +1034,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "9f7436db-6253-4718-aa61-b4676faa90c7",
@@ -908,7 +1051,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "a31e2319-d8e0-4e48-98c8-3f23d0a17d50",
@@ -924,7 +1068,27 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
+            },
+            {
+                "thing_id": "aa24b0c5-3b74-4d8e-8743-faa21fab4031",
+                "name": "Ленинградская область",
+                "type": 3,
+                "description": null,
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-10 19:36:40",
+                "record_updated": "2026-08-10 19:36:54",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "aaaaaaaa-0000-4000-a000-00000000000a",
@@ -940,7 +1104,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "ac598f55-78b4-41c9-aaa6-32fa6a93d939",
@@ -956,7 +1121,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "ad3f8571-9b56-40af-b9c0-8d375f3b1976",
@@ -972,7 +1138,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "ad4be260-0af0-4e7c-928e-a7177158e1d0",
@@ -988,7 +1155,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "aea400ce-a2e4-4d56-a3ba-3ab1bdd30e7a",
@@ -1000,11 +1168,14 @@
                 "start_variety": "0",
                 "end_variety": "0",
                 "record_created": "2021-03-29 15:37:40",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 20:09:18",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "af6d4e0b-f452-442e-9fba-dcb60546b11d",
@@ -1020,7 +1191,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "b1b1b1b1-0001-4000-8000-000000000001",
@@ -1032,11 +1204,14 @@
                 "start_variety": null,
                 "end_variety": null,
                 "record_created": "2026-08-08 12:22:03",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 19:43:13",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "b1b1b1b1-0002-4000-8000-000000000001",
@@ -1048,16 +1223,19 @@
                 "start_variety": null,
                 "end_variety": null,
                 "record_created": "2026-08-08 12:22:03",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 19:43:41",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "b42957b9-3a93-4092-ad99-811a8478a0d3",
                 "name": "meanwhile",
-                "type": 2,
+                "type": 4,
                 "description": "А в это время",
                 "start": null,
                 "end": null,
@@ -1068,7 +1246,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "baeb5e5f-2659-4cb0-8260-55af9fadbe13",
@@ -1084,7 +1263,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
@@ -1100,7 +1280,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "c0e229b8-6e56-45ee-b454-71e557cdb191",
@@ -1116,7 +1297,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
@@ -1132,7 +1314,8 @@
                 "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "c38cad91-7747-4bbc-abd3-09b50e6e4672",
@@ -1148,7 +1331,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "c532f6ba-27b2-43ec-b4ec-30cbff78eed0",
@@ -1164,7 +1348,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "caf05706-c73d-43e9-a496-6069f9aefc99",
@@ -1180,7 +1365,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "cf74b151-7161-4f80-b4e5-41b2de69c6ca",
@@ -1196,7 +1382,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "d0eefbac-ce31-4bf1-b392-61e3a6d17ae5",
@@ -1212,7 +1399,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "d6320bf5-ca8b-4e50-ad5c-873216d9fcf0",
@@ -1228,7 +1416,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "da17d697-d877-4625-8bcd-944570a21796",
@@ -1244,7 +1433,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "db91a470-2590-4f33-92bd-3e3dd33f5353",
@@ -1260,7 +1450,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "dbb3866e-e5a8-4186-b6e3-a273a42b1809",
@@ -1276,7 +1467,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "dbd6eec5-9df1-473b-bf65-42e68f4e5d7b",
@@ -1292,7 +1484,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "dc006cda-047a-4862-acf7-e215355b6890",
@@ -1308,7 +1501,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "e18d73eb-a5d3-47be-a785-106f6f185651",
@@ -1324,7 +1518,27 @@
                 "owner": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
+            },
+            {
+                "thing_id": "e28a10f2-936c-4db9-8055-07597efff61d",
+                "name": "Выборг",
+                "type": 3,
+                "description": null,
+                "start": null,
+                "end": null,
+                "start_variety": null,
+                "end_variety": null,
+                "record_created": "2026-08-10 19:37:54",
+                "record_updated": "2026-08-10 19:37:53",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "e3cad1b0-74fa-44b2-9b2f-2adaf36baa14",
@@ -1340,7 +1554,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "e5b4c1b6-019b-4ab4-9387-cd54ca67048c",
@@ -1356,7 +1571,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "ea206516-9e45-482f-89be-05313f52e5e3",
@@ -1372,7 +1588,8 @@
                 "owner": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "ea7aed7a-8cdf-45e4-9896-43c57ffdf132",
@@ -1388,7 +1605,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
@@ -1404,7 +1622,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "f48ef10a-40f6-4190-bfae-2834e9781ad1",
@@ -1416,11 +1635,14 @@
                 "start_variety": "0",
                 "end_variety": "0",
                 "record_created": "2021-03-26 09:29:00",
-                "record_updated": "2026-08-10 07:32:45",
+                "record_updated": "2026-08-10 20:06:42",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": {
+                    "properties": []
+                },
+                "abstract": false
             },
             {
                 "thing_id": "f8c9f7a6-99ed-4156-81ff-991e8008f377",
@@ -1436,7 +1658,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "f989e699-dc6f-45f8-a985-145d28f68ffd",
@@ -1452,7 +1675,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "f9d434b8-28d9-45d5-bf19-a625319ea63b",
@@ -1468,7 +1692,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             },
             {
                 "thing_id": "fb8d457c-62b4-43e9-9e4d-014201176f01",
@@ -1484,7 +1709,8 @@
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
                 "public": true,
                 "deleted": false,
-                "data": null
+                "data": null,
+                "abstract": false
             }
         ],
         "links": [
@@ -1502,33 +1728,7 @@
                 "deleted": false
             },
             {
-                "translation": "\"Parent\" is subclass of \"Link\"",
-                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_start_variety": null,
-                "link_end_variety": null,
-                "link_uuid": "05e9b4e0-2602-453b-8454-631bb7799a76",
-                "deleted": false
-            },
-            {
-                "translation": "\"Class of\" is subclass of \"Link\"",
-                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_start_variety": null,
-                "link_end_variety": null,
-                "link_uuid": "5d781450-1c3e-4db6-8f31-c6c180455c60",
-                "deleted": false
-            },
-            {
-                "translation": "\"Something\" is subclass of \"Everything\"",
+                "translation": "Something is a child of Everything",
                 "one_thing_id": "939cd822-9e23-450c-8c5e-c23f67cca792",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
                 "other_thing_id": "3e15244c-a9e1-4a91-a0ca-1c65722a64df",
@@ -2178,7 +2378,7 @@
                 "deleted": false
             },
             {
-                "translation": "This is child of Character",
+                "translation": "Musician is a child of Character",
                 "one_thing_id": "f48ef10a-40f6-4190-bfae-2834e9781ad1",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
                 "other_thing_id": "860dd2fe-b70f-42b2-a446-20528245eeff",
@@ -2191,7 +2391,7 @@
                 "deleted": false
             },
             {
-                "translation": "This is child of Character",
+                "translation": "Writer is a child of Character",
                 "one_thing_id": "f48ef10a-40f6-4190-bfae-2834e9781ad1",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
                 "other_thing_id": "aea400ce-a2e4-4d56-a3ba-3ab1bdd30e7a",
@@ -2204,10 +2404,10 @@
                 "deleted": false
             },
             {
-                "translation": "This is child of Something",
-                "one_thing_id": "3e15244c-a9e1-4a91-a0ca-1c65722a64df",
+                "translation": "Something is a child of Document",
+                "one_thing_id": "9f7436db-6253-4718-aa61-b4676faa90c7",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "9f7436db-6253-4718-aa61-b4676faa90c7",
+                "other_thing_id": "3e15244c-a9e1-4a91-a0ca-1c65722a64df",
                 "public": true,
                 "link_start": null,
                 "link_end": null,
@@ -2542,19 +2742,6 @@
                 "deleted": false
             },
             {
-                "translation": "is of class is related to Link",
-                "one_thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_start_variety": null,
-                "link_end_variety": null,
-                "link_uuid": "76943517-e656-4b28-bb24-8b9332b5022e",
-                "deleted": false
-            },
-            {
                 "translation": "Group read access is subclass of System",
                 "one_thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
@@ -2633,8 +2820,8 @@
                 "deleted": false
             },
             {
-                "translation": "\"Property\" is subclass of \"Everything\"",
-                "one_thing_id": "939cd822-9e23-450c-8c5e-c23f67cca792",
+                "translation": "Property is a child of System",
+                "one_thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
                 "other_thing_id": "b1b1b1b1-0001-4000-8000-000000000001",
                 "public": true,
@@ -2646,8 +2833,8 @@
                 "deleted": false
             },
             {
-                "translation": "\"Language\" is subclass of \"Everything\"",
-                "one_thing_id": "939cd822-9e23-450c-8c5e-c23f67cca792",
+                "translation": "Language is a child of System",
+                "one_thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
                 "other_thing_id": "b1b1b1b1-0002-4000-8000-000000000001",
                 "public": true,
@@ -2656,6 +2843,136 @@
                 "link_start_variety": null,
                 "link_end_variety": null,
                 "link_uuid": "0415e2e9-7f17-43c0-b242-499f69d39445",
+                "deleted": false
+            },
+            {
+                "translation": "Ленинградская область is of class Region",
+                "one_thing_id": "aa24b0c5-3b74-4d8e-8743-faa21fab4031",
+                "link_type_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
+                "other_thing_id": "a31e2319-d8e0-4e48-98c8-3f23d0a17d50",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "ec28bf56-48e8-4b02-8faf-f2f4b55d811c",
+                "deleted": false
+            },
+            {
+                "translation": "Выборг is of class City",
+                "one_thing_id": "e28a10f2-936c-4db9-8055-07597efff61d",
+                "link_type_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
+                "other_thing_id": "14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "5eecb199-3625-42ab-8665-dc436a7875b3",
+                "deleted": false
+            },
+            {
+                "translation": "\"Kind\" is subclass of \"Link\"",
+                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "733112a1-9e87-47ee-8a86-81cc38e77a41",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "6e4c349c-7156-4ec9-941d-e5a29b5f4007",
+                "deleted": false
+            },
+            {
+                "translation": "\"Containment\" is subclass of \"Link\"",
+                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "79762fd7-e52d-4401-8010-fda9a7e81aa0",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "1e251203-317a-4111-9213-f4d1e676bcde",
+                "deleted": false
+            },
+            {
+                "translation": "\"Equivalence\" is subclass of \"Link\"",
+                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "16414472-da4b-427d-8886-b7c75d133750",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "0eb1a626-e377-4f15-8e58-4048865d5f7c",
+                "deleted": false
+            },
+            {
+                "translation": "\"Time\" is subclass of \"Link\"",
+                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "1858e752-8df2-43ef-86c3-0d3581e522a8",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "3b25b324-6161-4c6d-a516-63bd94e1ca51",
+                "deleted": false
+            },
+            {
+                "translation": "\"is a parent of\" is subclass of \"Kind\"",
+                "one_thing_id": "733112a1-9e87-47ee-8a86-81cc38e77a41",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "cf44a07f-a2c7-4171-8519-32fe60835850",
+                "deleted": false
+            },
+            {
+                "translation": "\"is of class\" is subclass of \"Kind\"",
+                "one_thing_id": "733112a1-9e87-47ee-8a86-81cc38e77a41",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "555f50a7-bcee-4666-b338-908aaa116797",
+                "deleted": false
+            },
+            {
+                "translation": "\"meanwhile\" is subclass of \"Time\"",
+                "one_thing_id": "1858e752-8df2-43ef-86c3-0d3581e522a8",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "b42957b9-3a93-4092-ad99-811a8478a0d3",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "f3054b8c-5d5f-4c41-abe4-62af2e291bbc",
+                "deleted": false
+            },
+            {
+                "translation": "\"followed by\" is subclass of \"Time\"",
+                "one_thing_id": "1858e752-8df2-43ef-86c3-0d3581e522a8",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "41211efa-61fd-422d-b07f-7041289bc8aa",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_start_variety": null,
+                "link_end_variety": null,
+                "link_uuid": "6f21b136-1f4a-4619-ae0e-1c2f4634e8b8",
                 "deleted": false
             }
         ],

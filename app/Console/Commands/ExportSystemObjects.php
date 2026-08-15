@@ -36,6 +36,12 @@ class ExportSystemObjects extends Command
         UUID::GROUP_READ_ACCESS,
         UUID::BELONGS_TO_USER_GROUP,
         UUID::SYSTEM_OWNER,
+        // Abstract base link types (link taxonomy grouping containers)
+        '733112a1-9e87-47ee-8a86-81cc38e77a41', // Kind
+        '79762fd7-e52d-4401-8010-fda9a7e81aa0', // Containment
+        '16414472-da4b-427d-8886-b7c75d133750', // Equivalence
+        '1858e752-8df2-43ef-86c3-0d3581e522a8', // Time
+        '41211efa-61fd-422d-b07f-7041289bc8aa', // followed by
     ];
 
     /**
@@ -47,6 +53,7 @@ class ExportSystemObjects extends Command
         'thing_id', 'name', 'type', 'description',
         'start', 'end', 'start_variety', 'end_variety',
         'record_created', 'record_updated', 'owner', 'public', 'deleted', 'data',
+        'abstract',
     ];
 
     /**
@@ -88,11 +95,14 @@ class ExportSystemObjects extends Command
             })
             ->all();
 
-        // 2. Links: both endpoints within the exported thing set
+        // 2. Links: both endpoints AND the link type within the exported thing
+        //    set — the export must be self-contained so the seeder never
+        //    references a link type that is not part of the bootstrap.
         $links = DB::table('links')
             ->where('deleted', false)
             ->whereIn('one_thing_id', $thingIds)
             ->whereIn('other_thing_id', $thingIds)
+            ->whereIn('link_type_id', $thingIds)
             ->orderBy('link_id')
             ->get()
             ->map(function ($link) {

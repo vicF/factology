@@ -11,7 +11,7 @@ use App\Eloquent\Link;
 use App\Eloquent\Thing;
 use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
-use http\Exception\InvalidArgumentException;
+use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -804,18 +804,36 @@ class Everything
             $link['other_thing_id'] = $this->thing_id;
         }
 
-        // Check if link already exists by unique constraint
+        // Abstract link types are grouping containers, never real relations.
+        if (!empty($link['link_type_id'])
+            && DB::table('things')->where('thing_id', $link['link_type_id'])->value('abstract')) {
+            throw new InvalidArgumentException("Link type {$link['link_type_id']} is abstract and cannot be used to create a link");
+        }
+
+        // Check if link already exists by unique constraint — the endpoint pair
+        // is matched in EITHER direction, so adding the reverse of an existing
+        // link reuses that row instead of creating a duplicate.
         $existing = DB::table('links')
-            ->where('one_thing_id', $link['one_thing_id'])
             ->where('link_type_id', $link['link_type_id'])
-            ->where('other_thing_id', $link['other_thing_id'])
+            ->where(function ($query) use ($link) {
+                $query->where('one_thing_id', $link['one_thing_id'])
+                    ->where('other_thing_id', $link['other_thing_id'])
+                    ->orWhere(function ($query) use ($link) {
+                        $query->where('one_thing_id', $link['other_thing_id'])
+                            ->where('other_thing_id', $link['one_thing_id']);
+                    });
+            })
             ->first();
 
         if ($existing) {
-            // Update existing — preserve link_uuid
+            // Update existing — preserve link_uuid. Only re-word the translation
+            // when the existing row already points the same way; a reverse match
+            // keeps its own direction-specific wording.
+            $sameDirection = $existing->one_thing_id === $link['one_thing_id']
+                && $existing->other_thing_id === $link['other_thing_id'];
             return DB::table('links')
                 ->where('link_id', $existing->link_id)
-                ->update(['translation' => $link['translation']]) > 0;
+                ->update(['translation' => $sameDirection ? $link['translation'] : $existing->translation]) > 0;
         }
 
         // Insert new link with generated UUID

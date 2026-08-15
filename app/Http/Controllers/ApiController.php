@@ -263,11 +263,52 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // Abstract link types are grouping containers, never real relations.
+        if (!empty($data['link_type_id'])
+            && DB::table('things')->where('thing_id', $data['link_type_id'])->value('abstract')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Abstract link types cannot be used to create a link',
+                'errors'  => ['link_type_id' => 'This link type is abstract and only groups its children.'],
+            ], 422);
+        }
         if(!empty($data['link_id'])) {
             DB::table('links')
                 ->where('link_id', $data['link_id'])
                 ->update($data);
         } else {
+            // Prevent reversed duplicates: the endpoint pair is matched in EITHER
+            // direction. If the same pair+type already exists, reuse that row
+            // instead of inserting a new one.
+            if (!empty($data['one_thing_id']) && !empty($data['other_thing_id']) && !empty($data['link_type_id'])) {
+                $existing = DB::table('links')
+                    ->where('link_type_id', $data['link_type_id'])
+                    ->where(function ($query) use ($data) {
+                        $query->where('one_thing_id', $data['one_thing_id'])
+                            ->where('other_thing_id', $data['other_thing_id'])
+                            ->orWhere(function ($query) use ($data) {
+                                $query->where('one_thing_id', $data['other_thing_id'])
+                                    ->where('other_thing_id', $data['one_thing_id']);
+                            });
+                    })
+                    ->first();
+
+                if ($existing) {
+                    $sameDirection = $existing->one_thing_id === $data['one_thing_id']
+                        && $existing->other_thing_id === $data['other_thing_id'];
+                    if ($sameDirection && !empty($data['translation'])) {
+                        DB::table('links')
+                            ->where('link_id', $existing->link_id)
+                            ->update(['translation' => $data['translation']]);
+                    }
+                    $data['link_id'] = $existing->link_id;
+                    return response()->json(
+                        [
+                            'data'    => $data,
+                            'success' => true
+                        ]);
+                }
+            }
             // Generate link_uuid for stable export/import matching if not provided
             if (empty($data['link_uuid'])) {
                 $data['link_uuid'] = (string) Str::uuid();
@@ -570,6 +611,13 @@ class ApiController extends BaseController
             ->auth()
             ->where('things.deleted', 0);
 
+        // Abstract things are grouping containers (e.g. the base link types), not
+        // real objects: they are never selectable. Exclude them unless the caller
+        // explicitly asks to include them (e.g. a future filter tree).
+        if (empty($requestBody['include_abstract'])) {
+            $query->where('things.abstract', false);
+        }
+
         // Reference-type filter: restrict results to only things that are
         // actually referenced as an owner or server by other things.
         if (!empty($requestBody['filter_type'])) {
@@ -836,9 +884,9 @@ class ApiController extends BaseController
             c.public,
             c.name_translations
         FROM descendants d
-        JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
+        JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ? AND l.deleted IS NOT TRUE
         JOIN things c ON l.other_thing_id = c.thing_id
-        WHERE (c.type = ? OR c.type = ?) AND d.level < 10 $publicCondition
+        WHERE (c.type = ? OR c.type = ?) AND c.deleted IS NOT TRUE AND d.level < 10 $publicCondition
     )
     SELECT * FROM descendants
     ORDER BY level, $sortPriority, name;

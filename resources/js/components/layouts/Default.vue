@@ -74,12 +74,14 @@
                                 <div class="user-icon-container">
                                     <IconAdmin v-if="isAdmin" class="icon-lg" data-testid="admin-icon" />
                                     <IconUser v-else class="icon-lg" />
-                                    <div v-if="authenticated && user" class="status-indicator logged-in" :class="{ 'admin-mode': isAdmin }" data-testid="logged-in-indicator">
+                                    <!-- In admin mode the red bar + admin icon already signal the
+                                         state, so the status dot is hidden (it would overlap the gear). -->
+                                    <div v-if="!isAdmin && authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
                                         </svg>
                                     </div>
-                                    <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
+                                    <div v-else-if="!isAdmin" class="status-indicator logged-out" data-testid="logged-out-indicator">
                                         <IconUser class="icon-xs" />
                                     </div>
                                 </div>
@@ -751,10 +753,6 @@ form.mx-2 {
 
 .status-indicator.logged-out {
     background-color: #dc3545;
-}
-
-.status-indicator.admin-mode {
-    border-color: #b02a37;
 }
 
 /* Admin role label inside the user dropdown header */
