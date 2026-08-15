@@ -70,7 +70,7 @@
                         :style="dropdownStyles"
                         @mousedown="handleDropdownMouseDown"
                     >
-                        <div v-if="loading" class="text-center py-4 text-muted">
+                        <div v-if="loading || suggestionsLoading" class="text-center py-4 text-muted">
                             <div class="spinner-border spinner-border-sm" role="status"></div>
                             <div class="mt-2">Loading...</div>
                         </div>
@@ -82,7 +82,7 @@
                                 v-if="filteredObjects.length === 0"
                                 class="text-center py-4 text-muted small"
                             >
-                                {{ searchText ? 'No matching objects found' : 'Start typing or paste UUID' }}
+                                {{ searchText.trim().length >= 2 ? 'No matching objects found' : (searchText ? 'Continue typing to search...' : 'Start typing or paste UUID') }}
                             </div>
                             <div v-else class="dropdown-items-container">
                                 <button
@@ -211,6 +211,7 @@ const searchText = ref('')
 const isOpen = ref(false)
 const selectedObject = ref(null)
 const loading = ref(false)
+const suggestionsLoading = ref(false)
 const error = ref(null)
 const inputRef = ref(null)
 const dropdownRef = ref(null)
@@ -410,6 +411,9 @@ async function loadSuggestions() {
         }
         return
     }
+    // Show a spinner while the initial list is assembled (recent items first,
+    // then network-backed fillers), so the dropdown never looks empty mid-load.
+    suggestionsLoading.value = true
     try {
         await historyStore.hydrate();
         // Show the persisted recent items immediately (local read, no network)
@@ -433,7 +437,8 @@ async function loadSuggestions() {
             pendingSuggestions.value = await historyStore.getRecent(props.type, props.maxResults).catch(() => []);
         }
     } finally {
-        suggestionsLoaded.value = true;
+        suggestionsLoading.value = false
+        suggestionsLoaded.value = true
     }
 }
 
@@ -495,6 +500,7 @@ function debouncedSearch(val) {
         if (props.filterType) body.filter_type = props.filterType
         axios.post('/object', body)
             .then(response => {
+                if (searchText.value !== searchTerm) return
                 let results = []
                 if (typeof response.data === 'string') {
                     const parsed = JSON.parse(response.data)
@@ -505,18 +511,21 @@ function debouncedSearch(val) {
                     else if (Array.isArray(response.data.things)) results = response.data.things
                     else if (Array.isArray(response.data)) results = response.data
                 }
-                if (searchText.value === searchTerm) {
-                    searchResults.value = results
-                    nextTick(() => calculateDropdownPosition())
-                }
+                searchResults.value = results
+                nextTick(() => calculateDropdownPosition())
                 error.value = null
             })
             .catch(err => {
+                if (searchText.value !== searchTerm) return
                 console.error('Search failed:', err)
                 error.value = 'Search failed'
                 searchResults.value = []
             })
-            .finally(() => { loading.value = false })
+            .finally(() => {
+                // Only a response for the current term may clear the spinner —
+                // a stale response must not interrupt a newer search.
+                if (searchText.value === searchTerm) loading.value = false
+            })
     } else {
         searchResults.value = []
     }
@@ -526,7 +535,16 @@ function onInput(e) {
     const raw = e.target.value
     searchText.value = raw
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => debouncedSearch(raw), 300)
+    if (raw.trim().length >= 2) {
+        // Searching — show the spinner immediately (the debounced request is
+        // still pending), so the dropdown never flashes "No matching objects
+        // found" while results are on their way.
+        loading.value = true
+        debounceTimer = setTimeout(() => debouncedSearch(raw), 300)
+    } else {
+        loading.value = false
+        searchResults.value = []
+    }
 }
 
 function handleDropdownMouseDown(e) {

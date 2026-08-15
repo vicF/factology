@@ -6,18 +6,18 @@
                 <ObjectField
                     fieldName="one_thing"
                     v-model="link.one_thing_id"
-                    :isEditable="!lockFirstObject"
-                    :name="lockFirstObject ? currentObjectDisplayName : 'First object'"
-                    :displayName="lockFirstObject ? currentObjectDisplayName : null"
+                    :isEditable="!lockFirst"
+                    :name="lockFirst ? currentObjectDisplayName : 'First object'"
+                    :displayName="lockFirst ? currentObjectDisplayName : null"
                     :type="effectiveObjectType"
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
-                    :excludeUuid="lockFirstObject ? null : (link.other_thing_id || null)"
+                    :excludeUuid="lockFirst ? null : (link.other_thing_id || null)"
                     required
                 />
                 <span
-                    v-if="lockFirstObject && currentObjectUnsaved"
+                    v-if="lockFirst && currentObjectUnsaved"
                     class="badge badge-unsaved"
                     title="This object is not saved yet"
                 >{{ unsavedLabel }}</span>
@@ -34,11 +34,11 @@
                     class="flex-field"
                 />
                 <button
-                    v-if="!lockFirstObject"
                     type="button"
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
                     :disabled="!link.one_thing_id || !link.other_thing_id || link.one_thing_id === link.other_thing_id"
+                    :title="lockFirst ? 'Swap direction: the currently edited object moves to the second slot' : 'Swap the two objects'"
                 >
                     Swap
                 </button>
@@ -175,6 +175,12 @@ if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
 
+// Local lock state. Starts from the prop but can be released by swapping: when
+// the locked (currently edited) object is swapped into the second slot, the
+// first slot must become editable so the relation direction can be changed.
+const lockFirst = ref(props.lockFirstObject);
+watch(() => props.lockFirstObject, (v) => { lockFirst.value = v; });
+
 // The second-object selector (the one the user actually needs to fill in when
 // adding a link) — used to move focus there instead of the fixed first slot.
 const secondObjectFieldRef = ref(null);
@@ -250,6 +256,9 @@ const swapObjects = () => {
     const temp = link.value.one_thing_id;
     link.value.one_thing_id = link.value.other_thing_id;
     link.value.other_thing_id = temp;
+    // The locked first object (the currently edited object) has moved to the
+    // second slot, so the first slot is no longer fixed to it — unlock it.
+    if (lockFirst.value) lockFirst.value = false;
 };
 
 const removeSelf = () => {

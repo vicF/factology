@@ -45,6 +45,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
     let hydrated = false;
     let favoritesCache = [];       // cached favorite UUIDs from DB
     let favoritesLoaded = false;   // favorites have been fetched at least once this session
+    let otherCache = {};           // { type: [object, ...] } — fallback filler objects, cached per session
 
     // ── Hydration ──
     async function hydrate() {
@@ -150,13 +151,31 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         await hydrate();
         const cacheStore = useObjectCacheStore();
         const results = [];
+        const needsFetch = [];
         for (const e of recentCache) {
             if (results.length >= limit) break;
             // Prefer the live cache; fall back to the persisted display
             // snapshot so recent items survive a fresh session.
             const obj = cacheStore.getCachedObject(e.uuid) || e.obj;
-            if (!obj || !objectMatchesType(obj, type)) continue;
+            if (!obj) {
+                // Legacy entries (recorded before snapshots existed) have no
+                // name on a fresh session — fetch them so they still render.
+                needsFetch.push(e);
+                continue;
+            }
+            if (!objectMatchesType(obj, type)) continue;
             results.push(obj);
+        }
+        // Recover legacy entries in parallel (fetchOrGetObject caches the
+        // result, and skips already-known-missing ids, so this is one-time).
+        if (needsFetch.length) {
+            const settled = await Promise.allSettled(
+                needsFetch.map(e => cacheStore.fetchOrGetObject(e.uuid))
+            );
+            for (let i = 0; i < needsFetch.length && results.length < limit; i++) {
+                const obj = settled[i].status === 'fulfilled' ? settled[i].value : null;
+                if (obj && objectMatchesType(obj, type)) results.push(obj);
+            }
         }
         return results;
     }
@@ -291,6 +310,36 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         }
     }
 
+    // ── Get any other objects of the requested type (fallback filler) ──
+    // Ensures the dropdown always has something to choose from, even when the
+    // user has no local history yet. Cached in-memory per type for the session.
+    async function getOtherObjects(type, limit = 15) {
+        if (otherCache[type]?.length) return otherCache[type].slice(0, limit);
+        try {
+            const response = await axios.post('/object', {
+                search: '',
+                type: type ? [type] : [],
+                classes: [],
+            });
+            let things = response.data?.things;
+            if (things && typeof things === 'object' && !Array.isArray(things)) {
+                things = Object.values(things);
+            }
+            things = Array.isArray(things) ? things : [];
+            const results = [];
+            for (const t of things) {
+                if (!t?.thing_id) continue;
+                if (objectMatchesType(t, type)) results.push(t);
+                if (results.length >= limit) break;
+            }
+            otherCache[type] = results;
+            return results;
+        } catch (e) {
+            console.warn('Failed to load fallback objects:', e);
+            return [];
+        }
+    }
+
     // ── Get combined suggestions for dropdown ──
     async function getSuggestions(type, contextType = null, linkTypeId = null, oneThingId = null, limit = 15) {
         await hydrate();
@@ -342,6 +391,14 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
             for (const obj of global) add(obj, 'global');
         }
 
+        // 7. Any other objects of the requested type — the dropdown must never
+        //    be empty, so when no history/suggestions exist, fill with objects
+        //    from the server.
+        if (results.length < limit) {
+            const other = await getOtherObjects(type, limit - results.length);
+            for (const obj of other) add(obj, 'other');
+        }
+
         return results;
     }
 
@@ -353,6 +410,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         hydrated = true;
         favoritesCache = [];
         favoritesLoaded = false;
+        otherCache = {};
         await persist();
     }
 
@@ -363,6 +421,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         getContextSuggestions,
         getCurrentUserObject,
         getGlobalSuggestions,
+        getOtherObjects,
         getSuggestions,
         fetchFavorites,
         ensureFavorites,

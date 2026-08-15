@@ -65,6 +65,29 @@ describe('objectHistory store', () => {
         expect((await store.getRecent(4)).map(o => o.thing_id)).toEqual(['link-1'])
     })
 
+    it('recovers legacy recent entries (no snapshot) by fetching them on a fresh session', async () => {
+        // Simulate the pre-snapshot storage format, as persisted by older code.
+        localStorage.setItem('objectHistory:recent', JSON.stringify([
+            { uuid: 'legacy-1', type: 3, selectedAt: 1 },
+            { uuid: 'legacy-2', type: 4, selectedAt: 2 },
+        ]))
+        axios.get.mockImplementation((url) => {
+            if (url === '/object/legacy-1') {
+                return Promise.resolve({ data: { data: { thing_id: 'legacy-1', type: 3, name: 'Legacy Thing' } } })
+            }
+            if (url === '/object/legacy-2') {
+                return Promise.resolve({ data: { data: { thing_id: 'legacy-2', type: 4, name: 'Legacy Link' } } })
+            }
+            return Promise.resolve({ data: { data: null } })
+        })
+
+        const store = useObjectHistoryStore()
+        const recent = await store.getRecent(3)
+
+        expect(recent.map(o => o.thing_id)).toEqual(['legacy-1'])
+        expect(recent[0].name).toBe('Legacy Thing')
+    })
+
     it('puts recent items on top of suggestions and fills the rest with other sources', async () => {
         const store = useObjectHistoryStore()
         const cache = useObjectCacheStore()
@@ -90,6 +113,26 @@ describe('objectHistory store', () => {
         const suggestions = await store.getSuggestions(3, 3, 'linktype', 'one-thing', 15)
         expect(suggestions.map(o => o.thing_id)).toEqual(['freq-1', 'recent-1', 'global-1'])
         expect(suggestions[0]._suggestionType).toBe('recent')
+    })
+
+    it('fills the dropdown with other objects of the type when there is no history', async () => {
+        // No recent, no favorites, no context — the /object fallback must fill
+        // the list so the dropdown is never empty.
+        axios.post.mockImplementation((url) => {
+            if (url === '/object') {
+                return Promise.resolve({ data: { things: [
+                    { thing_id: 'o1', type: 3, name: 'One' },
+                    { thing_id: 'o2', type: 3, name: 'Two' },
+                ] } })
+            }
+            return Promise.resolve({ data: { things: [] } })
+        })
+
+        const store = useObjectHistoryStore()
+        const suggestions = await store.getSuggestions(3, null, null, null, 15)
+
+        expect(suggestions.map(o => o.thing_id)).toEqual(['o1', 'o2'])
+        expect(suggestions[0]._suggestionType).toBe('other')
     })
 
     it('respects the type filter across all suggestion sources', async () => {

@@ -125,6 +125,52 @@ describe('ObjectField', () => {
         wrapper.unmount()
     })
 
+    it('shows a loading state while the suggestion list is being fetched', async () => {
+        mockHistory.getRecent.mockResolvedValue([])
+        let resolveSuggestions
+        mockHistory.getSuggestions.mockReturnValue(new Promise(r => { resolveSuggestions = r }))
+
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        await wrapper.find('input').trigger('focus')
+        await flushPromises()
+
+        // The initial list is still assembling (network-backed filler pending),
+        // so the dropdown must show a spinner instead of looking empty.
+        expect(wrapper.vm.suggestionsLoading).toBe(true)
+
+        resolveSuggestions([{ thing_id: '1', name: 'Loaded', type: THING_TYPE }])
+        await flushPromises()
+
+        expect(wrapper.vm.suggestionsLoading).toBe(false)
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['1'])
+    })
+
+    it('shows a spinner while the debounced search is pending instead of "nothing found"', async () => {
+        vi.useFakeTimers()
+        try {
+            mockHistory.getRecent.mockResolvedValue([])
+            mockHistory.getSuggestions.mockResolvedValue([])
+            axios.post.mockResolvedValue({ data: { things: [] } })
+
+            const wrapper = mount(ObjectField, { props: { modelValue: null } })
+            await wrapper.find('input').trigger('focus')
+            await flushPromises()
+
+            // Typing immediately turns on the spinner (the debounced request is
+            // pending), so the empty "no results" message never flashes.
+            await wrapper.find('input').setValue('needle')
+            expect(wrapper.vm.loading).toBe(true)
+            expect(wrapper.vm.suggestionsLoading).toBe(false)
+
+            // After the debounce fires and the request resolves, the spinner stops.
+            await vi.advanceTimersByTimeAsync(320)
+            await flushPromises()
+            expect(wrapper.vm.loading).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it('does not clobber the search view with late-arriving suggestions while typing', async () => {
         mockHistory.getRecent.mockResolvedValue([{ thing_id: '1', name: 'Recent', type: THING_TYPE }])
         let resolveSuggestions

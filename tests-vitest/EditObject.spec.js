@@ -211,14 +211,14 @@ describe('EditObject', () => {
         expect(document.querySelector('.linked-object input[name="one_thing"]')).toBeNull()
     })
 
-    it('does not offer Swap in the object edit form (prevents self-links)', async () => {
+    it('offers Swap in the object edit form so the relation direction can be swapped', async () => {
         await mountEditObject({ object: OBJECT })
 
         clickButton('Add Link')
         await nextTick()
 
         const buttons = [...document.querySelectorAll('.linked-object button')]
-        expect(buttons.some(b => b.textContent.trim() === 'Swap')).toBe(false)
+        expect(buttons.some(b => b.textContent.trim() === 'Swap')).toBe(true)
     })
 
     it('fills a link with a newly created object instead of an existing one', async () => {

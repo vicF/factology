@@ -648,11 +648,14 @@ const handleLinkedObjectCreated = async () => {
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
     return object.value.links.map(link => ({
-        other_thing_id: link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id,
+        // Pass through the link's actual direction. The currently edited object
+        // may be on either end (the direction can be swapped), so normalizing
+        // one_thing_id to the current object would silently flip incoming links.
+        one_thing_id: link.one_thing_id,
+        other_thing_id: link.other_thing_id,
         link_type_id: link.link_type_id,
         description: link.translation || '',
         link_id: link.link_id,
-        one_thing_id: link.one_thing_id,
     }));
 });
 
