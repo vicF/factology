@@ -237,6 +237,8 @@
                                 }"
                                 :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
+                                :lockFirstObject="true"
+                                :currentObjectUnsaved="!isEditMode"
                                 @update="updateItem"
                                 @remove="removeItem"
                             />
@@ -794,9 +796,9 @@ const addNewLinkedObject = async () => {
         link_id: null,
     });
     await nextTick();
-    const el = linkedObjectRefs.value[linkedObjects.value.length - 1];
-    const input = el?.$el?.querySelector('input');
-    if (input) input.focus();
+    // Focus the second-object selector — the first one is fixed to the current
+    // object, so the user only ever needs to fill in the other end of the link.
+    linkedObjectRefs.value[linkedObjects.value.length - 1]?.focusSecondObject?.();
 };
 
 const updateItem = ({ index, data }) => {

@@ -6,14 +6,20 @@
                 <ObjectField
                     fieldName="one_thing"
                     v-model="link.one_thing_id"
-                    :isEditable="true"
-                    name="First object"
+                    :isEditable="!lockFirstObject"
+                    :name="lockFirstObject ? currentObjectDisplayName : 'First object'"
+                    :displayName="lockFirstObject ? currentObjectDisplayName : null"
                     :type="effectiveObjectType"
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
                     required
                 />
+                <span
+                    v-if="lockFirstObject && currentObjectUnsaved"
+                    class="badge badge-unsaved"
+                    title="This object is not saved yet"
+                >{{ unsavedLabel }}</span>
             </div>
 
             <div class="form-group flex-group">
@@ -27,10 +33,11 @@
                     class="flex-field"
                 />
                 <button
+                    v-if="!lockFirstObject"
                     type="button"
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
-                    :disabled="!link.one_thing_id || !link.other_thing_id"
+                    :disabled="!link.one_thing_id || !link.other_thing_id || link.one_thing_id === link.other_thing_id"
                 >
                     Swap
                 </button>
@@ -38,6 +45,7 @@
 
             <div class="form-group flex-group">
                 <ObjectField
+                    ref="secondObjectFieldRef"
                     fieldName="other_thing"
                     v-model="link.other_thing_id"
                     :isEditable="true"
@@ -46,6 +54,7 @@
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
+                    :excludeUuid="lockFirstObject ? link.one_thing_id : null"
                     required
                     class="flex-field"
                 />
@@ -96,6 +105,7 @@
                 :contextObjectType="contextObjectType"
                 :contextLinkTypeId="contextLinkTypeId"
                 :contextOneThingId="contextOneThingId"
+                :excludeUuid="currentObject?.thing_id || null"
                 required
                 class="flex-field"
             />
@@ -119,6 +129,15 @@ const props = defineProps({
     fixedLinkTypeUuid: { type: String, default: null },
     targetLabel: { type: String, default: 'Target object' },
     objectType: { type: Number, default: null },
+    // When true the "first object" selector is fixed to the current object
+    // (read-only display). This is the case inside the EditObject form, where
+    // one end of every link is always the object being edited — editing it
+    // makes no sense, and swapping it into the other slot creates a self-link.
+    lockFirstObject: { type: Boolean, default: false },
+    // Marks the fixed first object as "not saved yet" (create mode).
+    currentObjectUnsaved: { type: Boolean, default: false },
+    currentObjectPlaceholder: { type: String, default: '<current object>' },
+    unsavedLabel: { type: String, default: 'not saved yet' },
 });
 
 const emit = defineEmits(['update', 'remove']);
@@ -135,6 +154,13 @@ const contextObjectType = computed(() => {
     return effectiveObjectType.value;
 });
 
+// Live name for the fixed "first object" slot — shows the current object's
+// typed name, falling back to a placeholder while it is still unnamed.
+const currentObjectDisplayName = computed(() => {
+    const name = props.currentObject?.name;
+    return (name && String(name).trim()) ? String(name).trim() : props.currentObjectPlaceholder;
+});
+
 const contextLinkTypeId = computed(() => {
     return link.value.link_type_id || props.fixedLinkTypeUuid;
 });
@@ -147,6 +173,14 @@ const link = ref({ ...props.link });
 if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
+
+// The second-object selector (the one the user actually needs to fill in when
+// adding a link) — used to move focus there instead of the fixed first slot.
+const secondObjectFieldRef = ref(null);
+const focusSecondObject = () => {
+    secondObjectFieldRef.value?.focus?.();
+};
+defineExpose({ focusSecondObject });
 
 let isUpdatingFromParent = false;
 let previousEmitted = JSON.stringify(link.value);
@@ -283,6 +317,17 @@ onUnmounted(() => {
     border-radius: 4px;
     font-size: 14px;
     line-height: 1;
+}
+.badge-unsaved {
+    flex-shrink: 0;
+    align-self: center;
+    background-color: #ffc107;
+    color: #212529;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
 }
 .form-control {
     width: 100%;
