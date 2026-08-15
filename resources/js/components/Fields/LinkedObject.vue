@@ -13,6 +13,7 @@
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
+                    :excludeUuid="lockFirstObject ? null : (link.other_thing_id || null)"
                     required
                 />
                 <span
@@ -54,7 +55,7 @@
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
-                    :excludeUuid="lockFirstObject ? link.one_thing_id : null"
+                    :excludeUuid="link.one_thing_id || null"
                     required
                     class="flex-field"
                 />

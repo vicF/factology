@@ -160,7 +160,7 @@ const props = defineProps({
     },
     maxResults: {
         type: Number,
-        default: 12
+        default: 15
     },
     type: {
         type: Number,
@@ -243,7 +243,11 @@ const filteredObjects = computed(() => {
     if (searchResults.value.length > 0) {
         results = searchResults.value;
     } else if (!searchText.value.trim()) {
-        results = pendingSuggestions.value.length > 0 ? pendingSuggestions.value : (cacheStore.getRecent(props.type, props.maxResults) || []);
+        // The initial list comes from loadSuggestions (persisted recent items
+        // first, filled from other sources). It is a stable snapshot — do not
+        // fall back to the volatile in-memory cache here, otherwise the list
+        // would change whenever unrelated objects get cached elsewhere.
+        results = pendingSuggestions.value;
     } else {
         const term = searchText.value.toLowerCase().trim()
         results = cacheStore.searchCached(props.type, term, props.maxResults) || [];
@@ -408,6 +412,11 @@ async function loadSuggestions() {
     }
     try {
         await historyStore.hydrate();
+        // Show the persisted recent items immediately (local read, no network)
+        // so the dropdown is populated the moment it opens.
+        const recent = await historyStore.getRecent(props.type, props.maxResults);
+        if (!searchText.value.trim()) pendingSuggestions.value = recent;
+
         const results = await historyStore.getSuggestions(
             props.type,
             props.contextObjectType,
@@ -415,10 +424,14 @@ async function loadSuggestions() {
             props.contextOneThingId,
             props.maxResults
         );
-        pendingSuggestions.value = results;
+        // Swap in the complete list only if the user has not started typing —
+        // a late-arriving suggestion list must not clobber the search view.
+        if (!searchText.value.trim()) pendingSuggestions.value = results;
     } catch (e) {
         console.warn('Failed to load suggestions:', e);
-        pendingSuggestions.value = cacheStore.getRecent(props.type, props.maxResults) || [];
+        if (!searchText.value.trim()) {
+            pendingSuggestions.value = await historyStore.getRecent(props.type, props.maxResults).catch(() => []);
+        }
     } finally {
         suggestionsLoaded.value = true;
     }

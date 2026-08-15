@@ -1,8 +1,9 @@
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest' // Explicit imports
 import ObjectField from '@/components/Fields/ObjectField.vue'
 import { useObjectCacheStore } from '@/stores/objectCache'
+import { useObjectHistoryStore } from '@/stores/objectHistory'
 import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from '@/constants'
 import axios from 'axios'
 
@@ -11,9 +12,13 @@ vi.mock('axios')
 vi.mock('@/stores/objectCache', () => ({
     useObjectCacheStore: vi.fn()
 }))
+vi.mock('@/stores/objectHistory', () => ({
+    useObjectHistoryStore: vi.fn()
+}))
 
 describe('ObjectField', () => {
     let mockStore
+    let mockHistory
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -29,12 +34,21 @@ describe('ObjectField', () => {
         }
 
         useObjectCacheStore.mockReturnValue(mockStore)
+
+        mockHistory = {
+            hydrate: vi.fn(() => Promise.resolve()),
+            getRecent: vi.fn(() => Promise.resolve([])),
+            getSuggestions: vi.fn(() => Promise.resolve([])),
+            recordSelection: vi.fn(),
+        }
+        useObjectHistoryStore.mockReturnValue(mockHistory)
     })
 
-    it('opens dropdown on focus and loads recent objects', async () => {
+    it('opens dropdown on focus and shows persisted recent objects first', async () => {
         // Override the default mock for this specific test
-        const mockData = [{ thing_id: '1', name: 'Test' }]
-        mockStore.getRecent.mockReturnValue(mockData)
+        const mockData = [{ thing_id: '1', name: 'Test', type: THING_TYPE }]
+        mockHistory.getRecent.mockResolvedValue(mockData)
+        mockHistory.getSuggestions.mockResolvedValue(mockData)
 
         const wrapper = mount(ObjectField, {
             props: { modelValue: null }
@@ -42,9 +56,11 @@ describe('ObjectField', () => {
 
         // Trigger focus to open dropdown
         await wrapper.find('input').trigger('focus')
+        await flushPromises()
 
         expect(wrapper.vm.isOpen).toBe(true)
-        expect(mockStore.getRecent).toHaveBeenCalled()
+        expect(mockHistory.getRecent).toHaveBeenCalled()
+        expect(mockHistory.getRecent).toHaveBeenCalledWith(THING_TYPE, 15)
 
         // Checking internal state (computed property)
         expect(wrapper.vm.filteredObjects).toEqual(mockData)
@@ -107,5 +123,41 @@ describe('ObjectField', () => {
         await nextTick()
         expect(document.activeElement).toBe(wrapper.find('input.form-control').element)
         wrapper.unmount()
+    })
+
+    it('does not clobber the search view with late-arriving suggestions while typing', async () => {
+        mockHistory.getRecent.mockResolvedValue([{ thing_id: '1', name: 'Recent', type: THING_TYPE }])
+        let resolveSuggestions
+        mockHistory.getSuggestions.mockReturnValue(new Promise(r => { resolveSuggestions = r }))
+
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        await wrapper.find('input').trigger('focus')
+        await nextTick()
+
+        // The user starts typing before the (slow) suggestion pipeline resolves.
+        await wrapper.find('input').setValue('needle')
+        resolveSuggestions([{ thing_id: '2', name: 'Suggestion', type: THING_TYPE }])
+        await flushPromises()
+
+        // The initial recent list is NOT replaced by the late suggestions — the
+        // search view stays in charge until the user clears the text.
+        expect(wrapper.vm.pendingSuggestions.map(o => o.thing_id)).toEqual(['1'])
+        expect(wrapper.vm.searchText).toBe('needle')
+    })
+
+    it('initial list is stable and does not re-read the volatile object cache', async () => {
+        mockHistory.getRecent.mockResolvedValue([{ thing_id: '1', name: 'Recent', type: THING_TYPE }])
+        mockHistory.getSuggestions.mockResolvedValue([{ thing_id: '1', name: 'Recent', type: THING_TYPE }])
+        mockStore.getRecent.mockReturnValue([{ thing_id: '999', name: 'Volatile', type: THING_TYPE }])
+
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        await wrapper.find('input').trigger('focus')
+        await flushPromises()
+
+        // The dropdown list comes from the persisted recent items, not from the
+        // cache store's in-memory recent list (which changes as objects get
+        // cached elsewhere in the app).
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['1'])
+        expect(mockStore.getRecent).not.toHaveBeenCalled()
     })
 })

@@ -196,6 +196,22 @@ describe('LinkedObject', () => {
         expect(swapButton.attributes('disabled')).toBeDefined()
     })
 
+    it('excludes the other selected object from both selectors when neither end is locked', async () => {
+        const wrapper = mount(LinkedObject, {
+            props: {
+                link: { one_thing_id: 'a', other_thing_id: 'b', link_type_id: 'type' },
+                index: 0,
+            }
+        })
+        await nextTick()
+
+        const fields = wrapper.findAllComponents(ObjectField)
+        // First selector excludes the selected second object, second excludes
+        // the selected first object — an object cannot be linked to itself.
+        expect(fields[0].props('excludeUuid')).toBe('b')
+        expect(fields[2].props('excludeUuid')).toBe('a')
+    })
+
     it('excludes the current object from the class/parent target in single-field mode', async () => {
         const wrapper = mount(LinkedObject, {
             props: {

@@ -17,13 +17,34 @@ const MAX_RECENT = 200;
 const MAX_CONTEXT_PER_KEY = 50;
 const MAX_CONTEXT_KEYS = 500;
 
+// True when an object matches the selector's numeric type. The `class_id`
+// fallback is legacy (older cached objects carried a class reference).
+function objectMatchesType(obj, type) {
+    if (!type) return true;
+    return !!obj && (obj.type === type || obj.class_id === type);
+}
+
+// Minimal renderable snapshot of an object so the recent list can be displayed
+// immediately after a fresh session, before the object cache is repopulated.
+// Kept deliberately small (name only, no long descriptions) to limit storage.
+function makeSnapshot(obj, fallbackType) {
+    if (!obj) return null;
+    return {
+        thing_id: obj.thing_id,
+        type: obj.type || fallbackType,
+        name: obj.name || '',
+        name_translations: obj.name_translations || null,
+    };
+}
+
 export const useObjectHistoryStore = defineStore('objectHistory', () => {
     // ── In-memory caches (hydrated once from storage) ──
-    let recentCache = [];          // { uuid, type, selectedAt }
+    let recentCache = [];          // { uuid, type, selectedAt, obj? } — obj is a display snapshot
     let freqCache = {};            // { uuid: count }
     let contextCache = {};         // { 'type:linkType': [ {uuid, count, lastSelectedAt} ] }
     let hydrated = false;
     let favoritesCache = [];       // cached favorite UUIDs from DB
+    let favoritesLoaded = false;   // favorites have been fetched at least once this session
 
     // ── Hydration ──
     async function hydrate() {
@@ -88,9 +109,14 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
 
         const now = Date.now();
 
+        // Snapshot the object now (it is cached right before recording) so the
+        // recent list stays renderable across sessions without refetching.
+        const cacheStore = useObjectCacheStore();
+        const snapshot = makeSnapshot(cacheStore.getCachedObject(uuid), type);
+
         // Update recent list
         recentCache = recentCache.filter(e => e.uuid !== uuid);
-        recentCache.unshift({ uuid, type, selectedAt: now });
+        recentCache.unshift({ uuid, type, selectedAt: now, obj: snapshot });
         pruneRecent();
 
         // Update frequency counter
@@ -120,21 +146,28 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
     }
 
     // ── Get recently used ──
-    async function getRecent(type, limit = 12) {
+    async function getRecent(type, limit = 15) {
         await hydrate();
         const cacheStore = useObjectCacheStore();
-        const filtered = recentCache.filter(e => e.type === type);
-        const uuids = filtered.slice(0, limit).map(e => e.uuid);
-        return uuids.map(u => cacheStore.getCachedObject(u)).filter(Boolean).slice(0, limit);
+        const results = [];
+        for (const e of recentCache) {
+            if (results.length >= limit) break;
+            // Prefer the live cache; fall back to the persisted display
+            // snapshot so recent items survive a fresh session.
+            const obj = cacheStore.getCachedObject(e.uuid) || e.obj;
+            if (!obj || !objectMatchesType(obj, type)) continue;
+            results.push(obj);
+        }
+        return results;
     }
 
     // ── Get most frequently used ──
-    async function getMostFrequent(type, limit = 12) {
+    async function getMostFrequent(type, limit = 15) {
         await hydrate();
         const cacheStore = useObjectCacheStore();
         const entries = Object.entries(freqCache)
             .map(([uuid, count]) => ({ uuid, count, obj: cacheStore.getCachedObject(uuid) }))
-            .filter(e => e.obj && (e.obj.type === type || e.obj.class_id === type))
+            .filter(e => e.obj && objectMatchesType(e.obj, type))
             .sort((a, b) => b.count - a.count);
         return entries.slice(0, limit).map(e => e.obj);
     }
@@ -179,11 +212,29 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
                 type: [],
                 classes: [],
             });
-            favoritesCache = (response.data?.things || []).map(t => t.thing_id);
-            return response.data?.things || [];
+            const things = response.data?.things || [];
+            favoritesCache = things.map(t => t.thing_id);
+            // Cache the favorite objects so dropdowns can render them without a
+            // second fetch (they are not part of the regular search flow).
+            const cacheStore = useObjectCacheStore();
+            for (const t of things) {
+                if (t?.thing_id) cacheStore.cacheObject(t.thing_id, t, t.type);
+            }
+            return things;
         } catch (e) {
             console.warn('Failed to fetch favorites:', e);
             return [];
+        }
+    }
+
+    // Fetch favorites at most once per session (lazily, on first use).
+    async function ensureFavorites() {
+        if (favoritesLoaded) return;
+        favoritesLoaded = true;
+        try {
+            await fetchFavorites();
+        } catch (e) {
+            console.warn('Failed to preload favorites:', e);
         }
     }
 
@@ -241,73 +292,54 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
     }
 
     // ── Get combined suggestions for dropdown ──
-    async function getSuggestions(type, contextType = null, linkTypeId = null, oneThingId = null, limit = 12) {
+    async function getSuggestions(type, contextType = null, linkTypeId = null, oneThingId = null, limit = 15) {
         await hydrate();
         const results = [];
         const seen = new Set();
+        const cacheStore = useObjectCacheStore();
 
-        // 1. Favorites (from DB — authoritative, user-curated)
-        const favObjects = (favoritesCache.length > 0)
-            ? favoritesCache.map(id => useObjectCacheStore().getCachedObject(id)).filter(Boolean)
-            : [];
-        for (const obj of favObjects) {
-            if (!seen.has(obj.thing_id) && results.length < limit) {
-                results.push({ ...obj, _suggestionType: 'favorite' });
-                seen.add(obj.thing_id);
+        const add = (obj, tag) => {
+            if (!obj?.thing_id || seen.has(obj.thing_id)) return;
+            if (!objectMatchesType(obj, type)) return;
+            if (results.length >= limit) return;
+            results.push({ ...obj, _suggestionType: tag });
+            seen.add(obj.thing_id);
+        };
+
+        // 1. Recently used (persisted locally, most recent first) — always on top.
+        const recent = await getRecent(type, limit);
+        for (const obj of recent) add(obj, 'recent');
+
+        // 2. Favorites (from DB — authoritative, user-curated). Only fetched
+        //    when recent items do not already fill the dropdown.
+        if (results.length < limit) {
+            await ensureFavorites();
+            for (const id of favoritesCache) {
+                add(cacheStore.getCachedObject(id), 'favorite');
             }
         }
 
-        // 2. Current user suggestion
+        // 3. Current user suggestion
         if (type === THING_TYPE && results.length < limit) {
-            const userObj = await getCurrentUserObject();
-            if (userObj && !seen.has(userObj.thing_id)) {
-                results.push({ ...userObj, _suggestionType: 'current_user' });
-                seen.add(userObj.thing_id);
-            }
+            add(await getCurrentUserObject(), 'current_user');
         }
 
-        // 3. Context-aware
+        // 4. Context-aware
         if (contextType !== null && linkTypeId !== null && results.length < limit) {
             const ctxSuggestions = await getContextSuggestions(contextType, linkTypeId, limit);
-            for (const obj of ctxSuggestions) {
-                if (!seen.has(obj.thing_id) && results.length < limit) {
-                    results.push({ ...obj, _suggestionType: 'context' });
-                    seen.add(obj.thing_id);
-                }
-            }
+            for (const obj of ctxSuggestions) add(obj, 'context');
         }
 
-        // 4. Most frequent
+        // 5. Most frequent
         if (results.length < limit) {
             const freq = await getMostFrequent(type, limit);
-            for (const obj of freq) {
-                if (!seen.has(obj.thing_id) && results.length < limit) {
-                    results.push({ ...obj, _suggestionType: 'frequent' });
-                    seen.add(obj.thing_id);
-                }
-            }
+            for (const obj of freq) add(obj, 'frequent');
         }
 
-        // 5. Global DB suggestions
+        // 6. Global DB suggestions (network — last-resort filler)
         if (results.length < limit && oneThingId && linkTypeId) {
             const global = await getGlobalSuggestions(oneThingId, linkTypeId, limit - results.length);
-            for (const obj of global) {
-                if (!seen.has(obj.thing_id) && results.length < limit) {
-                    results.push({ ...obj, _suggestionType: 'global' });
-                    seen.add(obj.thing_id);
-                }
-            }
-        }
-
-        // 6. Recent
-        if (results.length < limit) {
-            const recent = await getRecent(type, limit);
-            for (const obj of recent) {
-                if (!seen.has(obj.thing_id) && results.length < limit) {
-                    results.push({ ...obj, _suggestionType: 'recent' });
-                    seen.add(obj.thing_id);
-                }
-            }
+            for (const obj of global) add(obj, 'global');
         }
 
         return results;
@@ -320,6 +352,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         contextCache = {};
         hydrated = true;
         favoritesCache = [];
+        favoritesLoaded = false;
         await persist();
     }
 
@@ -332,6 +365,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         getGlobalSuggestions,
         getSuggestions,
         fetchFavorites,
+        ensureFavorites,
         toggleFavorite,
         isFavorite,
         clearAll,

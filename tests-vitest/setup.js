@@ -24,6 +24,7 @@ vi.mock('@/stores/objectCache', () => ({
 vi.mock('@/stores/objectHistory', () => ({
     useObjectHistoryStore: vi.fn(() => ({
         hydrate: vi.fn(),
+        getRecent: vi.fn(() => []),
         getSuggestions: vi.fn(() => []),
         recordSelection: vi.fn(),
     })),
