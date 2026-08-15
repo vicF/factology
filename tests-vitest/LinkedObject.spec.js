@@ -153,7 +153,7 @@ describe('LinkedObject', () => {
         expect(wrapper.find('.badge-unsaved').exists()).toBe(false)
     })
 
-    it('hides the Swap button when the first object is locked', async () => {
+    it('always shows the Swap button, even when the first object is locked', async () => {
         const wrapper = mount(LinkedObject, {
             props: {
                 link: { one_thing_id: 'current-id', other_thing_id: 'other-id', link_type_id: 'type' },
@@ -165,7 +165,36 @@ describe('LinkedObject', () => {
         await nextTick()
 
         const buttons = wrapper.findAll('button')
-        expect(buttons.some(b => b.text().trim() === 'Swap')).toBe(false)
+        expect(buttons.some(b => b.text().trim() === 'Swap')).toBe(true)
+    })
+
+    it('unlocks the first object slot after swapping a locked row', async () => {
+        const wrapper = mount(LinkedObject, {
+            props: {
+                link: { one_thing_id: 'current-id', other_thing_id: 'other-id', link_type_id: 'type' },
+                currentObject: { thing_id: 'current-id', name: 'Current' },
+                index: 0,
+                lockFirstObject: true,
+            }
+        })
+        await nextTick()
+
+        const fields = wrapper.findAllComponents(ObjectField)
+        // Initially the first selector is read-only (locked to the current object).
+        expect(fields[0].props('isEditable')).toBe(false)
+
+        const swapButton = wrapper.findAll('button').find(b => b.text().trim() === 'Swap')
+        await swapButton.trigger('click')
+        await nextTick()
+
+        // The current object moved to the second slot and the first becomes editable.
+        const emitted = wrapper.emitted('update')
+        const payload = emitted[emitted.length - 1][0].data
+        expect(payload.one_thing_id).toBe('other-id')
+        expect(payload.other_thing_id).toBe('current-id')
+
+        const afterSwap = wrapper.findAllComponents(ObjectField)
+        expect(afterSwap[0].props('isEditable')).toBe(true)
     })
 
     it('excludes the current object from the second-object selector when the first is locked', async () => {

@@ -237,7 +237,7 @@
                                 }"
                                 :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                :lockFirstObject="true"
+                                :lockFirstObject="item.one_thing_id === formData.thing_id"
                                 :currentObjectUnsaved="!isEditMode"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -863,7 +863,10 @@ const submitForm = async () => {
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
-                one_thing_id: formData.value.thing_id,
+                // Respect the row's own direction: normally the currently edited
+                // object, but the user may have swapped it, making the other end
+                // the first object.
+                one_thing_id: item.one_thing_id || formData.value.thing_id,
                 link_type_id: item.link_type_id,
                 other_thing_id: item.other_thing_id,
                 description: item.translation || '',
@@ -919,7 +922,7 @@ const submitForm = async () => {
                 .filter(item => item.link_id && item.other_thing_id?.trim())
                 .map(item => ({
                     link_id: item.link_id,
-                    one_thing_id: formData.value.thing_id,
+                    one_thing_id: item.one_thing_id || formData.value.thing_id,
                     other_thing_id: item.other_thing_id,
                     link_type_id: item.link_type_id,
                     translation: item.translation,
