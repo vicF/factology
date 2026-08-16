@@ -8,6 +8,10 @@ Object.entries(Icons).forEach(([name, component]) => {
     config.global.components[name] = component
 })
 
+// Provide a trivial $t for components whose specs don't install a real i18n
+// instance (translations return the key — English catalogs are key-identical).
+config.global.mocks['$t'] = (key) => key
+
 // Mock the object cache store completely
 vi.mock('@/stores/objectCache', () => ({
     useObjectCacheStore: vi.fn(() => ({

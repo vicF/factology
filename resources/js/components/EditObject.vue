@@ -173,7 +173,7 @@
                                 </label>
                                 <select id="ownerSelect" class="form-select" v-model="formData.owner">
                                     <option value="">—</option>
-                                    <option :value="UUID.SYSTEM_OWNER">System Owner</option>
+                                    <option :value="UUID.SYSTEM_OWNER">{{ $t('System Owner') }}</option>
                                     <option v-for="o in ownerOptions" :key="o.thing_id" :value="o.thing_id">
                                         {{ o.name || o.thing_id }}
                                     </option>
@@ -184,13 +184,13 @@
                             </div>
 
                             <!-- Object type indicator -->
-                            <div v-if="formData.type == 1" class="mb-3">General</div>
-                            <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
-                            <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
-                            <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
-                            <div v-else-if="formData.type == 5" class="mb-3">External</div>
-                            <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">Server</div>
-                            <div v-else class="mb-3">!Unknown type!</div>
+                            <div v-if="formData.type == 1" class="mb-3">{{ $t('Type General') }}</div>
+                            <div v-if="formData.type == CLASS_TYPE" class="mb-3">{{ $t('Type Class') }}</div>
+                            <div v-else-if="formData.type == THING_TYPE" class="mb-3">{{ $t('Type Thing') }}</div>
+                            <div v-else-if="formData.type == LINK_TYPE" class="mb-3">{{ $t('Type Link') }}</div>
+                            <div v-else-if="formData.type == 5" class="mb-3">{{ $t('Type External') }}</div>
+                            <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">{{ $t('Type Server') }}</div>
+                            <div v-else class="mb-3">{{ $t('Unknown type') }}</div>
 
                             <!-- Top action row: all links sit between this and the bottom row -->
                             <div
@@ -298,7 +298,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" :aria-label="$t('Close')"></button>
                     </div>
                     <div class="modal-body">
                         <p>{{ $t('You have unsaved changes. Are you sure you want to close?') }}</p>
@@ -316,7 +316,7 @@
         </div>
         <!-- Error modal -->
         <ErrorModal
-            title="Save Failed"
+            :title="$t('Save Failed')"
             :message="errorMessage"
             :details="errorDetails"
             :show="showError"

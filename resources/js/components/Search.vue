@@ -3,7 +3,7 @@
         <div v-if="!loaded" class="row">
             <div class="col text-center py-5">
                 <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">{{ $t('Loading...') }}</span>
                 </div>
             </div>
         </div>
@@ -12,14 +12,14 @@
             <div class="col-md-10 offset-md-1">
                 <div class="admin-toolbar d-flex gap-2 align-items-center">
                     <button class="btn btn-outline-secondary btn-sm" @click="exportData" :disabled="exporting">
-                        {{ exporting ? 'Exporting...' : 'Export' }}
+                        {{ exporting ? $t('Exporting...') : $t('Export') }}
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" @click="showImportModal = true">
-                        Import
+                        {{ $t('Import') }}
                     </button>
                     <label class="small text-muted mb-0 ms-2">
                         <input type="checkbox" v-model="includeDeleted" />
-                        Include deleted
+                        {{ $t('Include deleted') }}
                     </label>
                 </div>
             </div>
@@ -27,7 +27,7 @@
 
         <div v-if="loaded && objects.length === 0" class="row">
             <div class="col text-center py-5">
-                <p class="text-muted">No results found</p>
+                <p class="text-muted">{{ $t('No results found') }}</p>
             </div>
         </div>
         <div v-if="loaded && objects.length > 0" class="row">
@@ -83,7 +83,7 @@
                                                 📅
                                                 <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
                                                 <template v-if="thing.start && thing.end"> → </template>
-                                                <template v-else-if="thing.end">until </template>
+                                                <template v-else-if="thing.end">{{ $t('until') }} </template>
                                                 <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
@@ -147,6 +147,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
@@ -164,6 +165,7 @@ const props = defineProps({
 defineOptions({ name: "Search" });
 
 const route = useRoute();
+const { t } = useI18n();
 const searchStore = useSearchStore();
 const authStore = useAuthStore();
 
@@ -200,14 +202,14 @@ const handleToggleVisibility = (thingId, thingIndex) => {
         return;
     }
     if (makePublic) {
-        confirmTitle.value = 'Make Public';
-        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
-        confirmButtonText.value = 'Make Public';
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
-        confirmButtonText.value = 'Make Private';
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
     pendingToggle = doToggle;
