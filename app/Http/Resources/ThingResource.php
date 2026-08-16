@@ -17,6 +17,8 @@ class ThingResource extends JsonResource
             'description_translations'=> $this->decodeJson($this->description_translations ?? null),
             'start'                   => $this->start,
             'end'                     => $this->end,
+            'start_meta'              => $this->decodeJson($this->start_meta ?? null),
+            'end_meta'                => $this->decodeJson($this->end_meta ?? null),
             'record_created'          => $this->record_created,
             'record_updated'          => $this->record_updated,
             'public'                  => (bool) $this->public,

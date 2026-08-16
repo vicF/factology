@@ -406,15 +406,17 @@ class ExportImportController extends BaseController
      */
     private function buildThingData(array $thing): array
     {
-        $fields = ['name', 'type', 'description', 'start', 'end', 'start_variety', 'end_variety',
+        $fields = ['name', 'type', 'description', 'start', 'end',
+                   'start_meta', 'end_meta', 'start_variety', 'end_variety',
                    'owner', 'public', 'deleted', 'data', 'server_uuid'];
 
         $data = [];
         foreach ($fields as $field) {
             if (array_key_exists($field, $thing)) {
                 $value = $thing[$field];
-                // Encode data field back to JSON string if it's an array/object
-                if ($field === 'data' && (is_array($value) || is_object($value))) {
+                // Encode JSON fields back to JSON strings if they're arrays/objects
+                if (in_array($field, ['data', 'start_meta', 'end_meta'], true)
+                    && (is_array($value) || is_object($value))) {
                     $value = json_encode($value);
                 }
                 $data[$field] = $value;
@@ -433,12 +435,19 @@ class ExportImportController extends BaseController
     {
         $fields = ['link_uuid', 'one_thing_id', 'link_type_id', 'other_thing_id',
                    'translation', 'public', 'link_start', 'link_end',
+                   'link_start_meta', 'link_end_meta',
                    'link_start_variety', 'link_end_variety', 'deleted'];
 
         $data = [];
         foreach ($fields as $field) {
             if (array_key_exists($field, $link)) {
-                $data[$field] = $link[$field];
+                $value = $link[$field];
+                // Encode JSON fields back to JSON strings if they're arrays/objects
+                if (in_array($field, ['link_start_meta', 'link_end_meta'], true)
+                    && (is_array($value) || is_object($value))) {
+                    $value = json_encode($value);
+                }
+                $data[$field] = $value;
             }
         }
 

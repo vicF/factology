@@ -71,6 +71,16 @@ class Everything
     public const TIME_FORMAT = 'Y-m-d H:i:s';
     public const DATABASE_TIME_FORMAT = 'YmdHis';
 
+    /** Link date columns persisted by addLink/updateLink when present. */
+    public const LINK_DATE_FIELDS = [
+        'link_start',
+        'link_end',
+        'link_start_variety',
+        'link_end_variety',
+        'link_start_meta',
+        'link_end_meta',
+    ];
+
     public string $template = 'partials.object.view.main.properties';
     public string $additional_template = ''; //'partials.object.view.additional.properties';
 
@@ -83,11 +93,13 @@ class Everything
         'description_translations',
         'data',
         'end',
+        'end_meta',
         'end_variety',
         'name',
         'name_translations',
         'public',
         'start',
+        'start_meta',
         'start_variety',
         'thing_id',
         'type',
@@ -104,6 +116,7 @@ class Everything
         'data',
         'end',
         'end_date',
+        'end_meta',
         'end_variety',
         'name',
         'name_translations',
@@ -112,6 +125,7 @@ class Everything
         'record_updated',
         'start',
         'start_date',
+        'start_meta',
         'start_variety',
         'thing_id',
         'type',
@@ -627,7 +641,7 @@ class Everything
                 $data[$jsonField]['lang'] = FieldLanguage::detect($data[$plainField] ?? null);
             }
         }
-        foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+        foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
             if (array_key_exists($jsonField, $data)) {
                 $value = $data[$jsonField];
                 if (is_array($value) || is_object($value)) {
@@ -662,7 +676,7 @@ class Everything
 
             // Localization JSON columns are only written when present in the request,
             // so an update that omits them never wipes existing translations/data.
-            foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+            foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
                 if (array_key_exists($jsonField, $data)) {
                     $upsertData[$jsonField] = $data[$jsonField];
                 }
@@ -782,14 +796,20 @@ class Everything
     public function updateLink($link): int
     {
         $this->setLinkTranslation($link);
+        $update = [
+            'one_thing_id'   => $link['one_thing_id'],
+            'link_type_id'   => $link['link_type_id'],
+            'other_thing_id' => $link['other_thing_id'],
+            'translation'    => $link['translation'],
+        ];
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $update[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
         return DB::table('links')
             ->where('link_id', $link['link_id'])
-            ->update([
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-                'translation'    => $link['translation'],
-            ]);
+            ->update($update);
     }
 
     public function addLink(array $link): bool
@@ -837,13 +857,19 @@ class Everything
         }
 
         // Insert new link with generated UUID
-        return DB::table('links')->insert([
+        $insert = [
             'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
             'one_thing_id'  => $link['one_thing_id'],
             'link_type_id'  => $link['link_type_id'],
             'other_thing_id'=> $link['other_thing_id'],
             'translation'   => $link['translation'],
-        ]);
+        ];
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $insert[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
+        return DB::table('links')->insert($insert);
     }
 
     public function setAsChildOf($parentClass): bool

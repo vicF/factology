@@ -16,8 +16,26 @@ class LinkResource extends JsonResource
             'translation'    => $this->translation ?? null,
             'description'    => $this->description ?? null,   // <-- safe fallback
             'public'         => isset($this->public) ? (bool) $this->public : null,
-            'name'           => $this->name ?? null,          // from things.name
+            'link_start'     => $this->link_start ?? null,
+            'link_end'       => $this->link_end ?? null,
+            'link_start_meta'=> $this->decodeJson($this->link_start_meta ?? null),
+            'link_end_meta'  => $this->decodeJson($this->link_end_meta ?? null),
+            // name = name of other_thing_id, one_name = name of one_thing_id
+            // (both from left joins, so display can name either endpoint).
+            'name'           => $this->name ?? null,
+            'one_name'       => $this->one_name ?? null,
             'link_name'      => $this->link_name ?? null,     // from link_types.name
         ];
+    }
+
+    /**
+     * Decode a json/jsonb column (query builder returns these as strings).
+     */
+    private function decodeJson($value)
+    {
+        if (is_string($value)) {
+            return json_decode($value, true) ?: null;
+        }
+        return $value;
     }
 }

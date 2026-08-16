@@ -112,7 +112,7 @@
                                                     <span class="link-arrow">→</span>
                                                     <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
                                                         <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
+                                                        <span class="link-name">{{ truncateText(getOtherThingName(link, thing.thing_id) || 'Related', 30) }}</span>
                                                     </RouterLink>
                                                 </div>
                                                 <div v-if="thing.links.length > 3" class="more-links">
@@ -238,6 +238,13 @@ if (props.typeClass !== undefined && props.typeClass !== null) {
 const getOtherThingId = (link, currentThingId) => {
     const thingId = link.thing_id || link.one_thing_id;
     return thingId === currentThingId ? link.other_thing_id : thingId;
+};
+
+// API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one matching the target.
+const getOtherThingName = (link, currentThingId) => {
+    const targetId = getOtherThingId(link, currentThingId);
+    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
 };
 
 const truncateText = (text, maxLength) => {

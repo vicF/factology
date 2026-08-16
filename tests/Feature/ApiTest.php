@@ -617,4 +617,147 @@ class ApiTest extends TestCase
         ]);
         return $thingId;
     }
+
+    /**
+     * Flexible dates: search uses interval-overlap so before/after/between
+     * dates match correctly.
+     */
+    public function testSearchDateIntervalOverlap(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        // "before 1500" — open start, bound end.
+        $before1500 = $this->createTestObject($user, [
+            'name'     => 'Flexible Before 1500',
+            'start'    => null,
+            'end'      => '15000101000000',
+            'end_meta' => ['qualifier' => 'before', 'precision' => 'year'],
+        ]);
+
+        // "between 1600 and 1700" — both bounds set.
+        $between1600_1700 = $this->createTestObject($user, [
+            'name'       => 'Flexible Between 1600 and 1700',
+            'start'      => '16000101000000',
+            'end'        => '17000101000000',
+            'start_meta' => ['qualifier' => 'between', 'precision' => 'year'],
+        ]);
+
+        // "after 1800" — open end.
+        $after1800 = $this->createTestObject($user, [
+            'name'       => 'Flexible After 1800',
+            'start'      => '18000101000000',
+            'end'        => null,
+            'start_meta' => ['qualifier' => 'after', 'precision' => 'year'],
+        ]);
+
+        // Window 1450–1650: before-1500 and between-1600-1700 overlap; after-1800 does not.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '14500101000000',
+            'date_to'   => '16500101000000',
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($before1500), 'A "before 1500" date must match the 1450–1650 window');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1450–1650 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1450–1650 window');
+
+        // Window 1650–1750: only between-1600-1700 overlaps.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '16500101000000',
+            'date_to'   => '17500101000000',
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1650–1750 window');
+        $this->assertFalse($ids->contains($before1500), 'A "before 1500" date must not match the 1650–1750 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1650–1750 window');
+    }
+
+    /**
+     * Flexible dates: start_meta/end_meta survive a store round-trip.
+     */
+    public function testCreateWithFlexibleDateMeta(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start'      => '15000101000000',
+            'end'        => '16000101000000',
+            'start_meta' => [
+                'qualifier' => 'approx',
+                'precision' => 'year',
+                'era'       => 'gregorian',
+            ],
+            'end_meta' => [
+                'qualifier' => 'between',
+                'precision' => 'year',
+            ],
+        ]);
+
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+        $this->assertSame('approx', $json['data']['start_meta']['qualifier']);
+        $this->assertSame('between', $json['data']['end_meta']['qualifier']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('approx', json_decode($row->start_meta, true)['qualifier']);
+        $this->assertSame('between', json_decode($row->end_meta, true)['qualifier']);
+        $this->assertSame('15000101000000', $row->start);
+        $this->assertSame('16000101000000', $row->end);
+    }
+
+    /**
+     * Flexible dates: invalid start_meta.qualifier is rejected.
+     */
+    public function testFlexibleDateMetaValidation(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start_meta' => ['qualifier' => 'bogus'],
+        ]);
+        try {
+            $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData, 422);
+            $this->assertArrayHasKey('errors', $json, 'Validation should fail for an invalid start_meta.qualifier');
+            $this->assertArrayHasKey('start_meta.qualifier', $json['errors']);
+        } catch (AssertionFailedError $e) {
+            $this->fail('Expected 422 for invalid start_meta.qualifier: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Flexible dates: BC (negative) start dates are accepted.
+     */
+    public function testBcStartDateAccepted(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '-15000101235959', // 1500 BC
+            'end'      => '15000101000000',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('-15000101235959', $row->start);
+    }
 }

@@ -130,6 +130,13 @@ if (!(isCapacitor && !apiBaseUrl)) {
 
 app.config.globalProperties.$dateFromDb = dateFromDb;
 
+// Flexible dates: localized display + the value object itself
+import * as flexibleDate from './utils/flexibleDate.js';
+app.config.globalProperties.$flexibleDate = flexibleDate.FlexibleDate;
+app.config.globalProperties.$flexibleDateFormat = function(start, end, startMeta, endMeta) {
+    return flexibleDate.formatLocalized(start, end, startMeta, endMeta, (key) => i18n.global.t(key));
+};
+
 // Localized-data resolution helpers (templates can use $objectName(...), etc.)
 import * as localized from './utils/localized.js';
 app.config.globalProperties.$objectName = localized.objectName;

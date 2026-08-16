@@ -132,19 +132,28 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <DateField
-                                    fieldName="start"
-                                    v-model="formData.start"
+                                <FlexibleDateField
+                                    side="start"
+                                    :start="formData.start"
+                                    :end="formData.end"
+                                    :startMeta="formData.start_meta"
+                                    :endMeta="formData.end_meta"
                                     :isEditable="true"
                                     :label="$t('Start')"
+                                    @update:value="applyStartDate"
                                 />
                             </div>
                             <div class="mb-3">
-                                <DateField
-                                    fieldName="end"
-                                    v-model="formData.end"
+                                <FlexibleDateField
+                                    side="end"
+                                    :start="formData.start"
+                                    :end="formData.end"
+                                    :startMeta="formData.start_meta"
+                                    :endMeta="formData.end_meta"
                                     :isEditable="true"
                                     :label="$t('End')"
+                                    :disabled="startSpansDates"
+                                    @update:value="applyEndDate"
                                 />
                             </div>
 
@@ -225,11 +234,16 @@
                                 :key="item.id"
                                 :ref="(el) => setLinkedObjectRef(idx, el)"
                                 :link="{
-                                    one_thing_id: formData.thing_id,
+                                    // Keep the link's stored direction — forcing one_thing_id
+                                    // to the current object made incoming links (where the
+                                    // current object is other_thing_id) render as self-links.
+                                    one_thing_id: item.one_thing_id || formData.thing_id,
                                     other_thing_id: item.other_thing_id,
                                     link_type_id: item.link_type_id,
                                     translation: item.translation,
-                                    link_id: item.link_id
+                                    link_id: item.link_id,
+                                    name: item.name,
+                                    one_name: item.one_name
                                 }"
                                 :currentObject="{
                                     thing_id: formData.thing_id,
@@ -335,7 +349,7 @@ import { useI18n } from 'vue-i18n';
 
 // CRITICAL: These component imports are required - DO NOT REMOVE
 import TextField from './Fields/TextField.vue';
-import DateField from './Fields/DateField.vue';
+import FlexibleDateField from './Fields/FlexibleDateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
@@ -378,6 +392,8 @@ const formData = ref({
     description: '', // current-locale text (filled by initLocalization)
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
+    start_meta: isEditMode.value ? (props.object.start_meta || null) : null,
+    end_meta: isEditMode.value ? (props.object.end_meta || null) : null,
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
     owner: isEditMode.value ? (props.object.owner || '') : '',
@@ -389,6 +405,28 @@ const formData = ref({
 // Owner options for the admin-only Owner select (from /search/options)
 const ownerOptions = ref([]);
 const isAdmin = computed(() => !!authStore.user?.is_admin);
+
+// ── Flexible date fields ──────────────────────────────────────────
+// The Start field owns both columns for spanning qualifiers
+// (between/alternatives/before occupy the end column too); the End
+// field is then disabled so the two can't collide.
+const startSpansDates = computed(() => {
+    const q = formData.value.start_meta?.qualifier;
+    return q === 'between' || q === 'alternatives' || q === 'before';
+});
+
+function applyStartDate({ start, end, meta }) {
+    formData.value.start = start || null;
+    formData.value.start_meta = meta || null;
+    if (end != null && end !== '') {
+        formData.value.end = end;
+    }
+}
+
+function applyEndDate({ start, end, meta }) {
+    formData.value.end = end || null;
+    formData.value.end_meta = meta || null;
+}
 
 const loadOwnerOptions = async () => {
     try {
@@ -715,6 +753,8 @@ const initializeData = () => {
             link_type_id: item.link_type_id || '',
             translation: item.description || item.translation || '',
             link_id: item.linkId || null,
+            name: item.name || null,
+            one_name: item.one_name || null,
         };
 
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
@@ -883,6 +923,8 @@ const submitForm = async () => {
             description_translations: descPayload.translations,
             start: formData.value.start || null,
             end: formData.value.end || null,
+            start_meta: formData.value.start_meta || null,
+            end_meta: formData.value.end_meta || null,
             public: formData.value.public,
             type: formData.value.type,
             data: formData.value.data,

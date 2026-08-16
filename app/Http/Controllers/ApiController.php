@@ -8,6 +8,8 @@ use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
+use Fokin\Facts\Data\Era;
+use Fokin\Facts\Data\FlexibleDate;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ApiController extends BaseController
@@ -92,7 +95,7 @@ class ApiController extends BaseController
              * Start date/time as numeric string: YYYYMMDDHHMMSS
              * @example 20260228111234
              */
-            'start' => ['nullable', 'string', 'regex:/^\d*$/'],
+            'start' => ['nullable', 'string', 'regex:/^-?\d*$/'],
 
             /**
              * End date/time as numeric string: YYYYMMDDHHMMSS
@@ -101,13 +104,33 @@ class ApiController extends BaseController
             'end' => [
                 'nullable',
                 'string',
-                'regex:/^\d*$/',
+                'regex:/^-?\d*$/',
                 function ($attribute, $value, $fail) use ($request) {
-                    if ($request->has('start') && $value < $request->start) {
+                    if ($request->has('start') && $request->start !== null && bccomp($value, $request->start) < 0) {
                         $fail('The end date must be after the start date.');
                     }
                 },
             ],
+
+            /**
+             * Flexible-date display metadata for the start/end bounds.
+             * Shape: { qualifier, era, precision, alternatives: [...], comment }.
+             */
+            'start_meta' => ['nullable', 'array'],
+            'start_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'start_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'start_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'start_meta.alternatives' => ['nullable', 'array'],
+            'start_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'start_meta.comment' => ['nullable', 'string', 'max:500'],
+
+            'end_meta' => ['nullable', 'array'],
+            'end_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'end_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'end_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'end_meta.alternatives' => ['nullable', 'array'],
+            'end_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'end_meta.comment' => ['nullable', 'string', 'max:500'],
 
             /**
              * Public flag (0 or 1)
@@ -263,6 +286,12 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
+        foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+            if (isset($data[$metaField]) && is_array($data[$metaField])) {
+                $data[$metaField] = json_encode($data[$metaField]);
+            }
+        }
         // Abstract link types are grouping containers, never real relations.
         if (!empty($data['link_type_id'])
             && DB::table('things')->where('thing_id', $data['link_type_id'])->value('abstract')) {
@@ -720,12 +749,18 @@ class ApiController extends BaseController
                     ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
             });
         }
-        // Date range filter
+        // Date range filter — interval-overlap semantics so flexible dates
+        // (before/after/between with open bounds) match correctly:
+        //   [thing.start, thing.end] ∩ [date_from, date_to] ≠ ∅
         if (!empty($requestBody['date_from'])) {
-            $query->where('start', '>=', $requestBody['date_from']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.end')->orWhere('things.end', '>=', $requestBody['date_from']);
+            });
         }
         if (!empty($requestBody['date_to'])) {
-            $query->where('start', '<=', $requestBody['date_to']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.start')->orWhere('things.start', '<=', $requestBody['date_to']);
+            });
         }
         // Owner filter — exact UUID match when possible, ILIKE fallback
         if (!empty($requestBody['owner'])) {
@@ -760,11 +795,14 @@ class ApiController extends BaseController
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
-                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
                     $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as one_side', function ($join) {
+                    $join->on('links.one_thing_id', '=', 'one_side.thing_id');
                 })
                 ->leftJoin('things as link_types', function ($join) {
                     $join->on('links.link_type_id', '=', 'link_types.thing_id');

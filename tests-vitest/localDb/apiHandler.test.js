@@ -51,7 +51,9 @@ describe('Local API link enrichment (mirrors server LinkResource)', () => {
             l.one_thing_id === UUID.SOMETHING,
         );
         expect(parentLink).toBeTruthy();
-        expect(parentLink.name).toBe('Something'); // opposite endpoint
+        // `name` = other_thing_id (Event), `one_name` = one_thing_id (Something).
+        // The Something endpoint is the target when viewing Event.
+        expect(parentLink.one_name).toBe('Something');
     });
 });
 

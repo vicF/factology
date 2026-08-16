@@ -109,11 +109,7 @@
                                         <div v-if="object.start || object.end || object.description" class="result-description">
                                             <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
                                                 <span class="date-badge">
-                                                    📅
-                                                    <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
-                                                    <template v-if="object.start && object.end"> → </template>
-                                                    <template v-else-if="object.end">{{ $t('until') }} </template>
-                                                    <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
+                                                    📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
@@ -165,9 +161,9 @@
 
                                         <div class="result-info-section">
                                             <div class="result-header">
-                                                <div class="result-title" v-if="link.name">
+                                                <div class="result-title" v-if="getLinkTargetName(link)">
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
-                                                        {{ link.name }}
+                                                        {{ getLinkTargetName(link) }}
                                                     </RouterLink>
                                                     <IconPrivate v-if="authenticated && !link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
                                                     <IconPublic v-if="authenticated && link.target_public && hoveredLink === linkIndex" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
@@ -473,6 +469,13 @@ const getLinkTargetId = (link) => {
     return link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id;
 };
 
+// The API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one that matches the target.
+const getLinkTargetName = (link) => {
+    const targetId = getLinkTargetId(link);
+    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+};
+
 const getObject = async () => {
     try {
         loaded.value = false;
@@ -656,6 +659,10 @@ const linkRecords = computed(() => {
         link_type_id: link.link_type_id,
         description: link.translation || '',
         link_id: link.link_id,
+        // Endpoint names from the API (name = other_thing_id, one_name = one_thing_id)
+        // so the edit-modal preview resolves immediately.
+        name: link.name || null,
+        one_name: link.one_name || null,
     }));
 });
 

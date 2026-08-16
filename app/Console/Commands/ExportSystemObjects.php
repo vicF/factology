@@ -51,7 +51,7 @@ class ExportSystemObjects extends Command
      */
     private const THING_COLUMNS = [
         'thing_id', 'name', 'type', 'description',
-        'start', 'end', 'start_variety', 'end_variety',
+        'start', 'end', 'start_meta', 'end_meta', 'start_variety', 'end_variety',
         'record_created', 'record_updated', 'owner', 'public', 'deleted', 'data',
         'abstract',
     ];
@@ -63,6 +63,7 @@ class ExportSystemObjects extends Command
     private const LINK_COLUMNS = [
         'translation', 'one_thing_id', 'link_type_id', 'other_thing_id',
         'public', 'link_start', 'link_end',
+        'link_start_meta', 'link_end_meta',
         'link_start_variety', 'link_end_variety', 'link_uuid', 'deleted',
     ];
 
@@ -88,8 +89,10 @@ class ExportSystemObjects extends Command
             ->get()
             ->map(function ($thing) {
                 $row = array_intersect_key((array) $thing, array_flip(self::THING_COLUMNS));
-                if (is_string($row['data'])) {
-                    $row['data'] = json_decode($row['data']);
+                foreach (['data', 'start_meta', 'end_meta'] as $jsonField) {
+                    if (is_string($row[$jsonField] ?? null)) {
+                        $row[$jsonField] = json_decode($row[$jsonField]);
+                    }
                 }
                 return $row;
             })
@@ -106,7 +109,13 @@ class ExportSystemObjects extends Command
             ->orderBy('link_id')
             ->get()
             ->map(function ($link) {
-                return array_intersect_key((array) $link, array_flip(self::LINK_COLUMNS));
+                $row = array_intersect_key((array) $link, array_flip(self::LINK_COLUMNS));
+                foreach (['link_start_meta', 'link_end_meta'] as $jsonField) {
+                    if (is_string($row[$jsonField] ?? null)) {
+                        $row[$jsonField] = json_decode($row[$jsonField]);
+                    }
+                }
+                return $row;
             })
             ->all();
 

@@ -20,9 +20,10 @@ export const schemaMap = {
         serverTables: ['things'],
         columns: [
             'thing_id', 'name', 'type', 'description', 'start', 'end',
+            'start_meta', 'end_meta',
             'start_variety', 'end_variety', 'record_created', 'record_updated',
             'owner', 'public', 'deleted', 'data', 'server_uuid', 'imported_at',
-            'name_translations', 'description_translations',
+            'name_translations', 'description_translations', 'abstract',
         ],
     },
 
@@ -32,6 +33,7 @@ export const schemaMap = {
         columns: [
             'link_id', 'translation', 'one_thing_id', 'link_type_id',
             'other_thing_id', 'public', 'link_start', 'link_end',
+            'link_start_meta', 'link_end_meta',
             'link_start_variety', 'link_end_variety', 'link_uuid', 'deleted',
             'imported_at',
         ],
