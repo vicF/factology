@@ -203,25 +203,56 @@
                                                 {{ link.translation }}
                                             </div>
 
-                                            <div v-if="link.target" class="link-related mt-1">
+                                            <div v-if="authenticated && editMode" class="link-actions">
+                                                <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
+                                                <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
+                                            </div>
+                                        </div>
+
+                                        <!-- RIGHT: related items of this link's target (compact, like search results) -->
+                                        <div v-if="link.target" class="result-links-section">
+                                            <div class="links-container">
+                                                <div class="links-title">
+                                                    <span>🔗 Related</span>
+                                                    <span class="links-count">({{ relatedItems(link).length }})</span>
+                                                </div>
+                                                <div v-if="relatedItems(link).length > 0" class="links-list">
+                                                    <template v-if="!expandedRelatedLinks.has(link.link_id)">
+                                                        <div
+                                                            v-for="(rl, rlIndex) in relatedItems(link).slice(0, 3)"
+                                                            :key="`${rl.link_id}-${rlIndex}`"
+                                                            class="link-item"
+                                                        >
+                                                            <RouterLink :to="{ name: 'object', params: { uid: rl.target.thing_id } }" class="link-target">
+                                                                <Image :node-id="rl.target.thing_id" :type="rl.target.type" width="14px" class="link-icon" />
+                                                                <span class="link-name">{{ $truncateText(rl.target.name || rl.name || $t('Related'), 30) }}</span>
+                                                            </RouterLink>
+                                                        </div>
+                                                        <button
+                                                            v-if="relatedItems(link).length > 3"
+                                                            type="button"
+                                                            class="more-links"
+                                                            @click="toggleLinkRelated(link)"
+                                                        >
+                                                            +{{ relatedItems(link).length - 3 }} more
+                                                        </button>
+                                                    </template>
+                                                    <RelatedList
+                                                        v-else
+                                                        :links="relatedItems(link)"
+                                                        :level="1"
+                                                        :on-expand="expandLinkTarget"
+                                                        :exclude-id="object?.thing_id"
+                                                    />
+                                                </div>
                                                 <button
+                                                    v-else
                                                     type="button"
                                                     class="btn btn-outline-secondary btn-sm"
                                                     @click="toggleLinkRelated(link)"
                                                 >
-                                                    {{ expandedRelatedLinks.has(link.link_id) ? $t('Hide related') : $t('Show related') }}
+                                                    {{ $t('Show related') }}
                                                 </button>
-                                                <RelatedList
-                                                    v-if="expandedRelatedLinks.has(link.link_id)"
-                                                    :links="link.target.links || []"
-                                                    :level="1"
-                                                    :on-expand="expandLinkTarget"
-                                                />
-                                            </div>
-
-                                            <div v-if="authenticated && editMode" class="link-actions">
-                                                <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
-                                                <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
                                             </div>
                                         </div>
                                     </div>
@@ -375,12 +406,20 @@ const serverError = ref(false);
 
 const { loadDeeper } = useRelatedExpansion();
 
+// Related items shown in a link's right-column panel: the target's links,
+// minus the object currently being viewed (a back-link to it is redundant).
+const relatedItems = (link) => {
+    const links = link.target?.links || [];
+    return links.filter(l => l.target?.thing_id !== object.value?.thing_id);
+};
+
 // Load one more level of related objects for a link's target on demand.
 const expandLinkTarget = async (link) => {
     const targetId = link.target?.thing_id;
     if (!targetId) return;
     try {
-        link.target.links = await loadDeeper(targetId, 1);
+        const deeper = await loadDeeper(targetId, 1);
+        link.target.links = deeper.filter(l => l.target?.thing_id !== object.value?.thing_id);
     } catch (error) {
         console.error('Object.vue - failed to load deeper related objects:', error);
     }
@@ -396,7 +435,7 @@ const toggleLinkRelated = async (link) => {
         expandedRelatedLinks.value = set;
         return;
     }
-    if (!link.target?.links?.length) {
+    if (!relatedItems(link).length) {
         await expandLinkTarget(link);
     }
     set.add(key);
@@ -525,9 +564,10 @@ const getObject = async () => {
     try {
         loaded.value = false;
         serverError.value = false;
-        // depth=1 attaches a shallow `target` to each direct link so the links
-        // section can expand related objects one more level on demand.
-        const response = await axios.get(`/object/${route.params.uid}?depth=1`);
+        // depth=2 attaches a `target` to each direct link AND pre-fills the
+        // related items of those targets, so the right-column panel can show
+        // a compact summary of each link's related objects immediately.
+        const response = await axios.get(`/object/${route.params.uid}?depth=2`);
         object.value = response.data.data;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
@@ -998,5 +1038,14 @@ watch(() => object.value, (newObject) => {
     font-size: 0.85rem;
     color: #6c757d;
     word-break: break-all;
+}
+/* The global .more-links is styled for a div; as a button it needs a reset. */
+button.more-links {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
 }
 </style>

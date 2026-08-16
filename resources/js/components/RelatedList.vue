@@ -1,7 +1,7 @@
 <template>
     <div class="related-list">
         <div
-            v-for="(link, idx) in links"
+            v-for="(link, idx) in visibleLinks"
             :key="linkKey(link, idx)"
             class="related-item"
             :style="indentStyle"
@@ -39,7 +39,7 @@
                 v-if="isOpen(linkKey(link, idx)) && link.target && link.target.links && link.target.links.length"
                 class="related-children"
             >
-                <RelatedList :links="link.target.links" :level="level + 1" :on-expand="onExpand" />
+                <RelatedList :links="link.target.links" :level="level + 1" :on-expand="onExpand" :exclude-id="excludeId" />
             </div>
         </div>
     </div>
@@ -73,12 +73,23 @@ const props = defineProps({
         type: Function,
         default: null,
     },
+    // Thing id to hide everywhere in this subtree — e.g. the object currently
+    // being viewed on the object page (a back-link to it is redundant).
+    excludeId: {
+        type: String,
+        default: null,
+    },
 });
 
 defineOptions({ name: 'RelatedList' });
 
 const { t } = useI18n();
 const { isOpen, toggle } = useRelatedExpansion();
+
+const visibleLinks = computed(() => {
+    if (!props.excludeId) return props.links;
+    return props.links.filter(l => l.target?.thing_id !== props.excludeId);
+});
 
 const indentStyle = computed(() => ({ paddingLeft: `${(props.level - 1) * 14}px` }));
 

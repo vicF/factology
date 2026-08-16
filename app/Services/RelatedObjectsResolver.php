@@ -37,7 +37,10 @@ class RelatedObjectsResolver
      */
     public function forObject(string $rootId, int $depth, int $breadth): array
     {
-        $linksByParent = $this->resolveLevels([$rootId], $depth, $breadth, seedVisited: [$rootId]);
+        // The top level is unlimited so every direct link gets a `target`
+        // (the detail page's flat list is the source of truth for what is
+        // shown); only the top `breadth` links recurse into deeper levels.
+        $linksByParent = $this->resolveLevels([$rootId], $depth, $breadth, seedVisited: [$rootId], topLevelBreadth: null);
 
         return $this->assembleTree($rootId, $linksByParent, $depth);
     }
@@ -58,8 +61,9 @@ class RelatedObjectsResolver
         }
 
         // Level 1 only; roots are not deduped against each other so a link
-        // between two search results is still shown from both sides.
-        $linksByParent = $this->resolveLevels($rootIds, 1, $breadth, seedVisited: []);
+        // between two search results is still shown from both sides. The top
+        // level is capped at `breadth` for search results.
+        $linksByParent = $this->resolveLevels($rootIds, 1, $breadth, seedVisited: [], topLevelBreadth: $breadth);
 
         foreach ($rootIds as $rootId) {
             $result[$rootId] = $this->assembleTree($rootId, $linksByParent, 1);
@@ -73,12 +77,15 @@ class RelatedObjectsResolver
      * ['link' => flat link stdClass with `target` set, 'child_id' => string,
      *  'sort' => [richness, has_link_start, link_start, record_updated, name]].
      *
-     * @param array $frontier    ids to expand from
-     * @param int   $depth       max levels
-     * @param int   $breadth     max links per parent per level
-     * @param array $seedVisited ids treated as already visited BEFORE level 1
+     * @param array     $frontier        ids to expand from
+     * @param int       $depth           max levels
+     * @param int       $breadth         max links per parent at deeper levels
+     * @param array     $seedVisited     ids treated as already visited BEFORE level 1
+     * @param int|null  $topLevelBreadth max links at level 1; null = unlimited
+     *                                   (every direct link keeps a `target`, but
+     *                                   only the top `breadth` recurse deeper)
      */
-    protected function resolveLevels(array $frontier, int $depth, int $breadth, array $seedVisited): array
+    protected function resolveLevels(array $frontier, int $depth, int $breadth, array $seedVisited, ?int $topLevelBreadth = null): array
     {
         $linksByParent = [];
         $visited = [];
@@ -147,14 +154,21 @@ class RelatedObjectsResolver
                     $levelItems[$parent][$i] = $item;
                 }
                 $levelItems[$parent] = array_values($levelItems[$parent]);
-
                 $levelItems[$parent] = $this->rank($levelItems[$parent]);
-                $levelItems[$parent] = array_slice($levelItems[$parent], 0, $breadth);
 
-                foreach ($levelItems[$parent] as $item) {
-                    $visited[$item['child_id']] = true;
-                    $nextFrontier[] = $item['child_id'];
+                // Level 1 may keep every direct link (with a `target`); at
+                // deeper levels, cap per parent. Only the top `breadth` links
+                // of each parent advance the frontier (recurse deeper).
+                $cap = ($level === 1 && $topLevelBreadth === null) ? null : $breadth;
+                $kept = $cap === null ? $levelItems[$parent] : array_slice($levelItems[$parent], 0, $cap);
+                $nestable = array_slice($levelItems[$parent], 0, $breadth);
+
+                foreach ($kept as $item) {
+                    $visited[$item['child_id']] = true; // dedupe to lowest level
                     $linksByParent[$parent][] = $item;
+                }
+                foreach ($nestable as $item) {
+                    $nextFrontier[] = $item['child_id'];
                 }
             }
 
