@@ -647,6 +647,14 @@ class ApiController extends BaseController
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
+            // A class-tree filter means "objects of these classes". Classes and
+            // link types can themselves be members of a class (LINK_TO_CLASS),
+            // so without an explicit type filter the selected class nodes leak
+            // into the results. Default to objects-only unless the caller asked
+            // for another type explicitly.
+            if (empty($requestBody['type'])) {
+                $query->where('things.type', 3);
+            }
         }
 
         if (@$requestBody['search']) {
@@ -743,7 +751,13 @@ class ApiController extends BaseController
         ];
         $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $data = $query->orderBy($sortCol, $sortDir)->limit(100)->get();
+        // groupBy(thing_id): the class filter (and favorites join) can match
+        // an object through several links at once; group by the PK so each
+        // object appears exactly once. (Postgres accepts selecting the other
+        // columns because they are functionally dependent on the PK, and it
+        // works even though things.data is plain `json`, which DISTINCT can't
+        // dedupe.)
+        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];

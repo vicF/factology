@@ -310,6 +310,79 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('end', $json['data'][0]);
     }
 
+    public function testSearchWithClassesReturnsEachObjectOnce(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // Object linked to two selected classes (Something AND Event): with the
+        // recursive class filter the expanded set contains both, and without a
+        // dedupe step the leftJoin would return this object twice.
+        $thingA = $this->createTestObject($user, [
+            'name' => 'Dup Class Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING],
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // Object linked to a single selected class.
+        $thingB = $this->createTestObject($user, [
+            'name' => 'Single Class Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING],
+            ],
+        ]);
+
+        $res = $this->postJson('/api/v1/object', ['classes' => [UUID::SOMETHING, UUID::EVENT]]);
+        $res->assertStatus(200);
+
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertSame(
+            1,
+            $ids->filter(fn ($id) => $id === $thingA)->count(),
+            'Object linked to two selected classes must appear exactly once'
+        );
+        $this->assertSame(
+            1,
+            $ids->filter(fn ($id) => $id === $thingB)->count(),
+            'Object linked to one selected class must appear exactly once'
+        );
+    }
+
+    public function testSearchWithClassesDoesNotReturnClassNodes(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A real object of class Event.
+        $objectId = $this->createTestObject($user, [
+            'name' => 'Event Member Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // A CLASS node that is itself a member of Event (LINK_TO_CLASS). It
+        // matches the same class filter but must NOT appear in the results —
+        // a class-tree filter selects objects, never the class nodes.
+        $classId = $this->createTestObject($user, [
+            'name' => 'Leak Class Member',
+            'type' => UUID::G_CLASS,
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // No `type` in the body: the backend must default to objects-only.
+        $res = $this->postJson('/api/v1/object', ['classes' => [UUID::EVENT]]);
+        $res->assertStatus(200);
+
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($objectId), 'The real object must be returned');
+        $this->assertFalse($ids->contains($classId), 'A class node must not leak into the results');
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();
