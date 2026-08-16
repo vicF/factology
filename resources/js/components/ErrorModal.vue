@@ -18,13 +18,13 @@
                             class="btn btn-sm btn-outline-secondary"
                             @click="showDetails = !showDetails"
                         >
-                            {{ showDetails ? 'Hide technical details' : 'Show technical details' }}
+                            {{ showDetails ? $t('Hide technical details') : $t('Show technical details') }}
                         </button>
                         <pre v-if="showDetails" class="mt-2 p-2 bg-light border rounded" style="font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all;">{{ details }}</pre>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="close">Close</button>
+                    <button type="button" class="btn btn-secondary" @click="close">{{ $t('Close') }}</button>
                 </div>
             </div>
         </div>

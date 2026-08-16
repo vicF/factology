@@ -22,7 +22,7 @@
                                     name="name"
                                     v-model="user.name"
                                     id="name"
-                                    placeholder="Enter name"
+                                    :placeholder="$t('Enter name')"
                                     class="form-control"
                                     autocomplete="name"
                                     required
@@ -36,7 +36,7 @@
                                     name="email"
                                     v-model="user.email"
                                     id="email"
-                                    placeholder="Enter Email"
+                                    :placeholder="$t('Enter Email')"
                                     class="form-control"
                                     autocomplete="email"
                                     required
@@ -50,7 +50,7 @@
                                     name="password"
                                     v-model="user.password"
                                     id="password"
-                                    placeholder="Enter Password"
+                                    :placeholder="$t('Enter Password')"
                                     class="form-control"
                                     autocomplete="new-password"
                                     required
@@ -64,7 +64,7 @@
                                     name="password_confirmation"
                                     v-model="user.password_confirmation"
                                     id="password_confirmation"
-                                    placeholder="Confirm Password"
+                                    :placeholder="$t('Confirm Password')"
                                     class="form-control"
                                     autocomplete="new-password"
                                     required
@@ -107,7 +107,7 @@
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title">{{ legalDocTitle }}</h5>
-                                        <button type="button" class="close" @click="showLegalModal = false" aria-label="Close">
+                                        <button type="button" class="close" @click="showLegalModal = false" :aria-label="$t('Close')">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>

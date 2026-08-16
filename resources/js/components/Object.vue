@@ -386,14 +386,14 @@ const doToggle = (thingId, makePublic, onSuccess) => {
         return;
     }
     if (makePublic) {
-        confirmTitle.value = 'Make Public';
-        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
-        confirmButtonText.value = 'Make Public';
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
-        confirmButtonText.value = 'Make Private';
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
     pendingToggle = { thingId, makePublic, onSuccess };

@@ -20,12 +20,12 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ displayName }}</router-link>
-                    <span v-if="authenticated && editMode && !nodePublic" class="private-icon" title="Private" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
-                    <span v-if="authenticated && editMode && nodePublic && showIcons" class="public-icon" title="Public" @click.stop="toggleVisibility(false)"><IconPublic /></span>
+                    <span v-if="authenticated && editMode && !nodePublic" class="private-icon" :title="$t('Private')" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
+                    <span v-if="authenticated && editMode && nodePublic && showIcons" class="public-icon" :title="$t('Public')" @click.stop="toggleVisibility(false)"><IconPublic /></span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && editMode && showIcons }">
-                    <span class="add-subclass" @click="openCreateSubclassModal" :title="`Add child class below &quot;${displayName}&quot;`">+</span>
-                    <span class="add-object" @click="openCreateObjectModal" :title="`Create object of class &quot;${displayName}&quot;`">📦</span>
+                    <span class="add-subclass" @click="openCreateSubclassModal" :title="$t('Add child class below {name}', { name: displayName })">+</span>
+                    <span class="add-object" @click="openCreateObjectModal" :title="$t('Create object of class {name}', { name: displayName })">📦</span>
                 </span>
             </div>
         </div>
@@ -57,6 +57,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useSearchStore } from '../stores/search';
 import { eventBus } from '../eventBus';
@@ -73,6 +74,7 @@ const authStore = useAuthStore();
 const authenticated = computed(() => authStore.authenticated);
 const uiStore = useUiStore();
 const editMode = computed(() => uiStore.editMode);
+const { t } = useI18n();
 
 // Props definition
 const props = defineProps({
@@ -140,14 +142,14 @@ const toggleVisibility = (makePublic) => {
         return;
     }
     if (makePublic) {
-        confirmTitle.value = 'Make Public';
-        confirmMessage.value = 'Make this class visible to everyone?';
-        confirmButtonText.value = 'Make Public';
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this class visible to everyone?');
+        confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this class private? Only you will be able to see it.';
-        confirmButtonText.value = 'Make Private';
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this class private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
     pendingToggle = makePublic;
