@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { pruneEmptyNodes } from '../utils/classTree';
 
 export const useSearchStore = defineStore('search', () => {
     const searchQuery = ref('');
@@ -32,6 +33,12 @@ export const useSearchStore = defineStore('search', () => {
     function uncheckSubtree(ids) {
         const set = new Set(ids);
         checkedItems.value = checkedItems.value.filter(id => !set.has(id));
+    }
+
+    // After unchecking, drop internal nodes that lost all their selected
+    // descendants, cascading up to the tree root (see pruneEmptyNodes).
+    function pruneEmptyAncestors(treeNodes) {
+        checkedItems.value = pruneEmptyNodes(treeNodes, checkedItems.value);
     }
 
     function setTypeThing(value) {
@@ -83,7 +90,7 @@ export const useSearchStore = defineStore('search', () => {
     return {
         searchQuery, checkedItems, typeThing, typeClass,
         sortBy, sortOrder, visibility, dateFrom, dateTo, owner, server, filtersVisible,
-        setSearchQuery, checkSubtree, uncheckSubtree, setTypeThing, setTypeClass,
+        setSearchQuery, checkSubtree, uncheckSubtree, pruneEmptyAncestors, setTypeThing, setTypeClass,
         setFilter, resetFilters, toggleFilters, getFilterParams,
     };
 });

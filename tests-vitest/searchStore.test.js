@@ -38,4 +38,34 @@ describe('search store class selection', () => {
         store.uncheckSubtree(['zzz'])
         expect(store.checkedItems).toEqual(['a'])
     })
+
+    it('pruneEmptyAncestors drops empty internal nodes up to the root', () => {
+        const store = useSearchStore()
+        // Something → Event → [Disaster, Festival] ; Something → Place
+        const tree = [
+            { id: 'something', nodes: [
+                { id: 'event', nodes: [{ id: 'disaster' }, { id: 'festival' }] },
+                { id: 'place' },
+            ] },
+        ]
+        store.checkSubtree(['something', 'event', 'disaster', 'festival', 'place'])
+        store.uncheckSubtree(['disaster', 'festival'])
+        store.pruneEmptyAncestors(tree)
+        // Event lost all selected descendants and must be removed; Something
+        // still has Place.
+        expect(store.checkedItems).toEqual(['something', 'place'])
+    })
+
+    it('pruneEmptyAncestors empties the whole set when nothing remains selected', () => {
+        const store = useSearchStore()
+        const tree = [
+            { id: 'something', nodes: [
+                { id: 'event', nodes: [{ id: 'disaster' }] },
+            ] },
+        ]
+        store.checkSubtree(['something', 'event', 'disaster'])
+        store.uncheckSubtree(['disaster'])
+        store.pruneEmptyAncestors(tree)
+        expect(store.checkedItems).toEqual([])
+    })
 })

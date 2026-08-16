@@ -59,6 +59,7 @@
 import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { useSearchStore } from '../stores/search';
+import { useObjectsStore } from '../stores/objects';
 import { eventBus } from '../eventBus';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
@@ -116,6 +117,7 @@ const displayName = computed(() => fieldText(props.name, props.translations));
 defineOptions({ name: 'tree-menu' });
 
 const store = useSearchStore();
+const objectsStore = useObjectsStore();
 
 // State
 const treeState = useTreeState();
@@ -176,7 +178,12 @@ const executeToggle = async (makePublic) => {
 // Computed
 const subtreeIds = computed(() => [props.id, ...collectSubtreeIds(props.nodes)]);
 const nodeState = computed(() => nodeSelectionState(props.id, props.nodes, store.checkedItems));
-const isChecked = computed(() => nodeState.value === 'checked' || nodeState.value === 'semi');
+// :checked must only be true for fully-checked nodes. Semi nodes render the
+// dash via :indeterminate over an unchecked box, so clicking them toggles the
+// native checked false→true, which Vue then patches to a real check — the
+// stale-state bug (parent visually unchecked after re-checking a semi node)
+// came from binding checked=true on semi nodes.
+const isChecked = computed(() => nodeState.value === 'checked');
 const isSemi = computed(() => nodeState.value === 'semi');
 const showToggle = computed(() => props.nodes && props.nodes.length > 0);
 const indent = computed(() => ({ marginLeft: `${props.depth * 15}px` }));
@@ -194,6 +201,9 @@ const onCheckboxChange = () => {
         store.checkSubtree(subtreeIds.value);
     } else if (nodeState.value === 'checked') {
         store.uncheckSubtree(subtreeIds.value);
+        // Drop now-empty parents (and their ancestors) that lost every
+        // selected descendant, up to the tree root.
+        store.pruneEmptyAncestors(objectsStore.rootNodes);
     } else {
         store.checkSubtree(subtreeIds.value);
     }
