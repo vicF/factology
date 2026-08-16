@@ -203,6 +203,22 @@
                                                 {{ link.translation }}
                                             </div>
 
+                                            <div v-if="link.target" class="link-related mt-1">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-secondary btn-sm"
+                                                    @click="toggleLinkRelated(link)"
+                                                >
+                                                    {{ expandedRelatedLinks.has(link.link_id) ? $t('Hide related') : $t('Show related') }}
+                                                </button>
+                                                <RelatedList
+                                                    v-if="expandedRelatedLinks.has(link.link_id)"
+                                                    :links="link.target.links || []"
+                                                    :level="1"
+                                                    :on-expand="expandLinkTarget"
+                                                />
+                                            </div>
+
                                             <div v-if="authenticated && editMode" class="link-actions">
                                                 <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
                                                 <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
@@ -336,6 +352,8 @@ import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externa
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
+import RelatedList from './RelatedList.vue';
+import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 
@@ -354,6 +372,36 @@ const editMode = computed(() => uiStore.editMode);
 const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
+
+const { loadDeeper } = useRelatedExpansion();
+
+// Load one more level of related objects for a link's target on demand.
+const expandLinkTarget = async (link) => {
+    const targetId = link.target?.thing_id;
+    if (!targetId) return;
+    try {
+        link.target.links = await loadDeeper(targetId, 1);
+    } catch (error) {
+        console.error('Object.vue - failed to load deeper related objects:', error);
+    }
+};
+
+// Per-link related-subtree visibility on the object page.
+const expandedRelatedLinks = ref(new Set());
+const toggleLinkRelated = async (link) => {
+    const key = link.link_id;
+    const set = new Set(expandedRelatedLinks.value);
+    if (set.has(key)) {
+        set.delete(key);
+        expandedRelatedLinks.value = set;
+        return;
+    }
+    if (!link.target?.links?.length) {
+        await expandLinkTarget(link);
+    }
+    set.add(key);
+    expandedRelatedLinks.value = set;
+};
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 const hoveredLink = ref(null);
@@ -477,7 +525,9 @@ const getObject = async () => {
     try {
         loaded.value = false;
         serverError.value = false;
-        const response = await axios.get(`/object/${route.params.uid}`);
+        // depth=1 attaches a shallow `target` to each direct link so the links
+        // section can expand related objects one more level on demand.
+        const response = await axios.get(`/object/${route.params.uid}?depth=1`);
         object.value = response.data.data;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);

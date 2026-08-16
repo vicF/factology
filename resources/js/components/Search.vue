@@ -100,7 +100,10 @@
                                                 <span>🔗 Related</span>
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
-                                            <div class="links-list">
+                                            <div v-if="shownAll.has(thing.thing_id)" class="links-list">
+                                                <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" />
+                                            </div>
+                                            <div v-else class="links-list">
                                                 <div
                                                     v-for="(link, linkIndex) in thing.links.slice(0, 3)"
                                                     :key="`${link.link_type_id}-${linkIndex}`"
@@ -115,9 +118,14 @@
                                                         <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
                                                     </RouterLink>
                                                 </div>
-                                                <div v-if="thing.links.length > 3" class="more-links">
+                                                <button
+                                                    v-if="thing.links.length > 3"
+                                                    class="more-links"
+                                                    type="button"
+                                                    @click="toggleShowAll(thing.thing_id)"
+                                                >
                                                     +{{ thing.links.length - 3 }} more
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -155,6 +163,8 @@ import { useAuthStore } from '../stores/auth';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
+import RelatedList from "./RelatedList.vue";
+import { useRelatedExpansion } from "../composables/useRelatedExpansion";
 
 const props = defineProps({
     searchText: String,
@@ -173,6 +183,31 @@ const objects = ref([]);
 const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
+
+const { loadDeeper } = useRelatedExpansion();
+
+// Per-result unfold state for the Related panel ("+N more" → show all direct links).
+const shownAll = ref(new Set());
+const toggleShowAll = (thingId) => {
+    const set = new Set(shownAll.value);
+    if (set.has(thingId)) {
+        set.delete(thingId);
+    } else {
+        set.add(thingId);
+    }
+    shownAll.value = set;
+};
+
+// Load one more level of related objects for a link target on demand.
+const expandTarget = async (link) => {
+    const targetId = link.target?.thing_id;
+    if (!targetId) return;
+    try {
+        link.target.links = await loadDeeper(targetId, 1);
+    } catch (error) {
+        console.error('Search.vue - failed to load deeper related objects:', error);
+    }
+};
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
