@@ -281,9 +281,17 @@ const exportData = async () => {
 };
 
 const getObjects = async () => {
-    const type = [];
+    let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
+
+    // The class-tree filter only applies to objects: classes are linked to
+    // their members (LINK_TO_CLASS), never the other way round, so without
+    // a things-only type the selected class nodes themselves leak into the
+    // results. When the tree selection is active we always search objects.
+    if (searchStore.checkedItems.length > 0) {
+        type = [3];
+    }
 
     processing.value = true;
     loaded.value = false;

@@ -644,6 +644,14 @@ class ApiController extends BaseController
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
+            // A class-tree filter means "objects of these classes". Classes and
+            // link types can themselves be members of a class (LINK_TO_CLASS),
+            // so without an explicit type filter the selected class nodes leak
+            // into the results. Default to objects-only unless the caller asked
+            // for another type explicitly.
+            if (empty($requestBody['type'])) {
+                $query->where('things.type', 3);
+            }
         }
 
         if (@$requestBody['search']) {
