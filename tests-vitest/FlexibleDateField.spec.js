@@ -1,5 +1,6 @@
 // tests-vitest/FlexibleDateField.spec.js
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { describe, it, expect } from 'vitest'
 import FlexibleDateField from '@/components/Fields/FlexibleDateField.vue'
 import i18n from '@/lang/i18n'
@@ -96,5 +97,28 @@ describe('FlexibleDateField', () => {
         expect(payload.start).toBeNull()
         expect(payload.end).toBe('15000101000000')
         expect(payload.meta.qualifier).toBe('before')
+    })
+
+    it('does NOT infer "between" for a legacy start+end pair without meta', async () => {
+        // Old objects store a plain exact range in start/end with no meta.
+        // "between" (uncertainty) is a new concept; it must not be assumed.
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: {
+                isEditable: true,
+                side: 'start',
+                start: '2026081112',
+                end: '2026081122',
+                startMeta: null,
+                endMeta: null,
+            },
+        })
+
+        await nextTick()
+        const qualifier = wrapper.find('select').element.value
+        expect(qualifier).toBe('exact')
+        // The preview must echo a plain exact bound, not a "between" range.
+        expect(wrapper.find('code').text()).not.toContain('between')
+        expect(wrapper.find('code').text()).toContain('2026-08-11')
     })
 })

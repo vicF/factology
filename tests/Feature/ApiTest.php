@@ -760,4 +760,34 @@ class ApiTest extends TestCase
         $row = DB::table('things')->where('thing_id', $uniqueId)->first();
         $this->assertSame('-15000101235959', $row->start);
     }
+
+    /**
+     * Link descriptions: the detail endpoint exposes BOTH endpoint names for
+     * every link (`one_name` = one_thing_id's name, `name` = other_thing_id's
+     * name) regardless of direction, so the frontend can render incoming and
+     * outgoing links alike (previously an incoming link lost the one endpoint
+     * and rendered "Unknown").
+     */
+    public function testObjectDetailLinksExposeBothEndpointNames(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $holder = $this->createTestObject($user, ['name' => 'Detail Link Holder']);
+        $target = $this->createTestObject($user, ['name' => 'Detail Link Target']);
+
+        // holder → target: from the target's perspective this is an INCOMING
+        // link, the case that previously dropped the one-endpoint name.
+        $this->putApi('/api/v1/object/' . $holder, array_merge(
+            $this->getFullObjectDataForUpdate($holder),
+            ['links_to_add' => [['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => $target]]],
+        ));
+
+        $json = $this->getApi('/api/v1/object/' . $target);
+        $links = $json['data']['links'] ?? [];
+        $incoming = collect($links)->firstWhere('one_thing_id', $holder);
+        $this->assertNotNull($incoming, 'target should have an incoming link from the holder');
+        $this->assertSame('Detail Link Holder', $incoming['one_name']);
+        $this->assertSame('Detail Link Target', $incoming['name']);
+    }
 }

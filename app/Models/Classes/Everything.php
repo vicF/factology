@@ -371,12 +371,17 @@ class Everything
             $thing['owner_name'] = DB::table('things')->where('thing_id', $thing['owner'])->value('name');
         }
 
+        // Both endpoint names are exposed with a single contract so the
+        // frontend can render either direction without knowing which endpoint
+        // is the current object: `name` is always other_thing_id's name and
+        // `one_name` always one_thing_id's name (same as ApiController::search).
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
@@ -384,7 +389,8 @@ class Everything
         ->where('links.other_thing_id', $thing['thing_id'])
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
 

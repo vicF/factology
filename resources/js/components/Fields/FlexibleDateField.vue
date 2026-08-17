@@ -87,16 +87,21 @@ function initFromStored() {
                 .join(', ')
         }
     } else {
-        // Infer a simple structure from the columns.
+        // Infer a simple structure from the columns. A legacy start+end pair
+        // with no meta is a range of EXACT bounds (e.g. an event that lasted
+        // from 12:00 to 22:00) — NOT the "between" qualifier, which implies
+        // uncertainty and is a brand-new concept no stored object has yet.
         const my = v != null && v !== '' ? v : null
-        const other = otherValue.value != null && otherValue.value !== '' ? otherValue.value : null
-        if (my && other) qualifier.value = QUALIFIER_BETWEEN
-        else if (my && !other) qualifier.value = QUALIFIERS[0]
+        if (my) qualifier.value = QUALIFIERS[0]
         else qualifier.value = QUALIFIER_UNKNOWN
         era.value = Era.GREGORIAN
         precision.value = PRECISIONS[2]
         comment.value = ''
         text.value = my ? formatBoundLocalized(String(my), { precision: precision.value, era: era.value }, t) : ''
+        // Keep the other bound around: it pre-fills the upper-bound input if the
+        // user switches this field to "between", and is otherwise edited by the
+        // sibling field for this legacy exact-range shape.
+        const other = otherValue.value != null && otherValue.value !== '' ? otherValue.value : null
         text2.value = other ? formatBoundLocalized(String(other), { precision: precision.value, era: era.value }, t) : ''
         alternativesText.value = ''
     }
