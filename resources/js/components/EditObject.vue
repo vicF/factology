@@ -744,7 +744,7 @@ const initializeData = () => {
             return;
         }
 
-        if (formData.value.type === CLASS_TYPE && item.link_type_id === LINK_TO_PARENT) {
+        if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && item.link_type_id === LINK_TO_PARENT) {
             const parentId = linkItem.one_thing_id || linkItem.other_thing_id;
             if (parentId) {
                 parentLinkData.value.other_thing_id = parentId;
@@ -764,7 +764,7 @@ const initializeData = () => {
             classLinkData.value.other_thing_id = props.object.class.thing_id;
             classLinkData.value.link_id = props.object.class?.link_id || null;
         }
-        if (formData.value.type === CLASS_TYPE && props.object.links) {
+        if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && props.object.links) {
             const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
             if (parentLinkFromLinks) {
                 let parentId;
@@ -929,7 +929,7 @@ const submitForm = async () => {
             };
         }
 
-        if (formData.value.type === CLASS_TYPE && parentLinkData.value.other_thing_id) {
+        if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && parentLinkData.value.other_thing_id) {
             payload.parent = {
                 one_thing_id: parentLinkData.value.other_thing_id,
                 link_type_id: LINK_TO_PARENT,
@@ -972,7 +972,7 @@ const submitForm = async () => {
             response = await axios.put(`/object/${formData.value.thing_id}`, payload);
             cacheStore.cacheObject(formData.value.thing_id, response.data.data || response.data, formData.value.type);
             emit('object-updated', response.data);
-            if (formData.value.type === CLASS_TYPE) {
+            if (formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) {
                 // Reload the authoritative class tree so renames and new
                 // translations (localized display names) show in the sidebar.
                 objectsStore.loadClassTree();
@@ -984,6 +984,11 @@ const submitForm = async () => {
             emit('object-created', response.data);
             if (formData.value.type === CLASS_TYPE) {
                 objectsStore.addClassToTree(formData.value.thing_id, formData.value.name, parentLinkData.value.other_thing_id);
+            } else if (formData.value.type === LINK_TYPE) {
+                // Reload from the server so the new node carries its real type
+                // (addClassToTree omits it), keeping the tree's create actions
+                // correct for the freshly added link type.
+                objectsStore.loadClassTree();
             }
             if (props.callback && props.callback.type === 'link-created') {
                 eventBus.emit('link-created', {
