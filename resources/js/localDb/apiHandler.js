@@ -142,16 +142,16 @@ async function handleSearch(body) {
     }
 
     // Apply sorting (mirror server ApiController::search):
-    //   default sort_by=updated → _updatedAt, default order desc
+    //   default sort_by=start → start, default order desc
     const sortMap = {
         updated: '_updatedAt',
         created: '_createdAt',
         start: 'start',
         name: 'name',
     };
-    const sortBy = params.sort_by || 'updated';
+    const sortBy = params.sort_by || 'start';
     const sortDir = (params.sort_order || 'desc') === 'asc' ? 1 : -1;
-    const sortKey = sortMap[sortBy] || '_updatedAt';
+    const sortKey = sortMap[sortBy] || 'start';
     results.sort((a, b) => {
         const va = a[sortKey];
         const vb = b[sortKey];

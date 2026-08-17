@@ -762,6 +762,31 @@ class ApiTest extends TestCase
     }
 
     /**
+     * Search defaults to sorting by start date DESC, with undated objects last
+     * (Postgres puts NULLs first on DESC without an explicit NULLS LAST).
+     */
+    public function testSearchDefaultsToStartDateDescending(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $this->createTestObject($user, ['name' => 'Sort Older', 'start' => '20200101']);
+        $this->createTestObject($user, ['name' => 'Sort Newer', 'start' => '20220101']);
+        $this->createTestObject($user, ['name' => 'Sort Middle', 'start' => '20210101']);
+        $this->createTestObject($user, ['name' => 'Sort Undated', 'start' => null, 'end' => null]);
+
+        $res = $this->postJson('/api/v1/object', []);
+        $res->assertStatus(200);
+
+        $ours = collect($res->json('things'))
+            ->whereIn('name', ['Sort Older', 'Sort Middle', 'Sort Newer', 'Sort Undated'])
+            ->pluck('name')
+            ->values()
+            ->all();
+        $this->assertSame(['Sort Newer', 'Sort Middle', 'Sort Older', 'Sort Undated'], $ours);
+    }
+
+    /**
      * Link descriptions: the detail endpoint exposes BOTH endpoint names for
      * every link (`one_name` = one_thing_id's name, `name` = other_thing_id's
      * name) regardless of direction, so the frontend can render incoming and

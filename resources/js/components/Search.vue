@@ -40,6 +40,11 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
+                                <div v-if="groupLabels[thingIndex]" class="date-group-header">
+                                    <span class="date-group-line"></span>
+                                    <span class="date-group-label">{{ groupLabels[thingIndex] }}</span>
+                                    <span class="date-group-line"></span>
+                                </div>
                                 <div class="result-content">
                                     <!-- LEFT: icon only -->
                                     <div class="result-icon-section">
@@ -142,13 +147,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
+import { currentLocale } from '../utils/localized.js';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
@@ -173,6 +179,42 @@ const processing = ref(false);
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+
+// ── Date-group delimiters (only meaningful when sorting by start date) ──────
+function dateGroupKey(start) {
+    if (!start) return null;
+    const s = String(start).replace(/^-/, '');
+    if (!/^\d+$/.test(s)) return null;
+    if (s.length <= 4) return 'y' + s;
+    const y = s.slice(0, 4);
+    const m = parseInt(s.slice(4, 6), 10);
+    return (m >= 1 && m <= 12) ? 'm' + y + '-' + String(m).padStart(2, '0') : 'y' + y;
+}
+
+function dateGroupLabel(key) {
+    if (!key) return null;
+    if (key[0] === 'y') return key.slice(1);
+    const m = key.match(/^m(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    const locale = currentLocale();
+    return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+        .format(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, 1));
+}
+
+// Header label aligned with each result row (null = no header before it).
+const groupLabels = computed(() => {
+    const labels = new Array(objects.value.length).fill(null);
+    if (searchStore.sortBy !== 'start') return labels;
+    let prevKey = null;
+    objects.value.forEach((thing, i) => {
+        const key = dateGroupKey(thing.start);
+        if (key !== prevKey) {
+            labels[i] = dateGroupLabel(key);
+            prevKey = key;
+        }
+    });
+    return labels;
+});
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 let quickMode = false;
@@ -396,3 +438,26 @@ onUnmounted(() => {
     eventBus.off('trigger-search', triggerSearchHandler);
 });
 </script>
+
+<style scoped>
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+
+.date-group-label {
+    white-space: nowrap;
+}
+</style>

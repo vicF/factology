@@ -782,15 +782,30 @@ class ApiController extends BaseController
             'start'   => 'start',
             'name'    => 'name',
         ];
-        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
+        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'start'] ?? 'start';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        // When sorting by a date column, undated objects (NULL) must go last
+        // regardless of direction — Postgres would otherwise put them first on
+        // DESC. Column names come from the fixed map above, so this is safe.
+        if ($sortCol === 'start') {
+            // Legacy values are unpadded (e.g. '2026081112' = 2026-08-11 12:00)
+            // and sort numerically as tiny numbers next to 14-digit canonicals
+            // ('20260809000000'), so 2026 objects could fall below the page
+            // limit. Compare the zero-extended key instead: multiplying by the
+            // power of ten that brings the digit count to 14 is monotonic for
+            // both positive and negative (BC) values, so the order is truly
+            // chronological.
+            $query->orderByRaw('start * POWER(10, GREATEST(0, 14 - LENGTH(start::text))) ' . $sortDir . ' NULLS LAST');
+        } else {
+            $query->orderBy($sortCol, $sortDir);
+        }
         // groupBy(thing_id): the class filter (and favorites join) can match
         // an object through several links at once; group by the PK so each
         // object appears exactly once. (Postgres accepts selecting the other
         // columns because they are functionally dependent on the PK, and it
         // works even though things.data is plain `json`, which DISTINCT can't
         // dedupe.)
-        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
+        $data = $query->groupBy('things.thing_id')->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
