@@ -23,6 +23,7 @@ class SearchRequest extends FormRequest
             'owner'      => 'nullable|string|max:255',
             'server'     => 'nullable|string|max:255',
             'filter_type' => 'nullable|string|in:owner,server',
+            'depth'      => 'nullable|integer|min:0|max:6',
         ];
     }
 

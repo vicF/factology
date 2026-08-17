@@ -8,7 +8,7 @@ class ThingResource extends JsonResource
 {
     public function toArray($request)
     {
-        return [
+        $out = [
             'thing_id'                => $this->thing_id,
             'name'                    => $this->name,
             'name_translations'       => $this->decodeJson($this->name_translations ?? null),
@@ -23,6 +23,11 @@ class ThingResource extends JsonResource
             'deleted'                 => (bool) $this->deleted,
             'data'                    => $this->decodeJson($this->data ?? null),
         ];
+        // Only emitted when the search resolver attached per-thing links.
+        if (isset($this->links)) {
+            $out['links'] = $this->links;
+        }
+        return $out;
     }
 
     /**

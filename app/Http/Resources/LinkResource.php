@@ -18,6 +18,11 @@ class LinkResource extends JsonResource
             'public'         => isset($this->public) ? (bool) $this->public : null,
             'name'           => $this->name ?? null,          // from things.name
             'link_name'      => $this->link_name ?? null,     // from link_types.name
+            'link_name_translations' => isset($this->link_name_translations)
+                ? (is_string($this->link_name_translations)
+                    ? (json_decode($this->link_name_translations, true) ?: null)
+                    : $this->link_name_translations)
+                : null,
         ];
     }
 }

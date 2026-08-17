@@ -6,6 +6,7 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\RelatedObjectsResolver;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
@@ -41,10 +42,12 @@ class ApiController extends BaseController
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function get($id)
+    public function get($id, Request $request)
     {
         try {
-            $data = Everything::getDataById($id);
+            $depth = (int) $request->query('depth', 0);
+            $depth = min(max($depth, 0), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+            $data = Everything::getDataById($id, $depth);
             return response()->json(
                 [
                     'data'    => $data,
@@ -881,6 +884,7 @@ class ApiController extends BaseController
         if (!empty($ids)) {
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->addSelect('link_types.name_translations as link_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
@@ -892,8 +896,25 @@ class ApiController extends BaseController
                 ->get()->toArray();
         }
 
+        // Multilevel related objects: attach direct related links (with a
+        // shallow resolved `target`) to each result thing. Deeper levels are
+        // fetched on demand via GET /object/{id}?depth=N.
+        $depth = (int) ($requestBody['depth'] ?? RelatedObjectsResolver::DEFAULT_SEARCH_DEPTH);
+        $depth = min(max($depth, 0), RelatedObjectsResolver::SEARCH_DEPTH_CAP);
+
+        $linksByRoot = $depth > 0
+            ? (new RelatedObjectsResolver)->forMany($ids, RelatedObjectsResolver::SEARCH_BREADTH)
+            : [];
+
+        $things = $data->map(function ($thing) use ($linksByRoot) {
+            if (isset($linksByRoot[$thing->thing_id])) {
+                $thing->links = $linksByRoot[$thing->thing_id];
+            }
+            return $thing;
+        });
+
         return response()->json([
-            'things' => ThingResource::collection($data),
+            'things' => ThingResource::collection($things),
             'links'  => LinkResource::collection($links),
         ]);
 
