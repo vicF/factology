@@ -348,9 +348,10 @@ describe('Local API multilevel related (mirrors server depth)', () => {
         const directTargets = obj.links.map(l => l.target?.thing_id).sort();
         expect(directTargets).toEqual([B, C].sort());
 
-        // B's deeper links are cut — both A and C are already at level 1
+        // B's deeper links are cut — both A and C are already at level 1,
+        // so B (a recursed node) carries an empty target.links.
         const bLink = obj.links.find(l => l.target?.thing_id === B);
-        expect(bLink.target.links).toBeUndefined();
+        expect(bLink.target.links).toEqual([]);
     });
 
     it('search with depth in the body attaches related links', async () => {

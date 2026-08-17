@@ -457,6 +457,7 @@ async function enrichLinks(links, currentThingId) {
             ...link,
             name: target?.name ?? link.name ?? null,
             link_name: linkType?.name ?? link.link_name ?? null,
+            link_name_translations: linkType?.name_translations ?? link.link_name_translations ?? null,
             type: target?.type ?? link.type,
             target_public: target?.public ?? link.target_public,
             // Resolved other endpoint, mirroring the server's `link.target`.
@@ -567,9 +568,10 @@ async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = 
             const nextVisited = new Set([...visited, ...childIds]);
             const childLinks = await listLinksForThing(tid);
             const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null);
-            if (nested.length > 0) {
-                link.target.links = nested;
-            }
+            // Recursed links always carry `target.links` (possibly empty) —
+            // mirrors the server, so the frontend can distinguish a resolved
+            // but empty node from one that was never loaded.
+            link.target.links = nested;
         }
         result.push(link);
     }

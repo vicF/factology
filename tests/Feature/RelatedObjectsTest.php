@@ -247,9 +247,11 @@ class RelatedObjectsTest extends TestCase
         sort($expected);
         $this->assertEquals($expected, $targetIds);
 
-        // B's deeper links are cut (both A and C are already visited at level 1).
+        // B's deeper links are cut (both A and C are already visited at level 1);
+        // B is a recursed node, so it carries an empty target.links.
         $bLink = collect($detail['links'])->firstWhere('target.thing_id', $b);
-        $this->assertArrayNotHasKey('links', $bLink['target']);
+        $this->assertArrayHasKey('links', $bLink['target']);
+        $this->assertSame([], $bLink['target']['links']);
 
         // No runaway recursion — bounded response.
         $this->assertLessThanOrEqual(2, $this->maxNestingDepth($detail['links']));

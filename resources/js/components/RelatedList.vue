@@ -18,7 +18,16 @@
                 </button>
                 <span v-else class="related-caret-placeholder"></span>
 
-                <template v-if="link.target">
+                <LinkDescription
+                    v-if="parent"
+                    :link="link"
+                    :object="parent"
+                    size="small"
+                    hide-object-name
+                />
+                <template v-else-if="link.target">
+                    <span class="related-type">{{ truncateName(linkTypeName(link), 18) }}</span>
+                    <span class="related-type-arrow">→</span>
                     <RouterLink
                         :to="{ name: 'object', params: { uid: link.target.thing_id } }"
                         class="related-target"
@@ -39,7 +48,7 @@
                 v-if="isOpen(linkKey(link, idx)) && link.target && link.target.links && link.target.links.length"
                 class="related-children"
             >
-                <RelatedList :links="link.target.links" :level="level + 1" :on-expand="onExpand" :exclude-id="excludeId" />
+                <RelatedList :links="link.target.links" :level="level + 1" :on-expand="onExpand" :exclude-id="excludeId" :parent="link.target" />
             </div>
         </div>
     </div>
@@ -49,7 +58,9 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
+import { fieldText } from '../utils/localized.js';
 import Image from './Image.vue';
+import LinkDescription from './LinkDescription.vue';
 
 /**
  * Recursive renderer for multilevel related objects.
@@ -77,6 +88,13 @@ const props = defineProps({
     // being viewed on the object page (a back-link to it is redundant).
     excludeId: {
         type: String,
+        default: null,
+    },
+    // The object that owns these links (each link's "common" endpoint). When
+    // provided, rows render the full link description (LinkDescription) with
+    // that endpoint collapsed to a "*".
+    parent: {
+        type: Object,
         default: null,
     },
 });
@@ -115,6 +133,9 @@ const toggleExpand = async (link, idx) => {
     }
     toggle(key);
 };
+
+const linkTypeName = (link) =>
+    fieldText(link.link_name, link.link_name_translations) || link.link_name || t('Related');
 
 const truncateName = (text, max = 40) => {
     if (!text) return '';
@@ -167,6 +188,20 @@ const truncateName = (text, max = 40) => {
     text-decoration: underline;
 }
 .related-icon {
+    flex-shrink: 0;
+}
+.related-type {
+    font-size: 10px;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+    flex-shrink: 0;
+}
+.related-type-arrow {
+    color: #adb5bd;
+    font-size: 10px;
     flex-shrink: 0;
 }
 .related-name {

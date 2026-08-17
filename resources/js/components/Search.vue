@@ -101,7 +101,7 @@
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
                                             <div v-if="shownAll.has(thing.thing_id)" class="links-list">
-                                                <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" />
+                                                <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" :parent="thing" />
                                             </div>
                                             <div v-else class="links-list">
                                                 <div
@@ -109,14 +109,7 @@
                                                     :key="`${link.link_type_id}-${linkIndex}`"
                                                     class="link-item"
                                                 >
-                                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
-                                                        <Image :node-id="link.link_type_id" width="14px" />
-                                                    </RouterLink>
-                                                    <span class="link-arrow">→</span>
-                                                    <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
-                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
-                                                    </RouterLink>
+                                                    <LinkDescription :link="link" :object="thing" size="small" hide-object-name />
                                                 </div>
                                                 <button
                                                     v-if="thing.links.length > 3"
@@ -164,6 +157,7 @@ import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
 import RelatedList from "./RelatedList.vue";
+import LinkDescription from "./LinkDescription.vue";
 import { useRelatedExpansion } from "../composables/useRelatedExpansion";
 
 const props = defineProps({

@@ -364,6 +364,7 @@ class Everything
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
@@ -372,6 +373,7 @@ class Everything
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
@@ -398,6 +400,15 @@ class Everything
             ->orderBy('link_start')
             ->get()
             ->toArray();
+
+        // Decode the link type's translations (jsonb comes back as a string).
+        foreach ($thing['links'] as &$flatLink) {
+            if (isset($flatLink->link_name_translations) && is_string($flatLink->link_name_translations)) {
+                $decoded = json_decode($flatLink->link_name_translations, true);
+                $flatLink->link_name_translations = $decoded ?: null;
+            }
+        }
+        unset($flatLink);
 
         // Multilevel related objects: when a depth is requested, resolve the
         // nested tree of related objects and attach a `target` (with nested

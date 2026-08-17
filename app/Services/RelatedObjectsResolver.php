@@ -147,7 +147,9 @@ class RelatedObjectsResolver
                         continue;
                     }
                     $link = $item['link'];
-                    $link->link_name = $linkTypeNames[$link->link_type_id] ?? null;
+                    $linkType = $linkTypeNames[$link->link_type_id] ?? null;
+                    $link->link_name = $linkType['name'] ?? null;
+                    $link->link_name_translations = $linkType['name_translations'] ?? null;
                     $item['link'] = $link;
                     $item['target'] = $this->buildTarget($row, $classes[$childId] ?? null);
                     $item['sort'] = $this->sortKey($link, $row);
@@ -160,15 +162,22 @@ class RelatedObjectsResolver
                 // deeper levels, cap per parent. Only the top `breadth` links
                 // of each parent advance the frontier (recurse deeper).
                 $cap = ($level === 1 && $topLevelBreadth === null) ? null : $breadth;
+
+                // Mark the top `breadth` links as recursed so the assembler
+                // emits `target.links` (possibly empty) for them — this lets
+                // the frontend tell "resolved but empty" from "never loaded".
+                foreach ($levelItems[$parent] as $idx => $item) {
+                    if ($idx < $breadth) {
+                        $levelItems[$parent][$idx]['recurse'] = true;
+                        $nextFrontier[] = $item['child_id'];
+                    }
+                }
+
                 $kept = $cap === null ? $levelItems[$parent] : array_slice($levelItems[$parent], 0, $cap);
-                $nestable = array_slice($levelItems[$parent], 0, $breadth);
 
                 foreach ($kept as $item) {
                     $visited[$item['child_id']] = true; // dedupe to lowest level
                     $linksByParent[$parent][] = $item;
-                }
-                foreach ($nestable as $item) {
-                    $nextFrontier[] = $item['child_id'];
                 }
             }
 
@@ -198,14 +207,18 @@ class RelatedObjectsResolver
                 'public'         => $link->public !== null ? (bool) $link->public : null,
                 'link_start'     => $link->link_start ?? null,
                 'link_end'       => $link->link_end ?? null,
-                'name'           => $target['name'] ?? null,
-                'link_name'      => $link->link_name ?? null,
-                'target'         => $target,
+                'name'                    => $target['name'] ?? null,
+                'link_name'               => $link->link_name ?? null,
+                'link_name_translations'  => $link->link_name_translations ?? null,
+                'target'                  => $target,
             ];
 
             if ($remainingDepth > 1) {
                 $childId = $item['child_id'];
-                if (!empty($linksByParent[$childId])) {
+                // Recursed links always carry `target.links` (an empty array
+                // when the child has no kept links); links beyond the breadth
+                // cap are never recursed, so they have no `target.links` key.
+                if (!empty($item['recurse'])) {
                     $node['target']['links'] = $this->assembleTree($childId, $linksByParent, $remainingDepth - 1);
                 }
             }
@@ -301,7 +314,7 @@ class RelatedObjectsResolver
     }
 
     /**
-     * @return array [link_type_id => name]
+     * @return array [link_type_id => ['name' => string|null, 'name_translations' => array|null]]
      */
     protected function fetchLinkTypeNames(array $linkTypeIds): array
     {
@@ -311,17 +324,24 @@ class RelatedObjectsResolver
         }
 
         $rows = DB::table('things')
-            ->select('thing_id', 'name')
+            ->select('thing_id', 'name', 'name_translations')
             ->whereIn('thing_id', $linkTypeIds)
             ->where('deleted', false)
             ->get();
 
-        $names = [];
+        $result = [];
         foreach ($rows as $row) {
-            $names[$row->thing_id] = $row->name;
+            $translations = $row->name_translations ?? null;
+            if (is_string($translations)) {
+                $translations = json_decode($translations, true) ?: null;
+            }
+            $result[$row->thing_id] = [
+                'name'              => $row->name ?? null,
+                'name_translations' => $translations,
+            ];
         }
 
-        return $names;
+        return $result;
     }
 
     /**

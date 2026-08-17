@@ -764,6 +764,7 @@ class ApiController extends BaseController
         if (!empty($ids)) {
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->addSelect('link_types.name_translations as link_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {

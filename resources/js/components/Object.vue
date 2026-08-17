@@ -148,7 +148,7 @@
                             <!-- Links list -->
                             <div v-if="object.links && object.links.length" class="results-list">
                                 <div v-for="(link, linkIndex) in object.links" :key="link.link_id"
-                                    class="result-item"
+                                    class="result-item object-link-item"
                                     @mouseenter="hoveredLink = linkIndex"
                                     @mouseleave="hoveredLink = null">
                                     <div class="result-content">
@@ -210,12 +210,11 @@
                                         </div>
 
                                         <!-- RIGHT: related items of this link's target (compact, like search results) -->
-                                        <div v-if="link.target" class="result-links-section">
+                                        <div
+                                            v-if="link.target && (relatedItems(link).length > 0 || !Array.isArray(link.target.links))"
+                                            class="result-links-section"
+                                        >
                                             <div class="links-container">
-                                                <div class="links-title">
-                                                    <span>🔗 Related</span>
-                                                    <span class="links-count">({{ relatedItems(link).length }})</span>
-                                                </div>
                                                 <div v-if="relatedItems(link).length > 0" class="links-list">
                                                     <template v-if="!expandedRelatedLinks.has(link.link_id)">
                                                         <div
@@ -223,10 +222,7 @@
                                                             :key="`${rl.link_id}-${rlIndex}`"
                                                             class="link-item"
                                                         >
-                                                            <RouterLink :to="{ name: 'object', params: { uid: rl.target.thing_id } }" class="link-target">
-                                                                <Image :node-id="rl.target.thing_id" :type="rl.target.type" width="14px" class="link-icon" />
-                                                                <span class="link-name">{{ $truncateText(rl.target.name || rl.name || $t('Related'), 30) }}</span>
-                                                            </RouterLink>
+                                                            <LinkDescription :link="rl" :object="link.target" size="small" hide-object-name />
                                                         </div>
                                                         <button
                                                             v-if="relatedItems(link).length > 3"
@@ -243,10 +239,11 @@
                                                         :level="1"
                                                         :on-expand="expandLinkTarget"
                                                         :exclude-id="object?.thing_id"
+                                                        :parent="link.target"
                                                     />
                                                 </div>
                                                 <button
-                                                    v-else
+                                                    v-else-if="!Array.isArray(link.target.links)"
                                                     type="button"
                                                     class="btn btn-outline-secondary btn-sm"
                                                     @click="toggleLinkRelated(link)"
@@ -1047,5 +1044,17 @@ button.more-links {
     padding: 0;
     text-align: left;
     cursor: pointer;
+}
+/* The links list shares one grid template so every row's right column
+   (the related items of each link) aligns vertically. */
+.object-link-item .result-content {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 260px;
+    gap: 1rem;
+    align-items: flex-start;
+}
+.object-link-item .result-links-section {
+    width: 260px;
+    max-width: 260px;
 }
 </style>
