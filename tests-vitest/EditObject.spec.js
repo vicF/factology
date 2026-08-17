@@ -221,6 +221,53 @@ describe('EditObject', () => {
         expect(buttons.some(b => b.textContent.trim() === 'Swap')).toBe(true)
     })
 
+    it('keeps the swapped link direction after swapping a locked row', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        // The new row is locked to the edited object; the user picks the other end.
+        const firstSlot = document.querySelector('.linked-object .form-control-plaintext')
+        expect(firstSlot.textContent).toContain('Existing Object')
+        wrapper.vm.linkedObjects[0].other_thing_id = 'other-object-id'
+        await nextTick()
+        await flushPromises()
+
+        // Swap: the edited object should move to the second slot.
+        const swapButton = [...document.querySelectorAll('.linked-object button')]
+            .find(b => b.textContent.trim() === 'Swap')
+        expect(swapButton.hasAttribute('disabled')).toBe(false)
+        swapButton.click()
+        await nextTick()
+        await flushPromises()
+
+        // The row's direction is now reversed and the first slot became editable.
+        expect(wrapper.vm.linkedObjects[0].one_thing_id).toBe('other-object-id')
+        expect(wrapper.vm.linkedObjects[0].other_thing_id).toBe(EDIT_ID)
+        expect(document.querySelector('.linked-object input[name="one_thing"]')).toBeTruthy()
+        // The edited object moved to the second slot, where it stays read-only.
+        expect(document.querySelector('.linked-object input[name="other_thing"]')).toBeNull()
+        const secondSlot = document.querySelector('.linked-object .form-control-plaintext')
+        expect(secondSlot.textContent).toContain('Existing Object')
+
+        // Saving the object carries the swapped direction to the backend.
+        submitForm()
+        await flushPromises()
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const [url, body] = axios.put.mock.calls[0]
+        expect(url).toBe(`/object/${EDIT_ID}`)
+        expect(body.links_to_add).toEqual([
+            {
+                one_thing_id: 'other-object-id',
+                link_type_id: DEFAULT_LINK_TYPE,
+                other_thing_id: EDIT_ID,
+                description: '',
+                public: 0,
+            },
+        ])
+    })
+
     it('fills a link with a newly created object instead of an existing one', async () => {
         await mountEditObject({ object: OBJECT })
 

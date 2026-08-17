@@ -168,7 +168,7 @@ describe('LinkedObject', () => {
         expect(buttons.some(b => b.text().trim() === 'Swap')).toBe(true)
     })
 
-    it('unlocks the first object slot after swapping a locked row', async () => {
+    it('keeps the current object read-only in whichever slot it lands after swapping', async () => {
         const wrapper = mount(LinkedObject, {
             props: {
                 link: { one_thing_id: 'current-id', other_thing_id: 'other-id', link_type_id: 'type' },
@@ -182,6 +182,7 @@ describe('LinkedObject', () => {
         const fields = wrapper.findAllComponents(ObjectField)
         // Initially the first selector is read-only (locked to the current object).
         expect(fields[0].props('isEditable')).toBe(false)
+        expect(fields[2].props('isEditable')).toBe(true)
 
         const swapButton = wrapper.findAll('button').find(b => b.text().trim() === 'Swap')
         await swapButton.trigger('click')
@@ -195,6 +196,44 @@ describe('LinkedObject', () => {
 
         const afterSwap = wrapper.findAllComponents(ObjectField)
         expect(afterSwap[0].props('isEditable')).toBe(true)
+        // The pinned object stays read-only — the read-only slot just moved.
+        expect(afterSwap[2].props('isEditable')).toBe(false)
+        expect(afterSwap[2].props('displayName')).toBe('Current')
+    })
+
+    it('keeps the current object read-only when it starts in the second slot', async () => {
+        // Existing link where the edited object is the OTHER end.
+        const wrapper = mount(LinkedObject, {
+            props: {
+                link: { one_thing_id: 'other-id', other_thing_id: 'current-id', link_type_id: 'type' },
+                currentObject: { thing_id: 'current-id', name: 'Current' },
+                index: 0,
+                lockFirstObject: true,
+            }
+        })
+        await nextTick()
+
+        const fields = wrapper.findAllComponents(ObjectField)
+        expect(fields[0].props('isEditable')).toBe(true)
+        expect(fields[2].props('isEditable')).toBe(false)
+        expect(fields[2].props('displayName')).toBe('Current')
+    })
+
+    it('leaves both ends editable when the current object is not pinned (link editor)', async () => {
+        // EditLinkModal passes no lockFirstObject — both ends of the link are
+        // freely editable even though one of them is the current object.
+        const wrapper = mount(LinkedObject, {
+            props: {
+                link: { one_thing_id: 'current-id', other_thing_id: 'other-id', link_type_id: 'type' },
+                currentObject: { thing_id: 'current-id', name: 'Current' },
+                index: 0,
+            }
+        })
+        await nextTick()
+
+        const fields = wrapper.findAllComponents(ObjectField)
+        expect(fields[0].props('isEditable')).toBe(true)
+        expect(fields[2].props('isEditable')).toBe(true)
     })
 
     it('excludes the current object from the second-object selector when the first is locked', async () => {

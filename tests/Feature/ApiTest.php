@@ -568,6 +568,68 @@ class ApiTest extends TestCase
     }
 
     /**
+     * Test that non-admin users cannot delete another user's object
+     */
+    public function testUserCannotDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $otherUser = $this->createTestUser()->getUser();
+        $otherUser->thing_id = $this->createUserThing($otherUser);
+        $otherUser->save();
+
+        Sanctum::actingAs($otherUser, ['*']);
+        $response = $this->deleteJson('/api/v1/object/' . $thingId);
+        $this->assertEquals(403, $response->getStatusCode(),
+            'Expected 403 Forbidden when a non-admin user tries to delete another user\'s object');
+
+        // Verify the object was NOT deleted
+        $this->assertDatabaseHas('things', [
+            'thing_id' => $thingId,
+        ]);
+
+        // Clean up as owner
+        Sanctum::actingAs($owner, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Test that admins can delete another user's object
+     */
+    public function testAdminCanDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $admin = $this->createTestUser()->getUser();
+        $admin->thing_id = $this->createUserThing($admin);
+        $admin->is_admin = true;
+        $admin->save();
+
+        // Admin deletes the owner's object
+        Sanctum::actingAs($admin, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+
+        // Verify the object was deleted
+        $this->assertDatabaseMissing('things', [
+            'thing_id' => $thingId,
+        ]);
+    }
+
+    /**
      * Test creating an object with minimal required fields
      */
     public function testCreateWithMinimalFields(): void

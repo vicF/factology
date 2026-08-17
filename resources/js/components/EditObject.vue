@@ -225,7 +225,7 @@
                                 :key="item.id"
                                 :ref="(el) => setLinkedObjectRef(idx, el)"
                                 :link="{
-                                    one_thing_id: formData.thing_id,
+                                    one_thing_id: item.one_thing_id || formData.thing_id,
                                     other_thing_id: item.other_thing_id,
                                     link_type_id: item.link_type_id,
                                     translation: item.translation,
@@ -237,7 +237,7 @@
                                 }"
                                 :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                :lockFirstObject="item.one_thing_id === formData.thing_id"
+                                :lockFirstObject="true"
                                 :currentObjectUnsaved="!isEditMode"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -596,6 +596,20 @@ if (!isEditMode.value && formData.value.thing_id && !cacheStore.hasCachedObject(
         type: formData.value.type,
     }, formData.value.type);
 }
+
+// Keep the unsaved object's cache entry in sync with the live name, so links
+// whose other end is this object (e.g. after swapping direction) display the
+// typed name instead of the "New Object" placeholder.
+watch(() => formData.value.name, (name) => {
+    if (isEditMode.value || !formData.value.thing_id) return;
+    const cached = cacheStore.getCachedObject(formData.value.thing_id);
+    if (cached) {
+        cacheStore.cacheObject(formData.value.thing_id, {
+            ...cached,
+            name: name || 'New Object',
+        }, formData.value.type);
+    }
+});
 
 // Special links as full objects (same shape as regular links)
 const classLinkData = ref({

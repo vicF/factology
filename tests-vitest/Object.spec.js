@@ -130,3 +130,56 @@ describe('Object view — edit mode gating', () => {
         expect(wrapper.find('.visibility-badge').exists()).toBe(true)
     })
 })
+
+describe('Object view — admin edit/delete on another user\'s object', () => {
+    beforeEach(() => {
+        axios.get.mockResolvedValue({
+            data: { data: { ...OBJECT, owner: 'other-user', owner_name: 'Victor Fokin' } },
+        })
+        uiState.editMode = true
+        authState.user = { thing_id: 'user-1', name: 'Alice', is_admin: true }
+    })
+
+    const deleteButton = (wrapper) =>
+        wrapper.findAll('.object-actions button').find(b => b.text().includes('Delete'))
+
+    it('enables Delete for admins on another user\'s object', async () => {
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(deleteButton(wrapper).attributes('disabled')).toBeUndefined()
+    })
+
+    it('shows the other-owner warning banner for admins', async () => {
+        const wrapper = mountObject()
+        await flushPromises()
+
+        const banner = wrapper.find('.alert-warning')
+        expect(banner.exists()).toBe(true)
+        expect(banner.text()).toContain('You are editing an object that belongs to')
+    })
+
+    it('warns about the owner in the delete confirmation', async () => {
+        const confirmSpy = vi.fn(() => true)
+        vi.stubGlobal('confirm', confirmSpy)
+        const wrapper = mountObject()
+        await flushPromises()
+
+        await deleteButton(wrapper).trigger('click')
+        await flushPromises()
+
+        expect(confirmSpy).toHaveBeenCalledTimes(1)
+        expect(confirmSpy.mock.calls[0][0]).toContain('You are going to delete the object that belongs to')
+        expect(axios.delete).toHaveBeenCalledWith('/object/obj-1')
+        vi.unstubAllGlobals()
+    })
+
+    it('keeps Delete disabled and hides the banner for a non-admin on another user\'s object', async () => {
+        authState.user = { thing_id: 'user-1', name: 'Alice', is_admin: false }
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(deleteButton(wrapper).attributes('disabled')).toBeDefined()
+        expect(wrapper.find('.alert-warning').exists()).toBe(false)
+    })
+})
