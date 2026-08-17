@@ -6,6 +6,7 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\RelatedObjectsResolver;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
 use Fokin\Facts\Data\UUID;
@@ -41,10 +42,12 @@ class ApiController extends BaseController
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function get($id)
+    public function get($id, Request $request)
     {
         try {
-            $data = Everything::getDataById($id);
+            $depth = (int) $request->query('depth', 0);
+            $depth = min(max($depth, 0), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+            $data = Everything::getDataById($id, $depth);
             return response()->json(
                 [
                     'data'    => $data,
@@ -644,6 +647,14 @@ class ApiController extends BaseController
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
+            // A class-tree filter means "objects of these classes". Classes and
+            // link types can themselves be members of a class (LINK_TO_CLASS),
+            // so without an explicit type filter the selected class nodes leak
+            // into the results. Default to objects-only unless the caller asked
+            // for another type explicitly.
+            if (empty($requestBody['type'])) {
+                $query->where('things.type', 3);
+            }
         }
 
         if (@$requestBody['search']) {
@@ -740,13 +751,20 @@ class ApiController extends BaseController
         ];
         $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $data = $query->orderBy($sortCol, $sortDir)->limit(100)->get();
+        // groupBy(thing_id): the class filter (and favorites join) can match
+        // an object through several links at once; group by the PK so each
+        // object appears exactly once. (Postgres accepts selecting the other
+        // columns because they are functionally dependent on the PK, and it
+        // works even though things.data is plain `json`, which DISTINCT can't
+        // dedupe.)
+        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->addSelect('link_types.name_translations as link_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
@@ -758,8 +776,25 @@ class ApiController extends BaseController
                 ->get()->toArray();
         }
 
+        // Multilevel related objects: attach direct related links (with a
+        // shallow resolved `target`) to each result thing. Deeper levels are
+        // fetched on demand via GET /object/{id}?depth=N.
+        $depth = (int) ($requestBody['depth'] ?? RelatedObjectsResolver::DEFAULT_SEARCH_DEPTH);
+        $depth = min(max($depth, 0), RelatedObjectsResolver::SEARCH_DEPTH_CAP);
+
+        $linksByRoot = $depth > 0
+            ? (new RelatedObjectsResolver)->forMany($ids, RelatedObjectsResolver::SEARCH_BREADTH)
+            : [];
+
+        $things = $data->map(function ($thing) use ($linksByRoot) {
+            if (isset($linksByRoot[$thing->thing_id])) {
+                $thing->links = $linksByRoot[$thing->thing_id];
+            }
+            return $thing;
+        });
+
         return response()->json([
-            'things' => ThingResource::collection($data),
+            'things' => ThingResource::collection($things),
             'links'  => LinkResource::collection($links),
         ]);
 

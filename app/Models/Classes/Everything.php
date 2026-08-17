@@ -9,6 +9,7 @@ namespace App\Models\Classes;
 
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
+use App\Services\RelatedObjectsResolver;
 use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
 use InvalidArgumentException;
@@ -304,7 +305,7 @@ class Everything
      * Returns data and links to display object on the web
      * @return void
      */
-    public static function getDataById($id): array
+    public static function getDataById($id, int $depth = 0): array
     {
         LOG::debug('retrieving object data for id: ' . $id);
         $class = self::getClassDataByObjectId($id);
@@ -312,7 +313,7 @@ class Everything
 
         try {
             /** @var Everything $className */
-            return $className::getClassSpecificDataById($id, $class);
+            return $className::getClassSpecificDataById($id, $class, $depth);
 
             /*$thing = $className::_getRow($id)->first();
             // Keep date in db format to be able to compare
@@ -323,7 +324,7 @@ class Everything
         }
     }
 
-    public static function getClassSpecificDataById($id, $class): array
+    public static function getClassSpecificDataById($id, $class, int $depth = 0): array
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
@@ -363,6 +364,7 @@ class Everything
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
@@ -371,6 +373,7 @@ class Everything
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
@@ -397,6 +400,34 @@ class Everything
             ->orderBy('link_start')
             ->get()
             ->toArray();
+
+        // Decode the link type's translations (jsonb comes back as a string).
+        foreach ($thing['links'] as &$flatLink) {
+            if (isset($flatLink->link_name_translations) && is_string($flatLink->link_name_translations)) {
+                $decoded = json_decode($flatLink->link_name_translations, true);
+                $flatLink->link_name_translations = $decoded ?: null;
+            }
+        }
+        unset($flatLink);
+
+        // Multilevel related objects: when a depth is requested, resolve the
+        // nested tree of related objects and attach a `target` (with nested
+        // `target.links` at deeper levels) onto the matching flat link rows.
+        // Additive only — the flat fields above are untouched, so existing
+        // consumers (edit form, links section) keep working unchanged.
+        if ($depth > 0 && !empty($thing['links'])) {
+            $related = (new RelatedObjectsResolver)->forObject($id, $depth, RelatedObjectsResolver::BREADTH_CAP);
+            $relatedByLinkId = [];
+            foreach ($related as $rel) {
+                $relatedByLinkId[$rel['link_id']] = $rel['target'];
+            }
+            foreach ($thing['links'] as &$link) {
+                if (isset($relatedByLinkId[$link->link_id])) {
+                    $link->target = $relatedByLinkId[$link->link_id];
+                }
+            }
+            unset($link);
+        }
 
         // Annotations pointing to URLs instead of internal objects.
         // The whole list is returned; the frontend diffs it on save.

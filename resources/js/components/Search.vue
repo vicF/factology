@@ -100,24 +100,25 @@
                                                 <span>🔗 Related</span>
                                                 <span class="links-count">({{ thing.links.length }})</span>
                                             </div>
-                                            <div class="links-list">
+                                            <div v-if="shownAll.has(thing.thing_id)" class="links-list">
+                                                <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" :parent="thing" />
+                                            </div>
+                                            <div v-else class="links-list">
                                                 <div
                                                     v-for="(link, linkIndex) in thing.links.slice(0, 3)"
                                                     :key="`${link.link_type_id}-${linkIndex}`"
                                                     class="link-item"
                                                 >
-                                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
-                                                        <Image :node-id="link.link_type_id" width="14px" />
-                                                    </RouterLink>
-                                                    <span class="link-arrow">→</span>
-                                                    <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
-                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
-                                                    </RouterLink>
+                                                    <LinkDescription :link="link" :object="thing" size="small" hide-object-name />
                                                 </div>
-                                                <div v-if="thing.links.length > 3" class="more-links">
+                                                <button
+                                                    v-if="thing.links.length > 3"
+                                                    class="more-links"
+                                                    type="button"
+                                                    @click="toggleShowAll(thing.thing_id)"
+                                                >
                                                     +{{ thing.links.length - 3 }} more
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -155,6 +156,9 @@ import { useAuthStore } from '../stores/auth';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
+import RelatedList from "./RelatedList.vue";
+import LinkDescription from "./LinkDescription.vue";
+import { useRelatedExpansion } from "../composables/useRelatedExpansion";
 
 const props = defineProps({
     searchText: String,
@@ -173,6 +177,31 @@ const objects = ref([]);
 const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
+
+const { loadDeeper } = useRelatedExpansion();
+
+// Per-result unfold state for the Related panel ("+N more" → show all direct links).
+const shownAll = ref(new Set());
+const toggleShowAll = (thingId) => {
+    const set = new Set(shownAll.value);
+    if (set.has(thingId)) {
+        set.delete(thingId);
+    } else {
+        set.add(thingId);
+    }
+    shownAll.value = set;
+};
+
+// Load one more level of related objects for a link target on demand.
+const expandTarget = async (link) => {
+    const targetId = link.target?.thing_id;
+    if (!targetId) return;
+    try {
+        link.target.links = await loadDeeper(targetId, 1);
+    } catch (error) {
+        console.error('Search.vue - failed to load deeper related objects:', error);
+    }
+};
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
@@ -283,9 +312,17 @@ const exportData = async () => {
 };
 
 const getObjects = async () => {
-    const type = [];
+    let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
+
+    // The class-tree filter only applies to objects: classes are linked to
+    // their members (LINK_TO_CLASS), never the other way round, so without
+    // a things-only type the selected class nodes themselves leak into the
+    // results. When the tree selection is active we always search objects.
+    if (searchStore.checkedItems.length > 0) {
+        type = [3];
+    }
 
     processing.value = true;
     loaded.value = false;

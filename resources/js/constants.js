@@ -18,6 +18,7 @@ export const SERVER_TYPE   = 6;
 export const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
 export const LINK_TO_CLASS = 'c217c185-742f-4a9f-8e69-acea2b4f5aea';
 export const SOMETHING = '3e15244c-a9e1-4a91-a0ca-1c65722a64df';
+export const EVENT = '0eed3b56-bdd6-47f0-9413-d9640a9dcafc';
 
 // You can also export as object for better grouping
 export const TYPE_NAMES = {

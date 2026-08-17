@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import {CLASS_TYPE, LINK_TYPE, SOMETHING} from "../constants.js"
+import {CLASS_TYPE, LINK_TYPE, EVENT} from "../constants.js"
 import { eventBus } from "../eventBus.js"
+import { useSearchStore } from './search'
+import { collectSubtreeIds } from '../utils/classTree'
 
 export const useObjectsStore = defineStore('objects', {
     state: () => ({
@@ -31,6 +33,18 @@ export const useObjectsStore = defineStore('objects', {
                 // We want all of them as root nodes.
                 this.rootNodes = response.data.things || []
                 console.log('rootNodes', this.rootNodes)
+
+                // Default selection: check "Event" + its whole subtree so the
+                // default view shows Event and all its subclasses (recursive
+                // class filter). Applied only if the user has not changed the
+                // selection yet.
+                const searchStore = useSearchStore();
+                if (searchStore.checkedItems.length === 0) {
+                    const event = this.findNodeById(EVENT);
+                    if (event) {
+                        searchStore.checkSubtree([event.id, ...collectSubtreeIds(event.nodes)]);
+                    }
+                }
             } catch (error) {
                 console.log('catch', error)
                 if (error.response?.status === 422) {
