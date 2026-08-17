@@ -19,7 +19,7 @@
                 <span
                     v-if="lockFirst && currentObjectUnsaved"
                     class="badge badge-unsaved"
-                    title="This object is not saved yet"
+                    :title="$t('This object is not saved yet')"
                 >{{ unsavedLabel }}</span>
             </div>
 
@@ -28,7 +28,7 @@
                     fieldName="link_type"
                     v-model="link.link_type_id"
                     :isEditable="true"
-                    name="Link type"
+                    :name="$t('Link type')"
                     :type="LINK_TYPE"
                     required
                     class="flex-field"
@@ -38,9 +38,9 @@
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
                     :disabled="!link.one_thing_id || !link.other_thing_id || link.one_thing_id === link.other_thing_id"
-                    :title="lockFirst ? 'Swap direction: the currently edited object moves to the second slot' : 'Swap the two objects'"
+                    :title="lockFirst ? $t('Swap direction: the currently edited object moves to the second slot') : $t('Swap the two objects')"
                 >
-                    Swap
+                    {{ $t('Swap') }}
                 </button>
             </div>
 
@@ -50,7 +50,7 @@
                     fieldName="other_thing"
                     v-model="link.other_thing_id"
                     :isEditable="true"
-                    name="Second object"
+                    :name="$t('Second object')"
                     :type="effectiveObjectType"
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
@@ -60,7 +60,7 @@
                     class="flex-field"
                 />
                 <button type="button" class="btn btn-primary flex-button" @click="openCreateObjectModal">
-                    Create
+                    {{ $t('Create') }}
                 </button>
             </div>
 
@@ -68,7 +68,7 @@
                 <textarea
                     v-model="link.translation"
                     class="form-control"
-                    placeholder="Enter description..."
+                    :placeholder="$t('Enter description...')"
                     rows="2"
                 ></textarea>
             </div>
@@ -90,7 +90,7 @@
             </div>
 
             <div class="d-flex gap-2 mt-3">
-                <button type="button" class="btn btn-danger" @click="removeSelf">Delete</button>
+                <button type="button" class="btn btn-danger" @click="removeSelf">{{ $t('Delete') }}</button>
             </div>
         </div>
     </template>

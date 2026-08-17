@@ -46,7 +46,7 @@
                         class="btn btn-outline-secondary"
                         type="button"
                         @click.stop="clearSelection"
-                        title="Clear selection"
+                        :title="$t('Clear selection')"
                     >
                         <IconClose width="14" height="14" />
                     </button>
@@ -55,7 +55,7 @@
                         class="btn btn-outline-secondary"
                         type="button"
                         @click="isOpen ? closeDropdown() : openDropdown()"
-                        :title="isOpen ? 'Close' : 'Select object'"
+                        :title="isOpen ? $t('Close') : $t('Select object')"
                     >
                         <IconChevronUp v-if="isOpen" width="14" height="14" />
                         <IconChevronDown v-else width="14" height="14" />
@@ -72,7 +72,7 @@
                     >
                         <div v-if="loading || suggestionsLoading" class="text-center py-4 text-muted">
                             <div class="spinner-border spinner-border-sm" role="status"></div>
-                            <div class="mt-2">Loading...</div>
+                            <div class="mt-2">{{ $t('Loading...') }}</div>
                         </div>
                         <div v-else-if="error" class="alert alert-danger m-2 py-2 small">
                             {{ error }}

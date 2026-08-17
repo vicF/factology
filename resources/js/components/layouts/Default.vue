@@ -8,15 +8,15 @@
                 <div class="collapse navbar-collapse d-flex justify-content-between align-items-center" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
+                            <router-link :to="{name:'dashboard'}" class="nav-link" :title="$t('Home')" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
                                 <IconHome class="icon-xl" />
                             </router-link>
                         </li>
                     </ul>
 
                     <form class="d-flex flex-grow-1 mx-2 position-relative" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
-                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="button" @click="toggleFilters" title="Filters" style="display: flex; align-items: center; justify-content: center; margin-right: 4px;">
+                        <input class="form-control me-2" type="search" :placeholder="$t('Search')" v-model="searchQuery" :aria-label="$t('Search')" data-testid="search-input">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="button" @click="toggleFilters" :title="$t('Filters')" style="display: flex; align-items: center; justify-content: center; margin-right: 4px;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="4" y1="6" x2="20" y2="6"></line>
                                 <line x1="8" y1="12" x2="20" y2="12"></line>
@@ -84,7 +84,7 @@
                                 aria-expanded="false"
                                 data-testid="user-dropdown-btn"
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
-                                :title="authenticated && user ? `Logged in as ${user.name}${isAdmin ? ' (Admin)' : ''}` : 'Not logged in'"
+                                :title="authenticated && user ? $t('Logged in as {name}', { name: user.name }) + (isAdmin ? ' (' + $t('Admin') + ')' : '') : $t('Not logged in')"
                             >
                                 <div class="user-icon-container">
                                     <IconAdmin v-if="isAdmin" class="icon-lg" data-testid="admin-icon" />
@@ -105,14 +105,14 @@
                             <ul class="dropdown-menu dropdown-menu-end" data-testid="user-dropdown-menu">
                                 <!-- Guest links -->
                                 <template v-if="!authenticated">
-                                    <li class="dropdown-header text-muted small">Guest Mode</li>
+                                    <li class="dropdown-header text-muted small">{{ $t('Guest Mode') }}</li>
                                     <li><router-link class="dropdown-item" to="/login" data-testid="login-link">
                                         <IconLogin class="icon-sm me-2" />
-                                        Login
+                                        {{ $t('Login') }}
                                     </router-link></li>
                                     <li v-if="authStore.registrationEnabled"><router-link class="dropdown-item" to="/register" data-testid="register-link">
                                         <IconAdd class="icon-sm me-2" />
-                                        Register
+                                        {{ $t('Register') }}
                                     </router-link></li>
                                 </template>
 
@@ -120,8 +120,8 @@
                                 <template v-else>
                                     <li class="dropdown-header text-muted small">
                                         <IconCheck class="icon-xs me-1" />
-                                        Logged in as
-                                        <span v-if="isAdmin" class="admin-role-badge" data-testid="admin-role-badge">Admin</span>
+                                        {{ $t('Logged in as') }}
+                                        <span v-if="isAdmin" class="admin-role-badge" data-testid="admin-role-badge">{{ $t('Admin') }}</span>
                                     </li>
                                     <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
                                         <IconUser class="icon-sm me-2" />
@@ -130,7 +130,7 @@
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
                                         <IconLogout class="icon-sm me-2" />
-                                        Logout
+                                        {{ $t('Logout') }}
                                     </a></li>
                                 </template>
                             </ul>
@@ -233,7 +233,7 @@
             >
                 <div class="error-icon">⚠️</div>
                 <div class="error-content">
-                    <div class="error-title">Error</div>
+                    <div class="error-title">{{ $t('Error') }}</div>
                     <div class="error-message">{{ error.message }}</div>
                 </div>
                 <button class="error-close" @click="removeError(error.id)">×</button>
@@ -246,7 +246,6 @@
 import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
 import SearchFilterPanel from "../SearchFilterPanel.vue"
 import { setLanguage } from '../../lang/i18n.js'
@@ -298,12 +297,12 @@ const wasAtTop = ref(false)
 
 // Language switcher data
 const currentLocale = ref(localStorage.getItem('locale') || 'en')
+// Only languages with installed UI translations (i18n.js catalogs) are offered.
+// Content-translation languages live separately as Language-class objects and
+// are offered in the object editor, not here.
 const availableLocales = [
     { code: 'en', name: 'English' },
     { code: 'ru', name: 'Русский' },
-    { code: 'fr', name: 'Français' },
-    { code: 'de', name: 'Deutsch' },
-    { code: 'es', name: 'Español' }
 ]
 
 const switchLanguage = (locale) => {
