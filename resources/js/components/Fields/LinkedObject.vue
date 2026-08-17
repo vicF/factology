@@ -38,7 +38,7 @@
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
                     :disabled="!link.one_thing_id || !link.other_thing_id || link.one_thing_id === link.other_thing_id"
-                    :title="lockFirst ? $t('Swap direction: the currently edited object moves to the second slot') : $t('Swap the two objects')"
+                    :title="lockFirst || lockSecond ? $t('Swap direction of the link') : $t('Swap the two objects')"
                 >
                     {{ $t('Swap') }}
                 </button>
@@ -49,17 +49,28 @@
                     ref="secondObjectFieldRef"
                     fieldName="other_thing"
                     v-model="link.other_thing_id"
-                    :isEditable="true"
-                    :name="$t('Second object')"
+                    :isEditable="!lockSecond"
+                    :name="lockSecond ? currentObjectDisplayName : $t('Second object')"
+                    :displayName="lockSecond ? currentObjectDisplayName : null"
                     :type="effectiveObjectType"
                     :contextObjectType="contextObjectType"
                     :contextLinkTypeId="contextLinkTypeId"
                     :contextOneThingId="contextOneThingId"
-                    :excludeUuid="link.one_thing_id || null"
+                    :excludeUuid="lockSecond ? null : (link.one_thing_id || null)"
                     required
                     class="flex-field"
                 />
-                <button type="button" class="btn btn-primary flex-button" @click="openCreateObjectModal">
+                <span
+                    v-if="lockSecond && currentObjectUnsaved"
+                    class="badge badge-unsaved"
+                    :title="$t('This object is not saved yet')"
+                >{{ unsavedLabel }}</span>
+                <button
+                    v-if="!lockSecond"
+                    type="button"
+                    class="btn btn-primary flex-button"
+                    @click="openCreateObjectModal"
+                >
                     {{ $t('Create') }}
                 </button>
             </div>
@@ -130,10 +141,11 @@ const props = defineProps({
     fixedLinkTypeUuid: { type: String, default: null },
     targetLabel: { type: String, default: 'Target object' },
     objectType: { type: Number, default: null },
-    // When true the "first object" selector is fixed to the current object
-    // (read-only display). This is the case inside the EditObject form, where
-    // one end of every link is always the object being edited — editing it
-    // makes no sense, and swapping it into the other slot creates a self-link.
+    // When true the current object is pinned to this link row: whichever slot
+    // holds it is shown read-only (the object being edited cannot be changed
+    // inside the link row). Used by the EditObject form, where one end of every
+    // link is always the object being edited; swapping direction only moves the
+    // read-only slot to the other end.
     lockFirstObject: { type: Boolean, default: false },
     // Marks the fixed first object as "not saved yet" (create mode).
     currentObjectUnsaved: { type: Boolean, default: false },
@@ -175,11 +187,19 @@ if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
 
-// Local lock state. Starts from the prop but can be released by swapping: when
-// the locked (currently edited) object is swapped into the second slot, the
-// first slot must become editable so the relation direction can be changed.
-const lockFirst = ref(props.lockFirstObject);
-watch(() => props.lockFirstObject, (v) => { lockFirst.value = v; });
+// The current object is pinned to this row (EditObject passes
+// lockFirstObject=true). The pinned object's identity is fixed by the form, so
+// whichever slot holds it is read-only — swapping direction just moves the
+// read-only slot to the other end instead of unlocking the object.
+const pinnedCurrentObject = computed(() =>
+    props.lockFirstObject && props.currentObject?.thing_id != null
+);
+const lockFirst = computed(() =>
+    pinnedCurrentObject.value && link.value.one_thing_id === props.currentObject.thing_id
+);
+const lockSecond = computed(() =>
+    pinnedCurrentObject.value && link.value.other_thing_id === props.currentObject.thing_id
+);
 
 // The second-object selector (the one the user actually needs to fill in when
 // adding a link) — used to move focus there instead of the fixed first slot.
@@ -235,8 +255,15 @@ watch(() => [link.value.one_thing_id, link.value.other_thing_id, link.value.link
     { deep: true }
 );
 
+// The requestId of the create modal this row opened, so the link-created event
+// is matched exactly. With stacked modals several link rows may share an index,
+// so a prefix match is not enough — only the row that actually opened the modal
+// may consume the result.
+const pendingCreateRequestId = ref(null);
+
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    pendingCreateRequestId.value = requestId;
     const payload = {
         title: 'Create new object',
         params: { type: effectiveObjectType.value },
@@ -256,9 +283,6 @@ const swapObjects = () => {
     const temp = link.value.one_thing_id;
     link.value.one_thing_id = link.value.other_thing_id;
     link.value.other_thing_id = temp;
-    // The locked first object (the currently edited object) has moved to the
-    // second slot, so the first slot is no longer fixed to it — unlock it.
-    if (lockFirst.value) lockFirst.value = false;
 };
 
 const removeSelf = () => {
@@ -266,7 +290,7 @@ const removeSelf = () => {
 };
 
 const handleLinkCreated = async (data) => {
-    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
+    if (data.requestId && data.requestId === pendingCreateRequestId.value) {
         const newId = data.newObjectId;
         if (newId && !link.value.other_thing_id) {
             await nextTick();

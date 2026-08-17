@@ -216,13 +216,29 @@ export class FlexibleDate {
         let number = String(value)
         const bc = number.startsWith('-')
         if (bc) number = number.slice(1)
-        const yearLen = number.length - 10
-        if (yearLen < 1) return null
-        const year = parseInt(number.slice(0, yearLen), 10)
-        const rest = number.slice(-10)
-        let h = parseInt(rest.slice(4, 6), 10)
-        let mi = parseInt(rest.slice(6, 8), 10)
-        let s = parseInt(rest.slice(8, 10), 10)
+        let year, m, d, h, mi, s
+        if (number.length <= 14) {
+            // Padded 14-digit canonicals and legacy unpadded values (e.g.
+            // '2026081112' = 2026-08-11 12:00) both split as a 4-digit year
+            // followed by up to five 2-digit groups.
+            const parts = splitDigitDate(number)
+            year = parseInt(parts.y, 10)
+            m = parseInt(parts.mo, 10)
+            d = parseInt(parts.d, 10)
+            h = parseInt(parts.h, 10)
+            mi = parseInt(parts.mi, 10)
+            s = parseInt(parts.s, 10)
+        } else {
+            // Huge year: (length − 10) year digits + 10-digit tail.
+            const yearLen = number.length - 10
+            year = parseInt(number.slice(0, yearLen), 10)
+            const rest = number.slice(-10)
+            m = parseInt(rest.slice(0, 2), 10)
+            d = parseInt(rest.slice(2, 4), 10)
+            h = parseInt(rest.slice(4, 6), 10)
+            mi = parseInt(rest.slice(6, 8), 10)
+            s = parseInt(rest.slice(8, 10), 10)
+        }
         if (bc) {
             h = 23 - h
             mi = 59 - mi
@@ -230,10 +246,21 @@ export class FlexibleDate {
         }
         return {
             y: bc ? -year : year,
-            m: parseInt(rest.slice(0, 2), 10),
-            d: parseInt(rest.slice(2, 4), 10),
-            h, mi, s,
+            m, d, h, mi, s,
         }
+    }
+
+    static precisionFromValue(value) {
+        if (value === null || value === undefined || value === '') return null
+        const digits = String(value).replace(/^-/, '')
+        const len = digits.length
+        if (len <= 4) return PRECISION_YEAR
+        if (len > 14) return PRECISION_YEAR
+        const n = Math.floor((digits.slice(4).length + 1) / 2)
+        if (n === 1) return PRECISION_MONTH
+        if (n === 2) return PRECISION_DAY
+        if (n === 3 || n === 4) return PRECISION_MINUTE
+        return PRECISION_SECOND
     }
 
     toDb(side = 'start') {
@@ -277,7 +304,7 @@ export class FlexibleDate {
         if (value === null || value === undefined || value === '') return ''
         const c = FlexibleDate.componentsFromCanonical(value)
         if (!c) return value
-        const precision = (meta && meta.precision) || PRECISION_DAY
+        const precision = (meta && meta.precision) || FlexibleDate.precisionFromValue(value) || PRECISION_DAY
         const era = (meta && meta.era) || Era.GREGORIAN
         let y = c.y
         let m = c.m
@@ -386,11 +413,56 @@ export function formatLocalized(start, end, startMeta, endMeta, t) {
     }
     const s = start !== null && start !== undefined ? fmt(start, sm) : ''
     const e = end !== null && end !== undefined ? fmt(end, em) : ''
-    if (s !== '' && e !== '') return s + ' — ' + e
+    if (s !== '' && e !== '') {
+        // Identical bounds (e.g. a single exact date stored in both columns)
+        // have nothing to compare — show the date once.
+        if (s === e) return s
+        return s + ' — ' + e
+    }
     if (qualifier === QUALIFIER_APPROX) {
         return t('dates.circa') + ' ' + (s !== '' ? s : e)
     }
     return s !== '' ? s : e
+}
+
+// Compact form for result lists: when two EXACT bounds fall on the same
+// calendar date and only the times differ, collapse to "DATE HH:MM → HH:MM"
+// (e.g. "2026-08-11 12:00 → 22:00") instead of repeating the date twice.
+export function formatRangeShort(start, end, startMeta, endMeta, t) {
+    if (start === null || start === undefined || start === '' || end === null || end === undefined || end === '') {
+        return formatLocalized(start, end, startMeta, endMeta, t)
+    }
+    const sm = startMeta && typeof startMeta === 'object' ? startMeta : {}
+    const em = endMeta && typeof endMeta === 'object' ? endMeta : {}
+    const qualifier = sm.qualifier || em.qualifier || QUALIFIER_EXACT
+    if (qualifier === QUALIFIER_EXACT) {
+        const cs = FlexibleDate.componentsFromCanonical(start)
+        const ce = FlexibleDate.componentsFromCanonical(end)
+        const hasTime = (p) => p === PRECISION_MINUTE || p === PRECISION_SECOND
+        if (
+            cs && ce
+            && cs.y === ce.y && cs.m === ce.m && cs.d === ce.d
+            && hasTime(FlexibleDate.precisionFromValue(start))
+            && hasTime(FlexibleDate.precisionFromValue(end))
+        ) {
+            const pad = (n) => String(n).padStart(2, '0')
+            const ps = FlexibleDate.precisionFromValue(start)
+            const pe = FlexibleDate.precisionFromValue(end)
+            const timeOf = (c, p) => {
+                const t1 = pad(c.h) + ':' + pad(c.mi)
+                return (p === PRECISION_SECOND && c.s !== 0)
+                    ? t1 + ':' + pad(c.s)
+                    : t1
+            }
+            const t1 = timeOf(cs, ps)
+            const t2 = timeOf(ce, pe)
+            if (t1 !== t2) {
+                const dateStr = formatBoundLocalized(start, { ...sm, precision: PRECISION_DAY }, t)
+                return dateStr + ' ' + t1 + ' → ' + t2
+            }
+        }
+    }
+    return formatLocalized(start, end, startMeta, endMeta, t)
 }
 
 function maxPrecision(a, b) {

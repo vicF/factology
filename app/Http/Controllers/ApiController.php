@@ -417,7 +417,8 @@ class ApiController extends BaseController
     public function delete($id)
     {
         $existing = DB::table('things')->where('thing_id', $id)->first();
-        if (!$existing || $existing->owner !== auth()->user()->thing_id) {
+        // Admins may delete any object; everyone else only their own.
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to delete this record',

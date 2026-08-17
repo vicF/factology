@@ -121,4 +121,28 @@ describe('FlexibleDateField', () => {
         expect(wrapper.find('code').text()).not.toContain('between')
         expect(wrapper.find('code').text()).toContain('2026-08-11')
     })
+
+    it('infers minute precision from a legacy value that stores hours', async () => {
+        // start='2026081112' is 2026-08-11 12:00. Without meta the field must
+        // infer minute precision instead of defaulting to day, so the minutes
+        // are not dropped from the preview/format.
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: {
+                isEditable: true,
+                side: 'start',
+                start: '2026081112',
+                end: '2026081122',
+                startMeta: null,
+                endMeta: null,
+            },
+        })
+        await nextTick()
+
+        const selects = wrapper.findAll('select')
+        // Structured controls order: qualifier, era, precision.
+        expect(selects[2].element.value).toBe('minute')
+        expect(wrapper.find('code').text()).toContain('12:00')
+        expect(wrapper.find('code').text()).toContain('2026-08-11')
+    })
 })

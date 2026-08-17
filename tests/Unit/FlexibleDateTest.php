@@ -299,6 +299,28 @@ class FlexibleDateTest extends TestCase
         );
     }
 
+    public function testPrecisionFromValue(): void
+    {
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('2026'));
+        $this->assertSame(FlexibleDate::PRECISION_MONTH, FlexibleDate::precisionFromValue('202608'));
+        $this->assertSame(FlexibleDate::PRECISION_DAY, FlexibleDate::precisionFromValue('20260815'));
+        $this->assertSame(FlexibleDate::PRECISION_MINUTE, FlexibleDate::precisionFromValue('2026081112'));
+        $this->assertSame(FlexibleDate::PRECISION_MINUTE, FlexibleDate::precisionFromValue('202608151200'));
+        $this->assertSame(FlexibleDate::PRECISION_SECOND, FlexibleDate::precisionFromValue('20260815120000'));
+        $this->assertSame(FlexibleDate::PRECISION_SECOND, FlexibleDate::precisionFromValue('-15000101235959'));
+        $this->assertNull(FlexibleDate::precisionFromValue(null));
+    }
+
+    public function testFormatBoundInfersPrecisionWithoutMeta(): void
+    {
+        // Legacy data has no meta.precision — the stored digit length decides.
+        $this->assertSame('2026-08-11 12:00', FlexibleDate::formatBound('2026081112', []));
+        $this->assertSame('2026-08-11 22:00', FlexibleDate::formatBound('2026081122', null));
+        $this->assertSame('2026-08-15', FlexibleDate::formatBound('20260815', []));
+        // Explicit meta precision still wins.
+        $this->assertSame('2026', FlexibleDate::formatBound('20260815120000', ['precision' => FlexibleDate::PRECISION_YEAR]));
+    }
+
     public function testFormatPair(): void
     {
         $d = FlexibleDate::parse('около 1650');
@@ -319,6 +341,12 @@ class FlexibleDateTest extends TestCase
         $this->assertSame(
             '1940 — 2020',
             FlexibleDate::formatPair($birth->value, $death->value, $birth->toArray(), $death->toArray())
+        );
+
+        // Identical bounds show the date once, not twice.
+        $this->assertSame(
+            '1994-03-08 21:00:00',
+            FlexibleDate::formatPair('19940308210000', '19940308210000', [], null)
         );
     }
 

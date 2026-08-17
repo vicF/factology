@@ -251,7 +251,7 @@
                                 }"
                                 :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                :lockFirstObject="item.one_thing_id === formData.thing_id"
+                                :lockFirstObject="true"
                                 :currentObjectUnsaved="!isEditMode"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -372,7 +372,12 @@ const props = defineProps({
     params: { type: Object, default: () => ({}) },
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
-    callback: { type: Object, default: null }
+    callback: { type: Object, default: null },
+    // When several create modals are stacked (link-row "Create" while another
+    // modal is open), only the top one is visible. A modal that becomes
+    // inactive is hidden without the unsaved-changes prompt — its form state
+    // stays mounted so it can be shown again later.
+    active: { type: Boolean, default: true },
 });
 
 // Emits definition
@@ -635,6 +640,20 @@ if (!isEditMode.value && formData.value.thing_id && !cacheStore.hasCachedObject(
     }, formData.value.type);
 }
 
+// Keep the unsaved object's cache entry in sync with the live name, so links
+// whose other end is this object (e.g. after swapping direction) display the
+// typed name instead of the "New Object" placeholder.
+watch(() => formData.value.name, (name) => {
+    if (isEditMode.value || !formData.value.thing_id) return;
+    const cached = cacheStore.getCachedObject(formData.value.thing_id);
+    if (cached) {
+        cacheStore.cacheObject(formData.value.thing_id, {
+            ...cached,
+            name: name || 'New Object',
+        }, formData.value.type);
+    }
+});
+
 // Special links as full objects (same shape as regular links)
 const classLinkData = ref({
     one_thing_id: formData.value.thing_id,
@@ -663,6 +682,9 @@ let modalInstance = null;
 let confirmModalInstance = null;
 let isClosing = false;
 let isSubmitting = false;
+// Set while the modal is hidden because a stacked modal on top became active —
+// hides for this reason must not show the unsaved-changes prompt.
+let isForcedHide = false;
 
 // Unsaved changes tracking
 const originalFormData = ref({});
@@ -888,6 +910,9 @@ const handleHideModal = (event) => {
         event.stopPropagation();
         return;
     }
+    // A stacked modal becoming active hides this one — no unsaved-changes
+    // prompt for that; the form stays mounted underneath.
+    if (isForcedHide) return;
     if (hasUnsavedChanges.value && !isClosing && !isSubmitting) {
         event.preventDefault();
         event.stopPropagation();
@@ -1043,13 +1068,28 @@ onMounted(async () => {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => {
-            if (!isSubmitting) emit('close');
+            const wasForcedHide = isForcedHide;
+            isForcedHide = false;
+            if (!isSubmitting && !wasForcedHide) emit('close');
         });
         setTimeout(() => {
-            if (modalInstance && modalElement) modalInstance.show();
+            if (modalInstance && modalElement && props.active) modalInstance.show();
         }, 100);
     }
     if (confirmModalElement) confirmModalInstance = new Modal(confirmModalElement);
+});
+
+// Stacked create modals: hide this one (no prompt) when a modal above becomes
+// active, and re-show it when it becomes the top again.
+watch(() => props.active, (active) => {
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement || !modalInstance) return;
+    if (active) {
+        modalInstance.show();
+    } else {
+        isForcedHide = true;
+        modalInstance.hide();
+    }
 });
 
 onUnmounted(() => {

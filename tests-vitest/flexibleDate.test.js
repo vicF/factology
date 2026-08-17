@@ -2,7 +2,10 @@
 // Mirrors tests/Unit/FlexibleDateTest.php — the fixtures here must stay in
 // sync so the PHP and JS implementations prove identical behavior.
 import { Era } from '../resources/js/constants/eras.js'
-import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR } from '../resources/js/utils/flexibleDate.js'
+import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR, formatRangeShort } from '../resources/js/utils/flexibleDate.js'
+import i18n from '../resources/js/lang/i18n.js'
+
+const t = (key) => i18n.global.t(key)
 
 describe('Era / calendar conversions', () => {
     test.each([
@@ -144,6 +147,26 @@ describe('FlexibleDate formatting', () => {
         expect(FlexibleDate.formatBound('20250114000000', { precision: PRECISION_YEAR, era: Era.WORLD_CREATION })).toBe('7533 (world_creation)')
     })
 
+    test('precisionFromValue infers precision from the digit length', () => {
+        expect(FlexibleDate.precisionFromValue('2026')).toBe(PRECISION_YEAR)
+        expect(FlexibleDate.precisionFromValue('202608')).toBe('month')
+        expect(FlexibleDate.precisionFromValue('20260815')).toBe('day')
+        expect(FlexibleDate.precisionFromValue('2026081112')).toBe('minute')
+        expect(FlexibleDate.precisionFromValue('202608151200')).toBe('minute')
+        expect(FlexibleDate.precisionFromValue('20260815120000')).toBe('second')
+        expect(FlexibleDate.precisionFromValue('-15000101235959')).toBe('second')
+        expect(FlexibleDate.precisionFromValue(null)).toBeNull()
+    })
+
+    test('formatBound infers precision from the value when meta has none', () => {
+        // Legacy data has no meta.precision — the stored digit length decides.
+        expect(FlexibleDate.formatBound('2026081112', {})).toBe('2026-08-11 12:00')
+        expect(FlexibleDate.formatBound('2026081122', null)).toBe('2026-08-11 22:00')
+        expect(FlexibleDate.formatBound('20260815', {})).toBe('2026-08-15')
+        // Explicit meta precision still wins.
+        expect(FlexibleDate.formatBound('20260815120000', { precision: PRECISION_YEAR })).toBe('2026')
+    })
+
     test('format() and formatPair', () => {
         expect(FlexibleDate.parse('около 1650').format()).toBe('circa 1650')
         expect(FlexibleDate.parse('before 1500').format()).toBe('before 1500')
@@ -159,5 +182,31 @@ describe('FlexibleDate formatting', () => {
         const a = FlexibleDate.parse('2025-12-31')
         const b = FlexibleDate.parse('2026')
         expect(b.value > a.value).toBe(true)
+    })
+
+    test('formatRangeShort collapses a same-day time range', () => {
+        expect(formatRangeShort('2026081112', '2026081122', null, null, t)).toBe('2026-08-11 12:00 → 22:00')
+    })
+
+    test('formatRangeShort keeps two dates when the day differs', () => {
+        expect(formatRangeShort('20260811', '20260812', null, null, t)).toBe('2026-08-11 — 2026-08-12')
+    })
+
+    test('formatRangeShort handles a single bound', () => {
+        expect(formatRangeShort('1650', null, null, null, t)).toBe('1650')
+    })
+
+    test('identical start and end show the date once, not twice', () => {
+        expect(formatRangeShort('19940308210000', '19940308210000', null, null, t)).toBe('1994-03-08 21:00:00')
+    })
+
+    test('formatRangeShort does not collapse an explicit between range', () => {
+        expect(formatRangeShort(
+            '20260811120000',
+            '20260811220000',
+            { qualifier: QUALIFIER_BETWEEN, precision: 'minute' },
+            null,
+            t,
+        )).toBe('between 2026-08-11 12:00 and 2026-08-11 22:00')
     })
 })

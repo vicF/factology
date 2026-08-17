@@ -81,10 +81,7 @@
         <span v-if="thing.start || thing.end" class="inline-date" style="margin-right: 8px;">
 
                                                 📅
-                                                <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
-                                                <template v-if="thing.start && thing.end"> → </template>
-                                                <template v-else-if="thing.end">{{ $t('until') }} </template>
-                                                <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
+                                                {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -255,13 +252,6 @@ const truncateText = (text, maxLength) => {
     return text.substring(0, maxLength) + '...';
 };
 
-const formatDateShort = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
-};
-
 const exportData = async () => {
     exporting.value = true;
     try {
@@ -289,7 +279,13 @@ const exportData = async () => {
     }
 };
 
+// Monotonic id so an out-of-order response from an earlier request (e.g. the
+// mount-time search vs. the tree's late auto-selection) never overwrites newer
+// results.
+let searchRequestSeq = 0;
 const getObjects = async () => {
+    const requestId = ++searchRequestSeq;
+
     let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
@@ -329,6 +325,7 @@ const getObjects = async () => {
         }
 
         const response = await axios.post('/object', body);
+        if (requestId !== searchRequestSeq) return; // stale response
 
         validationErrors.value = {};
 
@@ -344,14 +341,17 @@ const getObjects = async () => {
             objects.value = response.data.things || response.data || [];
         }
     } catch (error) {
+        if (requestId !== searchRequestSeq) return; // stale error
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors || {};
         }
         objects.value = [];
     } finally {
-        processing.value = false;
-        loaded.value = true;
+        if (requestId === searchRequestSeq) {
+            processing.value = false;
+            loaded.value = true;
+        }
     }
 };
 

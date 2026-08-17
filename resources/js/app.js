@@ -136,6 +136,10 @@ app.config.globalProperties.$flexibleDate = flexibleDate.FlexibleDate;
 app.config.globalProperties.$flexibleDateFormat = function(start, end, startMeta, endMeta) {
     return flexibleDate.formatLocalized(start, end, startMeta, endMeta, (key) => i18n.global.t(key));
 };
+// Compact form for result lists (collapses a same-day time range to one date).
+app.config.globalProperties.$flexibleDateFormatShort = function(start, end, startMeta, endMeta) {
+    return flexibleDate.formatRangeShort(start, end, startMeta, endMeta, (key) => i18n.global.t(key));
+};
 
 // Localized-data resolution helpers (templates can use $objectName(...), etc.)
 import * as localized from './utils/localized.js';

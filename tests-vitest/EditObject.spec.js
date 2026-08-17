@@ -279,6 +279,43 @@ describe('EditObject', () => {
         ])
     })
 
+    it('enables Swap once a linked object is created into the empty slot', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const swapButton = () =>
+            [...document.querySelectorAll('.linked-object button')].find(b => b.textContent.trim() === 'Swap')
+        // Only one end is filled yet, so Swap is disabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(true)
+
+        // Clicking "Create" opens the create-object modal (App.vue stacks it on
+        // top of this one); a saved object comes back via the link-created event.
+        const createButton = [...document.querySelectorAll('.linked-object .flex-button')]
+            .find(b => b.textContent.includes('Create'))
+        createButton.click()
+        await nextTick()
+
+        const openCalls = eventBusMock.emit.mock.calls.filter(c => c[0] === 'open-create-modal')
+        expect(openCalls.length).toBe(1)
+        const payload = openCalls[0][1]
+        expect(payload.callback.type).toBe('link-created')
+
+        eventBusMock.emit('link-created', {
+            requestId: payload.callback.requestId,
+            newObjectId: NEW_OBJECT_ID,
+            newObjectName: 'Created Author',
+            index: 0,
+            linkTypeUuid: payload.callback.linkTypeUuid,
+            comment: '',
+        })
+        await flushPromises()
+
+        // Both ends are now filled → Swap becomes enabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(false)
+    })
+
     it('saves external links added in the form', async () => {
         await mountEditObject({ object: OBJECT })
 

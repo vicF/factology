@@ -368,6 +368,34 @@ class FlexibleDate
     }
 
     /**
+     * Infer the finest precision encoded in a stored canonical value
+     * (e.g. '2026081112' → minute, '15000101000000' → second).
+     * Mirrors splitDigitDate's precision rules. Used when the meta has no
+     * precision (legacy data stored before the meta columns existed).
+     */
+    public static function precisionFromValue(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $digits = ltrim($value, '-');
+        $len = strlen($digits);
+        if ($len <= 4) {
+            return self::PRECISION_YEAR;
+        }
+        if ($len > 14) {
+            return self::PRECISION_YEAR;
+        }
+        $n = intdiv(strlen(substr($digits, 4)) + 1, 2);
+        return match ($n) {
+            1 => self::PRECISION_MONTH,
+            2 => self::PRECISION_DAY,
+            3, 4 => self::PRECISION_MINUTE,
+            default => self::PRECISION_SECOND,
+        };
+    }
+
+    /**
      * Build the canonical padded digit string from era-calendar components.
      */
     private static function canonicalFromComponents(int $y, int $m, int $d, int $h, int $mi, int $s, string $era): ?string
@@ -402,6 +430,28 @@ class FlexibleDate
     {
         if ($value === null || $value === '') {
             return null;
+        }
+        // Legacy unpadded values (e.g. '2026081112' = 2026-08-11 12:00) and the
+        // padded 14-digit canonical form both split as a 4-digit year followed
+        // by up to five 2-digit groups; longer values are huge years handled
+        // by the engine decoder below.
+        if (strlen(ltrim($value, '-')) <= 14) {
+            $parts = self::splitDigitDate(ltrim($value, '-'));
+            $bc = str_starts_with($value, '-');
+            $h = (int) $parts['h'];
+            $mi = (int) $parts['mi'];
+            $s = (int) $parts['s'];
+            if ($bc) {
+                $h = 23 - $h;
+                $mi = 59 - $mi;
+                $s = 59 - $s;
+            }
+            return [
+                'y' => (int) ($bc ? '-' . $parts['y'] : $parts['y']),
+                'm' => (int) $parts['mo'],
+                'd' => (int) $parts['d'],
+                'h' => $h, 'mi' => $mi, 's' => $s,
+            ];
         }
         $formatted = Everything::dateFromDb($value, 'UTC', 'Y-m-d H:i:s');
         if (!is_string($formatted)) {
@@ -498,7 +548,7 @@ class FlexibleDate
         if ($c === null) {
             return $value;
         }
-        $precision = $meta['precision'] ?? self::PRECISION_DAY;
+        $precision = $meta['precision'] ?? self::precisionFromValue($value) ?? self::PRECISION_DAY;
         $era = $meta['era'] ?? Era::GREGORIAN;
 
         $y = $c['y'];
@@ -566,6 +616,11 @@ class FlexibleDate
         $s = $start !== null ? self::formatBound($start, $sm) : '';
         $e = $end !== null ? self::formatBound($end, $em) : '';
         if ($s !== '' && $e !== '') {
+            // Identical bounds (e.g. a single exact date in both columns) have
+            // nothing to compare — show the date once.
+            if ($s === $e) {
+                return $s;
+            }
             return $s . ' — ' . $e;
         }
         if ($qualifier === self::QUALIFIER_APPROX) {

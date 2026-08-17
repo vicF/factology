@@ -18,6 +18,7 @@ import {
     QUALIFIER_UNKNOWN,
 } from '@/utils/flexibleDate'
 import { Era, ERA_KEYS } from '@/constants/eras'
+import IconCheck from '../icons/IconCheck.vue'
 
 const props = defineProps({
     fieldName: { type: String, default: 'start' },
@@ -95,7 +96,9 @@ function initFromStored() {
         if (my) qualifier.value = QUALIFIERS[0]
         else qualifier.value = QUALIFIER_UNKNOWN
         era.value = Era.GREGORIAN
-        precision.value = PRECISIONS[2]
+        // Legacy values have no meta: infer the finest precision encoded in the
+        // stored digits (e.g. '2026081112' → minute) instead of assuming day.
+        precision.value = FlexibleDate.precisionFromValue(my) || PRECISIONS[2]
         comment.value = ''
         text.value = my ? formatBoundLocalized(String(my), { precision: precision.value, era: era.value }, t) : ''
         // Keep the other bound around: it pre-fills the upper-bound input if the
@@ -261,7 +264,7 @@ onMounted(() => {
                 <!-- Live preview / parse error -->
                 <div v-if="error" class="text-danger small mt-1">{{ error }}</div>
                 <div v-else-if="preview" class="text-muted small mt-1">
-                    {{ t('dates.preview') }}: <code>{{ preview }}</code>
+                    <IconCheck class="preview-icon" /> <code>{{ preview }}</code>
                 </div>
 
                 <!-- Structured controls -->
@@ -287,3 +290,10 @@ onMounted(() => {
         </template>
     </div>
 </template>
+
+<style scoped>
+.preview-icon {
+    color: #198754;
+    vertical-align: -1px;
+}
+</style>

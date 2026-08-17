@@ -58,6 +58,12 @@
                             </div>
                         </div>
 
+                        <!-- Warning when editing/deleting another user's object -->
+                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
+                            <i class="bi bi-person-exclamation me-1"></i>
+                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
+                        </div>
+
                         <!-- Tabs -->
                         <ul class="nav nav-tabs justify-content-end mb-3">
                             <li class="nav-item">
@@ -457,12 +463,23 @@ const canEdit = computed(() => {
     return !!uid && authStore.user?.thing_id === uid;
 });
 
-// Delete stays owner-only in both UI and backend (the DELETE endpoint has no
-// admin override).
+// Delete follows the same rule as edit: admins may delete any object,
+// everyone else only their own (the DELETE endpoint enforces this too).
 const canDelete = computed(() => {
+    if (!authenticated.value) return false;
+    if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return authenticated.value && !!uid && authStore.user?.thing_id === uid;
+    return !!uid && authStore.user?.thing_id === uid;
 });
+
+// True when the viewed object belongs to a different account than the current
+// user. Editing/deleting such an object is an admin-only power for now, and the
+// UI warns about it — the check is written generically so it will also cover
+// future non-owner edit permissions.
+const isOtherOwnerObject = computed(() =>
+    authenticated.value && object.value?.owner &&
+    object.value.owner !== authStore.user?.thing_id
+);
 
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;
@@ -550,7 +567,10 @@ const openCreateLinkModal = () => {
 
 const deleteObject = async () => {
     if (!object.value) return;
-    if (!confirm(t('Are you sure you want to delete this object?'))) return;
+    const confirmMessage = canDelete.value && isOtherOwnerObject.value
+        ? `${t('You are going to delete the object that belongs to {owner}.', { owner: object.value.owner_name || t('another user') })} ${t('Are you sure you want to delete this object?')}`
+        : t('Are you sure you want to delete this object?');
+    if (!confirm(confirmMessage)) return;
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
         if (object.value.type === 2) {
