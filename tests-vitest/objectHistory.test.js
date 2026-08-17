@@ -7,7 +7,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useObjectHistoryStore } from '@/stores/objectHistory'
 import { useObjectCacheStore } from '@/stores/objectCache'
-import { THING_TYPE } from '@/constants'
+import { THING_TYPE, LINK_TYPE, CLASS_TYPE } from '@/constants'
+import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
 // setup.js mocks these stores for component tests; this file tests the REAL
@@ -27,6 +28,9 @@ describe('objectHistory store', () => {
         setActivePinia(createPinia())
         localStorage.clear()
         vi.clearAllMocks()
+        // History is per-user; default to a guest so the namespaced storage key
+        // is deterministic. Individual tests may override with a real user.
+        useAuthStore.mockImplementation(() => ({ user: { thing_id: null } }))
         axios.post.mockResolvedValue({ data: { things: [] } })
         axios.get.mockResolvedValue({ data: { data: { thing_id: 'x', type: 3, name: 'X' } } })
     })
@@ -148,5 +152,71 @@ describe('objectHistory store', () => {
             .toEqual(['thing-1'])
         expect((await store.getSuggestions(4, null, null, null, 15)).map(o => o.thing_id))
             .toEqual(['link-1'])
+    })
+
+    it('getRecentSync returns persisted recent items without any await', async () => {
+        const store = useObjectHistoryStore()
+        const cache = useObjectCacheStore()
+        cache.cacheObject('obj-1', { thing_id: 'obj-1', type: 3, name: 'One' }, 3)
+        await store.recordSelection('obj-1', 3)
+
+        // Fresh Pinia = new session with no in-memory state; the sync read must
+        // still see the persisted snapshot.
+        setActivePinia(createPinia())
+        const fresh = useObjectHistoryStore()
+        const sync = fresh.getRecentSync(3)
+        expect(sync.map(o => o.thing_id)).toEqual(['obj-1'])
+        expect(sync[0].name).toBe('One')
+    })
+
+    it('getRecentSync filters by type and is empty for the wrong type', async () => {
+        const store = useObjectHistoryStore()
+        const cache = useObjectCacheStore()
+        cache.cacheObject('link-1', { thing_id: 'link-1', type: 4, name: 'L1' }, 4)
+        await store.recordSelection('link-1', 4)
+
+        expect(store.getRecentSync(4).map(o => o.thing_id)).toEqual(['link-1'])
+        expect(store.getRecentSync(3)).toEqual([])
+    })
+
+    it('preloadFromServer seeds recent lists for the user from the server', async () => {
+        useAuthStore.mockImplementation(() => ({ user: { thing_id: 'user-1' }, token: 'tok' }))
+        axios.get.mockResolvedValue({ data: {
+            links: [{ thing_id: 'lt-1', type: LINK_TYPE, name: 'LinkType' }],
+            things: [{ thing_id: 't-1', type: THING_TYPE, name: 'Thing' }],
+            classes: [{ thing_id: 'c-1', type: CLASS_TYPE, name: 'Class' }],
+        } })
+
+        const store = useObjectHistoryStore()
+        await store.preloadFromServer()
+
+        // The seeded lists render synchronously (no network, no hydrate await)
+        // — exactly what the dropdown needs for an instant first paint.
+        expect(store.getRecentSync(LINK_TYPE).map(o => o.thing_id)).toEqual(['lt-1'])
+        expect(store.getRecentSync(THING_TYPE).map(o => o.thing_id)).toEqual(['t-1'])
+        expect(store.getRecentSync(CLASS_TYPE).map(o => o.thing_id)).toEqual(['c-1'])
+
+        // Seeded items are persisted too, so a fresh session renders them
+        // without waiting for the preload network call again.
+        setActivePinia(createPinia())
+        const fresh = useObjectHistoryStore()
+        expect(fresh.getRecentSync(THING_TYPE).map(o => o.thing_id)).toEqual(['t-1'])
+    })
+
+    it('preloadFromServer keeps real user selections ahead of server seeds', async () => {
+        useAuthStore.mockImplementation(() => ({ user: { thing_id: 'user-1' }, token: 'tok' }))
+        const store = useObjectHistoryStore()
+        const cache = useObjectCacheStore()
+        cache.cacheObject('picked', { thing_id: 'picked', type: 3, name: 'Picked' }, 3)
+        await store.recordSelection('picked', 3)
+
+        axios.get.mockResolvedValue({ data: {
+            links: [],
+            things: [{ thing_id: 'seed-1', type: THING_TYPE, name: 'Seed' }],
+            classes: [],
+        } })
+        await store.preloadFromServer()
+
+        expect(store.getRecentSync(THING_TYPE).map(o => o.thing_id)).toEqual(['picked', 'seed-1'])
     })
 })

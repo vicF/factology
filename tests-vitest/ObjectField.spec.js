@@ -38,6 +38,7 @@ describe('ObjectField', () => {
         mockHistory = {
             hydrate: vi.fn(() => Promise.resolve()),
             getRecent: vi.fn(() => Promise.resolve([])),
+            getRecentSync: vi.fn(() => []),
             getSuggestions: vi.fn(() => Promise.resolve([])),
             recordSelection: vi.fn(),
         }
@@ -141,6 +142,26 @@ describe('ObjectField', () => {
         resolveSuggestions([{ thing_id: '1', name: 'Loaded', type: THING_TYPE }])
         await flushPromises()
 
+        expect(wrapper.vm.suggestionsLoading).toBe(false)
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['1'])
+    })
+
+    it('renders local recent items immediately without waiting for the network', async () => {
+        const localRecent = [{ thing_id: '1', name: 'Recent', type: THING_TYPE }]
+        // Both the synchronous and the hydrated reads return the same persisted
+        // recent list (as the real store does); only the network-backed
+        // suggestion pipeline stays pending.
+        mockHistory.getRecentSync.mockReturnValue(localRecent)
+        mockHistory.getRecent.mockResolvedValue(localRecent)
+        let resolveSuggestions
+        mockHistory.getSuggestions.mockReturnValue(new Promise(r => { resolveSuggestions = r }))
+
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        await wrapper.find('input').trigger('focus')
+        await nextTick()
+
+        // Local data is on screen while the (still pending) server-backed
+        // suggestion pipeline runs in the background — no spinner in between.
         expect(wrapper.vm.suggestionsLoading).toBe(false)
         expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['1'])
     })

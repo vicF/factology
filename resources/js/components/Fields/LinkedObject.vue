@@ -255,8 +255,15 @@ watch(() => [link.value.one_thing_id, link.value.other_thing_id, link.value.link
     { deep: true }
 );
 
+// The requestId of the create modal this row opened, so the link-created event
+// is matched exactly. With stacked modals several link rows may share an index,
+// so a prefix match is not enough — only the row that actually opened the modal
+// may consume the result.
+const pendingCreateRequestId = ref(null);
+
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    pendingCreateRequestId.value = requestId;
     const payload = {
         title: 'Create new object',
         params: { type: effectiveObjectType.value },
@@ -283,7 +290,7 @@ const removeSelf = () => {
 };
 
 const handleLinkCreated = async (data) => {
-    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
+    if (data.requestId && data.requestId === pendingCreateRequestId.value) {
         const newId = data.newObjectId;
         if (newId && !link.value.other_thing_id) {
             await nextTick();

@@ -495,6 +495,125 @@ class ApiController extends BaseController
     }
 
     /**
+     * Per-user "quick lists" for the object / link-type / class dropdowns.
+     *
+     * Returns the link types, things and classes this user uses most, derived
+     * from links attached to objects they own. Short user lists are padded with
+     * globally popular objects of the same type so a fresh user still gets a
+     * useful dropdown. The client fetches this once at app load and seeds its
+     * local history cache from it, so opening a dropdown makes no per-open
+     * network request — the server is only hit when the user searches.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function suggestLists(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $userThingId = Auth::user()->thing_id;
+        $limit = 30;
+
+        // Rank the values of $column by how often they appear in links whose
+        // subject (one_thing_id) is an object owned by the current user.
+        $rankOwned = function (string $column, bool $whereNotNull = false) use ($userThingId, $limit) {
+            $query = DB::table('links as l')
+                ->join('things as o', function ($join) use ($userThingId) {
+                    $join->on('o.thing_id', '=', 'l.one_thing_id')
+                        ->where('o.owner', '=', $userThingId)
+                        ->where('o.deleted', false);
+                })
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE')
+                ->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($limit);
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->get()->pluck('id')->all();
+        };
+
+        // Link types the user uses most.
+        $linkTypeIds = $rankOwned('link_type_id');
+        // Things the user links to most (the other end of their links).
+        $thingIds    = $rankOwned('other_thing_id', true);
+        // Classes the user's own things belong to (LINK_TO_CLASS links).
+        $classIds = DB::table('links as l')
+            ->join('things as o', function ($join) use ($userThingId) {
+                $join->on('o.thing_id', '=', 'l.one_thing_id')
+                    ->where('o.owner', '=', $userThingId)
+                    ->where('o.deleted', false);
+            })
+            ->select('l.other_thing_id as id', DB::raw('COUNT(*) as cnt'))
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->whereRaw('l.deleted IS NOT TRUE')
+            ->whereNotNull('l.other_thing_id')
+            ->groupBy('l.other_thing_id')
+            ->orderByDesc('cnt')
+            ->limit($limit)
+            ->get()
+            ->pluck('id')
+            ->all();
+
+        // Pad short user lists with globally popular objects of the same type —
+        // only when the user's own usage does not already fill the list, so a
+        // well-established user never pays for the global GROUP BY queries.
+        $globalRank = function (string $column, int $needed, bool $linkToClassOnly = false, bool $whereNotNull = false) {
+            if ($needed <= 0) {
+                return [];
+            }
+            $query = DB::table('links as l')
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE');
+            if ($linkToClassOnly) {
+                $query->where('l.link_type_id', UUID::LINK_TO_CLASS);
+            }
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($needed)
+                ->get()
+                ->pluck('id')
+                ->all();
+        };
+
+        $linkTypeIds = array_merge($linkTypeIds, $globalRank('link_type_id', $limit - count($linkTypeIds)));
+        $thingIds    = array_merge($thingIds, $globalRank('other_thing_id', $limit - count($thingIds), false, true));
+        $classIds    = array_merge($classIds, $globalRank('other_thing_id', $limit - count($classIds), true, true));
+
+        // Resolve full thing rows, keeping the ranked order and applying the
+        // standard visibility scope (abstract system objects are excluded, same
+        // as the search endpoint).
+        $resolve = function (array $ids) {
+            $ids = array_values(array_filter(array_unique($ids)));
+            if (!$ids) {
+                return [];
+            }
+            $rows = DB::table('things')
+                ->auth()
+                ->where('things.deleted', false)
+                ->where('things.abstract', false)
+                ->whereIn('things.thing_id', $ids)
+                ->get()
+                ->keyBy('thing_id');
+            $ordered = [];
+            foreach ($ids as $id) {
+                if ($rows->has((string) $id)) {
+                    $ordered[] = $rows[(string) $id];
+                }
+            }
+            return $ordered;
+        };
+
+        return response()->json([
+            'links'   => ThingResource::collection($resolve($linkTypeIds)),
+            'things'  => ThingResource::collection($resolve($thingIds)),
+            'classes' => ThingResource::collection($resolve($classIds)),
+        ]);
+    }
+
+    /**
      * Toggle favorite status for an object.
      *
      * Creates or deletes a MY_FAVORITE link between the current user and the target object.

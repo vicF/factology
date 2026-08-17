@@ -411,15 +411,22 @@ async function loadSuggestions() {
         }
         return
     }
-    // Show a spinner while the initial list is assembled (recent items first,
-    // then network-backed fillers), so the dropdown never looks empty mid-load.
-    suggestionsLoading.value = true
+    // Phase 1 — instant paint from local data. The dropdown must never block on
+    // the network: persisted recent items (+ any lists preloaded at app load)
+    // render synchronously, and the richer server-backed list streams in below.
+    if (!searchText.value.trim()) {
+        pendingSuggestions.value = historyStore.getRecentSync(props.type, props.maxResults);
+    }
+    // Only show the spinner when there is genuinely nothing local to display.
+    suggestionsLoading.value = pendingSuggestions.value.length === 0
+
     try {
         await historyStore.hydrate();
-        // Show the persisted recent items immediately (local read, no network)
-        // so the dropdown is populated the moment it opens.
         const recent = await historyStore.getRecent(props.type, props.maxResults);
-        if (!searchText.value.trim()) pendingSuggestions.value = recent;
+        if (!searchText.value.trim()) {
+            pendingSuggestions.value = recent;
+            suggestionsLoading.value = recent.length === 0;
+        }
 
         const results = await historyStore.getSuggestions(
             props.type,
@@ -430,11 +437,14 @@ async function loadSuggestions() {
         );
         // Swap in the complete list only if the user has not started typing —
         // a late-arriving suggestion list must not clobber the search view.
-        if (!searchText.value.trim()) pendingSuggestions.value = results;
+        if (!searchText.value.trim()) {
+            pendingSuggestions.value = results;
+            suggestionsLoading.value = false;
+        }
     } catch (e) {
         console.warn('Failed to load suggestions:', e);
         if (!searchText.value.trim()) {
-            pendingSuggestions.value = await historyStore.getRecent(props.type, props.maxResults).catch(() => []);
+            pendingSuggestions.value = historyStore.getRecentSync(props.type, props.maxResults);
         }
     } finally {
         suggestionsLoading.value = false

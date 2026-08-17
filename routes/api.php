@@ -97,6 +97,7 @@ Route::prefix('v1')->group(function () {
 
         // History / favorites
         Route::post('/suggest/links',         [ApiController::class, 'suggestLinks']);
+        Route::get('/suggest/lists',          [ApiController::class, 'suggestLists']);
         Route::post('/object/{id}/favorite',  [ApiController::class, 'toggleFavorite']);
 
         // Export/Import (admin-only, enforced in controller)

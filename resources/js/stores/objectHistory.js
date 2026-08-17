@@ -5,17 +5,29 @@
 // Favorites are stored as real links in the DB (MY_FAVORITE link type).
 
 import { defineStore } from 'pinia';
-import { storage } from '@/utils/storage.js';
+import { storage, storageSync } from '@/utils/storage.js';
 import { useAuthStore } from './auth';
 import { useObjectCacheStore } from './objectCache';
 import axios from 'axios';
 import { UUID } from '@/constants/uuid.js';
-import { THING_TYPE } from '@/constants.js';
+import { THING_TYPE, LINK_TYPE, CLASS_TYPE } from '@/constants.js';
 
 const STORAGE_PREFIX = 'objectHistory';
 const MAX_RECENT = 200;
 const MAX_CONTEXT_PER_KEY = 50;
 const MAX_CONTEXT_KEYS = 500;
+
+// The history is per-user: keys are namespaced by the logged-in user's thing_id
+// (guests share a 'guest' namespace). Keeps users on the same browser from
+// seeing each other's recently used / frequent lists.
+function currentUserKey() {
+    const authStore = useAuthStore();
+    return authStore.user?.thing_id || 'guest';
+}
+
+function historyKey(suffix) {
+    return `${STORAGE_PREFIX}:${currentUserKey()}:${suffix}`;
+}
 
 // True when an object matches the selector's numeric type. The `class_id`
 // fallback is legacy (older cached objects carried a class reference).
@@ -43,34 +55,53 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
     let freqCache = {};            // { uuid: count }
     let contextCache = {};         // { 'type:linkType': [ {uuid, count, lastSelectedAt} ] }
     let hydrated = false;
+    let hydratedUserKey = null;    // user key the in-memory caches belong to
     let favoritesCache = [];       // cached favorite UUIDs from DB
     let favoritesLoaded = false;   // favorites have been fetched at least once this session
     let otherCache = {};           // { type: [object, ...] } — fallback filler objects, cached per session
 
     // ── Hydration ──
     async function hydrate() {
-        if (hydrated) return;
+        const userKey = currentUserKey();
+        if (hydrated && hydratedUserKey === userKey) return;
+        hydrated = false;
         try {
+            // Legacy fallback: before per-user namespacing the keys were stored
+            // flat (objectHistory:recent, ...). The first user to load after the
+            // upgrade takes over that data and the flat keys are removed.
+            const read = async (suffix) => {
+                let raw = await storage.get(historyKey(suffix));
+                if (raw === null) {
+                    const legacyKey = `${STORAGE_PREFIX}:${suffix}`;
+                    raw = await storage.get(legacyKey);
+                    if (raw !== null) {
+                        await storage.set(historyKey(suffix), raw);
+                        await storage.remove(legacyKey);
+                    }
+                }
+                return raw;
+            };
             const [recentRaw, freqRaw, contextRaw] = await Promise.all([
-                storage.get(`${STORAGE_PREFIX}:recent`),
-                storage.get(`${STORAGE_PREFIX}:freq`),
-                storage.get(`${STORAGE_PREFIX}:context`),
+                read('recent'),
+                read('freq'),
+                read('context'),
             ]);
-            if (recentRaw) recentCache = JSON.parse(recentRaw);
-            if (freqRaw) freqCache = JSON.parse(freqRaw);
-            if (contextRaw) contextCache = JSON.parse(contextRaw);
+            recentCache = recentRaw ? JSON.parse(recentRaw) : [];
+            freqCache = freqRaw ? JSON.parse(freqRaw) : {};
+            contextCache = contextRaw ? JSON.parse(contextRaw) : {};
         } catch (e) {
             console.warn('objectHistory: hydration failed', e);
         }
+        hydratedUserKey = userKey;
         hydrated = true;
     }
 
     // ── Persistence ──
     async function persist() {
         await Promise.all([
-            storage.set(`${STORAGE_PREFIX}:recent`, JSON.stringify(recentCache)),
-            storage.set(`${STORAGE_PREFIX}:freq`, JSON.stringify(freqCache)),
-            storage.set(`${STORAGE_PREFIX}:context`, JSON.stringify(contextCache)),
+            storage.set(historyKey('recent'), JSON.stringify(recentCache)),
+            storage.set(historyKey('freq'), JSON.stringify(freqCache)),
+            storage.set(historyKey('context'), JSON.stringify(contextCache)),
         ]);
     }
 
@@ -176,6 +207,28 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
                 const obj = settled[i].status === 'fulfilled' ? settled[i].value : null;
                 if (obj && objectMatchesType(obj, type)) results.push(obj);
             }
+        }
+        return results;
+    }
+
+    // ── Synchronous variant of getRecent ──
+    // Renders the persisted recent list (plus the in-memory object cache)
+    // without any await, so a dropdown can paint its items on the very first
+    // frame instead of waiting for hydrate()/the network. Falls back to a
+    // synchronous localStorage read when the store has not been hydrated yet.
+    function getRecentSync(type, limit = 15) {
+        let recent = recentCache;
+        if (!hydrated) {
+            const raw = storageSync.get(historyKey('recent')) ?? storageSync.get(`${STORAGE_PREFIX}:recent`);
+            try { if (raw) recent = JSON.parse(raw); } catch (e) { /* ignore */ }
+        }
+        const cacheStore = useObjectCacheStore();
+        const results = [];
+        for (const e of recent) {
+            if (results.length >= limit) break;
+            const obj = cacheStore.getCachedObject(e.uuid) || e.obj;
+            if (!obj || !objectMatchesType(obj, type)) continue;
+            results.push(obj);
         }
         return results;
     }
@@ -402,6 +455,51 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         return results;
     }
 
+    // ── Preload the user's quick lists from the server ──
+    // Called once at app load. Seeds the local recent/frequent caches with the
+    // user's most-used link types, things and classes so the first dropdown of
+    // the session opens instantly — even on a fresh device with no local
+    // history. The result is persisted, so later sessions render offline too.
+    async function preloadFromServer() {
+        const authStore = useAuthStore();
+        if (!authStore.token || !authStore.user?.thing_id) return;
+        await hydrate();
+        try {
+            const res = await axios.get('/suggest/lists');
+            const { links = [], things = [], classes = [] } = res.data || {};
+            const cacheStore = useObjectCacheStore();
+
+            const seed = (objects, type) => {
+                for (let i = 0; i < objects.length; i++) {
+                    const obj = objects[i];
+                    if (!obj?.thing_id) continue;
+                    if (obj.type !== undefined && !objectMatchesType(obj, type)) continue;
+                    cacheStore.cacheObject(obj.thing_id, obj, obj.type || type);
+                    // Append to recent (real user selections stay on top).
+                    if (!recentCache.some(e => e.uuid === obj.thing_id)) {
+                        recentCache.push({
+                            uuid: obj.thing_id,
+                            type: obj.type || type,
+                            selectedAt: Date.now(),
+                            obj: makeSnapshot(obj, type),
+                        });
+                    }
+                    // Rank-derived base frequency; never overwrite real usage.
+                    const rankWeight = objects.length - i;
+                    freqCache[obj.thing_id] = Math.max(freqCache[obj.thing_id] || 0, rankWeight);
+                }
+            };
+
+            seed(links, LINK_TYPE);
+            seed(things, THING_TYPE);
+            seed(classes, CLASS_TYPE);
+            pruneRecent();
+            await persist();
+        } catch (e) {
+            console.warn('objectHistory: server preload failed', e);
+        }
+    }
+
     // ── Reset / clear ──
     async function clearAll() {
         recentCache = [];
@@ -417,6 +515,8 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
     return {
         recordSelection,
         getRecent,
+        getRecentSync,
+        preloadFromServer,
         getMostFrequent,
         getContextSuggestions,
         getCurrentUserObject,

@@ -358,7 +358,12 @@ const props = defineProps({
     params: { type: Object, default: () => ({}) },
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
-    callback: { type: Object, default: null }
+    callback: { type: Object, default: null },
+    // When several create modals are stacked (link-row "Create" while another
+    // modal is open), only the top one is visible. A modal that becomes
+    // inactive is hidden without the unsaved-changes prompt — its form state
+    // stays mounted so it can be shown again later.
+    active: { type: Boolean, default: true },
 });
 
 // Emits definition
@@ -639,6 +644,9 @@ let modalInstance = null;
 let confirmModalInstance = null;
 let isClosing = false;
 let isSubmitting = false;
+// Set while the modal is hidden because a stacked modal on top became active —
+// hides for this reason must not show the unsaved-changes prompt.
+let isForcedHide = false;
 
 // Unsaved changes tracking
 const originalFormData = ref({});
@@ -862,6 +870,9 @@ const handleHideModal = (event) => {
         event.stopPropagation();
         return;
     }
+    // A stacked modal becoming active hides this one — no unsaved-changes
+    // prompt for that; the form stays mounted underneath.
+    if (isForcedHide) return;
     if (hasUnsavedChanges.value && !isClosing && !isSubmitting) {
         event.preventDefault();
         event.stopPropagation();
@@ -1015,13 +1026,28 @@ onMounted(async () => {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => {
-            if (!isSubmitting) emit('close');
+            const wasForcedHide = isForcedHide;
+            isForcedHide = false;
+            if (!isSubmitting && !wasForcedHide) emit('close');
         });
         setTimeout(() => {
-            if (modalInstance && modalElement) modalInstance.show();
+            if (modalInstance && modalElement && props.active) modalInstance.show();
         }, 100);
     }
     if (confirmModalElement) confirmModalInstance = new Modal(confirmModalElement);
+});
+
+// Stacked create modals: hide this one (no prompt) when a modal above becomes
+// active, and re-show it when it becomes the top again.
+watch(() => props.active, (active) => {
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement || !modalInstance) return;
+    if (active) {
+        modalInstance.show();
+    } else {
+        isForcedHide = true;
+        modalInstance.hide();
+    }
 });
 
 onUnmounted(() => {
