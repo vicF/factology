@@ -85,33 +85,39 @@
                                 {{ searchText.trim().length >= 2 ? 'No matching objects found' : (searchText ? 'Continue typing to search...' : 'Start typing or paste UUID') }}
                             </div>
                             <div v-else class="dropdown-items-container">
-                                <button
-                                    v-for="(obj, index) in filteredObjects"
-                                    :key="obj.thing_id || index"
-                                    type="button"
-                                    class="dropdown-item"
-                                    :data-test-name="obj.name"
-                                    @click="selectObject(obj, $event)"
-                                    @mousedown.prevent
-                                >
-                                    <IconClass v-if="obj.type === CLASS_TYPE" width="1.1em" height="1.1em" class="flex-shrink-0" />
-                                    <IconThing v-else-if="obj.type === THING_TYPE" width="1.1em" height="1.1em" class="flex-shrink-0" />
-                                    <IconLink v-else width="1.1em" height="1.1em" class="flex-shrink-0" />
-                                    <div class="flex-grow-1 text-truncate text-start">
-                                        <div class="d-flex align-items-center gap-1">
-                                            <span>{{ objectName(obj) || 'Unnamed' }}</span>
-                                            <small v-if="obj._suggestionType" class="suggestion-tag">
-                                                {{ suggestionLabel(obj._suggestionType) }}
+                                <template v-for="(obj, index) in filteredObjects" :key="obj.thing_id || index">
+                                    <div
+                                        v-if="showCategoryHeader(obj, index)"
+                                        class="dropdown-header small text-uppercase text-muted"
+                                    >
+                                        {{ categoryLabel(obj) }}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="dropdown-item"
+                                        :data-test-name="obj.name"
+                                        @click="selectObject(obj, $event)"
+                                        @mousedown.prevent
+                                    >
+                                        <IconClass v-if="obj.type === CLASS_TYPE" width="1.1em" height="1.1em" class="flex-shrink-0" />
+                                        <IconThing v-else-if="obj.type === THING_TYPE" width="1.1em" height="1.1em" class="flex-shrink-0" />
+                                        <IconLink v-else width="1.1em" height="1.1em" class="flex-shrink-0" />
+                                        <div class="flex-grow-1 text-truncate text-start">
+                                            <div class="d-flex align-items-center gap-1">
+                                                <span>{{ objectName(obj) || 'Unnamed' }}</span>
+                                                <small v-if="obj._suggestionType" class="suggestion-tag">
+                                                    {{ suggestionLabel(obj._suggestionType) }}
+                                                </small>
+                                            </div>
+                                            <small v-if="objectDescription(obj)" class="text-muted d-block text-truncate">
+                                                {{ objectDescription(obj) }}
                                             </small>
                                         </div>
-                                        <small v-if="objectDescription(obj)" class="text-muted d-block text-truncate">
-                                            {{ objectDescription(obj) }}
+                                        <small class="text-muted ms-auto font-monospace">
+                                            {{ (obj.thing_id || '').substring(0, 6) }}…
                                         </small>
-                                    </div>
-                                    <small class="text-muted ms-auto font-monospace">
-                                        {{ (obj.thing_id || '').substring(0, 6) }}…
-                                    </small>
-                                </button>
+                                    </button>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -132,7 +138,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useObjectCacheStore } from '@/stores/objectCache.js'
 import { useObjectHistoryStore } from '@/stores/objectHistory.js'
 import { CLASS_TYPE, THING_TYPE, LINK_TYPE } from "../../constants.js";
-import { objectName, objectDescription } from "../../utils/localized.js";
+import { objectName, objectDescription, fieldText } from "../../utils/localized.js";
 import axios from 'axios';
 
 // Icon components are globally registered, no need to import
@@ -258,6 +264,18 @@ const filteredObjects = computed(() => {
     }
     return results;
 })
+
+// ── Taxonomy grouping for link-type pickers ──────────────────────
+// The search endpoint attaches `category_*` fields to link-type results (the
+// abstract base the link type hangs under). When present, show a group header
+// at the start of each category run.
+const categoryKey = (obj) => obj.category_id || obj.category_name || '';
+const showCategoryHeader = (obj, index) => {
+    if (props.type !== LINK_TYPE || !obj.category_name) return false;
+    if (index === 0) return true;
+    return categoryKey(obj) !== categoryKey(filteredObjects.value[index - 1]);
+};
+const categoryLabel = (obj) => fieldText(obj.category_name, obj.category_translations);
 
 // ── Dropdown positioning ──────────────────────────────────────
 const calculateDropdownPosition = () => {

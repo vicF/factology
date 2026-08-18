@@ -80,7 +80,7 @@ vi.mock('../resources/js/localization/languageCatalog.js', () => ({
 
 const EDIT_ID = 'existing-object-id'
 const NEW_OBJECT_ID = 'brand-new-object-id'
-const DEFAULT_LINK_TYPE = '4b27fd0c-d8be-425c-a529-2186b2589e76'
+const DEFAULT_LINK_TYPE = 'c217c185-742f-4a9f-8e69-acea2b4f5aea' // LINK_TO_CLASS (is of class)
 const OBJECT = { thing_id: EDIT_ID, name: 'Existing Object', type: 3 }
 
 // The whole modal is teleported to <body>, so query the rendered DOM directly.

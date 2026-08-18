@@ -813,7 +813,7 @@ const addNewLinkedObject = async () => {
         id: uuidv4(),
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
-        link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
+        link_type_id: LINK_TO_CLASS,
         translation: '',
         link_id: null,
     });

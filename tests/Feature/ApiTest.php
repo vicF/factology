@@ -383,6 +383,27 @@ class ApiTest extends TestCase
         $this->assertFalse($ids->contains($classId), 'A class node must not leak into the results');
     }
 
+    public function testLinkTypeSearchAttachesTaxonomyCategory(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A nested link type (mother → biological parent → Kinship) resolves to
+        // its abstract base category, with localized name available.
+        $res = $this->postJson('/api/v1/object', ['search' => 'mother', 'type' => [UUID::G_LINK]]);
+        $res->assertStatus(200);
+        $mother = collect($res->json('things'))->firstWhere('name', 'is a mother of');
+        $this->assertNotNull($mother, 'is a mother of should be found');
+        $this->assertSame('Kinship', $mother['category_name']);
+        $this->assertSame('Родственные отношения', $mother['category_translations']['ru'] ?? null);
+
+        // A link type directly under the Link root gets itself as the category.
+        $res2 = $this->postJson('/api/v1/object', ['search' => 'related to', 'type' => [UUID::G_LINK]]);
+        $res2->assertStatus(200);
+        $related = collect($res2->json('things'))->firstWhere('name', 'is related to');
+        $this->assertSame('is related to', $related['category_name'] ?? null);
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();

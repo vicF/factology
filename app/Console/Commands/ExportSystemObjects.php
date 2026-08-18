@@ -23,12 +23,13 @@ class ExportSystemObjects extends Command
     protected $description = 'Export system-owned objects to resources/js/localDb/system-objects.json';
 
     /**
-     * Canonical things columns. The live dev DB may carry extra columns
-     * (e.g. name_translations) that are not part of the standard schema —
-     * the standard export only includes these.
+     * Canonical things columns. Localized names/descriptions are part of the
+     * standard schema (2026_08_08_add_localization_columns_to_things) and are
+     * included so the export stays a complete source of truth for the seeder.
      */
     private const THING_COLUMNS = [
         'thing_id', 'name', 'type', 'description',
+        'name_translations', 'description_translations',
         'start', 'end', 'start_variety', 'end_variety',
         'record_created', 'record_updated', 'owner', 'public', 'deleted', 'data',
         'abstract',
@@ -65,8 +66,12 @@ class ExportSystemObjects extends Command
             ->get()
             ->map(function ($thing) {
                 $row = array_intersect_key((array) $thing, array_flip(self::THING_COLUMNS));
-                if (is_string($row['data'])) {
-                    $row['data'] = json_decode($row['data']);
+                // Postgres jsonb columns arrive as strings via PDO; decode them
+                // so the export file holds real JSON objects.
+                foreach (['data', 'name_translations', 'description_translations'] as $col) {
+                    if (isset($row[$col]) && is_string($row[$col])) {
+                        $row[$col] = json_decode($row[$col]);
+                    }
                 }
                 return $row;
             })

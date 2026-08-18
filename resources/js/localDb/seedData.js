@@ -29,8 +29,8 @@ export const BOOTSTRAP_THINGS = [
     },
     {
         thing_id: UUID.LINK_TO_PARENT,
-        name: 'is a parent of',
-        description: 'Type of parent link whatever it can mean',
+        name: 'is a superclass of',
+        description: 'The object is a more general class/category that the linked object subclasses',
         type: UUID.G_LINK,
         public: true,
     },
@@ -90,7 +90,7 @@ export const BOOTSTRAP_LINKS = [
     { one: UUID.EVERYTHING, other: UUID.SOMETHING,      translation: '"Something" is subclass of "Everything"' },
     { one: UUID.EVERYTHING, other: UUID.LINK,           translation: '"Link" is subclass of "Everything"' },
     { one: UUID.EVERYTHING, other: UUID.SYSTEM,         translation: '"System" is subclass of "Everything"' },
-    { one: UUID.LINK,       other: UUID.LINK_TO_PARENT, translation: '"Parent" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.LINK_TO_PARENT, translation: '"Superclass" is subclass of "Link"' },
     { one: UUID.LINK,       other: UUID.LINK_TO_CLASS,  translation: '"Class of" is subclass of "Link"' },
 ];
 

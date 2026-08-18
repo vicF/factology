@@ -30,16 +30,19 @@ class DatabaseSeeder extends Seeder
         // Bootstrap things + default classes + system-owned objects.
         // Upsert by thing_id so reruns converge with the file.
         foreach ($system['things'] as $thing) {
-            // The export stores the `data` JSON column decoded; re-encode it for
-            // the query builder (which does not auto-cast arrays to JSON).
-            if (is_array($thing['data'] ?? null)) {
-                $thing['data'] = json_encode($thing['data']);
+            // The export stores JSON columns decoded; re-encode them for the
+            // query builder (which does not auto-cast arrays to JSON).
+            foreach (['data', 'name_translations', 'description_translations'] as $jsonCol) {
+                if (is_array($thing[$jsonCol] ?? null)) {
+                    $thing[$jsonCol] = json_encode($thing[$jsonCol]);
+                }
             }
             DB::table('things')->upsert(
                 array_merge($thing, ['server_uuid' => $serverUuid]),
                 ['thing_id'],
                 [
-                    'name', 'description', 'type', 'public', 'deleted',
+                    'name', 'description', 'name_translations', 'description_translations',
+                    'type', 'public', 'deleted',
                     'owner', 'start', 'end', 'start_variety', 'end_variety',
                     'data', 'server_uuid', 'abstract',
                 ]

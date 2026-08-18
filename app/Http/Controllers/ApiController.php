@@ -879,6 +879,14 @@ class ApiController extends BaseController
         // dedupe.)
         $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
 
+        // Link-type results carry their taxonomy base category (the abstract
+        // base they hang under, e.g. "Kinship", "Hierarchy") so the picker can
+        // group them.
+        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
+        if (in_array(UUID::G_LINK, $requestTypes, true)) {
+            $this->attachLinkTypeCategories($data);
+        }
+
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
@@ -918,6 +926,70 @@ class ApiController extends BaseController
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Attach the taxonomy base category to link-type search results so the
+     * picker can group them (e.g. "Kinship", "Hierarchy"). The base is the
+     * direct child of the Link root that the link type hangs under; for link
+     * types directly under Link it is the link type itself. Link types that
+     * are not part of the tree (system-internal ones) get no category.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachLinkTypeCategories($things): void
+    {
+        $bases = DB::table('links')
+            ->join('things as t', 't.thing_id', '=', 'links.other_thing_id')
+            ->where('links.one_thing_id', UUID::LINK)
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('t.type', UUID::G_LINK)
+            ->where('t.deleted', false)
+            ->get(['t.thing_id', 't.name', 't.name_translations'])
+            ->keyBy('thing_id');
+
+        if ($bases->isEmpty()) {
+            return;
+        }
+
+        // child => parent edges among link types (any depth).
+        $parents = DB::table('links')
+            ->join('things as p', 'p.thing_id', '=', 'links.one_thing_id')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('p.type', UUID::G_LINK)->where('p.deleted', false)
+            ->where('c.type', UUID::G_LINK)->where('c.deleted', false)
+            ->pluck('links.one_thing_id', 'links.other_thing_id');
+
+        foreach ($things as $thing) {
+            if ((int) $thing->type !== UUID::G_LINK) {
+                continue;
+            }
+            $base = $this->resolveLinkBase($thing->thing_id, $bases, $parents);
+            if ($base) {
+                $thing->category_id           = $base->thing_id;
+                $thing->category_name         = $base->name;
+                $thing->category_translations = $base->name_translations;
+            }
+        }
+    }
+
+    private function resolveLinkBase(string $thingId, $bases, $parents): ?object
+    {
+        if (isset($bases[$thingId])) {
+            return $bases[$thingId];
+        }
+        $node  = $thingId;
+        $guard = 0;
+        while (isset($parents[$node]) && $guard++ < 20) {
+            $node = $parents[$node];
+            if (isset($bases[$node])) {
+                return $bases[$node];
+            }
+        }
+        return null;
     }
 
     /**

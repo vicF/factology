@@ -40,7 +40,7 @@ describe('Local API link enrichment (mirrors server LinkResource)', () => {
         const toSomething = obj.links.find(l => l.other_thing_id === UUID.SOMETHING);
         expect(toSomething).toBeTruthy();
         expect(toSomething.name).toBe('Something');
-        expect(toSomething.link_name).toBe('is a parent of');
+        expect(toSomething.link_name).toBe('is a superclass of');
     });
 
     it('resolves names for links found via other_thing_id too', async () => {
@@ -97,7 +97,7 @@ describe('Local API class tree (mirrors server searchTree)', () => {
         expect(names).toContain('City');
         expect(names).toContain('Vehicle');
         expect(names).toContain('Guitar');
-        expect(names).toContain('is a parent of'); // link type node under Link
+        expect(names).toContain('is a superclass of'); // link type node under Link
         // Orphans (not reachable from Everything) are excluded, like the server
         expect(names).not.toContain('Married to');
         expect(names).not.toContain('meanwhile');
