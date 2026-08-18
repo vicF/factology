@@ -38,7 +38,7 @@ class ExportSystemObjectsTest extends TestCase
     }
 
     /** @test */
-    public function export_includes_system_owned_and_reserved_but_not_user_owned()
+    public function export_includes_system_owned_but_not_user_owned()
     {
         $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         $systemThingId = uuid_create();
@@ -57,7 +57,9 @@ class ExportSystemObjectsTest extends TestCase
 
         $this->assertContains($systemThingId, $ids);
         $this->assertNotContains($userThingId, $ids);
-        $this->assertContains(UUID::EVERYTHING, $ids); // reserved bootstrap always exported
+        // Bootstrap UUIDs (e.g. Everything) appear because the seed assigns
+        // them the System Owner — the export itself has no predefined list.
+        $this->assertContains(UUID::EVERYTHING, $ids);
 
         @unlink($path);
     }

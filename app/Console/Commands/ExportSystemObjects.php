@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\DB;
  * Export system objects to the standard database/system-objects.json file.
  *
  * "System objects" are things owned by UUID::SYSTEM_OWNER (the flag set by an
- * admin via the UI) plus the reserved bootstrap UUIDs every installation needs.
- * Both the Postgres DatabaseSeeder and the Dexie seeder read this file as the
- * single source of truth for default classes/objects.
+ * admin via the UI). There is no predefined list of UUIDs — ownership by the
+ * system is the single source of truth. Both the Postgres DatabaseSeeder and
+ * the Dexie seeder read this file as the source of truth for default
+ * classes/objects, so anything the runtime needs must be owned by the system.
  */
 class ExportSystemObjects extends Command
 {
@@ -20,29 +21,6 @@ class ExportSystemObjects extends Command
                             {--path= : Output file (default resources/js/localDb/system-objects.json)}';
 
     protected $description = 'Export system-owned objects to resources/js/localDb/system-objects.json';
-
-    /**
-     * Reserved bootstrap UUIDs — always exported regardless of owner.
-     */
-    private const RESERVED_UUIDS = [
-        UUID::EVERYTHING,
-        UUID::LINK,
-        UUID::LINK_TO_PARENT,
-        UUID::LINK_TO_CLASS,
-        UUID::SOMETHING,
-        UUID::USER,
-        UUID::SYSTEM,
-        UUID::VICTOR_FOKIN,
-        UUID::GROUP_READ_ACCESS,
-        UUID::BELONGS_TO_USER_GROUP,
-        UUID::SYSTEM_OWNER,
-        // Abstract base link types (link taxonomy grouping containers)
-        '733112a1-9e87-47ee-8a86-81cc38e77a41', // Kind
-        '79762fd7-e52d-4401-8010-fda9a7e81aa0', // Containment
-        '16414472-da4b-427d-8886-b7c75d133750', // Equivalence
-        '1858e752-8df2-43ef-86c3-0d3581e522a8', // Time
-        '41211efa-61fd-422d-b07f-7041289bc8aa', // followed by
-    ];
 
     /**
      * Canonical things columns. The live dev DB may carry extra columns
@@ -68,13 +46,12 @@ class ExportSystemObjects extends Command
 
     public function handle(): int
     {
-        // 1. Things: reserved bootstrap UUIDs ∪ owner = SYSTEM_OWNER, not deleted
+        // 1. Things: owned by the system (owner = SYSTEM_OWNER), not deleted.
+        //    System ownership is the single source of truth — no predefined
+        //    UUID list.
         $thingIds = DB::table('things')
             ->where('deleted', false)
-            ->where(function ($q) {
-                $q->whereIn('thing_id', self::RESERVED_UUIDS)
-                  ->orWhere('owner', UUID::SYSTEM_OWNER);
-            })
+            ->where('owner', UUID::SYSTEM_OWNER)
             ->pluck('thing_id')
             ->map(fn($id) => (string) $id)
             ->unique()
