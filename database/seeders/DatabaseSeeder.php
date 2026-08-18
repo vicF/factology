@@ -99,6 +99,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed localization system objects (Property/Language classes + languages)
         $this->call(LocalizationSeeder::class);
+
+        // Seed geo system objects (Place on Earth class + Earth Coordinates property)
+        $this->call(GeoCoordinatesSeeder::class);
     }
 
     /**

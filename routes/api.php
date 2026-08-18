@@ -65,6 +65,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/object',       [ApiController::class, 'list']);
         Route::post('/object',      [ApiController::class, 'search']);
         Route::get('/object/{id}',  [ApiController::class, 'get']);
+        Route::get('/properties',   [ApiController::class, 'properties']);
+        Route::get('/class/{id}/properties', [ApiController::class, 'classProperties']);
         Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
         Route::get('/search/options', [ApiController::class, 'searchOptions']);
     });

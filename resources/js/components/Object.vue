@@ -76,6 +76,11 @@
                                     {{ $t('Graph') }}
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" :class="{ active: activeTab === 'map' }" @click.prevent="activeTab = 'map'" href="#">
+                                    {{ $t('Map') }}
+                                </a>
+                            </li>
                         </ul>
 
                         <!-- Details -->
@@ -144,6 +149,27 @@
                                                 <template v-else>{{ object.owner }}</template>
                                             </span>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Properties (data.properties): coordinates + other property values -->
+                            <div v-if="propertyEntries.length" class="result-separator"></div>
+                            <div v-if="propertyEntries.length" class="properties-section">
+                                <div class="properties-title">{{ $t('Properties') }}</div>
+                                <div class="properties-list">
+                                    <div v-for="p in propertyEntries" :key="p.property_id" class="property-row">
+                                        <span class="property-name">{{ p.name }}</span>
+                                        <span class="property-value">{{ p.text }}</span>
+                                        <a
+                                            v-if="p.isGeo"
+                                            class="property-map-link"
+                                            href="#"
+                                            :title="$t('Show on map')"
+                                            @click.prevent="activeTab = 'map'"
+                                        >
+                                            <i class="bi bi-geo-alt"></i>
+                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -312,6 +338,11 @@
                             <Graph v-if="graphInitialized" ref="graphComponentRef" :object="object" />
                         </div>
 
+                        <!-- Map -->
+                        <div v-show="activeTab === 'map'">
+                            <ObjectMap v-if="mapInitialized" ref="mapComponentRef" :object="object" />
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -388,8 +419,10 @@ import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import RelatedList from './RelatedList.vue';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
+import { buildPropertyEntries } from '../utils/properties.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
+const ObjectMap = defineAsyncComponent(() => import('./ObjectMap.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -427,6 +460,33 @@ const expandLinkTarget = async (link) => {
         console.error('Object.vue - failed to load deeper related objects:', error);
     }
 };
+
+// ─── Properties shown in the Details tab ────────────────────────────────
+// The object's `data.properties` map holds values keyed by property thing_id.
+// Property names come from GET /api/v1/properties (loaded once, cached across
+// page loads), and each value is formatted for display (coordinates get a
+// readable lat/lng summary and a link to the Map tab).
+let propertyDefinitionsData = null; // module-level cache
+const propertyDefinitions = ref(null);
+const loadPropertyDefinitions = async () => {
+    if (propertyDefinitionsData) {
+        propertyDefinitions.value = propertyDefinitionsData;
+        return;
+    }
+    try {
+        const res = await axios.get('/properties');
+        propertyDefinitionsData = res.data?.data ?? [];
+    } catch (error) {
+        propertyDefinitionsData = [];
+        console.error('Object.vue - failed to load property definitions:', error);
+    }
+    propertyDefinitions.value = propertyDefinitionsData;
+};
+
+// Property rows for the Details tab: name + formatted value (+ geo flag).
+const propertyEntries = computed(() =>
+    buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
+);
 
 // Per-link related-subtree visibility on the object page.
 const expandedRelatedLinks = ref(new Set());
@@ -524,6 +584,8 @@ const newLinkData = ref(null);
 
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
+const mapInitialized = ref(false);
+const mapComponentRef = ref(null);
 
 const defaultLinkedObjects = computed(() => {
     const links = [];
@@ -578,6 +640,7 @@ const getObject = async () => {
     try {
         loaded.value = false;
         serverError.value = false;
+        loadPropertyDefinitions(); // names for the Details-tab property rows (cached)
         // depth=2 attaches a `target` to each direct link AND pre-fills the
         // related items of those targets, so the right-column panel can show
         // a compact summary of each link's related objects immediately.
@@ -770,6 +833,9 @@ onMounted(() => {
     if (activeTab.value === 'graph') {
         graphInitialized.value = true;
     }
+    if (activeTab.value === 'map') {
+        mapInitialized.value = true;
+    }
     getObject();
 });
 
@@ -793,6 +859,15 @@ watch(activeTab, (newTab) => {
             });
         }
     }
+    if (newTab === 'map') {
+        if (!mapInitialized.value) {
+            mapInitialized.value = true;
+        } else {
+            nextTick(() => {
+                if (mapComponentRef.value) mapComponentRef.value.refreshView();
+            });
+        }
+    }
 }, { immediate: true });
 
 watch(() => object.value, (newObject) => {
@@ -803,6 +878,11 @@ watch(() => object.value, (newObject) => {
                 if (graphComponentRef.value) graphComponentRef.value.refreshView();
             }, 200);
         }
+    }
+    // updateData (showMap) already fetches and re-renders; refreshView is only
+    // needed when the tab becomes visible (handled in the activeTab watcher).
+    if (mapInitialized.value && mapComponentRef.value && newObject) {
+        mapComponentRef.value.updateData(newObject);
     }
 }, { deep: true });
 </script>
@@ -923,6 +1003,42 @@ watch(() => object.value, (newObject) => {
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
+}
+.properties-section {
+    margin-top: 0.25rem;
+}
+.properties-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 6px;
+}
+.properties-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.property-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+.property-name {
+    color: #6c757d;
+    min-width: 140px;
+}
+.property-value {
+    color: #212529;
+}
+.property-map-link {
+    color: #0d6efd;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.property-map-link:hover {
+    color: #0056b3;
 }
 .object-header {
     display: flex;

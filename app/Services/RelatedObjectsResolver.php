@@ -276,6 +276,11 @@ class RelatedObjectsResolver
 
         $byId = [];
         foreach ($rows as $row) {
+            // Decode jsonb once so buildTarget/sortKey reuse the array instead
+            // of each decoding the raw string again.
+            if (is_string($row->data)) {
+                $row->data = json_decode($row->data, true);
+            }
             $byId[$row->thing_id] = $row;
         }
 
@@ -359,6 +364,11 @@ class RelatedObjectsResolver
             $description = mb_substr($description, 0, self::TARGET_DESCRIPTION_PREVIEW) . '…';
         }
 
+        $data = $row->data ?? null;
+        if (is_string($data)) {
+            $data = json_decode($data, true);
+        }
+
         return [
             'thing_id'          => $row->thing_id,
             'name'              => $row->name ?? null,
@@ -367,6 +377,7 @@ class RelatedObjectsResolver
             'class'             => $class,
             'public'            => $row->public !== null ? (bool) $row->public : null,
             'description'       => $description,
+            'geo'               => GeoProperties::extract(is_array($data) ? ($data['properties'] ?? null) : null),
         ];
     }
 

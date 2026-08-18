@@ -9,6 +9,7 @@ namespace App\Models\Classes;
 
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
+use App\Services\GeoProperties;
 use App\Services\RelatedObjectsResolver;
 use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
@@ -344,6 +345,20 @@ class Everything
                 $thing[$jsonField] = json_decode($thing[$jsonField], true);
             }
         }
+
+        // Legacy objects may store data.properties as a list (old format); the
+        // property map must be an object (thing_id => value) so clients can
+        // attach values by property id. An empty list normalizes to an empty object.
+        if (isset($thing['data']['properties']) && $thing['data']['properties'] === []) {
+            $thing['data']['properties'] = new \stdClass();
+        }
+
+        // Geographic coordinates carried by the object's properties (by value shape).
+        $thing['geo'] = GeoProperties::extract(
+            isset($thing['data']['properties']) && is_array($thing['data']['properties'])
+                ? $thing['data']['properties']
+                : null
+        );
 
         // Clean up class object: extract just relevant info, excluding heavy json from c.data
         $thing['class'] = $class ? [

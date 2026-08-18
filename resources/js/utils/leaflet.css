@@ -1,0 +1,25 @@
+/* Shared Leaflet pin styles (see resources/js/utils/leaflet.js). */
+.geo-marker {
+    background: transparent;
+    border: none;
+}
+
+.geo-pin {
+    width: 20px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.geo-pin-root {
+    background: #4a6bff;
+    border: 2px solid #1e3b8a;
+}
+
+.geo-pin-related {
+    background: #28a745;
+    border: 2px solid #1e7e34;
+}

@@ -94,6 +94,37 @@ class LocalizationTest extends TestCase
         $this->assertEquals(['en' => 'Jonny', 'ru' => 'Ваня'], $get->json('data.data.properties.prop-1'));
     }
 
+    public function testLegacyArrayPropertiesAreNormalizedToAnObjectOnRead(): void
+    {
+        // Objects created before the properties-map format stored
+        // `data.properties` as a JSON list. The API must surface it as an
+        // object (thing_id => value) so the edit form can attach values by id
+        // (writing string keys onto an array would be dropped in serialization).
+        $user = $this->createTestUser()->getUser();
+        if (!isset($user->thing_id) || !$user->thing_id) {
+            $user->thing_id = $this->createUserThing($user);
+            $user->save();
+        }
+        Sanctum::actingAs($user, ['*']);
+
+        $thingId = uuid_create();
+        DB::table('things')->insert([
+            'thing_id'    => $thingId,
+            'name'        => 'Legacy Dacha',
+            'type'        => UUID::G_THING,
+            'data'        => '{"properties":[]}',
+            'owner'       => $user->thing_id,
+            'public'      => 1,
+            'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
+        ]);
+
+        $get = $this->getJson('/api/v1/object/' . $thingId);
+        $get->assertStatus(200);
+        $this->assertSame([], $get->json('data.data.properties'));
+        // Geo extraction stays harmless for the legacy value.
+        $this->assertSame([], $get->json('data.geo'));
+    }
+
     public function testUpsertPreservesTranslationsWhenOmitted(): void
     {
         $user = $this->createTestUser()->getUser();
