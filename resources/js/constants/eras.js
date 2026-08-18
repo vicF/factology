@@ -227,6 +227,40 @@ export const Era = {
         return { year, month, day, degrade: true };
     },
 
+    // ─── Generic era helpers (for the calendar picker) ───
+
+    /** Highest month number in an era's year (Hebrew has 13 in leap years). */
+    maxMonth(era) {
+        return era === this.HEBREW ? 13 : 12;
+    },
+
+    /** JDN of an era date (via the canonical-Gregorian conversions). */
+    eraToJDN(era, year, month, day) {
+        const c = this.toCanonical(era, year, month, day);
+        return this.gregorianToJDN(c.year, c.month, c.day);
+    },
+
+    /** Era components of a JDN (inverse of eraToJDN). */
+    jdnToEra(era, jdn) {
+        const g = this.jdnToGregorian(jdn);
+        return this.fromCanonical(era, g.year, g.month, g.day);
+    },
+
+    /** Number of days in an era month (JDN of next month's first minus this month's first). */
+    monthLength(era, year, month) {
+        const first = this.eraToJDN(era, year, month, 1);
+        const maxM = this.maxMonth(era);
+        const nextYear = month >= maxM ? year + 1 : year;
+        const nextMonth = month >= maxM ? 1 : month + 1;
+        const next = this.eraToJDN(era, nextYear, nextMonth, 1);
+        return next - first;
+    },
+
+    /** Weekday (0 = Monday … 6 = Sunday) of a JDN. */
+    weekday(jdn) {
+        return ((jdn % 7) + 7) % 7;
+    },
+
     fromCanonical(era, year, month, day) {
         switch (era) {
             case this.GREGORIAN:

@@ -145,4 +145,43 @@ describe('FlexibleDateField', () => {
         expect(wrapper.find('code').text()).toContain('12:00')
         expect(wrapper.find('code').text()).toContain('2026-08-11')
     })
+
+    it('toggles the format-help box via the ? button', async () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        await nextTick()
+
+        const helpButton = wrapper.findAll('button').find(b => b.text().trim() === '?')
+        expect(helpButton).toBeTruthy()
+        expect(wrapper.find('.flexible-date-help').exists()).toBe(false)
+
+        await helpButton.trigger('click')
+        expect(wrapper.find('.flexible-date-help').exists()).toBe(true)
+
+        await helpButton.trigger('click')
+        expect(wrapper.find('.flexible-date-help').exists()).toBe(false)
+    })
+
+    it('inserts today and emits its canonical value via the clock button', async () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        await nextTick()
+
+        const nowButton = wrapper.findAll('button').find(b => b.text().trim() === '🕒')
+        expect(nowButton).toBeTruthy()
+        await nowButton.trigger('click')
+
+        const payload = lastEmit(wrapper)
+        expect(payload).not.toBeNull()
+        // Today parses to a canonical YYYYMMDDHHMMSS string for the current date.
+        const now = new Date()
+        const pad = (n) => String(n).padStart(2, '0')
+        const expectStart = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + '00'
+        expect(payload.start).toBe(expectStart)
+        expect(payload.meta.precision).toBe('minute')
+    })
 })

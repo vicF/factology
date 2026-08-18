@@ -407,7 +407,7 @@ class ExportImportController extends BaseController
     private function buildThingData(array $thing): array
     {
         $fields = ['name', 'type', 'description', 'start', 'end',
-                   'start_meta', 'end_meta', 'start_variety', 'end_variety',
+                   'start_meta', 'end_meta',
                    'owner', 'public', 'deleted', 'data', 'server_uuid'];
 
         $data = [];
@@ -436,7 +436,7 @@ class ExportImportController extends BaseController
         $fields = ['link_uuid', 'one_thing_id', 'link_type_id', 'other_thing_id',
                    'translation', 'public', 'link_start', 'link_end',
                    'link_start_meta', 'link_end_meta',
-                   'link_start_variety', 'link_end_variety', 'deleted'];
+                   'deleted'];
 
         $data = [];
         foreach ($fields as $field) {

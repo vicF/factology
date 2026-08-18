@@ -75,8 +75,6 @@ class Everything
     public const LINK_DATE_FIELDS = [
         'link_start',
         'link_end',
-        'link_start_variety',
-        'link_end_variety',
         'link_start_meta',
         'link_end_meta',
     ];
@@ -94,13 +92,11 @@ class Everything
         'data',
         'end',
         'end_meta',
-        'end_variety',
         'name',
         'name_translations',
         'public',
         'start',
         'start_meta',
-        'start_variety',
         'thing_id',
         'type',
         'owner',
@@ -117,7 +113,6 @@ class Everything
         'end',
         'end_date',
         'end_meta',
-        'end_variety',
         'name',
         'name_translations',
         'public',
@@ -126,7 +121,6 @@ class Everything
         'start',
         'start_date',
         'start_meta',
-        'start_variety',
         'thing_id',
         'type',
         'owner',
@@ -1284,35 +1278,6 @@ class Everything
         $second = substr($thingId, 1, 1);
         //return $first . $second . $thingId . '.jpg';
         return ($webLink ? DIRECTORY_SEPARATOR : ('public' . DIRECTORY_SEPARATOR)) . 'thumbs' . DIRECTORY_SEPARATOR . $first . DIRECTORY_SEPARATOR . $second . DIRECTORY_SEPARATOR . $thingId . '.jpg';
-    }
-
-    public static function echoDateWithVariety($object, $type = 'start')
-    {
-        if ($type === 'end') {
-            $dateName = 'end_date';
-            $varietyName = 'end_variety';
-        } else {
-            $dateName = 'start_date';
-            $varietyName = 'start_variety';
-        }
-        $date = $object->$dateName;
-        if (empty($object->$varietyName)) {
-            echo $date;
-        } elseif ($object->$varietyName < 10000) {  // @todo  make it more exact
-            echo $date;
-        } elseif ($object->$varietyName < 240000) {
-            echo $date . ' (+1 hour)';
-        } elseif ($object->$varietyName < 31000000) {
-            [$date] = explode(' ', $date);
-            echo $date . ' (+1 day)';
-        } elseif ($object->$varietyName <= 10000000000) {
-            [$date] = explode('-', $date);
-            echo $date . " (+1 year)";
-        } else {
-            $years = floor($object->$varietyName / 10000000000);
-            [$date] = explode('-', $date);
-            echo $date . " (+$years years)";
-        }
     }
 
     public function createWithLinks()

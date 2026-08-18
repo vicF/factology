@@ -1,9 +1,14 @@
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest' // Explicit imports for stability
 import LinkedObject from '@/components/Fields/LinkedObject.vue'
 import ObjectField from '@/components/Fields/ObjectField.vue'
 import { useObjectCacheStore } from '@/stores/objectCache'
+import i18n from '@/lang/i18n'
+
+// FlexibleDateField (rendered inside every link row) uses `useI18n()`, which
+// requires the i18n plugin to be installed on the mounting app.
+config.global.plugins = [i18n]
 
 // 1. Mock the store module at the top level
 vi.mock('@/stores/objectCache', () => ({

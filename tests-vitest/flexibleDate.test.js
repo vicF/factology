@@ -2,7 +2,7 @@
 // Mirrors tests/Unit/FlexibleDateTest.php — the fixtures here must stay in
 // sync so the PHP and JS implementations prove identical behavior.
 import { Era } from '../resources/js/constants/eras.js'
-import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR, formatRangeShort } from '../resources/js/utils/flexibleDate.js'
+import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR, formatRangeShort, parseFuzz, formatBoundLocalized } from '../resources/js/utils/flexibleDate.js'
 import i18n from '../resources/js/lang/i18n.js'
 
 const t = (key) => i18n.global.t(key)
@@ -63,6 +63,22 @@ describe('FlexibleDate.parse', () => {
         expect(FlexibleDate.parse('2026-08-15').value).toBe('20260815000000')
         expect(FlexibleDate.parse('15.08.2026').value).toBe('20260815000000')
         expect(FlexibleDate.parse('2026-08').precision).toBe('month')
+    })
+
+    test('standard delimiters and space-separated time', () => {
+        expect(FlexibleDate.parse('20260816 19:30').value).toBe('20260816193000')
+        expect(FlexibleDate.parse('20260816 19:30').precision).toBe('minute')
+        expect(FlexibleDate.parse('20260816 19:30:45').value).toBe('20260816193045')
+        expect(FlexibleDate.parse('20260816 19:30:45').precision).toBe('second')
+        expect(FlexibleDate.parse('2026/08/16').value).toBe('20260816000000')
+        expect(FlexibleDate.parse('2026/08/16').precision).toBe('day')
+        expect(FlexibleDate.parse('2026.08.16').value).toBe('20260816000000')
+        expect(FlexibleDate.parse('2026/08').precision).toBe('month')
+        expect(FlexibleDate.parse('2026 08 15').value).toBe('20260815000000')
+        expect(FlexibleDate.parse('2026 08 15').precision).toBe('day')
+        expect(FlexibleDate.parse('2026 08 15 19:30').value).toBe('20260815193000')
+        expect(FlexibleDate.parse('2026 08 15 19:30').precision).toBe('minute')
+        expect(FlexibleDate.parse('2026 08').precision).toBe('month')
     })
 
     test('BC dates', () => {
@@ -147,14 +163,38 @@ describe('FlexibleDate formatting', () => {
         expect(FlexibleDate.formatBound('20250114000000', { precision: PRECISION_YEAR, era: Era.WORLD_CREATION })).toBe('7533 (world_creation)')
     })
 
-    test('precisionFromValue infers precision from the digit length', () => {
+    test('year-1 canonical round-trips via the length-10 rule', () => {
+        // Engine zero-pads years to 4, but the numeric column strips leading
+        // zeros → year-1 reads back as '10101000000' (11 digits). year = length − 10.
+        const c = FlexibleDate.componentsFromCanonical('10101000000')
+        expect(c.y).toBe(1)
+        expect(c.m).toBe(1)
+        expect(c.d).toBe(1)
+        expect(FlexibleDate.componentsFromCanonical('00010101000000').y).toBe(1)
+        expect(FlexibleDate.formatBound('10101000000', { precision: 'year' })).toBe('1')
+        expect(FlexibleDate.precisionFromValue('10101000000')).toBe('year')
+
+        // Input paths for 1- and 3-digit years pad the year to 4 first.
+        expect(FlexibleDate.parse('1-01-01').value).toBe('00010101000000')
+        expect(FlexibleDate.parse('1.1.1').value).toBe('00010101000000')
+        expect(FlexibleDate.parse('999-01-01').value).toBe('09990101000000')
+    })
+
+    test('precisionFromValue infers precision from the encoded groups', () => {
+        // Values < 11 digits are legacy unpadded shapes (4-digit year + groups).
         expect(FlexibleDate.precisionFromValue('2026')).toBe(PRECISION_YEAR)
         expect(FlexibleDate.precisionFromValue('202608')).toBe('month')
         expect(FlexibleDate.precisionFromValue('20260815')).toBe('day')
         expect(FlexibleDate.precisionFromValue('2026081112')).toBe('minute')
-        expect(FlexibleDate.precisionFromValue('202608151200')).toBe('minute')
-        expect(FlexibleDate.precisionFromValue('20260815120000')).toBe('second')
-        expect(FlexibleDate.precisionFromValue('-15000101235959')).toBe('second')
+        // Values ≥ 11 digits are canonical and always padded to seconds, so the
+        // finest precision actually encoded is inferred from the trailing groups.
+        expect(FlexibleDate.precisionFromValue('20260815120000')).toBe('minute')   // 12:00
+        expect(FlexibleDate.precisionFromValue('20260812000000')).toBe('day')      // day
+        expect(FlexibleDate.precisionFromValue('20260801000000')).toBe('month')    // month
+        expect(FlexibleDate.precisionFromValue('20260101000000')).toBe('year')     // year
+        expect(FlexibleDate.precisionFromValue('20260811123045')).toBe('second')   // 12:30:45
+        expect(FlexibleDate.precisionFromValue('10101000000')).toBe('year')        // year 1
+        expect(FlexibleDate.precisionFromValue('-15000101235959')).toBe('year')    // 1500 BC, inverted clock
         expect(FlexibleDate.precisionFromValue(null)).toBeNull()
     })
 
@@ -197,7 +237,7 @@ describe('FlexibleDate formatting', () => {
     })
 
     test('identical start and end show the date once, not twice', () => {
-        expect(formatRangeShort('19940308210000', '19940308210000', null, null, t)).toBe('1994-03-08 21:00:00')
+        expect(formatRangeShort('19940308210000', '19940308210000', null, null, t)).toBe('1994-03-08 21:00')
     })
 
     test('formatRangeShort does not collapse an explicit between range', () => {
@@ -208,5 +248,26 @@ describe('FlexibleDate formatting', () => {
             null,
             t,
         )).toBe('between 2026-08-11 12:00 and 2026-08-11 22:00')
+    })
+
+    test('parseFuzz accepts values with english and russian units', () => {
+        expect(parseFuzz('2 years')).toEqual({ value: 2, unit: 'year' })
+        expect(parseFuzz('±5 дней')).toEqual({ value: 5, unit: 'day' })
+        expect(parseFuzz('2y')).toEqual({ value: 2, unit: 'year' })
+        expect(parseFuzz(' 3 месяца ')).toEqual({ value: 3, unit: 'month' })
+        expect(parseFuzz('10 мин.')).toEqual({ value: 10, unit: 'minute' })
+        expect(parseFuzz('garbage')).toBeNull()
+        expect(parseFuzz('')).toBeNull()
+        expect(parseFuzz('±0 years')).toBeNull()
+    })
+
+    test('formatBoundLocalized appends the uncertainty margin', () => {
+        expect(formatBoundLocalized('20260812000000', { precision: 'day', fuzz: { value: 2, unit: 'year' } }, t))
+            .toBe('2026-08-12 ±2 years')
+        expect(formatBoundLocalized('20260812000000', { precision: 'day', fuzz: { value: 1, unit: 'day' } }, t))
+            .toBe('2026-08-12 ±1 day')
+        // No fuzz → unchanged.
+        expect(formatBoundLocalized('20260812000000', { precision: 'day' }, t))
+            .toBe('2026-08-12')
     })
 })

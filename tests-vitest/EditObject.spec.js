@@ -132,6 +132,12 @@ describe('EditObject', () => {
         expect(document.querySelectorAll('.linked-object').length).toBe(0)
         expect(formButtons().map(b => b.textContent.trim())).toEqual([
             'Add',
+            '🕒',
+            '?',
+            '📅',
+            '🕒',
+            '?',
+            '📅',
             'Add Link',
             'Add External Link',
             'Close',
@@ -277,6 +283,44 @@ describe('EditObject', () => {
                 public: 0,
             },
         ])
+    })
+
+    it('carries link start/end dates into the saved links_to_update payload', async () => {
+        const initialLinkedObjects = [{
+            link_id: 42,
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'other-object-id',
+            link_type_id: DEFAULT_LINK_TYPE,
+            description: '',
+            link_start: '20260811120000',
+            link_end: '20260811220000',
+            link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+            link_end_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+        }]
+        await mountEditObject({ object: { ...OBJECT }, initialLinkedObjects })
+        await flushPromises()
+
+        // The link row renders its start date field with the stored value.
+        const startInput = document.querySelector('.linked-object input[name="start"]')
+        expect(startInput).toBeTruthy()
+        expect(startInput.value.trim()).not.toBe('')
+
+        submitForm()
+        await flushPromises()
+
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const body = axios.put.mock.calls[0][1]
+        expect(body.links_to_update).toEqual([{
+            link_id: 42,
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'other-object-id',
+            link_type_id: DEFAULT_LINK_TYPE,
+            translation: '',
+            link_start: '20260811120000',
+            link_end: '20260811220000',
+            link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+            link_end_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+        }])
     })
 
     it('enables Swap once a linked object is created into the empty slot', async () => {

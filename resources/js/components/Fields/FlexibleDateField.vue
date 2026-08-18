@@ -9,6 +9,7 @@ import {
     FlexibleDate,
     formatBoundLocalized,
     formatLocalized,
+    parseFuzz,
     QUALIFIERS,
     PRECISIONS,
     QUALIFIER_BEFORE,
@@ -19,6 +20,7 @@ import {
 } from '@/utils/flexibleDate'
 import { Era, ERA_KEYS } from '@/constants/eras'
 import IconCheck from '../icons/IconCheck.vue'
+import DateCalendarPicker from './DateCalendarPicker.vue'
 
 const props = defineProps({
     fieldName: { type: String, default: 'start' },
@@ -49,6 +51,65 @@ const precision = ref(PRECISIONS[2])
 const comment = ref('')
 const error = ref(null)
 const preview = ref('')
+const showCalendar = ref(false)
+const showHelp = ref(false)
+const fuzzText = ref('')
+const fuzz = ref(null)
+
+// ── calendar integration ──
+
+function eraMarker(eraKey) {
+    switch (eraKey) {
+        case Era.JULIAN: return 'ст.ст.'
+        case Era.WORLD_CREATION: return 'от сотворения мира'
+        case Era.HIJRI: return 'хиджра'
+        case Era.HEBREW: return 'евр.'
+        default: return ''
+    }
+}
+
+function pad2(n) {
+    return String(n).padStart(2, '0')
+}
+
+// Build a text expression the parser accepts for the picked era date.
+function buildInputText(y, m, d, h, mi) {
+    const time = (h != null && h !== '') ? ' ' + pad2(h) + ':' + pad2(mi ?? 0) : ''
+    const marker = era.value !== Era.GREGORIAN ? ' ' + eraMarker(era.value) : ''
+    return y + '-' + pad2(m) + '-' + pad2(d) + time + marker
+}
+
+// Current date components in the selected era (or null if the text can't parse).
+const calendarModel = computed(() => {
+    const parsed = FlexibleDate.parse(text.value, era.value)
+    if (!parsed || !parsed.value) return null
+    const c = FlexibleDate.componentsFromCanonical(parsed.value)
+    const eraC = Era.fromCanonical(era.value, c.y, c.m, c.d)
+    return { year: eraC.year, month: eraC.month, day: eraC.day, hour: c.h, minute: c.mi, second: c.s }
+})
+
+function onCalendarPick(value) {
+    text.value = buildInputText(value.year, value.month, value.day, value.hour, value.minute)
+    showCalendar.value = false
+    onTextInput()
+}
+
+// Today's date in the input's own grammar ("YYYY-MM-DD"), used as a placeholder
+// example and as the "insert today" value.
+const todayDate = computed(() => {
+    const now = new Date()
+    return now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate())
+})
+
+// Insert the current date into the text field (converted to the selected era
+// for display) and re-run the normal parse/emit path.
+function insertToday() {
+    const now = new Date()
+    const eraC = Era.fromCanonical(era.value, now.getFullYear(), now.getMonth() + 1, now.getDate())
+    text.value = buildInputText(eraC.year, eraC.month, eraC.day, now.getHours(), now.getMinutes())
+    showHelp.value = false
+    onTextInput()
+}
 
 const myMeta = computed(() => (props.side === 'start' ? props.startMeta : props.endMeta))
 const myValue = computed(() => (props.side === 'start' ? props.start : props.end))
@@ -78,15 +139,23 @@ function initFromStored() {
         era.value = fd.era
         precision.value = fd.precision
         comment.value = fd.comment || ''
-        text.value = fd.original || formatBoundLocalized(fd.value, fd.toArray(), t)
-        if (fd.endValue) {
-            text2.value = formatBoundLocalized(fd.endValue, fd.toArray(), t)
+        // The stored canonical column is authoritative when the meta lacks the
+        // typed `original` (e.g. API-created links) — fromArray never carries
+        // the value itself, so fall back to the column.
+        const canonical = v != null && v !== '' ? String(v) : null
+        text.value = fd.original || formatBoundLocalized(fd.value ?? canonical, fd.toArray(), t)
+        const endCanonical = otherValue.value != null && otherValue.value !== '' ? String(otherValue.value) : null
+        const endVal = fd.endValue ?? endCanonical
+        if (endVal) {
+            text2.value = formatBoundLocalized(endVal, fd.toArray(), t)
         }
         if (fd.alternatives.length) {
             alternativesText.value = fd.alternatives
                 .map((a) => formatBoundLocalized(a, fd.toArray(), t))
                 .join(', ')
         }
+        fuzz.value = fd.fuzz
+        fuzzText.value = fd.fuzz ? fd.fuzz.value + ' ' + fd.fuzz.unit : ''
     } else {
         // Infer a simple structure from the columns. A legacy start+end pair
         // with no meta is a range of EXACT bounds (e.g. an event that lasted
@@ -107,7 +176,14 @@ function initFromStored() {
         const other = otherValue.value != null && otherValue.value !== '' ? otherValue.value : null
         text2.value = other ? formatBoundLocalized(String(other), { precision: precision.value, era: era.value }, t) : ''
         alternativesText.value = ''
+        fuzz.value = null
+        fuzzText.value = ''
     }
+}
+
+function onFuzzInput() {
+    fuzz.value = parseFuzz(fuzzText.value)
+    emitValue()
 }
 
 function buildFlexibleDate() {
@@ -118,6 +194,7 @@ function buildFlexibleDate() {
         fd.precision = precision.value
         fd.comment = comment.value || null
         fd.original = text.value
+        fd.fuzz = fuzz.value
         return fd
     }
 
@@ -133,6 +210,7 @@ function buildFlexibleDate() {
         fd.value = lo.value
         fd.endValue = hi.value
         fd.original = [text.value, text2.value].filter(Boolean).join(' — ')
+        fd.fuzz = fuzz.value
         return fd
     }
 
@@ -144,6 +222,7 @@ function buildFlexibleDate() {
         fd.precision = precision.value
         fd.comment = comment.value || null
         fd.original = alternativesText.value
+        fd.fuzz = fuzz.value
         const vals = []
         for (const p of parts) {
             const parsed = FlexibleDate.parse(p, era.value)
@@ -165,6 +244,7 @@ function buildFlexibleDate() {
     fd.era = era.value
     fd.precision = precision.value
     fd.comment = comment.value || null
+    fd.fuzz = fuzz.value
     return fd
 }
 
@@ -232,13 +312,46 @@ onMounted(() => {
                 {{ t('dates.disabled') }}
             </div>
             <div v-else>
-                <input
-                    :name="fieldName"
-                    v-model="text"
-                    type="text"
-                    class="form-control form-control-sm"
-                    :placeholder="t('dates.placeholder')"
-                    @input="onTextInput"
+                <div class="d-flex gap-1">
+                    <input
+                        :name="fieldName"
+                        v-model="text"
+                        type="text"
+                        class="form-control form-control-sm"
+                        :placeholder="t('dates.placeholder', { today: todayDate })"
+                        @input="onTextInput"
+                    />
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        :title="t('dates.now')"
+                        @click="insertToday"
+                    >🕒</button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        :title="t('dates.help')"
+                        :class="{ active: showHelp }"
+                        @click="showHelp = !showHelp"
+                    >?</button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        :title="t('dates.calendar')"
+                        :class="{ active: showCalendar }"
+                        @click="showCalendar = !showCalendar"
+                    >📅</button>
+                </div>
+                <div v-if="showHelp" class="flexible-date-help small text-muted mt-1">
+                    {{ t('dates.help_text') }}
+                </div>
+                <DateCalendarPicker
+                    v-if="showCalendar"
+                    class="mt-1"
+                    :era="era"
+                    :precision="precision"
+                    :model-value="calendarModel"
+                    @update:model-value="onCalendarPick"
                 />
 
                 <!-- Between: second bound -->
@@ -279,6 +392,14 @@ onMounted(() => {
                         <option v-for="p in PRECISIONS" :key="p" :value="p">{{ t('dates.precision.' + p) }}</option>
                     </select>
                     <input
+                        v-model="fuzzText"
+                        type="text"
+                        class="form-control form-control-sm w-auto"
+                        :placeholder="t('dates.fuzz_placeholder')"
+                        :title="t('dates.fuzz_title')"
+                        @input="onFuzzInput"
+                    />
+                    <input
                         v-model="comment"
                         type="text"
                         class="form-control form-control-sm flex-grow-1"
@@ -295,5 +416,12 @@ onMounted(() => {
 .preview-icon {
     color: #198754;
     vertical-align: -1px;
+}
+.flexible-date-help {
+    white-space: pre-line;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 6px 8px;
 }
 </style>

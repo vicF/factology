@@ -242,6 +242,10 @@
                                     link_type_id: item.link_type_id,
                                     translation: item.translation,
                                     link_id: item.link_id,
+                                    link_start: item.link_start,
+                                    link_end: item.link_end,
+                                    link_start_meta: item.link_start_meta,
+                                    link_end_meta: item.link_end_meta,
                                     name: item.name,
                                     one_name: item.one_name
                                 }"
@@ -774,7 +778,11 @@ const initializeData = () => {
             other_thing_id: item.other_thing_id || '',
             link_type_id: item.link_type_id || '',
             translation: item.description || item.translation || '',
-            link_id: item.linkId || null,
+            link_id: item.linkId ?? item.link_id ?? null,
+            link_start: item.link_start || null,
+            link_end: item.link_end || null,
+            link_start_meta: item.link_start_meta || null,
+            link_end_meta: item.link_end_meta || null,
             name: item.name || null,
             one_name: item.one_name || null,
         };
@@ -856,6 +864,10 @@ const addNewLinkedObject = async () => {
         link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
         translation: '',
         link_id: null,
+        link_start: null,
+        link_end: null,
+        link_start_meta: null,
+        link_end_meta: null,
     });
     await nextTick();
     // Focus the second-object selector — the first one is fixed to the current
@@ -925,6 +937,14 @@ const submitForm = async () => {
     try {
         isSubmitting = true;
 
+        const linkDateFields = (item) => {
+            const out = {};
+            for (const f of ['link_start', 'link_end', 'link_start_meta', 'link_end_meta']) {
+                if (item[f] != null && item[f] !== '') out[f] = item[f];
+            }
+            return out;
+        };
+
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
@@ -936,6 +956,7 @@ const submitForm = async () => {
                 other_thing_id: item.other_thing_id,
                 description: item.translation || '',
                 public: 0,
+                ...linkDateFields(item),
             }));
 
         const namePayload = buildFieldPayload('name');
@@ -993,6 +1014,7 @@ const submitForm = async () => {
                     other_thing_id: item.other_thing_id,
                     link_type_id: item.link_type_id,
                     translation: item.translation,
+                    ...linkDateFields(item),
                 }));
             if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
 

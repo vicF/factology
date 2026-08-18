@@ -52,6 +52,8 @@ class FlexibleDate
     public ?string $comment = null;
     public ?string $original = null;
     public bool $degrade = false;
+    /** Uncertainty margin: ['value' => 2, 'unit' => 'year'] → "±2 years". */
+    public ?array $fuzz = null;
 
     // ─── Serialization ───
 
@@ -74,6 +76,9 @@ class FlexibleDate
         if ($this->degrade) {
             $out['degrade'] = true;
         }
+        if (!empty($this->fuzz['value'])) {
+            $out['fuzz'] = ['value' => (int) $this->fuzz['value'], 'unit' => $this->fuzz['unit'] ?? 'year'];
+        }
         return $out;
     }
 
@@ -94,7 +99,60 @@ class FlexibleDate
         $d->comment = $data['comment'] ?? null;
         $d->original = $data['original'] ?? null;
         $d->degrade = !empty($data['degrade']);
+        if (!empty($data['fuzz']['value'])) {
+            $d->fuzz = ['value' => (int) $data['fuzz']['value'], 'unit' => $data['fuzz']['unit'] ?? 'year'];
+        }
         return $d;
+    }
+
+    // ─── Uncertainty margin ("fuzz") ───
+    // Legacy start_variety/end_variety encoded this as an opaque number; the
+    // flexible-date meta stores it structured as ['value' => N, 'unit' => ...].
+
+    private const FUZZ_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'];
+
+    private const FUZZ_UNIT_ALIASES = [
+        'year' => 'year', 'years' => 'year', 'y' => 'year', 'г' => 'year', 'год' => 'year', 'года' => 'year', 'лет' => 'year',
+        'month' => 'month', 'months' => 'month', 'мес' => 'month', 'мес.' => 'month', 'месяц' => 'month', 'месяца' => 'month', 'месяцев' => 'month',
+        'day' => 'day', 'days' => 'day', 'd' => 'day', 'дн' => 'day', 'дн.' => 'day', 'день' => 'day', 'дня' => 'day', 'дней' => 'day',
+        'hour' => 'hour', 'hours' => 'hour', 'h' => 'hour', 'ч' => 'hour', 'час' => 'hour', 'часа' => 'hour', 'часов' => 'hour',
+        'minute' => 'minute', 'minutes' => 'minute', 'min' => 'minute', 'мин' => 'minute', 'мин.' => 'minute', 'минута' => 'minute', 'минуты' => 'minute', 'минут' => 'minute',
+        'second' => 'second', 'seconds' => 'second', 'sec' => 'second', 'сек' => 'second', 'сек.' => 'second', 'секунда' => 'second', 'секунды' => 'second', 'секунд' => 'second',
+    ];
+
+    public static function parseFuzz(?string $text): ?array
+    {
+        $s = trim((string) $text);
+        $s = preg_replace('/^±\s*/u', '', $s) ?? $s;
+        if ($s === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{1,4})\s*(.+)$/u', $s, $m)) {
+            return null;
+        }
+        $unit = self::FUZZ_UNIT_ALIASES[mb_strtolower($m[2])] ?? null;
+        if ($unit === null) {
+            return null;
+        }
+        $value = (int) $m[1];
+        if ($value <= 0 || $value > 9999) {
+            return null;
+        }
+        return ['value' => $value, 'unit' => $unit];
+    }
+
+    public static function formatFuzz(?array $fuzz): string
+    {
+        if (empty($fuzz['value'])) {
+            return '';
+        }
+        $n = (int) $fuzz['value'];
+        if ($n <= 0) {
+            return '';
+        }
+        $unit = in_array($fuzz['unit'] ?? null, self::FUZZ_UNITS, true) ? $fuzz['unit'] : 'year';
+        $plural = $n === 1 ? $unit : $unit . 's';
+        return '±' . $n . ' ' . $plural;
     }
 
     // ─── Parsing ───
@@ -293,8 +351,47 @@ class FlexibleDate
             ];
         }
 
-        // ISO: Y-M-D[ H:i[:s]] (also "Y-M")
-        if (preg_match('/^(-?\d+)-(\d{1,2})(?:-(\d{1,2}))?(?:[ T](\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$/', $text, $m)) {
+        // Digit date + space-separated time: "20260816 19:30" (also with seconds)
+        if (preg_match('/^(\d{8})\s+(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/', $text, $m)) {
+            $h = (int) $m[2];
+            $mi = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : 0;
+            $s = isset($m[4]) && $m[4] !== '' ? (int) $m[4] : 0;
+            if ($h > 23 || $mi > 59 || $s > 59) {
+                return null;
+            }
+            $parts = self::splitDigitDate($m[1]);
+            $precision = isset($m[4]) && $m[4] !== '' ? self::PRECISION_SECOND : self::PRECISION_MINUTE;
+            return [
+                'y' => (int) $parts['y'], 'm' => (int) $parts['mo'], 'd' => (int) $parts['d'],
+                'h' => $h, 'mi' => $mi, 's' => $s,
+            ];
+        }
+
+        // Year-first with standard delimiters: "2026-08", "2026-08-16", "2026/08/16",
+        // "2026.08.16" (all optionally followed by a space/T-separated time).
+        if (preg_match('~^(-?\d+)[/.-](\d{1,2})(?:[/.-](\d{1,2}))?(?:[ T](\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$~', $text, $m)) {
+            $year = (int) $m[1];
+            $month = (int) $m[2];
+            $day = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null;
+            $hour = isset($m[4]) && $m[4] !== '' ? (int) $m[4] : 0;
+            $min = isset($m[5]) && $m[5] !== '' ? (int) $m[5] : 0;
+            $sec = isset($m[6]) && $m[6] !== '' ? (int) $m[6] : 0;
+            if ($month < 1 || $month > 12 || ($day !== null && ($day < 1 || $day > 31))) {
+                return null;
+            }
+            $precision = isset($m[6]) && $m[6] !== '' ? self::PRECISION_SECOND
+                : (isset($m[5]) && $m[5] !== '' ? self::PRECISION_MINUTE
+                : (isset($m[4]) && $m[4] !== '' ? self::PRECISION_MINUTE
+                : ($day !== null ? self::PRECISION_DAY : self::PRECISION_MONTH)));
+            return [
+                'y' => $year, 'm' => $month, 'd' => $day ?? 1,
+                'h' => $hour, 'mi' => $min, 's' => $sec,
+            ];
+        }
+
+        // Space-separated year month day: "2026 08 15" (also "2026 08 15 19:30",
+        // and "2026 08" for year+month).
+        if (preg_match('~^(-?\d+)\s+(\d{1,2})(?:\s+(\d{1,2}))?(?:\s+(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$~', $text, $m)) {
             $year = (int) $m[1];
             $month = (int) $m[2];
             $day = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null;
@@ -378,12 +475,41 @@ class FlexibleDate
         if ($value === null || $value === '') {
             return null;
         }
+        $bc = str_starts_with($value, '-');
         $digits = ltrim($value, '-');
         $len = strlen($digits);
-        if ($len <= 4) {
+        // Canonical values (≥ 11 digits: variable year + 10-digit tail) are
+        // always padded to seconds, so the finest precision actually encoded
+        // is inferred from the trailing groups: a day-precision date has a
+        // 000000 time tail, a month one has day=01, a year one day=01+month=01.
+        // BC dates store an inverted clock, so un-invert before inspecting.
+        if ($len >= 11) {
+            $tail = substr($digits, -10);
+            $m = (int) substr($tail, 0, 2);
+            $d = (int) substr($tail, 2, 2);
+            $h = (int) substr($tail, 4, 2);
+            $mi = (int) substr($tail, 6, 2);
+            $s = (int) substr($tail, 8, 2);
+            if ($bc) {
+                $h = 23 - $h;
+                $mi = 59 - $mi;
+                $s = 59 - $s;
+            }
+            if ($s !== 0) {
+                return self::PRECISION_SECOND;
+            }
+            if ($mi !== 0 || $h !== 0) {
+                return self::PRECISION_MINUTE;
+            }
+            if ($d !== 1) {
+                return self::PRECISION_DAY;
+            }
+            if ($m !== 1) {
+                return self::PRECISION_MONTH;
+            }
             return self::PRECISION_YEAR;
         }
-        if ($len > 14) {
+        if ($len <= 4) {
             return self::PRECISION_YEAR;
         }
         $n = intdiv(strlen(substr($digits, 4)) + 1, 2);
@@ -431,39 +557,49 @@ class FlexibleDate
         if ($value === null || $value === '') {
             return null;
         }
-        // Legacy unpadded values (e.g. '2026081112' = 2026-08-11 12:00) and the
-        // padded 14-digit canonical form both split as a 4-digit year followed
-        // by up to five 2-digit groups; longer values are huge years handled
-        // by the engine decoder below.
-        if (strlen(ltrim($value, '-')) <= 14) {
-            $parts = self::splitDigitDate(ltrim($value, '-'));
-            $bc = str_starts_with($value, '-');
-            $h = (int) $parts['h'];
-            $mi = (int) $parts['mi'];
-            $s = (int) $parts['s'];
+        $digits = ltrim($value, '-');
+        $bc = str_starts_with($value, '-');
+        if (strlen($digits) >= 11) {
+            // Canonical encoding (the engine's own read-back rule): a variable-
+            // length year followed by an EXACTLY 10-digit MMDDHHMMSS tail. The
+            // year is everything except the last 10 digits, so a year-1 date
+            // stored as `10101000000` (leading zeros stripped by the numeric
+            // column) parses back to year 1, not year 1010.
+            $yearLen = strlen($digits) - 10;
+            $year = (int) substr($digits, 0, $yearLen);
+            $rest = substr($digits, -10);
+            $h = (int) substr($rest, 4, 2);
+            $mi = (int) substr($rest, 6, 2);
+            $s = (int) substr($rest, 8, 2);
             if ($bc) {
                 $h = 23 - $h;
                 $mi = 59 - $mi;
                 $s = 59 - $s;
             }
             return [
-                'y' => (int) ($bc ? '-' . $parts['y'] : $parts['y']),
-                'm' => (int) $parts['mo'],
-                'd' => (int) $parts['d'],
+                'y' => $bc ? -$year : $year,
+                'm' => (int) substr($rest, 0, 2),
+                'd' => (int) substr($rest, 2, 2),
                 'h' => $h, 'mi' => $mi, 's' => $s,
             ];
         }
-        $formatted = Everything::dateFromDb($value, 'UTC', 'Y-m-d H:i:s');
-        if (!is_string($formatted)) {
-            return null;
+        // Legacy unpadded values (e.g. '2026081112' = 2026-08-11 12:00) are a
+        // 4-digit year followed by 2-digit groups. None should remain after
+        // the backfill migration; kept as a defensive fallback.
+        $parts = self::splitDigitDate($digits);
+        $h = (int) $parts['h'];
+        $mi = (int) $parts['mi'];
+        $s = (int) $parts['s'];
+        if ($bc) {
+            $h = 23 - $h;
+            $mi = 59 - $mi;
+            $s = 59 - $s;
         }
-        if (!preg_match('/^(-)?(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/', $formatted, $m)) {
-            return null;
-        }
-        $year = (int) ($m[1] . $m[2]);
         return [
-            'y' => $year, 'm' => (int) $m[3], 'd' => (int) $m[4],
-            'h' => (int) $m[5], 'mi' => (int) $m[6], 's' => (int) $m[7],
+            'y' => (int) ($bc ? '-' . $parts['y'] : $parts['y']),
+            'm' => (int) $parts['mo'],
+            'd' => (int) $parts['d'],
+            'h' => $h, 'mi' => $mi, 's' => $s,
         ];
     }
 
@@ -582,7 +718,8 @@ class FlexibleDate
                 $s = sprintf('%s-%02d-%02d', $bc ? '-' . $abs : $abs, $m, $d);
                 break;
         }
-        return $s . $eraSuffix;
+        $fuzz = self::formatFuzz($meta['fuzz'] ?? null);
+        return $s . $eraSuffix . ($fuzz !== '' ? ' ' . $fuzz : '');
     }
 
     /**

@@ -762,6 +762,41 @@ class ApiTest extends TestCase
     }
 
     /**
+     * Raw unpadded date values sent to the API are normalized to canonical
+     * form on save, so legacy-style digit strings never re-enter the database.
+     */
+    public function testStoreNormalizesUnpaddedDates(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '20200101', // raw day-precision
+            'end'      => '20200102',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('20200101000000', $row->start);
+        $this->assertSame('20200102000000', $row->end);
+
+        // Canonical values pass through untouched.
+        $canonicalId = uuid_create();
+        $requestData2 = $this->getDefaultObjectData([
+            'thing_id' => $canonicalId,
+            'start'    => '20260811120000',
+        ]);
+        $this->postApi('/api/v1/object/' . $canonicalId, $requestData2);
+        $row2 = DB::table('things')->where('thing_id', $canonicalId)->first();
+        $this->assertSame('20260811120000', $row2->start);
+    }
+
+    /**
      * Search defaults to sorting by start date DESC, with undated objects last
      * (Postgres puts NULLs first on DESC without an explicit NULLS LAST).
      */
@@ -770,20 +805,31 @@ class ApiTest extends TestCase
         $user = $this->createTestUser()->getUser();
         Sanctum::actingAs($user, ['*']);
 
-        $this->createTestObject($user, ['name' => 'Sort Older', 'start' => '20200101']);
-        $this->createTestObject($user, ['name' => 'Sort Newer', 'start' => '20220101']);
-        $this->createTestObject($user, ['name' => 'Sort Middle', 'start' => '20210101']);
-        $this->createTestObject($user, ['name' => 'Sort Undated', 'start' => null, 'end' => null]);
+        // ApiTest shares one persistent DB across runs, so use a unique per-run
+        // suffix to avoid matching leftover objects from earlier test runs.
+        $suffix = substr(uuid_create(), 0, 8);
+        $names = [
+            'older'   => "Sort Older $suffix",
+            'middle'  => "Sort Middle $suffix",
+            'newer'   => "Sort Newer $suffix",
+            'undated' => "Sort Undated $suffix",
+        ];
+        $this->createTestObject($user, ['name' => $names['older'], 'start' => '20200101']);
+        $this->createTestObject($user, ['name' => $names['newer'], 'start' => '20220101']);
+        $this->createTestObject($user, ['name' => $names['middle'], 'start' => '20210101']);
+        $this->createTestObject($user, ['name' => $names['undated'], 'start' => null, 'end' => null]);
 
-        $res = $this->postJson('/api/v1/object', []);
+        // Scope the search to this run's own objects (unique suffix) so the
+        // persistent shared DB and the 100-result limit don't hide them.
+        $res = $this->postJson('/api/v1/object', ['search' => $suffix]);
         $res->assertStatus(200);
 
         $ours = collect($res->json('things'))
-            ->whereIn('name', ['Sort Older', 'Sort Middle', 'Sort Newer', 'Sort Undated'])
+            ->whereIn('name', array_values($names))
             ->pluck('name')
             ->values()
             ->all();
-        $this->assertSame(['Sort Newer', 'Sort Middle', 'Sort Older', 'Sort Undated'], $ours);
+        $this->assertSame([$names['newer'], $names['middle'], $names['older'], $names['undated']], $ours);
     }
 
     /**

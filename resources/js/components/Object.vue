@@ -189,11 +189,10 @@
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
-                                                <span v-if="link.link_start" class="result-meta-row">
-                                                    {{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}
-                                                </span>
-                                                <span v-if="link.link_end" class="result-meta-row">
-                                                    {{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}
+                                                <span class="result-meta-row">
+                                                    <span class="date-badge">
+                                                        📅 {{ $flexibleDateFormat(link.link_start, link.link_end, link.link_start_meta, link.link_end_meta) }}
+                                                    </span>
                                                 </span>
                                             </div>
 
@@ -619,6 +618,8 @@ const updateLink = async (linkData) => {
             translation: linkData.translation,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
             link_id: linkData.link_id
         };
         if (linkData.link_id) {
@@ -642,6 +643,8 @@ const createLink = async (linkData) => {
             translation: linkData.translation,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
         };
         await axios.post(`/link`, payload);
         await getObject();
@@ -679,6 +682,12 @@ const linkRecords = computed(() => {
         link_type_id: link.link_type_id,
         description: link.translation || '',
         link_id: link.link_id,
+        // Flexible-date columns (canonical strings + jsonb meta) so the
+        // edit-modal link rows can edit them.
+        link_start: link.link_start || null,
+        link_end: link.link_end || null,
+        link_start_meta: link.link_start_meta || null,
+        link_end_meta: link.link_end_meta || null,
         // Endpoint names from the API (name = other_thing_id, one_name = one_thing_id)
         // so the edit-modal preview resolves immediately.
         name: link.name || null,

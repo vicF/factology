@@ -72,6 +72,20 @@ class ApiController extends BaseController
      */
     public function store(Request $request): \Illuminate\Http\JsonResponse
     {
+        // Normalize raw date values to canonical form BEFORE validation so the
+        // end>=start check compares chronologically-correct padded values
+        // (a raw '20260817' would otherwise sort below canonical '20260811120000'
+        // in bccomp) and no legacy-style unpadded digits re-enter the DB.
+        $normalizedDates = [];
+        foreach (['start', 'end'] as $dateField) {
+            $raw = $request->input($dateField);
+            if ($raw !== null && $raw !== '') {
+                $normalizedDates[$dateField] = self::normalizeDateField($raw);
+            }
+        }
+        if ($normalizedDates) {
+            $request->merge($normalizedDates);
+        }
         $validated = $request->validate([
             /**
              * UUID of the main object
@@ -278,6 +292,24 @@ class ApiController extends BaseController
     }
 
     /**
+     * Normalize a raw date digit string to its canonical padded form
+     * ('2026081112' → '20260811120000'). Canonical values (length ≥ 11:
+     * variable year + exactly 10-digit MMDDHHMMSS tail) pass through, so the
+     * flexible-date frontend (which always sends canonical values) is unaffected.
+     */
+    private static function normalizeDateField(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        if (strlen(ltrim($value, '-')) >= 11) {
+            return $value;
+        }
+        $parsed = FlexibleDate::parse($value);
+        return $parsed !== null && $parsed->value !== null ? $parsed->value : $value;
+    }
+
+    /**
      * Store link
      *
      * @param \Illuminate\Http\Request $request
@@ -290,6 +322,12 @@ class ApiController extends BaseController
         foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
             if (isset($data[$metaField]) && is_array($data[$metaField])) {
                 $data[$metaField] = json_encode($data[$metaField]);
+            }
+        }
+        // Normalize raw link date values to canonical form.
+        foreach (['link_start', 'link_end'] as $dateField) {
+            if (isset($data[$dateField]) && $data[$dateField] !== null && $data[$dateField] !== '') {
+                $data[$dateField] = self::normalizeDateField($data[$dateField]);
             }
         }
         // Abstract link types are grouping containers, never real relations.
@@ -787,15 +825,12 @@ class ApiController extends BaseController
         // When sorting by a date column, undated objects (NULL) must go last
         // regardless of direction — Postgres would otherwise put them first on
         // DESC. Column names come from the fixed map above, so this is safe.
+        // Plain numeric sort is chronologically correct for canonical values:
+        // value = year × 10^10 + MMDDHHMMSS tail, monotonic in the year for
+        // both positive and negative (BC) values. The backfill migration makes
+        // every stored start/end canonical, so no zero-extension is needed.
         if ($sortCol === 'start') {
-            // Legacy values are unpadded (e.g. '2026081112' = 2026-08-11 12:00)
-            // and sort numerically as tiny numbers next to 14-digit canonicals
-            // ('20260809000000'), so 2026 objects could fall below the page
-            // limit. Compare the zero-extended key instead: multiplying by the
-            // power of ten that brings the digit count to 14 is monotonic for
-            // both positive and negative (BC) values, so the order is truly
-            // chronological.
-            $query->orderByRaw('start * POWER(10, GREATEST(0, 14 - LENGTH(start::text))) ' . $sortDir . ' NULLS LAST');
+            $query->orderByRaw('start ' . $sortDir . ' NULLS LAST');
         } else {
             $query->orderBy($sortCol, $sortDir);
         }

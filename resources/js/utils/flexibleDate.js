@@ -7,6 +7,7 @@
 
 import { dateToDb } from '@/utils/dateUtils'
 import { Era } from '@/constants/eras'
+import { currentLocale } from '@/utils/localized'
 
 export const QUALIFIER_EXACT = 'exact'
 export const QUALIFIER_APPROX = 'approx'
@@ -72,6 +73,7 @@ export class FlexibleDate {
         this.comment = null
         this.original = null
         this.degrade = false
+        this.fuzz = null  // uncertainty margin: { value, unit } e.g. { 2, 'year' } → ±2 years
     }
 
     toArray() {
@@ -83,6 +85,9 @@ export class FlexibleDate {
         if (this.comment !== null && this.comment !== '') out.comment = this.comment
         if (this.original !== null && this.original !== '') out.original = this.original
         if (this.degrade) out.degrade = true
+        if (this.fuzz && this.fuzz.value != null && this.fuzz.value !== '') {
+            out.fuzz = { value: Number(this.fuzz.value), unit: this.fuzz.unit || 'year' }
+        }
         return out
     }
 
@@ -98,6 +103,9 @@ export class FlexibleDate {
         d.comment = data.comment ?? null
         d.original = data.original ?? null
         d.degrade = !!data.degrade
+        d.fuzz = (data.fuzz && data.fuzz.value != null && data.fuzz.value !== '')
+            ? { value: Number(data.fuzz.value), unit: data.fuzz.unit || 'year' }
+            : null
         return d
     }
 
@@ -217,19 +225,12 @@ export class FlexibleDate {
         const bc = number.startsWith('-')
         if (bc) number = number.slice(1)
         let year, m, d, h, mi, s
-        if (number.length <= 14) {
-            // Padded 14-digit canonicals and legacy unpadded values (e.g.
-            // '2026081112' = 2026-08-11 12:00) both split as a 4-digit year
-            // followed by up to five 2-digit groups.
-            const parts = splitDigitDate(number)
-            year = parseInt(parts.y, 10)
-            m = parseInt(parts.mo, 10)
-            d = parseInt(parts.d, 10)
-            h = parseInt(parts.h, 10)
-            mi = parseInt(parts.mi, 10)
-            s = parseInt(parts.s, 10)
-        } else {
-            // Huge year: (length − 10) year digits + 10-digit tail.
+        if (number.length >= 11) {
+            // Canonical encoding (the engine's own read-back rule): a variable-
+            // length year followed by an EXACTLY 10-digit MMDDHHMMSS tail. The
+            // year is everything except the last 10 digits, so a year-1 date
+            // stored as `10101000000` (leading zeros stripped by the numeric
+            // column) parses back to year 1, not year 1010.
             const yearLen = number.length - 10
             year = parseInt(number.slice(0, yearLen), 10)
             const rest = number.slice(-10)
@@ -238,6 +239,17 @@ export class FlexibleDate {
             h = parseInt(rest.slice(4, 6), 10)
             mi = parseInt(rest.slice(6, 8), 10)
             s = parseInt(rest.slice(8, 10), 10)
+        } else {
+            // Legacy unpadded values (e.g. '2026081112' = 2026-08-11 12:00) are
+            // a 4-digit year followed by 2-digit groups. None should remain
+            // after the backfill migration; kept as a defensive fallback.
+            const parts = splitDigitDate(number)
+            year = parseInt(parts.y, 10)
+            m = parseInt(parts.mo, 10)
+            d = parseInt(parts.d, 10)
+            h = parseInt(parts.h, 10)
+            mi = parseInt(parts.mi, 10)
+            s = parseInt(parts.s, 10)
         }
         if (bc) {
             h = 23 - h
@@ -252,10 +264,29 @@ export class FlexibleDate {
 
     static precisionFromValue(value) {
         if (value === null || value === undefined || value === '') return null
+        const bc = String(value).startsWith('-')
         const digits = String(value).replace(/^-/, '')
         const len = digits.length
+        // Canonical values (≥ 11 digits: variable year + 10-digit tail) are
+        // always padded to seconds, so the finest precision actually encoded
+        // is inferred from the trailing groups: a day-precision date has a
+        // 000000 time tail, a month one has day=01, a year one day=01+month=01.
+        // BC dates store an inverted clock, so un-invert before inspecting.
+        if (len >= 11) {
+            const tail = digits.slice(-10)
+            let m = parseInt(tail.slice(0, 2), 10)
+            let d = parseInt(tail.slice(2, 4), 10)
+            let h = parseInt(tail.slice(4, 6), 10)
+            let mi = parseInt(tail.slice(6, 8), 10)
+            let s = parseInt(tail.slice(8, 10), 10)
+            if (bc) { h = 23 - h; mi = 59 - mi; s = 59 - s }
+            if (s !== 0) return PRECISION_SECOND
+            if (mi !== 0 || h !== 0) return PRECISION_MINUTE
+            if (d !== 1) return PRECISION_DAY
+            if (m !== 1) return PRECISION_MONTH
+            return PRECISION_YEAR
+        }
         if (len <= 4) return PRECISION_YEAR
-        if (len > 14) return PRECISION_YEAR
         const n = Math.floor((digits.slice(4).length + 1) / 2)
         if (n === 1) return PRECISION_MONTH
         if (n === 2) return PRECISION_DAY
@@ -386,7 +417,66 @@ export function formatBoundLocalized(value, meta, t) {
         s = s.replace(/\s*\(hebrew\)$/, ' (' + t('era.hebrew') + ')')
     }
     if (/ BC$/.test(s)) s = s.replace(/ BC$/, ' ' + t('dates.bc'))
+    if (meta && meta.fuzz) {
+        const f = formatFuzz(meta.fuzz, t)
+        if (f) s = s + ' ' + f
+    }
     return s
+}
+
+// ─── Uncertainty margin ("fuzz") ───
+// Legacy start_variety/end_variety columns encoded this as an opaque number;
+// the flexible-date meta stores it structured as { value, unit }.
+
+const FUZZ_UNIT_ALIASES = {
+    year: 'year', years: 'year', y: 'year', 'г': 'year', 'год': 'year', 'года': 'year', 'лет': 'year',
+    month: 'month', months: 'month', 'мес': 'month', 'мес.': 'month', 'месяц': 'month', 'месяца': 'month', 'месяцев': 'month',
+    day: 'day', days: 'day', d: 'day', 'дн': 'day', 'дн.': 'day', 'день': 'day', 'дня': 'day', 'дней': 'day',
+    hour: 'hour', hours: 'hour', h: 'hour', 'ч': 'hour', 'час': 'hour', 'часа': 'hour', 'часов': 'hour',
+    minute: 'minute', minutes: 'minute', min: 'minute', 'мин': 'minute', 'мин.': 'minute', 'минута': 'minute', 'минуты': 'minute', 'минут': 'minute',
+    second: 'second', seconds: 'second', sec: 'second', 'сек': 'second', 'сек.': 'second', 'секунда': 'second', 'секунды': 'second', 'секунд': 'second',
+}
+
+export function parseFuzz(text) {
+    const s = String(text || '').trim().replace(/^±\s*/u, '')
+    if (s === '') return null
+    const m = s.match(/^(\d{1,4})\s*(.+)$/)
+    if (!m) return null
+    const unit = FUZZ_UNIT_ALIASES[m[2].toLowerCase()]
+    if (!unit) return null
+    const value = parseInt(m[1], 10)
+    if (!Number.isFinite(value) || value <= 0 || value > 9999) return null
+    return { value, unit }
+}
+
+function pluralRu(n, one, few, many) {
+    const n10 = n % 10
+    const n100 = n % 100
+    if (n10 === 1 && n100 !== 11) return one
+    if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
+    return many
+}
+
+const RU_FUZZ_FORMS = {
+    year: ['год', 'года', 'лет'],
+    month: ['месяц', 'месяца', 'месяцев'],
+    day: ['день', 'дня', 'дней'],
+    hour: ['час', 'часа', 'часов'],
+    minute: ['минута', 'минуты', 'минут'],
+    second: ['секунда', 'секунды', 'секунд'],
+}
+
+export function formatFuzz(fuzz, t) {
+    if (!fuzz || fuzz.value == null || fuzz.value === '') return ''
+    const n = Number(fuzz.value)
+    if (!Number.isFinite(n) || n <= 0) return ''
+    const unit = RU_FUZZ_FORMS[fuzz.unit] ? fuzz.unit : 'year'
+    if (currentLocale() === 'ru') {
+        const [one, few, many] = RU_FUZZ_FORMS[unit]
+        return '±' + n + ' ' + pluralRu(n, one, few, many)
+    }
+    const label = t('dates.fuzz.' + unit)
+    return '±' + n + ' ' + label + (n === 1 ? '' : 's')
 }
 
 export function formatLocalized(start, end, startMeta, endMeta, t) {
@@ -435,7 +525,7 @@ export function formatRangeShort(start, end, startMeta, endMeta, t) {
     const sm = startMeta && typeof startMeta === 'object' ? startMeta : {}
     const em = endMeta && typeof endMeta === 'object' ? endMeta : {}
     const qualifier = sm.qualifier || em.qualifier || QUALIFIER_EXACT
-    if (qualifier === QUALIFIER_EXACT) {
+    if (qualifier === QUALIFIER_EXACT && !sm.fuzz && !em.fuzz) {
         const cs = FlexibleDate.componentsFromCanonical(start)
         const ce = FlexibleDate.componentsFromCanonical(end)
         const hasTime = (p) => p === PRECISION_MINUTE || p === PRECISION_SECOND
@@ -487,7 +577,34 @@ function parseDateComponents(text) {
         const precision = m[5] != null ? PRECISION_MINUTE : (m[4] != null ? PRECISION_MINUTE : PRECISION_DAY)
         return { y: parseInt(m[3], 10), m: parseInt(m[2], 10), d: parseInt(m[1], 10), h: parseInt(m[4] || 0, 10), mi: parseInt(m[5] || 0, 10), s: 0, precision }
     }
-    m = text.match(/^(-?\d+)-(\d{1,2})(?:-(\d{1,2}))?(?:[ T](\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$/)
+    // Digit date + space-separated time: "20260816 19:30" (also "20260816 19:30:45")
+    m = text.match(/^(\d{8})\s+(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/)
+    if (m) {
+        const h = parseInt(m[2], 10)
+        const mi = m[3] != null && m[3] !== '' ? parseInt(m[3], 10) : 0
+        const s = m[4] != null && m[4] !== '' ? parseInt(m[4], 10) : 0
+        if (h > 23 || mi > 59 || s > 59) return null
+        const parts = splitDigitDate(m[1])
+        const precision = m[4] != null && m[4] !== '' ? PRECISION_SECOND : PRECISION_MINUTE
+        return { y: parseInt(parts.y, 10), m: parseInt(parts.mo, 10), d: parseInt(parts.d, 10), h, mi, s, precision }
+    }
+    // Year-first with standard delimiters: "2026-08", "2026-08-16", "2026/08/16",
+    // "2026.08.16" (all optionally followed by a space/T-separated time).
+    m = text.match(/^(-?\d+)[/.-](\d{1,2})(?:[/.-](\d{1,2}))?(?:[ T](\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$/)
+    if (m) {
+        const month = parseInt(m[2], 10)
+        const day = m[3] != null && m[3] !== '' ? parseInt(m[3], 10) : null
+        if (month < 1 || month > 12 || (day !== null && (day < 1 || day > 31))) return null
+        let precision
+        if (m[6] != null && m[6] !== '') precision = PRECISION_SECOND
+        else if (m[5] != null && m[5] !== '') precision = PRECISION_MINUTE
+        else if (m[4] != null && m[4] !== '') precision = PRECISION_MINUTE
+        else precision = day !== null ? PRECISION_DAY : PRECISION_MONTH
+        return { y: parseInt(m[1], 10), m: month, d: day || 1, h: parseInt(m[4] || 0, 10), mi: parseInt(m[5] || 0, 10), s: parseInt(m[6] || 0, 10), precision }
+    }
+    // Space-separated year month day: "2026 08 15" (also "2026 08 15 19:30",
+    // and "2026 08" for year+month).
+    m = text.match(/^(-?\d+)\s+(\d{1,2})(?:\s+(\d{1,2}))?(?:\s+(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?)?$/)
     if (m) {
         const month = parseInt(m[2], 10)
         const day = m[3] != null && m[3] !== '' ? parseInt(m[3], 10) : null

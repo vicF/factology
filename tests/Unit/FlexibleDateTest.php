@@ -134,6 +134,72 @@ class FlexibleDateTest extends TestCase
         $this->assertSame(FlexibleDate::PRECISION_MONTH, $d->precision);
     }
 
+    public function testParseStandardDelimiters(): void
+    {
+        // Digit date + space-separated time.
+        $d = FlexibleDate::parse('20260816 19:30');
+        $this->assertNotNull($d);
+        $this->assertSame('20260816193000', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_MINUTE, $d->precision);
+
+        $d = FlexibleDate::parse('20260816 19:30:45');
+        $this->assertSame('20260816193045', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_SECOND, $d->precision);
+
+        // Year-first with / and . delimiters.
+        $d = FlexibleDate::parse('2026/08/16');
+        $this->assertSame('20260816000000', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_DAY, $d->precision);
+
+        $d = FlexibleDate::parse('2026.08.16');
+        $this->assertSame('20260816000000', $d->value);
+
+        // Year-month with a slash delimiter.
+        $d = FlexibleDate::parse('2026/08');
+        $this->assertSame(FlexibleDate::PRECISION_MONTH, $d->precision);
+
+        // Space-separated year month day.
+        $d = FlexibleDate::parse('2026 08 15');
+        $this->assertNotNull($d);
+        $this->assertSame('20260815000000', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_DAY, $d->precision);
+
+        $d = FlexibleDate::parse('2026 08 15 19:30');
+        $this->assertSame('20260815193000', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_MINUTE, $d->precision);
+
+        $d = FlexibleDate::parse('2026 08');
+        $this->assertSame(FlexibleDate::PRECISION_MONTH, $d->precision);
+    }
+
+    public function testFuzz(): void
+    {
+        // parseFuzz accepts english and russian unit aliases.
+        $this->assertSame(['value' => 2, 'unit' => 'year'], FlexibleDate::parseFuzz('2 years'));
+        $this->assertSame(['value' => 5, 'unit' => 'day'], FlexibleDate::parseFuzz('±5 дней'));
+        $this->assertSame(['value' => 2, 'unit' => 'year'], FlexibleDate::parseFuzz('2y'));
+        $this->assertSame(['value' => 3, 'unit' => 'month'], FlexibleDate::parseFuzz(' 3 месяца '));
+        $this->assertSame(['value' => 10, 'unit' => 'minute'], FlexibleDate::parseFuzz('10 мин.'));
+        $this->assertNull(FlexibleDate::parseFuzz('garbage'));
+        $this->assertNull(FlexibleDate::parseFuzz(''));
+        $this->assertNull(FlexibleDate::parseFuzz('±0 years'));
+
+        // formatFuzz renders an english "±N unit" string.
+        $this->assertSame('±2 years', FlexibleDate::formatFuzz(['value' => 2, 'unit' => 'year']));
+        $this->assertSame('±1 day', FlexibleDate::formatFuzz(['value' => 1, 'unit' => 'day']));
+        $this->assertSame('', FlexibleDate::formatFuzz(null));
+
+        // formatBound appends the margin.
+        $this->assertSame(
+            '2026-08-12 ±2 years',
+            FlexibleDate::formatBound('20260812000000', ['precision' => FlexibleDate::PRECISION_DAY, 'fuzz' => ['value' => 2, 'unit' => 'year']])
+        );
+        $this->assertSame(
+            '2026-08-12',
+            FlexibleDate::formatBound('20260812000000', ['precision' => FlexibleDate::PRECISION_DAY])
+        );
+    }
+
     public function testParseBc(): void
     {
         // BC dates store an inverted clock so numeric order = chronological.
@@ -301,14 +367,58 @@ class FlexibleDateTest extends TestCase
 
     public function testPrecisionFromValue(): void
     {
+        // Values < 11 digits are legacy unpadded shapes (4-digit year + groups).
         $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('2026'));
         $this->assertSame(FlexibleDate::PRECISION_MONTH, FlexibleDate::precisionFromValue('202608'));
         $this->assertSame(FlexibleDate::PRECISION_DAY, FlexibleDate::precisionFromValue('20260815'));
         $this->assertSame(FlexibleDate::PRECISION_MINUTE, FlexibleDate::precisionFromValue('2026081112'));
-        $this->assertSame(FlexibleDate::PRECISION_MINUTE, FlexibleDate::precisionFromValue('202608151200'));
-        $this->assertSame(FlexibleDate::PRECISION_SECOND, FlexibleDate::precisionFromValue('20260815120000'));
-        $this->assertSame(FlexibleDate::PRECISION_SECOND, FlexibleDate::precisionFromValue('-15000101235959'));
+        // Values ≥ 11 digits are canonical (variable year + 10-digit tail) and
+        // always padded to seconds, so the finest precision actually encoded is
+        // inferred from the trailing groups.
+        $this->assertSame(FlexibleDate::PRECISION_MINUTE, FlexibleDate::precisionFromValue('20260815120000'));  // 12:00
+        $this->assertSame(FlexibleDate::PRECISION_DAY, FlexibleDate::precisionFromValue('20260812000000'));      // day
+        $this->assertSame(FlexibleDate::PRECISION_MONTH, FlexibleDate::precisionFromValue('20260801000000'));    // month
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('20260101000000'));     // year
+        $this->assertSame(FlexibleDate::PRECISION_SECOND, FlexibleDate::precisionFromValue('20260811123045'));   // 12:30:45
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('10101000000'));        // year 1 (BC-inverted clock still year)
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('-15000101235959'));    // 1500 BC, inverted clock
         $this->assertNull(FlexibleDate::precisionFromValue(null));
+    }
+
+    public function testYearOneCanonicalRoundTrip(): void
+    {
+        // The engine zero-pads years ≤ 4 digits to 4 ('0001'), but the numeric
+        // column strips the leading zeros, so a year-1 date reads back as
+        // '10101000000' (11 digits). The canonical read-back rule must then be
+        // `year = length - 10` — never a fixed 4-digit-year assumption.
+        $c = FlexibleDate::componentsFromCanonical('10101000000');
+        $this->assertSame(1, $c['y']);
+        $this->assertSame(1, $c['m']);
+        $this->assertSame(1, $c['d']);
+
+        // Same value in its zero-padded 14-digit form (before storage).
+        $c = FlexibleDate::componentsFromCanonical('00010101000000');
+        $this->assertSame(1, $c['y']);
+
+        $this->assertSame('1', FlexibleDate::formatBound('10101000000', ['precision' => FlexibleDate::PRECISION_YEAR]));
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('10101000000'));
+
+        // Input paths for 1- and 3-digit years produce canonical values with
+        // the year zero-padded (the flexible-date layer pads before the engine).
+        $this->assertSame('00010101000000', FlexibleDate::parse('1-01-01')->value);
+        $this->assertSame('00010101000000', FlexibleDate::parse('1.1.1')->value);
+        $this->assertSame('09990101000000', FlexibleDate::parse('999-01-01')->value);
+    }
+
+    public function testCanonicalSmallYearSortOrder(): void
+    {
+        // value = year × 10^10 + tail is monotonic in the year even though the
+        // digit count varies after leading-zero stripping.
+        $year1   = '10101000000';   // year 1
+        $year1000 = '10000101000000'; // year 1000
+        $year9999 = '99990101000000'; // year 9999
+        $this->assertSame(1, bccomp($year1000, $year1));
+        $this->assertSame(1, bccomp($year9999, $year1000));
     }
 
     public function testFormatBoundInfersPrecisionWithoutMeta(): void
@@ -343,9 +453,10 @@ class FlexibleDateTest extends TestCase
             FlexibleDate::formatPair($birth->value, $death->value, $birth->toArray(), $death->toArray())
         );
 
-        // Identical bounds show the date once, not twice.
+        // Identical bounds show the date once, not twice. The value's trailing
+        // zeros imply minute precision (21:00), so seconds are not displayed.
         $this->assertSame(
-            '1994-03-08 21:00:00',
+            '1994-03-08 21:00',
             FlexibleDate::formatPair('19940308210000', '19940308210000', [], null)
         );
     }
