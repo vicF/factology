@@ -97,10 +97,24 @@
                                             <GeoPicker
                                                 ref="geoPickerRef"
                                                 v-model="geoForm"
-                                                :clickable="geoForm.type === 'Point'"
+                                                :clickable="geoClickable"
+                                                @clicked="onGeoPickerClick"
                                                 class="mt-2"
                                             />
-                                            <small class="text-muted d-block mt-1">{{ $t('Click the map to set coordinates') }}</small>
+                                            <small class="text-muted d-block mt-1">{{ geoClickHint }}</small>
+                                            <div v-if="geoForm.type !== 'Point'" class="d-flex gap-2 mt-2">
+                                                <button
+                                                    v-if="geoForm.type === 'Polygon' && canFinishPolygon"
+                                                    type="button"
+                                                    class="btn btn-outline-secondary btn-sm"
+                                                    @click="finishPolygon"
+                                                >
+                                                    {{ $t('Finish') }}
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="clearGeo">
+                                                    {{ $t('Clear') }}
+                                                </button>
+                                            </div>
                                         </template>
 
                                         <!-- Generic text editor for other properties -->
@@ -464,7 +478,7 @@ import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { useAuthStore } from '@/stores/auth';
 import { UUID } from '../constants/uuid';
 import { currentLocale, changeSourceLang, objectName } from '../utils/localized.js';
-import { GEO_TYPES, extractCoordinates, isGeoPropertyName, isLegacyLatLng, latLngToPoint } from '../utils/geo.js';
+import { GEO_TYPES, appendVertex, closePolygon, extractCoordinates, isGeoPropertyName, isLegacyLatLng, latLngToPoint, stripBlankCoords } from '../utils/geo.js';
 import GeoPicker from './GeoPicker.vue';
 import { loadLanguages } from '../localization/languageCatalog.js';
 
@@ -929,6 +943,20 @@ const geoForm = computed({
     },
     set: (value) => {
         if (geoPropertyId.value) formData.value.data.properties[geoPropertyId.value] = value;
+        // Keep the raw GeoJSON draft in sync when the geometry changed from
+        // outside the textarea (e.g. vertex drags), but never clobber the
+        // user's own typing: a draft that parses to the same geometry is left as-is.
+        if (value?.type && value.type !== 'Point') {
+            let stale = true;
+            if (geoJsonDraft.value) {
+                try {
+                    stale = JSON.stringify(JSON.parse(geoJsonDraft.value)) !== JSON.stringify(value);
+                } catch (e) {
+                    stale = true; // unparseable draft → not from a committed geometry
+                }
+            }
+            if (stale) geoJsonDraft.value = JSON.stringify(value, null, 2);
+        }
     },
 });
 
@@ -993,6 +1021,57 @@ watch(() => geoForm.value?.type, (type) => {
         geoJsonDraft.value = JSON.stringify(geoForm.value, null, 2);
         geoJsonError.value = '';
     }
+});
+
+// ── Click-to-build vertex editing ──────────────────────────────────────────
+// Map clicks build the geometry: a click sets a Point, appends a vertex to a
+// LineString/MultiPoint, or appends a vertex to a Polygon ring (Finish closes
+// the ring). MultiLineString/MultiPolygon stay textarea-only.
+const CLICK_BUILD_TYPES = ['Point', 'MultiPoint', 'LineString', 'Polygon'];
+
+const geoClickable = computed(() => CLICK_BUILD_TYPES.includes(geoForm.value?.type));
+
+const onGeoPickerClick = ({ lat, lng }) => {
+    const next = appendVertex(geoForm.value, lng, lat);
+    if (!next) return;
+    geoForm.value = next;
+    if (next.type !== 'Point') geoJsonDraft.value = JSON.stringify(next, null, 2);
+};
+
+const finishPolygon = () => {
+    const next = closePolygon(geoForm.value);
+    if (next !== geoForm.value) {
+        geoForm.value = next;
+        geoJsonDraft.value = JSON.stringify(next, null, 2);
+    }
+};
+
+const clearGeo = () => {
+    const type = geoForm.value?.type || 'Point';
+    const next = { type, coordinates: defaultCoordinates(type) };
+    geoForm.value = next;
+    if (type !== 'Point') geoJsonDraft.value = JSON.stringify(next, null, 2);
+    geoJsonError.value = '';
+};
+
+// "Finish" is offered while a polygon ring is open (≥3 vertices, not closed).
+const canFinishPolygon = computed(() => {
+    const geometry = geoForm.value;
+    if (!geometry || geometry.type !== 'Polygon') return false;
+    const ring = stripBlankCoords(geometry.coordinates?.[0]);
+    if (ring.length < 3) return false;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    return !(first[0] === last[0] && first[1] === last[1]);
+});
+
+const geoClickHint = computed(() => {
+    const type = geoForm.value?.type;
+    if (type === 'Point') return t('Click the map to set coordinates');
+    if (type === 'MultiPoint' || type === 'LineString' || type === 'Polygon') {
+        return t('Click the map to add points');
+    }
+    return t('Edit GeoJSON below');
 });
 
 const ensureAllProperties = async () => {

@@ -23,3 +23,13 @@
     background: #28a745;
     border: 2px solid #1e7e34;
 }
+
+/* Draggable vertex handle used while editing LineString/Polygon geometries. */
+.geo-vertex-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #1e3b8a;
+    box-shadow: 0 0 0 1px rgba(30, 59, 138, 0.4);
+}

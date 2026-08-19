@@ -139,3 +139,46 @@ export function latLngToPoint({ lat, lng } = {}) {
     }
     return { type: 'Point', coordinates: [lngNum, latNum] };
 }
+
+// ── Click-to-build vertex editing (edit form) ──────────────────────────────
+
+/** Drop placeholder tuples (both values null/''/undefined) from a coordinate list. */
+export function stripBlankCoords(coords) {
+    return (coords || []).filter(
+        (c) => Array.isArray(c) && c[0] != null && c[1] != null && c[0] !== '' && c[1] !== ''
+    );
+}
+
+/**
+ * Append a clicked [lng, lat] vertex to a click-buildable geometry.
+ * Point → replaced by the clicked point; MultiPoint/LineString → vertex appended;
+ * Polygon → vertex appended to the first ring (starting one if empty).
+ * MultiLineString/MultiPolygon → null (not click-buildable). Returns a new geometry.
+ */
+export function appendVertex(geometry, lng, lat) {
+    if (!geometry || typeof geometry !== 'object') return null;
+    const type = geometry.type;
+    if (type === 'Point') return { type, coordinates: [lng, lat] };
+    if (type === 'MultiPoint' || type === 'LineString') {
+        return { type, coordinates: [...stripBlankCoords(geometry.coordinates), [lng, lat]] };
+    }
+    if (type === 'Polygon') {
+        const ring = stripBlankCoords(geometry.coordinates?.[0]);
+        return { type, coordinates: [ring.length ? [...ring, [lng, lat]] : [[lng, lat]]] };
+    }
+    return null;
+}
+
+/**
+ * Close a polygon's first ring by duplicating its first vertex (GeoJSON rings
+ * are closed). Returns the same geometry when there is nothing to close.
+ */
+export function closePolygon(geometry) {
+    if (!geometry || geometry.type !== 'Polygon') return geometry;
+    const ring = stripBlankCoords(geometry.coordinates?.[0]);
+    if (ring.length < 3) return geometry;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] === last[0] && first[1] === last[1]) return geometry;
+    return { type: 'Polygon', coordinates: [[...ring, first]] };
+}

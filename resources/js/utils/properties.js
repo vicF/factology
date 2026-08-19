@@ -7,8 +7,9 @@
 import { isGeoJsonGeometry, isLegacyLatLng } from './geo.js'
 import { objectName, resolveLocalized } from './localized.js'
 
-/** Render a number compactly (5 decimal places), or '' when not finite. */
+/** Render a number compactly (5 decimal places), or '' when not finite/empty. */
 export function formatCoord(n) {
+    if (n === '' || n === null || n === undefined) return '';
     const num = Number(n);
     return Number.isFinite(num) ? String(Math.round(num * 1e5) / 1e5) : '';
 }
@@ -26,7 +27,8 @@ export function formatScalar(v) {
 export function geoSummary(geometry, t = (key) => key) {
     const coords = geometry.coordinates;
     if (geometry.type === 'Point') {
-        const text = `${t('Latitude')}: ${formatCoord(coords[0])}, ${t('Longitude')}: ${formatCoord(coords[1])}`;
+        // GeoJSON order is [lng, lat]; display lat first.
+        const text = `${t('Latitude')}: ${formatCoord(coords[1])}, ${t('Longitude')}: ${formatCoord(coords[0])}`;
         const height = coords[2];
         return height != null && height !== '' ? `${text}, ${t('Height (m)')}: ${formatScalar(height)}` : text;
     }
@@ -65,10 +67,11 @@ export function formatPropertyValue(value, t = (key) => key) {
  */
 export function buildPropertyEntries(properties, definitions = [], t = (key) => key) {
     if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return [];
+    const defs = Array.isArray(definitions) ? definitions : [];
     const entries = [];
     for (const [propertyId, value] of Object.entries(properties)) {
         if (value === '' || value === null || value === undefined) continue;
-        const def = definitions.find((d) => d.thing_id === propertyId);
+        const def = defs.find((d) => d.thing_id === propertyId);
         const name = def ? objectName(def) || def.name || propertyId : propertyId;
         entries.push({ property_id: propertyId, name, ...formatPropertyValue(value, t) });
     }

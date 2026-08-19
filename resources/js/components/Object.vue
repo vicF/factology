@@ -475,7 +475,8 @@ const loadPropertyDefinitions = async () => {
     }
     try {
         const res = await axios.get('/properties');
-        propertyDefinitionsData = res.data?.data ?? [];
+        const data = res.data?.data;
+        propertyDefinitionsData = Array.isArray(data) ? data : [];
     } catch (error) {
         propertyDefinitionsData = [];
         console.error('Object.vue - failed to load property definitions:', error);

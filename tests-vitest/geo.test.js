@@ -6,6 +6,9 @@ import {
     isLegacyLatLng,
     buildMapFeatures,
     latLngToPoint,
+    stripBlankCoords,
+    appendVertex,
+    closePolygon,
 } from '../resources/js/utils/geo.js';
 
 describe('extractCoordinates', () => {
@@ -181,5 +184,65 @@ describe('buildMapFeatures', () => {
             ],
         });
         expect(features.map((f) => f.thing_id).sort()).toEqual(['b', 'c']);
+    });
+});
+
+// ── Click-to-build vertex editing ──────────────────────────────────────────
+
+describe('stripBlankCoords', () => {
+    test('drops placeholder tuples', () => {
+        expect(stripBlankCoords([[null, null], [1, 2], ['', '']])).toEqual([[1, 2]]);
+    });
+
+    test('handles null / non-array input', () => {
+        expect(stripBlankCoords(null)).toEqual([]);
+        expect(stripBlankCoords([undefined, 'nope'])).toEqual([]);
+    });
+});
+
+describe('appendVertex', () => {
+    test('point is replaced by the clicked position', () => {
+        expect(appendVertex({ type: 'Point', coordinates: [0, 0] }, 30.5, 59.9))
+            .toEqual({ type: 'Point', coordinates: [30.5, 59.9] });
+    });
+
+    test('line appends a vertex and strips template blanks', () => {
+        expect(appendVertex({ type: 'LineString', coordinates: [[null, null], [30, 59]] }, 31, 60))
+            .toEqual({ type: 'LineString', coordinates: [[30, 59], [31, 60]] });
+    });
+
+    test('polygon appends to the first ring, starting one when empty', () => {
+        const fromTemplate = appendVertex({ type: 'Polygon', coordinates: [[[null, null], [null, null], [null, null], [null, null]]] }, 30, 59);
+        expect(fromTemplate).toEqual({ type: 'Polygon', coordinates: [[[30, 59]]] });
+        const second = appendVertex(fromTemplate, 31, 60);
+        expect(second).toEqual({ type: 'Polygon', coordinates: [[[30, 59], [31, 60]]] });
+    });
+
+    test('multi-point appends a vertex', () => {
+        expect(appendVertex({ type: 'MultiPoint', coordinates: [[30, 59]] }, 31, 60))
+            .toEqual({ type: 'MultiPoint', coordinates: [[30, 59], [31, 60]] });
+    });
+
+    test('multi-line / multi-polygon are not click-buildable', () => {
+        expect(appendVertex({ type: 'MultiLineString', coordinates: [] }, 30, 59)).toBeNull();
+        expect(appendVertex({ type: 'MultiPolygon', coordinates: [] }, 30, 59)).toBeNull();
+        expect(appendVertex(null, 30, 59)).toBeNull();
+    });
+});
+
+describe('closePolygon', () => {
+    test('closes an open ring by duplicating the first vertex', () => {
+        const closed = closePolygon({ type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1]]] });
+        expect(closed).toEqual({ type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] });
+    });
+
+    test('leaves an already-closed ring alone', () => {
+        const geom = { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] };
+        expect(closePolygon(geom)).toBe(geom);
+    });
+
+    test('leaves degenerate rings alone', () => {
+        const geom = { type: 'Polygon', coordinates: [[[null, null], [null, null]]] };
+        expect(closePolygon(geom)).toBe(geom);
     });
 });
