@@ -311,7 +311,15 @@ const exportData = async () => {
     }
 };
 
+// Monotonic request sequence: only the latest search request may apply its
+// response. Search fires on mount (empty filter → everything, slow) and again
+// once the class-tree default selection lands (filtered, fast). Without this
+// guard the mount request's late response would overwrite the filtered results
+// with the unfiltered list seconds later.
+let searchRequestSeq = 0;
+
 const getObjects = async () => {
+    const requestId = ++searchRequestSeq;
     let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
@@ -352,6 +360,9 @@ const getObjects = async () => {
 
         const response = await axios.post('/object', body);
 
+        // A newer search superseded this one — its response will render instead.
+        if (requestId !== searchRequestSeq) return;
+
         validationErrors.value = {};
 
         if (typeof response.data === 'string') {
@@ -366,12 +377,16 @@ const getObjects = async () => {
             objects.value = response.data.things || response.data || [];
         }
     } catch (error) {
+        // Ignore failures from requests that were superseded by a newer search.
+        if (requestId !== searchRequestSeq) return;
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors || {};
         }
         objects.value = [];
     } finally {
+        // Only the latest request owns the processing/loaded flags.
+        if (requestId !== searchRequestSeq) return;
         processing.value = false;
         loaded.value = true;
     }
