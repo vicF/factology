@@ -1,7 +1,7 @@
 {
     "version": 1,
     "scope": "system",
-    "exported_at": "2026-08-19T06:50:19+00:00",
+    "exported_at": "2026-08-19T15:08:33+00:00",
     "general_types": [
         {
             "id": 1,
@@ -1792,31 +1792,6 @@
                 "abstract": false
             },
             {
-                "thing_id": "98796ce9-e32a-4638-8d3f-db5a4e4d80e3",
-                "name": "is married to",
-                "type": 4,
-                "description": "Состоит в браке",
-                "start": null,
-                "end": null,
-                "record_created": "2026-08-19 06:50:00",
-                "record_updated": "2026-08-19 06:50:00",
-                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
-                "public": true,
-                "deleted": false,
-                "data": {
-                    "properties": []
-                },
-                "name_translations": {
-                    "ru": "состоит в браке с",
-                    "lang": "en"
-                },
-                "description_translations": {
-                    "ru": "Состоит в браке (супруг/супруга)",
-                    "lang": "en"
-                },
-                "abstract": false
-            },
-            {
                 "thing_id": "9f7436db-6253-4718-aa61-b4676faa90c7",
                 "name": "Document",
                 "type": 2,
@@ -2781,7 +2756,7 @@
             {
                 "thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
                 "name": "Married to",
-                "type": 2,
+                "type": 4,
                 "description": "состоит в браке с",
                 "start": null,
                 "end": null,
@@ -3919,17 +3894,6 @@
                 "deleted": false
             },
             {
-                "translation": "Married to is a child of Link",
-                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_uuid": "b4719ffe-e892-45b7-a806-afbc40f05bdf",
-                "deleted": false
-            },
-            {
                 "translation": "Спортивная секция is a child of Group",
                 "one_thing_id": "c0e229b8-6e56-45ee-b454-71e557cdb191",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
@@ -4381,14 +4345,14 @@
                 "deleted": false
             },
             {
-                "translation": "\"is married to\" is subclass of \"Kinship\"",
+                "translation": "\"Married to\" is subclass of \"Kinship\"",
                 "one_thing_id": "b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "98796ce9-e32a-4638-8d3f-db5a4e4d80e3",
+                "other_thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
                 "public": true,
                 "link_start": null,
                 "link_end": null,
-                "link_uuid": "1cf47124-71e2-4b50-9305-21a13a3479ee",
+                "link_uuid": "13e482a6-0f85-4dcb-97d0-c272abfb2f59",
                 "deleted": false
             }
         ],
