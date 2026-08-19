@@ -1,10 +1,22 @@
 <template>
-    <div ref="mapEl" class="geo-picker" :style="{ height: height + 'px' }"></div>
+    <div class="geo-picker" :style="{ height: height + 'px' }">
+        <div ref="mapEl" class="geo-picker-map"></div>
+        <button
+            v-if="geolocationSupported"
+            type="button"
+            class="geo-locate-btn"
+            :title="t('Find my location')"
+            @click.stop="locate"
+        >
+            <i class="bi bi-crosshair"></i>
+        </button>
+    </div>
 </template>
 
 <script setup>
 import L from 'leaflet'
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { isGeoJsonGeometry } from '../utils/geo.js'
 import { createBaseMap, createPinIcon } from '../utils/leaflet.js'
 
@@ -21,6 +33,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['clicked', 'update:modelValue'])
+const { t } = useI18n()
 
 const mapEl = ref(null)
 let map = null
@@ -30,6 +43,30 @@ let workingGeo = null  // draggable clone of the current geometry
 let markerPlaced = false
 // Leaflet fires a map click after a marker drag ends; ignore clicks right after.
 let suppressClickUntil = 0
+
+// Geolocation is only available in secure contexts (HTTPS / localhost); the
+// button stays hidden otherwise.
+const geolocationSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
+
+// Center the map on the user's position (approximate, browser-reported). When
+// editing a still-empty Point, the coordinate is placed there right away.
+const locate = () => {
+    if (!map || !geolocationSupported) return
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const { latitude, longitude } = pos.coords
+            map.setView([latitude, longitude], Math.max(map.getZoom(), 15))
+            const geo = props.modelValue
+            const blankPoint = geo && geo.type === 'Point'
+                && (!Array.isArray(geo.coordinates) || geo.coordinates[0] == null || geo.coordinates[1] == null)
+            if (blankPoint) emit('clicked', { lat: latitude, lng: longitude })
+        },
+        (err) => {
+            console.error('GeoPicker locate failed:', err)
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    )
+}
 
 const pinIcon = createPinIcon('geo-pin geo-pin-related')
 const vertexIcon = L.divIcon({
@@ -204,7 +241,35 @@ defineExpose({ invalidate })
 
 <style scoped>
 .geo-picker {
+    position: relative;
     border-radius: 4px;
     z-index: 1;
+}
+
+.geo-picker-map {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+}
+
+.geo-locate-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1001;
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    background: #ffffff;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.geo-locate-btn:hover {
+    background: #f8f9fa;
 }
 </style>
