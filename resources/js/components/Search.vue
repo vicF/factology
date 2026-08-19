@@ -125,7 +125,9 @@
                                     </div>
                                 </div>
 
-                                <div v-if="thingIndex < objects.length - 1" class="result-separator"></div>
+                                <!-- A group boundary already draws its own labeled
+                                     separator line — don't stack a plain one on it. -->
+                                <div v-if="thingIndex < objects.length - 1 && !groupLabels[thingIndex + 1]" class="result-separator"></div>
                             </div>
                         </div>
                     </div>
@@ -155,6 +157,7 @@ import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
 import { currentLocale } from '../utils/localized.js';
+import { FlexibleDate } from '../utils/flexibleDate.js';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
@@ -183,22 +186,27 @@ const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owne
 // ── Date-group delimiters (only meaningful when sorting by start date) ──────
 function dateGroupKey(start) {
     if (!start) return null;
-    const s = String(start).replace(/^-/, '');
-    if (!/^\d+$/.test(s)) return null;
-    if (s.length <= 4) return 'y' + s;
-    const y = s.slice(0, 4);
-    const m = parseInt(s.slice(4, 6), 10);
-    return (m >= 1 && m <= 12) ? 'm' + y + '-' + String(m).padStart(2, '0') : 'y' + y;
+    // Decode via the canonical components so huge years (variable-length year
+    // in the digit string) group under their real year, not its first 4 digits.
+    const c = FlexibleDate.componentsFromCanonical(String(start));
+    if (!c) return null;
+    if (FlexibleDate.precisionFromValue(String(start)) === 'year') return 'y' + c.y;
+    return 'm' + c.y + '-' + String(c.m).padStart(2, '0');
 }
 
 function dateGroupLabel(key) {
     if (!key) return null;
-    if (key[0] === 'y') return key.slice(1);
-    const m = key.match(/^m(\d{4})-(\d{2})$/);
+    if (key[0] === 'y') {
+        const y = Number(key.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = key.match(/^m(-?\d+)-(\d{2})$/);
     if (!m) return null;
+    const year = parseInt(m[1], 10);
     const locale = currentLocale();
-    return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
-        .format(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, 1));
+    const label = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
 }
 
 // Header label aligned with each result row (null = no header before it).

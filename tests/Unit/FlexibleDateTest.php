@@ -200,6 +200,29 @@ class FlexibleDateTest extends TestCase
         );
     }
 
+    public function testHugeYearInputAndMalformedCanonical(): void
+    {
+        // A pure digit string that is not a valid YYYYMMDD… pattern is a huge
+        // year (year precision), not a 4-digit year plus time groups.
+        $d = FlexibleDate::parse('-13800000000000');
+        $this->assertNotNull($d);
+        $this->assertSame('-138000000000000101235959', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, $d->precision);
+
+        $d = FlexibleDate::parse('13800000000000');
+        $this->assertSame('138000000000000101000000', $d->value);
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, $d->precision);
+
+        // Malformed legacy canonicals (invalid 24:60:60 BC tail) display
+        // robustly instead of rendering garbage.
+        $this->assertSame(
+            ['y' => -13800000000000, 'm' => 1, 'd' => 1, 'h' => 0, 'mi' => 0, 's' => 0],
+            FlexibleDate::componentsFromCanonical('-138000000000000101246060')
+        );
+        $this->assertSame(FlexibleDate::PRECISION_YEAR, FlexibleDate::precisionFromValue('-138000000000000101246060'));
+        $this->assertSame('13800000000000 BC', FlexibleDate::formatBound('-138000000000000101246060', null));
+    }
+
     public function testParseBc(): void
     {
         // BC dates store an inverted clock so numeric order = chronological.

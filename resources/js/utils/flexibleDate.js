@@ -256,10 +256,30 @@ export class FlexibleDate {
             mi = 59 - mi
             s = 59 - s
         }
+        // Guard against malformed legacy canonicals (e.g. a huge BC year stored
+        // with an invalid 24:60:60 tail): clamp out-of-range parts so the
+        // display never renders negative/huge time values.
+        if (m < 1 || m > 12) m = 1
+        if (d < 1 || d > 31) d = 1
+        if (h < 0 || h > 23) h = 0
+        if (mi < 0 || mi > 59) mi = 0
+        if (s < 0 || s > 59) s = 0
         return {
             y: bc ? -year : year,
             m, d, h, mi, s,
         }
+    }
+
+    // Re-encode a stored canonical into its canonical padded form, fixing any
+    // malformed parts (e.g. a huge BC year stored with an invalid 24:60:60
+    // tail). Returns the corrected value, or the input unchanged if already
+    // canonical / unparseable. Idempotent.
+    static sanitizeCanonical(value) {
+        if (value === null || value === undefined || value === '') return value
+        const c = FlexibleDate.componentsFromCanonical(value)
+        if (!c) return value
+        const reencoded = canonicalFromComponents(c.y, c.m, c.d, c.h, c.mi, c.s, Era.GREGORIAN)
+        return reencoded ?? value
     }
 
     static precisionFromValue(value) {
@@ -280,6 +300,12 @@ export class FlexibleDate {
             let mi = parseInt(tail.slice(6, 8), 10)
             let s = parseInt(tail.slice(8, 10), 10)
             if (bc) { h = 23 - h; mi = 59 - mi; s = 59 - s }
+            // Malformed legacy values (invalid time parts) infer as coarser.
+            if (m < 1 || m > 12) m = 1
+            if (d < 1 || d > 31) d = 1
+            if (h < 0 || h > 23) h = 0
+            if (mi < 0 || mi > 59) mi = 0
+            if (s < 0 || s > 59) s = 0
             if (s !== 0) return PRECISION_SECOND
             if (mi !== 0 || h !== 0) return PRECISION_MINUTE
             if (d !== 1) return PRECISION_DAY
@@ -621,6 +647,17 @@ function parseDateComponents(text) {
         const sign = m[1].startsWith('-') ? '-' : ''
         const digits = m[1].replace(/^-/, '')
         if (digits.length < 1 || digits.length > 14) return null
+        // A 5–14-digit string that does not read as a valid YYYYMMDD… pattern is
+        // a huge year (e.g. "13800000000000" = 13.8 trillion BC), NOT a 4-digit
+        // year followed by time groups. Years with > 4 digits are year-precision.
+        if (digits.length > 4) {
+            const mo = parseInt(digits.slice(4, 6), 10)
+            const day = digits.length > 6 ? parseInt(digits.slice(6, 8), 10) : 1
+            const validYmd = (mo >= 1 && mo <= 12) && (day >= 1 && day <= 31)
+            if (!validYmd) {
+                return { y: parseInt(sign + digits, 10), m: 1, d: 1, h: 0, mi: 0, s: 0, precision: PRECISION_YEAR }
+            }
+        }
         const parts = splitDigitDate(digits)
         return { y: parseInt(sign + parts.y, 10), m: parseInt(parts.mo, 10), d: parseInt(parts.d, 10), h: parseInt(parts.h, 10), mi: parseInt(parts.mi, 10), s: parseInt(parts.s, 10), precision: parts.precision }
     }

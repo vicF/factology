@@ -81,6 +81,23 @@ describe('FlexibleDate.parse', () => {
         expect(FlexibleDate.parse('2026 08').precision).toBe('month')
     })
 
+    test('huge-digit years and malformed canonicals', () => {
+        // A pure digit string that is not a valid YYYYMMDD… pattern is a huge
+        // year (year precision), not a 4-digit year plus time groups.
+        expect(FlexibleDate.parse('-13800000000000').value).toBe('-138000000000000101235959')
+        expect(FlexibleDate.parse('-13800000000000').precision).toBe('year')
+        expect(FlexibleDate.parse('13800000000000').value).toBe('138000000000000101000000')
+        expect(FlexibleDate.parse('13800000000000').precision).toBe('year')
+
+        // Malformed legacy canonicals (invalid 24:60:60 BC tail) display
+        // robustly instead of rendering garbage.
+        expect(FlexibleDate.componentsFromCanonical('-138000000000000101246060')).toEqual({
+            y: -13800000000000, m: 1, d: 1, h: 0, mi: 0, s: 0,
+        })
+        expect(FlexibleDate.precisionFromValue('-138000000000000101246060')).toBe('year')
+        expect(FlexibleDate.formatBound('-138000000000000101246060', null)).toBe('13800000000000 BC')
+    })
+
     test('BC dates', () => {
         expect(FlexibleDate.parse('-1500').value).toBe('-15000101235959')
         expect(FlexibleDate.parse('1500 до н.э.').value).toBe('-15000101235959')

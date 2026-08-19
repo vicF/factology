@@ -419,6 +419,20 @@ class FlexibleDate
             if ($len < 1 || $len > 14) {
                 return null;
             }
+            // A 5–14-digit string that does not read as a valid YYYYMMDD… pattern
+            // is a huge year (e.g. "13800000000000" = 13.8 trillion BC), NOT a
+            // 4-digit year followed by time groups. Huge years are year-precision.
+            if ($len > 4) {
+                $mo = (int) substr($digits, 4, 2);
+                $day = $len > 6 ? (int) substr($digits, 6, 2) : 1;
+                if ($mo < 1 || $mo > 12 || $day < 1 || $day > 31) {
+                    $precision = self::PRECISION_YEAR;
+                    return [
+                        'y' => (int) ($sign . $digits), 'm' => 1, 'd' => 1,
+                        'h' => 0, 'mi' => 0, 's' => 0,
+                    ];
+                }
+            }
             $parts = self::splitDigitDate($digits);
             $precision = $parts['precision'];
             return [
@@ -495,6 +509,12 @@ class FlexibleDate
                 $mi = 59 - $mi;
                 $s = 59 - $s;
             }
+            // Malformed legacy values (invalid time parts) infer as coarser.
+            if ($m < 1 || $m > 12) { $m = 1; }
+            if ($d < 1 || $d > 31) { $d = 1; }
+            if ($h < 0 || $h > 23) { $h = 0; }
+            if ($mi < 0 || $mi > 59) { $mi = 0; }
+            if ($s < 0 || $s > 59) { $s = 0; }
             if ($s !== 0) {
                 return self::PRECISION_SECOND;
             }
@@ -568,6 +588,8 @@ class FlexibleDate
             $yearLen = strlen($digits) - 10;
             $year = (int) substr($digits, 0, $yearLen);
             $rest = substr($digits, -10);
+            $m = (int) substr($rest, 0, 2);
+            $d = (int) substr($rest, 2, 2);
             $h = (int) substr($rest, 4, 2);
             $mi = (int) substr($rest, 6, 2);
             $s = (int) substr($rest, 8, 2);
@@ -576,10 +598,16 @@ class FlexibleDate
                 $mi = 59 - $mi;
                 $s = 59 - $s;
             }
+            // Guard against malformed legacy canonicals (e.g. a huge BC year
+            // stored with an invalid 24:60:60 tail): clamp out-of-range parts.
+            if ($m < 1 || $m > 12) { $m = 1; }
+            if ($d < 1 || $d > 31) { $d = 1; }
+            if ($h < 0 || $h > 23) { $h = 0; }
+            if ($mi < 0 || $mi > 59) { $mi = 0; }
+            if ($s < 0 || $s > 59) { $s = 0; }
             return [
                 'y' => $bc ? -$year : $year,
-                'm' => (int) substr($rest, 0, 2),
-                'd' => (int) substr($rest, 2, 2),
+                'm' => $m, 'd' => $d,
                 'h' => $h, 'mi' => $mi, 's' => $s,
             ];
         }
@@ -587,6 +615,8 @@ class FlexibleDate
         // 4-digit year followed by 2-digit groups. None should remain after
         // the backfill migration; kept as a defensive fallback.
         $parts = self::splitDigitDate($digits);
+        $m = (int) $parts['mo'];
+        $d = (int) $parts['d'];
         $h = (int) $parts['h'];
         $mi = (int) $parts['mi'];
         $s = (int) $parts['s'];
@@ -595,12 +625,35 @@ class FlexibleDate
             $mi = 59 - $mi;
             $s = 59 - $s;
         }
+        if ($m < 1 || $m > 12) { $m = 1; }
+        if ($d < 1 || $d > 31) { $d = 1; }
+        if ($h < 0 || $h > 23) { $h = 0; }
+        if ($mi < 0 || $mi > 59) { $mi = 0; }
+        if ($s < 0 || $s > 59) { $s = 0; }
         return [
             'y' => (int) ($bc ? '-' . $parts['y'] : $parts['y']),
-            'm' => (int) $parts['mo'],
-            'd' => (int) $parts['d'],
+            'm' => $m, 'd' => $d,
             'h' => $h, 'mi' => $mi, 's' => $s,
         ];
+    }
+
+    /**
+     * Re-encode a stored canonical into its canonical padded form, fixing any
+     * malformed parts (e.g. a huge BC year stored with an invalid 24:60:60
+     * tail). Returns the corrected value, or the input unchanged if already
+     * canonical / unparseable. Idempotent.
+     */
+    public static function sanitizeCanonical(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        $c = self::componentsFromCanonical($value);
+        if ($c === null) {
+            return $value;
+        }
+        $reencoded = self::canonicalFromComponents($c['y'], $c['m'], $c['d'], $c['h'], $c['mi'], $c['s'], Era::GREGORIAN);
+        return $reencoded ?? $value;
     }
 
     // ─── Bounds → start/end columns + meta ───
