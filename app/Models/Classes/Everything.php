@@ -812,6 +812,7 @@ class Everything
 
     public function updateLink($link): int
     {
+        $this->assertParentKindConsistent($link);
         $this->setLinkTranslation($link);
         return DB::table('links')
             ->where('link_id', $link['link_id'])
@@ -840,6 +841,8 @@ class Everything
             && DB::table('things')->where('thing_id', $link['link_type_id'])->value('abstract')) {
             throw new InvalidArgumentException("Link type {$link['link_type_id']} is abstract and cannot be used to create a link");
         }
+
+        $this->assertParentKindConsistent($link);
 
         // Check if link already exists by unique constraint — the endpoint pair
         // is matched in EITHER direction, so adding the reverse of an existing
@@ -875,6 +878,50 @@ class Everything
             'other_thing_id'=> $link['other_thing_id'],
             'translation'   => $link['translation'],
         ]);
+    }
+
+    /**
+     * The class hierarchy (under Everything/Something) and the link taxonomy
+     * (under Link) are two separate trees. A "is a superclass of" edge may only
+     * connect nodes of the same kind — a class/thing cannot hang under a link
+     * type, and a link type cannot hang under a class. The only exceptions are
+     * the structural roots that host the other kind by design (Everything hosts
+     * the Link taxonomy root; System hosts system-internal link types).
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertParentKindConsistent(array $link): void
+    {
+        if (($link['link_type_id'] ?? null) !== UUID::LINK_TO_PARENT) {
+            return;
+        }
+        $parentId = $link['one_thing_id'] ?? null;
+        $childId  = $link['other_thing_id'] ?? null;
+        if (empty($parentId) || empty($childId)) {
+            return; // partial link — normalized by the caller
+        }
+
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return; // an endpoint is not in the DB yet — let the insert fail naturally
+        }
+
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return; // same kind — fine
+        }
+        if (in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true)) {
+            return; // structural roots may host the other kind
+        }
+
+        $kind = fn (bool $isLink) => $isLink ? 'link type' : 'class';
+        throw new InvalidArgumentException(
+            "Cannot set a {$kind($parentIsLink)} as the parent of a {$kind($childIsLink)} — "
+            . 'classes and link types form separate trees.'
+        );
     }
 
     public function setAsChildOf($parentClass): bool

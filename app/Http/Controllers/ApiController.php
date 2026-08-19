@@ -275,6 +275,18 @@ class ApiController extends BaseController
                 'errors'  => ['link_type_id' => 'This link type is abstract and only groups its children.'],
             ], 422);
         }
+        // Classes and link types form two separate trees — a "is a superclass of"
+        // edge may only connect same-kind endpoints (except the structural roots).
+        if (($data['link_type_id'] ?? null) === UUID::LINK_TO_PARENT
+            && !empty($data['one_thing_id'])
+            && !empty($data['other_thing_id'])
+            && !$this->isParentKindConsistent($data['one_thing_id'], $data['other_thing_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Classes and link types form separate trees — the parent must be of the same kind as the child.',
+                'errors'  => ['other_thing_id' => 'Cannot set a class/link-type of the other kind as the parent.'],
+            ], 422);
+        }
         if(!empty($data['link_id'])) {
             DB::table('links')
                 ->where('link_id', $data['link_id'])
@@ -324,6 +336,28 @@ class ApiController extends BaseController
                 'data'    => $data,
                 'success' => true
             ]);
+    }
+
+    /**
+     * Whether a "is a superclass of" edge between $parentId and $childId keeps
+     * the class/link-tree invariant: both endpoints must be the same kind (both
+     * link types or both non-link), unless the parent is a structural root that
+     * hosts the other kind by design (Everything → Link, System → system links).
+     */
+    private function isParentKindConsistent(string $parentId, string $childId): bool
+    {
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return true; // an endpoint is not in the DB yet — don't pre-empt a later failure
+        }
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return true;
+        }
+        return in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true);
     }
 
     /**

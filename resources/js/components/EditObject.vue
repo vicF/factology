@@ -31,13 +31,15 @@
                                 />
                             </div>
 
-                            <!-- Parent field for Class type (type 2) -->
-                            <div class="mb-3" v-if="formData.type === 2">
+                            <!-- Parent field for Class (2) and Link type (4) — classes
+                                 pick class parents, link types pick link-type parents -->
+                            <div class="mb-3" v-if="formData.type === CLASS_TYPE || formData.type === LINK_TYPE">
                                 <LinkedObject
                                     :link="parentLinkData"
                                     :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
                                     :index="0"
                                     :singleField="true"
+                                    :objectType="formData.type"
                                     :fixedLinkTypeUuid="LINK_TO_PARENT"
                                     :targetLabel="$t('Parent')"
                                     @update="handleParentLinkUpdate"

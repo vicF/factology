@@ -404,6 +404,59 @@ class ApiTest extends TestCase
         $this->assertSame('is related to', $related['category_name'] ?? null);
     }
 
+    public function testParentLinkKindConsistencyIsEnforced(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $classId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Class',
+            'type' => UUID::G_CLASS,
+        ]);
+        $linkTypeId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Link',
+            'type' => UUID::G_LINK,
+        ]);
+
+        $linkUri = '/api/v1/link';
+        $kinship = 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde'; // abstract Kinship base (link kind)
+
+        // 1. A class may not hang under a link type.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $classId,
+        ])->assertStatus(422);
+
+        // 2. A link type may not hang under a plain class.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(422);
+
+        // 3. Same-kind edges still work: a link type under a link-type parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+
+        // 4. And a class under a class parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $classId,
+        ])->assertStatus(200);
+
+        // 5. Structural-root exception: a link type under System stays allowed.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SYSTEM,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();

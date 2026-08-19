@@ -186,6 +186,13 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    // Include abstract grouping containers (e.g. taxonomy bases like Kinship)
+    // in search results — used by parent pickers, where abstract bases are
+    // valid parents for link types.
+    includeAbstract: {
+        type: Boolean,
+        default: false,
+    },
     // Show a clear (×) button when a value is selected. Optional filters
     // (e.g. owner/server in the search panel) enable this; required fields
     // that must always have an object selected leave it off.
@@ -526,6 +533,7 @@ function debouncedSearch(val) {
         if (props.type >= 2 && props.type <= 5) type.push(props.type)
         const body = { search: searchTerm, type, classes: [] }
         if (props.filterType) body.filter_type = props.filterType
+        if (props.includeAbstract) body.include_abstract = true
         axios.post('/object', body)
             .then(response => {
                 if (searchText.value !== searchTerm) return

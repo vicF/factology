@@ -113,7 +113,8 @@
                 v-model="link.other_thing_id"
                 :isEditable="true"
                 :label="targetLabel"
-                :type="CLASS_TYPE"
+                :type="parentTargetType"
+                :includeAbstract="props.objectType === LINK_TYPE"
                 :contextObjectType="contextObjectType"
                 :contextLinkTypeId="contextLinkTypeId"
                 :contextOneThingId="contextOneThingId"
@@ -162,6 +163,10 @@ const effectiveObjectType = computed(() => {
     if (props.currentObject?.type === CLASS_TYPE) return CLASS_TYPE;
     return THING_TYPE;
 });
+
+// Kind of the target picker for the single-field (parent) mode: classes pick
+// class parents, link types pick link-type parents.
+const parentTargetType = computed(() => props.objectType || CLASS_TYPE);
 
 const contextObjectType = computed(() => {
     return effectiveObjectType.value;
