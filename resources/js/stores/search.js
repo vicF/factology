@@ -9,7 +9,7 @@ export const useSearchStore = defineStore('search', () => {
     const typeClass = ref(false);
 
     // Extended filter state
-    const sortBy = ref('updated');
+    const sortBy = ref('start');
     const sortOrder = ref('desc');
     const visibility = ref('all');
     const dateFrom = ref(null);
@@ -62,7 +62,7 @@ export const useSearchStore = defineStore('search', () => {
     }
 
     function resetFilters() {
-        sortBy.value = 'updated';
+        sortBy.value = 'start';
         sortOrder.value = 'desc';
         visibility.value = 'all';
         dateFrom.value = null;
@@ -77,7 +77,7 @@ export const useSearchStore = defineStore('search', () => {
 
     function getFilterParams() {
         const params = {};
-        if (sortBy.value !== 'updated') params.sort_by = sortBy.value;
+        if (sortBy.value !== 'start') params.sort_by = sortBy.value;
         if (sortOrder.value !== 'desc') params.sort_order = sortOrder.value;
         if (visibility.value !== 'all') params.visibility = visibility.value;
         if (dateFrom.value) params.date_from = dateFrom.value;

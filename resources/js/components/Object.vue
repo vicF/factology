@@ -109,11 +109,7 @@
                                         <div v-if="object.start || object.end || object.description" class="result-description">
                                             <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
                                                 <span class="date-badge">
-                                                    📅
-                                                    <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
-                                                    <template v-if="object.start && object.end"> → </template>
-                                                    <template v-else-if="object.end">{{ $t('until') }} </template>
-                                                    <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
+                                                    📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
@@ -165,9 +161,9 @@
 
                                         <div class="result-info-section">
                                             <div class="result-header">
-                                                <div class="result-title" v-if="link.name">
+                                                <div class="result-title" v-if="getLinkTargetName(link)">
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
-                                                        {{ link.name }}
+                                                        {{ getLinkTargetName(link) }}
                                                     </RouterLink>
                                                     <IconPrivate v-if="authenticated && !link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
                                                     <IconPublic v-if="authenticated && link.target_public && hoveredLink === linkIndex" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
@@ -187,11 +183,10 @@
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
-                                                <span v-if="link.link_start" class="result-meta-row">
-                                                    {{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}
-                                                </span>
-                                                <span v-if="link.link_end" class="result-meta-row">
-                                                    {{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}
+                                                <span class="result-meta-row">
+                                                    <span class="date-badge">
+                                                        📅 {{ $flexibleDateFormat(link.link_start, link.link_end, link.link_start_meta, link.link_end_meta) }}
+                                                    </span>
                                                 </span>
                                             </div>
 
@@ -386,14 +381,14 @@ const doToggle = (thingId, makePublic, onSuccess) => {
         return;
     }
     if (makePublic) {
-        confirmTitle.value = 'Make Public';
-        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
-        confirmButtonText.value = 'Make Public';
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
-        confirmButtonText.value = 'Make Private';
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
     pendingToggle = { thingId, makePublic, onSuccess };
@@ -461,16 +456,34 @@ const canEdit = computed(() => {
     return !!uid && authStore.user?.thing_id === uid;
 });
 
-// Delete stays owner-only in both UI and backend (the DELETE endpoint has no
-// admin override).
+// Delete follows the same rule as edit: admins may delete any object,
+// everyone else only their own (the DELETE endpoint enforces this too).
 const canDelete = computed(() => {
+    if (!authenticated.value) return false;
+    if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return authenticated.value && !!uid && authStore.user?.thing_id === uid;
+    return !!uid && authStore.user?.thing_id === uid;
 });
+
+// True when the viewed object belongs to a different account than the current
+// user. Editing/deleting such an object is an admin-only power for now, and the
+// UI warns about it — the check is written generically so it will also cover
+// future non-owner edit permissions.
+const isOtherOwnerObject = computed(() =>
+    authenticated.value && object.value?.owner &&
+    object.value.owner !== authStore.user?.thing_id
+);
 
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;
     return link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id;
+};
+
+// The API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one that matches the target.
+const getLinkTargetName = (link) => {
+    const targetId = getLinkTargetId(link);
+    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
 };
 
 const getObject = async () => {
@@ -547,7 +560,10 @@ const openCreateLinkModal = () => {
 
 const deleteObject = async () => {
     if (!object.value) return;
-    if (!confirm(t('Are you sure you want to delete this object?'))) return;
+    const confirmMessage = canDelete.value && isOtherOwnerObject.value
+        ? `${t('You are going to delete the object that belongs to {owner}.', { owner: object.value.owner_name || t('another user') })} ${t('Are you sure you want to delete this object?')}`
+        : t('Are you sure you want to delete this object?');
+    if (!confirm(confirmMessage)) return;
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
         if (object.value.type === 2) {
@@ -596,6 +612,8 @@ const updateLink = async (linkData) => {
             translation: linkData.translation,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
             link_id: linkData.link_id
         };
         if (linkData.link_id) {
@@ -619,6 +637,8 @@ const createLink = async (linkData) => {
             translation: linkData.translation,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
         };
         await axios.post(`/link`, payload);
         await getObject();
@@ -656,6 +676,16 @@ const linkRecords = computed(() => {
         link_type_id: link.link_type_id,
         description: link.translation || '',
         link_id: link.link_id,
+        // Flexible-date columns (canonical strings + jsonb meta) so the
+        // edit-modal link rows can edit them.
+        link_start: link.link_start || null,
+        link_end: link.link_end || null,
+        link_start_meta: link.link_start_meta || null,
+        link_end_meta: link.link_end_meta || null,
+        // Endpoint names from the API (name = other_thing_id, one_name = one_thing_id)
+        // so the edit-modal preview resolves immediately.
+        name: link.name || null,
+        one_name: link.one_name || null,
     }));
 });
 

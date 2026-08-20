@@ -17,6 +17,12 @@
                     </div>
                     <div class="modal-body">
                         <form @submit.prevent="submitForm">
+                            <!-- Warning when editing another user's object -->
+                            <div v-if="isEditMode && isOtherOwnerObject" class="alert alert-warning mb-3" role="alert">
+                                <i class="bi bi-person-exclamation me-1"></i>
+                                {{ $t('You are editing an object that belongs to {owner}.', { owner: (object.owner_name || $t('another user')) }) }}
+                            </div>
+
                             <!-- Class field for Thing type (type 3) -->
                             <div class="mb-3" v-if="formData.type === 3">
                                 <LinkedObject
@@ -132,19 +138,28 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <DateField
-                                    fieldName="start"
-                                    v-model="formData.start"
+                                <FlexibleDateField
+                                    side="start"
+                                    :start="formData.start"
+                                    :end="formData.end"
+                                    :startMeta="formData.start_meta"
+                                    :endMeta="formData.end_meta"
                                     :isEditable="true"
                                     :label="$t('Start')"
+                                    @update:value="applyStartDate"
                                 />
                             </div>
                             <div class="mb-3">
-                                <DateField
-                                    fieldName="end"
-                                    v-model="formData.end"
+                                <FlexibleDateField
+                                    side="end"
+                                    :start="formData.start"
+                                    :end="formData.end"
+                                    :startMeta="formData.start_meta"
+                                    :endMeta="formData.end_meta"
                                     :isEditable="true"
                                     :label="$t('End')"
+                                    :disabled="startSpansDates"
+                                    @update:value="applyEndDate"
                                 />
                             </div>
 
@@ -173,7 +188,7 @@
                                 </label>
                                 <select id="ownerSelect" class="form-select" v-model="formData.owner">
                                     <option value="">—</option>
-                                    <option :value="UUID.SYSTEM_OWNER">System Owner</option>
+                                    <option :value="UUID.SYSTEM_OWNER">{{ $t('System Owner') }}</option>
                                     <option v-for="o in ownerOptions" :key="o.thing_id" :value="o.thing_id">
                                         {{ o.name || o.thing_id }}
                                     </option>
@@ -184,13 +199,13 @@
                             </div>
 
                             <!-- Object type indicator -->
-                            <div v-if="formData.type == 1" class="mb-3">General</div>
-                            <div v-if="formData.type == CLASS_TYPE" class="mb-3">Class</div>
-                            <div v-else-if="formData.type == THING_TYPE" class="mb-3">Thing</div>
-                            <div v-else-if="formData.type == LINK_TYPE" class="mb-3">Link</div>
-                            <div v-else-if="formData.type == 5" class="mb-3">External</div>
-                            <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">Server</div>
-                            <div v-else class="mb-3">!Unknown type!</div>
+                            <div v-if="formData.type == 1" class="mb-3">{{ $t('Type General') }}</div>
+                            <div v-if="formData.type == CLASS_TYPE" class="mb-3">{{ $t('Type Class') }}</div>
+                            <div v-else-if="formData.type == THING_TYPE" class="mb-3">{{ $t('Type Thing') }}</div>
+                            <div v-else-if="formData.type == LINK_TYPE" class="mb-3">{{ $t('Type Link') }}</div>
+                            <div v-else-if="formData.type == 5" class="mb-3">{{ $t('Type External') }}</div>
+                            <div v-else-if="formData.type == SERVER_TYPE" class="mb-3">{{ $t('Type Server') }}</div>
+                            <div v-else class="mb-3">{{ $t('Unknown type') }}</div>
 
                             <!-- Top action row: all links sit between this and the bottom row -->
                             <div
@@ -225,11 +240,20 @@
                                 :key="item.id"
                                 :ref="(el) => setLinkedObjectRef(idx, el)"
                                 :link="{
-                                    one_thing_id: formData.thing_id,
+                                    // Keep the link's stored direction — forcing one_thing_id
+                                    // to the current object made incoming links (where the
+                                    // current object is other_thing_id) render as self-links.
+                                    one_thing_id: item.one_thing_id || formData.thing_id,
                                     other_thing_id: item.other_thing_id,
                                     link_type_id: item.link_type_id,
                                     translation: item.translation,
-                                    link_id: item.link_id
+                                    link_id: item.link_id,
+                                    link_start: item.link_start,
+                                    link_end: item.link_end,
+                                    link_start_meta: item.link_start_meta,
+                                    link_end_meta: item.link_end_meta,
+                                    name: item.name,
+                                    one_name: item.one_name
                                 }"
                                 :currentObject="{
                                     thing_id: formData.thing_id,
@@ -237,7 +261,7 @@
                                 }"
                                 :index="idx"
                                 :objectType="formData.type === CLASS_TYPE ? CLASS_TYPE : THING_TYPE"
-                                :lockFirstObject="item.one_thing_id === formData.thing_id"
+                                :lockFirstObject="true"
                                 :currentObjectUnsaved="!isEditMode"
                                 @update="updateItem"
                                 @remove="removeItem"
@@ -298,7 +322,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">{{ $t('Unsaved Changes') }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" :aria-label="$t('Close')"></button>
                     </div>
                     <div class="modal-body">
                         <p>{{ $t('You have unsaved changes. Are you sure you want to close?') }}</p>
@@ -316,7 +340,7 @@
         </div>
         <!-- Error modal -->
         <ErrorModal
-            title="Save Failed"
+            :title="$t('Save Failed')"
             :message="errorMessage"
             :details="errorDetails"
             :show="showError"
@@ -335,7 +359,7 @@ import { useI18n } from 'vue-i18n';
 
 // CRITICAL: These component imports are required - DO NOT REMOVE
 import TextField from './Fields/TextField.vue';
-import DateField from './Fields/DateField.vue';
+import FlexibleDateField from './Fields/FlexibleDateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
@@ -358,7 +382,12 @@ const props = defineProps({
     params: { type: Object, default: () => ({}) },
     title: { type: String, default: '' },
     initialLinkedObjects: { type: Array, default: () => [] },
-    callback: { type: Object, default: null }
+    callback: { type: Object, default: null },
+    // When several create modals are stacked (link-row "Create" while another
+    // modal is open), only the top one is visible. A modal that becomes
+    // inactive is hidden without the unsaved-changes prompt — its form state
+    // stays mounted so it can be shown again later.
+    active: { type: Boolean, default: true },
 });
 
 // Emits definition
@@ -371,6 +400,13 @@ const router = useRouter();
 // Computed
 const isEditMode = computed(() => !!props.object);
 
+// True when the object being edited belongs to a different account than the
+// current user — warns inside the modal (not on the view page).
+const isOtherOwnerObject = computed(() =>
+    isEditMode.value && props.object?.owner &&
+    props.object.owner !== authStore.user?.thing_id
+);
+
 // Refs
 const formData = ref({
     thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
@@ -378,6 +414,8 @@ const formData = ref({
     description: '', // current-locale text (filled by initLocalization)
     start: isEditMode.value ? props.object.start || '' : '',
     end: isEditMode.value ? props.object.end || '' : '',
+    start_meta: isEditMode.value ? (props.object.start_meta || null) : null,
+    end_meta: isEditMode.value ? (props.object.end_meta || null) : null,
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
     type: props.params.type || 3,
     owner: isEditMode.value ? (props.object.owner || '') : '',
@@ -389,6 +427,28 @@ const formData = ref({
 // Owner options for the admin-only Owner select (from /search/options)
 const ownerOptions = ref([]);
 const isAdmin = computed(() => !!authStore.user?.is_admin);
+
+// ── Flexible date fields ──────────────────────────────────────────
+// The Start field owns both columns for spanning qualifiers
+// (between/alternatives/before occupy the end column too); the End
+// field is then disabled so the two can't collide.
+const startSpansDates = computed(() => {
+    const q = formData.value.start_meta?.qualifier;
+    return q === 'between' || q === 'alternatives' || q === 'before';
+});
+
+function applyStartDate({ start, end, meta }) {
+    formData.value.start = start || null;
+    formData.value.start_meta = meta || null;
+    if (end != null && end !== '') {
+        formData.value.end = end;
+    }
+}
+
+function applyEndDate({ start, end, meta }) {
+    formData.value.end = end || null;
+    formData.value.end_meta = meta || null;
+}
 
 const loadOwnerOptions = async () => {
     try {
@@ -597,6 +657,20 @@ if (!isEditMode.value && formData.value.thing_id && !cacheStore.hasCachedObject(
     }, formData.value.type);
 }
 
+// Keep the unsaved object's cache entry in sync with the live name, so links
+// whose other end is this object (e.g. after swapping direction) display the
+// typed name instead of the "New Object" placeholder.
+watch(() => formData.value.name, (name) => {
+    if (isEditMode.value || !formData.value.thing_id) return;
+    const cached = cacheStore.getCachedObject(formData.value.thing_id);
+    if (cached) {
+        cacheStore.cacheObject(formData.value.thing_id, {
+            ...cached,
+            name: name || 'New Object',
+        }, formData.value.type);
+    }
+});
+
 // Special links as full objects (same shape as regular links)
 const classLinkData = ref({
     one_thing_id: formData.value.thing_id,
@@ -625,6 +699,9 @@ let modalInstance = null;
 let confirmModalInstance = null;
 let isClosing = false;
 let isSubmitting = false;
+// Set while the modal is hidden because a stacked modal on top became active —
+// hides for this reason must not show the unsaved-changes prompt.
+let isForcedHide = false;
 
 // Unsaved changes tracking
 const originalFormData = ref({});
@@ -714,7 +791,13 @@ const initializeData = () => {
             other_thing_id: item.other_thing_id || '',
             link_type_id: item.link_type_id || '',
             translation: item.description || item.translation || '',
-            link_id: item.linkId || null,
+            link_id: item.linkId ?? item.link_id ?? null,
+            link_start: item.link_start || null,
+            link_end: item.link_end || null,
+            link_start_meta: item.link_start_meta || null,
+            link_end_meta: item.link_end_meta || null,
+            name: item.name || null,
+            one_name: item.one_name || null,
         };
 
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
@@ -794,6 +877,10 @@ const addNewLinkedObject = async () => {
         link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
         translation: '',
         link_id: null,
+        link_start: null,
+        link_end: null,
+        link_start_meta: null,
+        link_end_meta: null,
     });
     await nextTick();
     // Focus the second-object selector — the first one is fixed to the current
@@ -848,6 +935,9 @@ const handleHideModal = (event) => {
         event.stopPropagation();
         return;
     }
+    // A stacked modal becoming active hides this one — no unsaved-changes
+    // prompt for that; the form stays mounted underneath.
+    if (isForcedHide) return;
     if (hasUnsavedChanges.value && !isClosing && !isSubmitting) {
         event.preventDefault();
         event.stopPropagation();
@@ -860,6 +950,14 @@ const submitForm = async () => {
     try {
         isSubmitting = true;
 
+        const linkDateFields = (item) => {
+            const out = {};
+            for (const f of ['link_start', 'link_end', 'link_start_meta', 'link_end_meta']) {
+                if (item[f] != null && item[f] !== '') out[f] = item[f];
+            }
+            return out;
+        };
+
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
             .map(item => ({
@@ -871,6 +969,7 @@ const submitForm = async () => {
                 other_thing_id: item.other_thing_id,
                 description: item.translation || '',
                 public: 0,
+                ...linkDateFields(item),
             }));
 
         const namePayload = buildFieldPayload('name');
@@ -883,6 +982,8 @@ const submitForm = async () => {
             description_translations: descPayload.translations,
             start: formData.value.start || null,
             end: formData.value.end || null,
+            start_meta: formData.value.start_meta || null,
+            end_meta: formData.value.end_meta || null,
             public: formData.value.public,
             type: formData.value.type,
             data: formData.value.data,
@@ -926,6 +1027,7 @@ const submitForm = async () => {
                     other_thing_id: item.other_thing_id,
                     link_type_id: item.link_type_id,
                     translation: item.translation,
+                    ...linkDateFields(item),
                 }));
             if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;
 
@@ -1001,13 +1103,28 @@ onMounted(async () => {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
         modalElement.addEventListener('hidden.bs.modal', () => {
-            if (!isSubmitting) emit('close');
+            const wasForcedHide = isForcedHide;
+            isForcedHide = false;
+            if (!isSubmitting && !wasForcedHide) emit('close');
         });
         setTimeout(() => {
-            if (modalInstance && modalElement) modalInstance.show();
+            if (modalInstance && modalElement && props.active) modalInstance.show();
         }, 100);
     }
     if (confirmModalElement) confirmModalInstance = new Modal(confirmModalElement);
+});
+
+// Stacked create modals: hide this one (no prompt) when a modal above becomes
+// active, and re-show it when it becomes the top again.
+watch(() => props.active, (active) => {
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement || !modalInstance) return;
+    if (active) {
+        modalInstance.show();
+    } else {
+        isForcedHide = true;
+        modalInstance.hide();
+    }
 });
 
 onUnmounted(() => {

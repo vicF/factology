@@ -3,7 +3,7 @@
         <div v-if="!loaded" class="row">
             <div class="col text-center py-5">
                 <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">{{ $t('Loading...') }}</span>
                 </div>
             </div>
         </div>
@@ -12,14 +12,14 @@
             <div class="col-md-10 offset-md-1">
                 <div class="admin-toolbar d-flex gap-2 align-items-center">
                     <button class="btn btn-outline-secondary btn-sm" @click="exportData" :disabled="exporting">
-                        {{ exporting ? 'Exporting...' : 'Export' }}
+                        {{ exporting ? $t('Exporting...') : $t('Export') }}
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" @click="showImportModal = true">
-                        Import
+                        {{ $t('Import') }}
                     </button>
                     <label class="small text-muted mb-0 ms-2">
                         <input type="checkbox" v-model="includeDeleted" />
-                        Include deleted
+                        {{ $t('Include deleted') }}
                     </label>
                 </div>
             </div>
@@ -27,7 +27,7 @@
 
         <div v-if="loaded && objects.length === 0" class="row">
             <div class="col text-center py-5">
-                <p class="text-muted">No results found</p>
+                <p class="text-muted">{{ $t('No results found') }}</p>
             </div>
         </div>
         <div v-if="loaded && objects.length > 0" class="row">
@@ -40,6 +40,11 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
+                                <div v-if="groupLabels[thingIndex]" class="date-group-header">
+                                    <span class="date-group-line"></span>
+                                    <span class="date-group-label">{{ groupLabels[thingIndex] }}</span>
+                                    <span class="date-group-line"></span>
+                                </div>
                                 <div class="result-content">
                                     <!-- LEFT: icon only -->
                                     <div class="result-icon-section">
@@ -81,10 +86,7 @@
         <span v-if="thing.start || thing.end" class="inline-date" style="margin-right: 8px;">
 
                                                 📅
-                                                <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
-                                                <template v-if="thing.start && thing.end"> → </template>
-                                                <template v-else-if="thing.end">until </template>
-                                                <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
+                                                {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -112,7 +114,7 @@
                                                     <span class="link-arrow">→</span>
                                                     <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
                                                         <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(link.name || 'Related', 30) }}</span>
+                                                        <span class="link-name">{{ truncateText(getOtherThingName(link, thing.thing_id) || 'Related', 30) }}</span>
                                                     </RouterLink>
                                                 </div>
                                                 <div v-if="thing.links.length > 3" class="more-links">
@@ -123,7 +125,9 @@
                                     </div>
                                 </div>
 
-                                <div v-if="thingIndex < objects.length - 1" class="result-separator"></div>
+                                <!-- A group boundary already draws its own labeled
+                                     separator line — don't stack a plain one on it. -->
+                                <div v-if="thingIndex < objects.length - 1 && !groupLabels[thingIndex + 1]" class="result-separator"></div>
                             </div>
                         </div>
                     </div>
@@ -145,12 +149,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
+import { currentLocale } from '../utils/localized.js';
+import { FlexibleDate } from '../utils/flexibleDate.js';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
@@ -164,6 +171,7 @@ const props = defineProps({
 defineOptions({ name: "Search" });
 
 const route = useRoute();
+const { t } = useI18n();
 const searchStore = useSearchStore();
 const authStore = useAuthStore();
 
@@ -174,6 +182,47 @@ const processing = ref(false);
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+
+// ── Date-group delimiters (only meaningful when sorting by start date) ──────
+function dateGroupKey(start) {
+    if (!start) return null;
+    // Decode via the canonical components so huge years (variable-length year
+    // in the digit string) group under their real year, not its first 4 digits.
+    const c = FlexibleDate.componentsFromCanonical(String(start));
+    if (!c) return null;
+    if (FlexibleDate.precisionFromValue(String(start)) === 'year') return 'y' + c.y;
+    return 'm' + c.y + '-' + String(c.m).padStart(2, '0');
+}
+
+function dateGroupLabel(key) {
+    if (!key) return null;
+    if (key[0] === 'y') {
+        const y = Number(key.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = key.match(/^m(-?\d+)-(\d{2})$/);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const locale = currentLocale();
+    const label = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
+}
+
+// Header label aligned with each result row (null = no header before it).
+const groupLabels = computed(() => {
+    const labels = new Array(objects.value.length).fill(null);
+    if (searchStore.sortBy !== 'start') return labels;
+    let prevKey = null;
+    objects.value.forEach((thing, i) => {
+        const key = dateGroupKey(thing.start);
+        if (key !== prevKey) {
+            labels[i] = dateGroupLabel(key);
+            prevKey = key;
+        }
+    });
+    return labels;
+});
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 let quickMode = false;
@@ -200,14 +249,14 @@ const handleToggleVisibility = (thingId, thingIndex) => {
         return;
     }
     if (makePublic) {
-        confirmTitle.value = 'Make Public';
-        confirmMessage.value = 'Make this object visible to everyone? Anyone will be able to see it.';
-        confirmButtonText.value = 'Make Public';
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = 'Make Private';
-        confirmMessage.value = 'Make this object private? Only you will be able to see it.';
-        confirmButtonText.value = 'Make Private';
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
     pendingToggle = doToggle;
@@ -240,17 +289,17 @@ const getOtherThingId = (link, currentThingId) => {
     return thingId === currentThingId ? link.other_thing_id : thingId;
 };
 
+// API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one matching the target.
+const getOtherThingName = (link, currentThingId) => {
+    const targetId = getOtherThingId(link, currentThingId);
+    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+};
+
 const truncateText = (text, maxLength) => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
-};
-
-const formatDateShort = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
 };
 
 const exportData = async () => {
@@ -280,7 +329,13 @@ const exportData = async () => {
     }
 };
 
+// Monotonic id so an out-of-order response from an earlier request (e.g. the
+// mount-time search vs. the tree's late auto-selection) never overwrites newer
+// results.
+let searchRequestSeq = 0;
 const getObjects = async () => {
+    const requestId = ++searchRequestSeq;
+
     let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
@@ -320,6 +375,7 @@ const getObjects = async () => {
         }
 
         const response = await axios.post('/object', body);
+        if (requestId !== searchRequestSeq) return; // stale response
 
         validationErrors.value = {};
 
@@ -335,14 +391,17 @@ const getObjects = async () => {
             objects.value = response.data.things || response.data || [];
         }
     } catch (error) {
+        if (requestId !== searchRequestSeq) return; // stale error
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors || {};
         }
         objects.value = [];
     } finally {
-        processing.value = false;
-        loaded.value = true;
+        if (requestId === searchRequestSeq) {
+            processing.value = false;
+            loaded.value = true;
+        }
     }
 };
 
@@ -387,3 +446,26 @@ onUnmounted(() => {
     eventBus.off('trigger-search', triggerSearchHandler);
 });
 </script>
+
+<style scoped>
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+
+.date-group-label {
+    white-space: nowrap;
+}
+</style>

@@ -142,16 +142,16 @@ async function handleSearch(body) {
     }
 
     // Apply sorting (mirror server ApiController::search):
-    //   default sort_by=updated → _updatedAt, default order desc
+    //   default sort_by=start → start, default order desc
     const sortMap = {
         updated: '_updatedAt',
         created: '_createdAt',
         start: 'start',
         name: 'name',
     };
-    const sortBy = params.sort_by || 'updated';
+    const sortBy = params.sort_by || 'start';
     const sortDir = (params.sort_order || 'desc') === 'asc' ? 1 : -1;
-    const sortKey = sortMap[sortBy] || '_updatedAt';
+    const sortKey = sortMap[sortBy] || 'start';
     results.sort((a, b) => {
         const va = a[sortKey];
         const vb = b[sortKey];
@@ -424,16 +424,17 @@ async function enrichLinks(links, currentThingId) {
     }
 
     return links.map(link => {
-        // The "name" the UI shows is the link's opposite endpoint
-        const targetId = link.one_thing_id === currentThingId
-            ? link.other_thing_id
-            : link.one_thing_id;
-        const target = byId[targetId];
+        // Mirror the server LinkResource contract: `name` is the name of
+        // other_thing_id, `one_name` the name of one_thing_id — the UI picks
+        // the one matching the target endpoint.
+        const target = byId[link.other_thing_id];
+        const source = byId[link.one_thing_id];
         const linkType = byId[link.link_type_id];
 
         return {
             ...link,
             name: target?.name ?? link.name ?? null,
+            one_name: source?.name ?? link.one_name ?? null,
             link_name: linkType?.name ?? link.link_name ?? null,
             type: target?.type ?? link.type,
             target_public: target?.public ?? link.target_public,

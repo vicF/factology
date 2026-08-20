@@ -41,11 +41,14 @@ const COLUMN_TYPES = new Set([
     'foreignId', 'foreignIdCascade', 'uuidMorphs',
 ]);
 
-// Extract the column names declared inside the Blueprint closure of a
+// Extract the column names declared/removed inside the Blueprint closure of a
 // Schema::create('t') / Schema::table('t') block, scoped to `tableName`.
 // Uses a brace-depth scan so nested closures are handled correctly.
+// Returns { add: [...], drop: [...] } — callers apply these in migration order
+// to compute the cumulative final schema.
 function extractTableColumns(source, tableName) {
-    const cols = [];
+    const add = [];
+    const drop = [];
     const callRe = /\bSchema::(?:create|table)\(\s*['"]([^'"]+)['"]/g;
     let m;
     while ((m = callRe.exec(source)) !== null) {
@@ -74,10 +77,20 @@ function extractTableColumns(source, tableName) {
         const colRe = /\$table->([a-zA-Z_]+)\(\s*['"]([^'"]+)['"]/g;
         let cm;
         while ((cm = colRe.exec(block)) !== null) {
-            if (COLUMN_TYPES.has(cm[1])) cols.push(cm[2]);
+            if (COLUMN_TYPES.has(cm[1])) add.push(cm[2]);
+        }
+        // dropColumn targets (string or array form).
+        const dropRe = /\$table->dropColumn\(\s*\[([^\]]*)\]|dropColumn\(\s*['"]([^'"]+)['"]/g;
+        let dm;
+        while ((dm = dropRe.exec(block)) !== null) {
+            if (dm[1] !== undefined) {
+                for (const c of dm[1].matchAll(/['"]([^'"]+)['"]/g)) drop.push(c[1]);
+            } else if (dm[2] !== undefined) {
+                drop.push(dm[2]);
+            }
         }
     }
-    return cols;
+    return { add, drop };
 }
 
 describe.skipIf(!migrationsAvailable)('Local schema drift against server migrations', () => {
@@ -90,17 +103,23 @@ describe.skipIf(!migrationsAvailable)('Local schema drift against server migrati
         for (const [store, tables] of Object.entries(MIRRORED)) {
             const declared = new Set(schemaMap[store].columns);
             for (const table of tables) {
+                // Apply migrations in order: adds populate the set, drops remove
+                // columns again (e.g. legacy variety columns removed later).
+                const finalColumns = new Set();
                 for (const file of migrationFiles) {
                     const src = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
-                    for (const col of extractTableColumns(src, table)) {
-                        if (!declared.has(col)) {
-                            failures.push(
-                                `[${store}] table "${table}": column "${col}" defined in ` +
-                                `${file} is not declared in schemaMap.${store}.columns — ` +
-                                'add it to resources/js/localDb/schemaMap.js and handle it ' +
-                                'in the local store.'
-                            );
-                        }
+                    const { add, drop } = extractTableColumns(src, table);
+                    for (const col of add) finalColumns.add(col);
+                    for (const col of drop) finalColumns.delete(col);
+                }
+                for (const col of finalColumns) {
+                    if (!declared.has(col)) {
+                        failures.push(
+                            `[${store}] table "${table}": column "${col}" (final schema) ` +
+                            `is not declared in schemaMap.${store}.columns — ` +
+                            'add it to resources/js/localDb/schemaMap.js and handle it ' +
+                            'in the local store.'
+                        );
                     }
                 }
             }

@@ -7,7 +7,7 @@
             <div v-else class="placeholder" :style="placeholderStyle" v-html="identiconSvg" />
         </div>
         <div v-if="sideBar === 'right'" class="vertical-icon-bar">
-            <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="typeLabel">
+            <div v-if="shouldShowTypeLabel" class="icon-item type-icon" :class="typeBadgeClass" :title="$t(typeLabel)">
                 <IconClass v-if="type === 2" />
                 <IconLink v-else-if="type === 4" />
                 <IconThing v-else-if="type === 1" />
@@ -41,10 +41,10 @@ const imageError = ref(false)
 const currentImageIndex = ref(0)
 
 const typeLabel = computed(() => {
-    if (props.type === 2) return 'Class'
-    if (props.type === 4) return 'Link'
-    if (props.type === 1) return 'General'
-    if (props.type === 5) return 'External'
+    if (props.type === 2) return 'Type Class'
+    if (props.type === 4) return 'Type Link'
+    if (props.type === 1) return 'Type General'
+    if (props.type === 5) return 'Type External'
     return ''
 })
 

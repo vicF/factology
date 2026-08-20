@@ -37,9 +37,7 @@ class Thing extends Model
         'type',
         'description',
         'start',
-        'start_variety',
         'end',
-        'end_variety',
         'public',
         'owner',
         'server_uuid'];

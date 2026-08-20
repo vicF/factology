@@ -30,14 +30,6 @@ class AppServiceProvider extends ServiceProvider
             return "<?PHP echo \App\Models\Classes\Everything::getThumbPathById($varName); ?>";
         });
 
-        Blade::directive('start', static function ($varName) {
-            return "<?PHP echo \App\Models\Classes\Everything::echoDateWithVariety($varName); ?>";
-        });
-
-        Blade::directive('end', static function ($varName) {
-            return "<?PHP echo \App\Models\Classes\Everything::echoDateWithVariety($varName, 'end'); ?>";
-        });
-
         Blade::directive('edit', static function ($varName) {
             return '<?PHP
             if (Auth::check()) {

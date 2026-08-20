@@ -132,6 +132,12 @@ describe('EditObject', () => {
         expect(document.querySelectorAll('.linked-object').length).toBe(0)
         expect(formButtons().map(b => b.textContent.trim())).toEqual([
             'Add',
+            '🕒',
+            '?',
+            '📅',
+            '🕒',
+            '?',
+            '📅',
             'Add Link',
             'Add External Link',
             'Close',
@@ -277,6 +283,81 @@ describe('EditObject', () => {
                 public: 0,
             },
         ])
+    })
+
+    it('carries link start/end dates into the saved links_to_update payload', async () => {
+        const initialLinkedObjects = [{
+            link_id: 42,
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'other-object-id',
+            link_type_id: DEFAULT_LINK_TYPE,
+            description: '',
+            link_start: '20260811120000',
+            link_end: '20260811220000',
+            link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+            link_end_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+        }]
+        await mountEditObject({ object: { ...OBJECT }, initialLinkedObjects })
+        await flushPromises()
+
+        // The link row renders its start date field with the stored value.
+        const startInput = document.querySelector('.linked-object input[name="start"]')
+        expect(startInput).toBeTruthy()
+        expect(startInput.value.trim()).not.toBe('')
+
+        submitForm()
+        await flushPromises()
+
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const body = axios.put.mock.calls[0][1]
+        expect(body.links_to_update).toEqual([{
+            link_id: 42,
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'other-object-id',
+            link_type_id: DEFAULT_LINK_TYPE,
+            translation: '',
+            link_start: '20260811120000',
+            link_end: '20260811220000',
+            link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+            link_end_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
+        }])
+    })
+
+    it('enables Swap once a linked object is created into the empty slot', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const swapButton = () =>
+            [...document.querySelectorAll('.linked-object button')].find(b => b.textContent.trim() === 'Swap')
+        // Only one end is filled yet, so Swap is disabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(true)
+
+        // Clicking "Create" opens the create-object modal (App.vue stacks it on
+        // top of this one); a saved object comes back via the link-created event.
+        const createButton = [...document.querySelectorAll('.linked-object .flex-button')]
+            .find(b => b.textContent.includes('Create'))
+        createButton.click()
+        await nextTick()
+
+        const openCalls = eventBusMock.emit.mock.calls.filter(c => c[0] === 'open-create-modal')
+        expect(openCalls.length).toBe(1)
+        const payload = openCalls[0][1]
+        expect(payload.callback.type).toBe('link-created')
+
+        eventBusMock.emit('link-created', {
+            requestId: payload.callback.requestId,
+            newObjectId: NEW_OBJECT_ID,
+            newObjectName: 'Created Author',
+            index: 0,
+            linkTypeUuid: payload.callback.linkTypeUuid,
+            comment: '',
+        })
+        await flushPromises()
+
+        // Both ends are now filled → Swap becomes enabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(false)
     })
 
     it('saves external links added in the form', async () => {

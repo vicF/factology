@@ -8,6 +8,8 @@ use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
+use Fokin\Facts\Data\Era;
+use Fokin\Facts\Data\FlexibleDate;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ApiController extends BaseController
@@ -69,6 +72,20 @@ class ApiController extends BaseController
      */
     public function store(Request $request): \Illuminate\Http\JsonResponse
     {
+        // Normalize raw date values to canonical form BEFORE validation so the
+        // end>=start check compares chronologically-correct padded values
+        // (a raw '20260817' would otherwise sort below canonical '20260811120000'
+        // in bccomp) and no legacy-style unpadded digits re-enter the DB.
+        $normalizedDates = [];
+        foreach (['start', 'end'] as $dateField) {
+            $raw = $request->input($dateField);
+            if ($raw !== null && $raw !== '') {
+                $normalizedDates[$dateField] = self::normalizeDateField($raw);
+            }
+        }
+        if ($normalizedDates) {
+            $request->merge($normalizedDates);
+        }
         $validated = $request->validate([
             /**
              * UUID of the main object
@@ -92,7 +109,7 @@ class ApiController extends BaseController
              * Start date/time as numeric string: YYYYMMDDHHMMSS
              * @example 20260228111234
              */
-            'start' => ['nullable', 'string', 'regex:/^\d*$/'],
+            'start' => ['nullable', 'string', 'regex:/^-?\d*$/'],
 
             /**
              * End date/time as numeric string: YYYYMMDDHHMMSS
@@ -101,13 +118,33 @@ class ApiController extends BaseController
             'end' => [
                 'nullable',
                 'string',
-                'regex:/^\d*$/',
+                'regex:/^-?\d*$/',
                 function ($attribute, $value, $fail) use ($request) {
-                    if ($request->has('start') && $value < $request->start) {
+                    if ($request->has('start') && $request->start !== null && bccomp($value, $request->start) < 0) {
                         $fail('The end date must be after the start date.');
                     }
                 },
             ],
+
+            /**
+             * Flexible-date display metadata for the start/end bounds.
+             * Shape: { qualifier, era, precision, alternatives: [...], comment }.
+             */
+            'start_meta' => ['nullable', 'array'],
+            'start_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'start_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'start_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'start_meta.alternatives' => ['nullable', 'array'],
+            'start_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'start_meta.comment' => ['nullable', 'string', 'max:500'],
+
+            'end_meta' => ['nullable', 'array'],
+            'end_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'end_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'end_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'end_meta.alternatives' => ['nullable', 'array'],
+            'end_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'end_meta.comment' => ['nullable', 'string', 'max:500'],
 
             /**
              * Public flag (0 or 1)
@@ -255,6 +292,24 @@ class ApiController extends BaseController
     }
 
     /**
+     * Normalize a raw date digit string to its canonical padded form
+     * ('2026081112' → '20260811120000'). Canonical values (length ≥ 11:
+     * variable year + exactly 10-digit MMDDHHMMSS tail) pass through, so the
+     * flexible-date frontend (which always sends canonical values) is unaffected.
+     */
+    private static function normalizeDateField(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        if (strlen(ltrim($value, '-')) >= 11) {
+            return $value;
+        }
+        $parsed = FlexibleDate::parse($value);
+        return $parsed !== null && $parsed->value !== null ? $parsed->value : $value;
+    }
+
+    /**
      * Store link
      *
      * @param \Illuminate\Http\Request $request
@@ -263,6 +318,18 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
+        foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+            if (isset($data[$metaField]) && is_array($data[$metaField])) {
+                $data[$metaField] = json_encode($data[$metaField]);
+            }
+        }
+        // Normalize raw link date values to canonical form.
+        foreach (['link_start', 'link_end'] as $dateField) {
+            if (isset($data[$dateField]) && $data[$dateField] !== null && $data[$dateField] !== '') {
+                $data[$dateField] = self::normalizeDateField($data[$dateField]);
+            }
+        }
         // Abstract link types are grouping containers, never real relations.
         if (!empty($data['link_type_id'])
             && DB::table('things')->where('thing_id', $data['link_type_id'])->value('abstract')) {
@@ -388,7 +455,8 @@ class ApiController extends BaseController
     public function delete($id)
     {
         $existing = DB::table('things')->where('thing_id', $id)->first();
-        if (!$existing || $existing->owner !== auth()->user()->thing_id) {
+        // Admins may delete any object; everyone else only their own.
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to delete this record',
@@ -720,12 +788,18 @@ class ApiController extends BaseController
                     ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
             });
         }
-        // Date range filter
+        // Date range filter — interval-overlap semantics so flexible dates
+        // (before/after/between with open bounds) match correctly:
+        //   [thing.start, thing.end] ∩ [date_from, date_to] ≠ ∅
         if (!empty($requestBody['date_from'])) {
-            $query->where('start', '>=', $requestBody['date_from']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.end')->orWhere('things.end', '>=', $requestBody['date_from']);
+            });
         }
         if (!empty($requestBody['date_to'])) {
-            $query->where('start', '<=', $requestBody['date_to']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.start')->orWhere('things.start', '<=', $requestBody['date_to']);
+            });
         }
         // Owner filter — exact UUID match when possible, ILIKE fallback
         if (!empty($requestBody['owner'])) {
@@ -746,25 +820,40 @@ class ApiController extends BaseController
             'start'   => 'start',
             'name'    => 'name',
         ];
-        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
+        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'start'] ?? 'start';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        // When sorting by a date column, undated objects (NULL) must go last
+        // regardless of direction — Postgres would otherwise put them first on
+        // DESC. Column names come from the fixed map above, so this is safe.
+        // Plain numeric sort is chronologically correct for canonical values:
+        // value = year × 10^10 + MMDDHHMMSS tail, monotonic in the year for
+        // both positive and negative (BC) values. The backfill migration makes
+        // every stored start/end canonical, so no zero-extension is needed.
+        if ($sortCol === 'start') {
+            $query->orderByRaw('start ' . $sortDir . ' NULLS LAST');
+        } else {
+            $query->orderBy($sortCol, $sortDir);
+        }
         // groupBy(thing_id): the class filter (and favorites join) can match
         // an object through several links at once; group by the PK so each
         // object appears exactly once. (Postgres accepts selecting the other
         // columns because they are functionally dependent on the PK, and it
         // works even though things.data is plain `json`, which DISTINCT can't
         // dedupe.)
-        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
+        $data = $query->groupBy('things.thing_id')->limit(100)->get();
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
-                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
                     $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as one_side', function ($join) {
+                    $join->on('links.one_thing_id', '=', 'one_side.thing_id');
                 })
                 ->leftJoin('things as link_types', function ($join) {
                     $join->on('links.link_type_id', '=', 'link_types.thing_id');
