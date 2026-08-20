@@ -490,7 +490,7 @@ import FlexibleDateField from './Fields/FlexibleDateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
-import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
+import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TO_RELATED, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
 import { useObjectsStore } from '@/stores/objects';
@@ -1347,7 +1347,7 @@ const addNewLinkedObject = async () => {
         id: uuidv4(),
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
-        link_type_id: LINK_TO_CLASS,
+        link_type_id: LINK_TO_RELATED,
         translation: '',
         link_id: null,
         link_start: null,

@@ -17,6 +17,8 @@ export const SERVER_TYPE   = 6;
 
 export const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
 export const LINK_TO_CLASS = 'c217c185-742f-4a9f-8e69-acea2b4f5aea';
+// Generic default relation for new links (a plain link type, not a special one).
+export const LINK_TO_RELATED = '2da45f14-69c6-4d56-9f2f-809fda14abf5';
 export const SOMETHING = '3e15244c-a9e1-4a91-a0ca-1c65722a64df';
 export const EVENT = '0eed3b56-bdd6-47f0-9413-d9640a9dcafc';
 

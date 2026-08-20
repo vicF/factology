@@ -82,6 +82,7 @@ const EDIT_ID = 'existing-object-id'
 const NEW_OBJECT_ID = 'brand-new-object-id'
 const DEFAULT_LINK_TYPE = 'c217c185-742f-4a9f-8e69-acea2b4f5aea' // LINK_TO_CLASS (is of class)
 const REGULAR_LINK_TYPE = 'eca6d324-8ccd-45a1-b8ad-4a2f4bc72d08' // is a biological parent (a plain link type)
+const NEW_LINK_DEFAULT = '2da45f14-69c6-4d56-9f2f-809fda14abf5' // is related to — default for new link rows
 const OBJECT = { thing_id: EDIT_ID, name: 'Existing Object', type: 3 }
 
 // The whole modal is teleported to <body>, so query the rendered DOM directly.
@@ -268,7 +269,7 @@ describe('EditObject', () => {
         expect(body.links_to_add).toEqual([
             {
                 one_thing_id: 'other-object-id',
-                link_type_id: DEFAULT_LINK_TYPE,
+                link_type_id: NEW_LINK_DEFAULT,
                 other_thing_id: EDIT_ID,
                 description: '',
                 public: 0,
@@ -363,7 +364,7 @@ describe('EditObject', () => {
         expect(body.links_to_add).toEqual([
             {
                 one_thing_id: EDIT_ID,
-                link_type_id: DEFAULT_LINK_TYPE,
+                link_type_id: NEW_LINK_DEFAULT,
                 other_thing_id: NEW_OBJECT_ID,
                 description: '',
                 public: 0,
