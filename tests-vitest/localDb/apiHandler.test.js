@@ -52,7 +52,9 @@ describe('Local API link enrichment (mirrors server LinkResource)', () => {
             l.one_thing_id === UUID.SOMETHING,
         );
         expect(parentLink).toBeTruthy();
-        expect(parentLink.name).toBe('Something'); // opposite endpoint
+        // `name` = other_thing_id (Event), `one_name` = one_thing_id (Something).
+        // The Something endpoint is the target when viewing Event.
+        expect(parentLink.one_name).toBe('Something');
     });
 });
 
@@ -110,17 +112,15 @@ describe('Local API search sorting + class filter (mirrors server ApiController:
         await seedLocalDb();
     });
 
-    it('sorts by updated desc by default (new objects at the top)', async () => {
-        // Simulate a user-created object that is "newer" than the seed
+    it('sorts by start date desc by default (newest dates at the top)', async () => {
+        // Simulate a user-created object with a date newer than the seed
         const newId = 'aaaaaaaa-0000-4000-a000-0000000000aa';
         await handleLocalApiCall('post', `/object/${newId}`, JSON.stringify({
             name: 'Собака',
             type: UUID.G_CLASS,
             public: 1,
+            start: '20990101',
         }), CONTEXT);
-
-        // Force a newer timestamp so ordering is unambiguous
-        await getDb().objects.update(newId, { _updatedAt: Date.now() + 60000 });
 
         const res = await handleLocalApiCall('post', '/object', JSON.stringify({}));
         const things = res.data.things;

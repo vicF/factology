@@ -1,7 +1,7 @@
 {
     "version": 1,
     "scope": "system",
-    "exported_at": "2026-08-19T15:08:33+00:00",
+    "exported_at": "2026-08-20T10:49:15+00:00",
     "general_types": [
         {
             "id": 1,
@@ -50,7 +50,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "056b7935-a27f-48b3-bd56-b73c0c81db84",
@@ -72,7 +74,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "095c70ee-3e6a-4016-8dcd-d7b01710338a",
@@ -94,7 +98,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "0a1a2fe7-d4f7-4a85-8514-680cfd518bdb",
@@ -116,7 +122,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "0dc6915e-b92c-4834-b9a3-091273d0d334",
@@ -138,7 +146,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "0eed3b56-bdd6-47f0-9413-d9640a9dcafc",
@@ -160,7 +170,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "10349eba-510f-4739-9aff-ad22e0de0a8c",
@@ -182,7 +194,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "11544624-be5c-4cdc-8fe1-701c09391464",
@@ -204,7 +218,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee",
@@ -226,7 +242,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "16414472-da4b-427d-8886-b7c75d133750",
@@ -249,7 +267,9 @@
                     "ru": "Тождество, синонимия и дубликаты",
                     "lang": "en"
                 },
-                "abstract": true
+                "abstract": true,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "1858e752-8df2-43ef-86c3-0d3581e522a8",
@@ -272,7 +292,9 @@
                     "ru": "Временной порядок и одновременность",
                     "lang": "en"
                 },
-                "abstract": true
+                "abstract": true,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "1dcb897e-0f64-499f-b80d-2cac4a025ed4",
@@ -297,7 +319,9 @@
                     "ru": "Ссылка на место хранения файла",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "1e53a04c-15cf-49ba-9495-59d1d67500b6",
@@ -321,7 +345,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "1fdf78e0-aa61-4e52-bbed-4ce157da78ab",
@@ -343,7 +369,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "20408326-23ce-4382-b522-912aaa7b62d7",
@@ -365,7 +393,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "2067c7bf-0f6f-491d-af2b-10105db4e8cc",
@@ -387,7 +417,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "20f6b1ae-86de-4221-bf0c-995be2687405",
@@ -409,7 +441,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "259c83a7-1ec1-4a7c-ab9b-2ed953772633",
@@ -431,7 +465,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "26570302-457d-4282-a949-9a9917515de3",
@@ -453,7 +489,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "2922e0c4-e82b-45e3-b85a-17619d75c37f",
@@ -475,7 +513,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "298496fb-142b-4fc7-a844-7cb3fe9f9100",
@@ -497,7 +537,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "29cafd84-0fc9-4295-afcc-d73b9613e39f",
@@ -519,7 +561,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "2da45f14-69c6-4d56-9f2f-809fda14abf5",
@@ -541,7 +585,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "2f6ddb60-0cce-497b-bdbc-5e2234dad969",
@@ -566,7 +612,9 @@
                     "ru": "Женщина, вступившая в брак с отцом, но не являющаяся биологической матерью",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "3389e133-9141-42da-a5e6-1e17a4dbc247",
@@ -588,7 +636,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
@@ -611,7 +661,9 @@
                     "ru": "Объект является более общим классом/категорией (надклассом), чем связанный объект",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "36255438-6a10-4036-8df3-7894801b2759",
@@ -633,7 +685,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "3c7d2abc-3f31-4c73-bbbd-3e7b2e620630",
@@ -655,7 +709,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "3e15244c-a9e1-4a91-a0ca-1c65722a64df",
@@ -680,7 +736,9 @@
                     "ru": "Базовый класс",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "41211efa-61fd-422d-b07f-7041289bc8aa",
@@ -703,7 +761,9 @@
                     "ru": "Происходит позже по времени",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "48140ccc-d6c4-456b-bc2b-793778e74465",
@@ -727,7 +787,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4b22a805-f3e1-47b9-bb87-b7a9f6f68cc4",
@@ -749,7 +811,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
@@ -771,7 +835,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4c8ee41a-9912-4dff-8b44-7779a66e4fcf",
@@ -793,7 +859,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4cc9a0fd-1ac2-4bc2-9f10-4fac1f90f376",
@@ -815,7 +883,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4e3b5c5f-f347-42d9-9e93-3093b420d2f5",
@@ -837,7 +907,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4e544f1d-65e0-4452-b311-5639a9552e26",
@@ -859,7 +931,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4e605e49-3bbc-4bae-83fd-f1e7d7c76a77",
@@ -881,7 +955,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4ec0a490-9a24-491c-b0d7-c994d58fc468",
@@ -903,7 +979,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8",
@@ -925,7 +1003,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4eff773a-6bbd-410f-a668-681b41d69051",
@@ -947,7 +1027,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4f76b1b0-9de4-4c60-8e52-53fa429faabe",
@@ -969,7 +1051,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "4fdcbd06-3233-4dcc-8259-fd6150cce007",
@@ -991,7 +1075,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "52e2b5ce-562b-46eb-98b7-48703ed62a7e",
@@ -1013,7 +1099,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "5787ef00-3f6b-46fe-9e93-d32c9ebdeab4",
@@ -1035,7 +1123,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "5a0f67ea-a290-4ef6-9ac5-0e85d967c4f9",
@@ -1057,7 +1147,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "5a626fa7-b69f-4042-9556-374f10df0a2c",
@@ -1079,7 +1171,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "602f1b6b-1383-442b-908c-1a027d7a8010",
@@ -1101,7 +1195,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "6170d4e4-aab7-443b-baa1-f77dabc0e201",
@@ -1123,7 +1219,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "62e7ab56-4ebe-4002-a7f1-896e266b8078",
@@ -1145,7 +1243,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "634a0c5e-7a3e-4126-8d66-fb3acb23cadb",
@@ -1167,7 +1267,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "664e746e-8f37-4f80-ba78-734424eab2a6",
@@ -1189,7 +1291,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "69087526-c024-43a8-81bc-c067487e11bb",
@@ -1211,7 +1315,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "6a65dbf3-ad39-4446-8b8b-c0f539c1d53a",
@@ -1233,7 +1339,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf",
@@ -1255,7 +1363,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "70438955-8455-460b-b15e-aadf45d0c092",
@@ -1277,7 +1387,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "71e49073-503f-4faa-932d-68ab89662420",
@@ -1299,7 +1411,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "733112a1-9e87-47ee-8a86-81cc38e77a41",
@@ -1322,7 +1436,9 @@
                     "ru": "Отношения иерархии и классификации (надкласс-подкласс, экземпляр-класс)",
                     "lang": "en"
                 },
-                "abstract": true
+                "abstract": true,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "73482bbe-d377-4e01-9efb-de135916c94a",
@@ -1344,7 +1460,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "770b8c20-fb65-4896-9de6-21cecc03a332",
@@ -1366,7 +1484,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "79762fd7-e52d-4401-8010-fda9a7e81aa0",
@@ -1389,7 +1509,9 @@
                     "ru": "Отношения часть-целое и пространственное включение",
                     "lang": "en"
                 },
-                "abstract": true
+                "abstract": true,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "7bdf2d4a-5329-4603-9562-b5c656d45306",
@@ -1411,7 +1533,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "7c1d027d-43cc-4ce7-ab34-515c541b7248",
@@ -1433,7 +1557,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "7d548ec2-69e9-4329-b122-acb83cd83325",
@@ -1455,7 +1581,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "7faa08e2-d882-4aa2-af0c-28c7d381030a",
@@ -1477,7 +1605,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "81aa3a58-1a61-4a83-9046-6f5ec836a347",
@@ -1499,7 +1629,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "8355effc-a8af-4d4b-9cd2-f553d66fcaf3",
@@ -1521,7 +1653,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "860dd2fe-b70f-42b2-a446-20528245eeff",
@@ -1545,7 +1679,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "8617d9c3-94fb-4f75-a983-1d8ba0822b0d",
@@ -1567,7 +1703,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "8811c270-4285-4534-bb2a-c4da1ba850e4",
@@ -1589,7 +1727,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "89539d56-fea3-4349-a3f2-f4cff229f879",
@@ -1611,7 +1751,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "8ac2606d-d008-4588-8b9a-09a79ee5f44a",
@@ -1633,7 +1775,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "8c204a57-a9f7-4971-b4da-73a0b89c755f",
@@ -1655,7 +1799,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "90d97b01-ee65-4be5-ae27-fb9bec2aeedf",
@@ -1677,7 +1823,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "922cca80-a0ba-4a5e-8344-769f083f0e72",
@@ -1701,7 +1849,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "934efd3c-9781-4f2a-bd51-716a75cf5874",
@@ -1723,7 +1873,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "939cd822-9e23-450c-8c5e-c23f67cca792",
@@ -1745,7 +1897,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "960e0074-5945-4163-a9ba-576a09ced6da",
@@ -1767,7 +1921,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "97bcbb9c-31f6-4c3c-913c-dfa54bce03e4",
@@ -1789,7 +1945,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "9f7436db-6253-4718-aa61-b4676faa90c7",
@@ -1811,7 +1969,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "a2c12996-a579-4583-93c4-6adad5e61934",
@@ -1836,7 +1996,9 @@
                     "ru": "Состоит в родственной связи",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "a31e2319-d8e0-4e48-98c8-3f23d0a17d50",
@@ -1858,7 +2020,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "aa24b0c5-3b74-4d8e-8743-faa21fab4031",
@@ -1881,7 +2045,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "aaaaaaaa-0000-4000-a000-00000000000a",
@@ -1903,7 +2069,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ac598f55-78b4-41c9-aaa6-32fa6a93d939",
@@ -1925,7 +2093,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ad3f8571-9b56-40af-b9c0-8d375f3b1976",
@@ -1947,7 +2117,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ad4be260-0af0-4e7c-928e-a7177158e1d0",
@@ -1969,7 +2141,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "aea400ce-a2e4-4d56-a3ba-3ab1bdd30e7a",
@@ -1993,7 +2167,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "af6d4e0b-f452-442e-9fba-dcb60546b11d",
@@ -2015,7 +2191,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde",
@@ -2040,7 +2218,9 @@
                     "ru": "Семейные и родственные связи (родители, дети, супруги, родственники)",
                     "lang": "en"
                 },
-                "abstract": true
+                "abstract": true,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b1802974-4e1b-4ef5-9bab-54b97aaa9ee6",
@@ -2062,7 +2242,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b1b1b1b1-0001-4000-8000-000000000001",
@@ -2086,7 +2268,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b1b1b1b1-0002-4000-8000-000000000001",
@@ -2110,7 +2294,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b1b1b1b1-0003-4000-8000-000000000001",
@@ -2132,7 +2318,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b42957b9-3a93-4092-ad99-811a8478a0d3",
@@ -2154,7 +2342,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b4421ca2-43b4-4ad6-8974-f9b782e39b61",
@@ -2176,7 +2366,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b5b50e94-7f6c-4c6e-aa86-b555397eed79",
@@ -2198,7 +2390,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "b7c887b7-cee4-452d-b491-bd552de79d70",
@@ -2220,7 +2414,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "baeb5e5f-2659-4cb0-8260-55af9fadbe13",
@@ -2242,7 +2438,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c0b920d7-8b14-43a4-a28a-16115d0bee9e",
@@ -2264,7 +2462,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c0e229b8-6e56-45ee-b454-71e557cdb191",
@@ -2286,7 +2486,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
@@ -2308,7 +2510,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c38cad91-7747-4bbc-abd3-09b50e6e4672",
@@ -2330,7 +2534,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c532f6ba-27b2-43ec-b4ec-30cbff78eed0",
@@ -2352,7 +2558,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "c85af39e-c103-4c7f-bb69-c145e5a29e45",
@@ -2376,7 +2584,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "caf05706-c73d-43e9-a496-6069f9aefc99",
@@ -2398,7 +2608,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "cf74b151-7161-4f80-b4e5-41b2de69c6ca",
@@ -2420,7 +2632,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "d0eefbac-ce31-4bf1-b392-61e3a6d17ae5",
@@ -2442,7 +2656,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "d6320bf5-ca8b-4e50-ad5c-873216d9fcf0",
@@ -2464,7 +2680,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "d92fd5cd-ca65-41cb-879e-e87c0450fecd",
@@ -2486,7 +2704,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "da17d697-d877-4625-8bcd-944570a21796",
@@ -2508,7 +2728,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "db91a470-2590-4f33-92bd-3e3dd33f5353",
@@ -2530,7 +2752,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "dbb3866e-e5a8-4186-b6e3-a273a42b1809",
@@ -2552,7 +2776,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "dbd6eec5-9df1-473b-bf65-42e68f4e5d7b",
@@ -2574,7 +2800,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "dc006cda-047a-4862-acf7-e215355b6890",
@@ -2596,7 +2824,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "e0bea825-90ba-4b01-ad89-4a55bd6b68fb",
@@ -2618,7 +2848,9 @@
                     "lang": "ru"
                 },
                 "description_translations": null,
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "e18d73eb-a5d3-47be-a785-106f6f185651",
@@ -2640,7 +2872,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "e28a10f2-936c-4db9-8055-07597efff61d",
@@ -2663,7 +2897,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "e3cad1b0-74fa-44b2-9b2f-2adaf36baa14",
@@ -2685,7 +2921,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "e5b4c1b6-019b-4ab4-9387-cd54ca67048c",
@@ -2707,7 +2945,9 @@
                 "description_translations": {
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ea206516-9e45-482f-89be-05313f52e5e3",
@@ -2729,7 +2969,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ea7aed7a-8cdf-45e4-9896-43c57ffdf132",
@@ -2751,7 +2993,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
@@ -2773,7 +3017,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "eca6d324-8ccd-45a1-b8ad-4a2f4bc72d08",
@@ -2795,7 +3041,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "ef841bd8-b142-4d4c-97ae-dbf8399d4b59",
@@ -2820,7 +3068,9 @@
                     "ru": "Мужчина, вступивший в брак с матерью, но не являющийся биологическим отцом",
                     "lang": "en"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "f48ef10a-40f6-4190-bfae-2834e9781ad1",
@@ -2844,7 +3094,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "f8c9f7a6-99ed-4156-81ff-991e8008f377",
@@ -2866,7 +3118,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "f989e699-dc6f-45f8-a985-145d28f68ffd",
@@ -2888,7 +3142,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "f9d434b8-28d9-45d5-bf19-a625319ea63b",
@@ -2910,7 +3166,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             },
             {
                 "thing_id": "fb8d457c-62b4-43e9-9e4d-014201176f01",
@@ -2932,7 +3190,9 @@
                 "description_translations": {
                     "lang": "ru"
                 },
-                "abstract": false
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             }
         ],
         "links": [
@@ -2945,7 +3205,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "705464a6-a1d0-4969-9c3d-f934e0a676c7",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Something is a child of Everything",
@@ -2956,7 +3218,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "3f47aaba-2a54-4e2e-b234-0661c7d316b2",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Live Being is subclass of Something",
@@ -2967,7 +3231,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4088dcfc-0bd8-4e0e-9745-65de06d5d135",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Human is subclass of Live Being",
@@ -2978,7 +3244,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4b41403b-ac90-45f4-826b-306c1c73e8ab",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Event is subclass of Something",
@@ -2989,7 +3257,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "df31f9fe-72c5-43a0-90f0-855ebd0857ec",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Thing is subclass of Something",
@@ -3000,7 +3270,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "0be7267e-12f0-4eb5-a070-91505eca8369",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Computing Device is a child of Product",
@@ -3011,7 +3283,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4cce3b81-1192-4e46-a39e-c004070528b4",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Computer Data is subclass of Something",
@@ -3022,7 +3296,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b451464f-24e4-4613-936e-627d8a863a77",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Folder is subclass of Computer Data",
@@ -3033,7 +3309,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "de5864e6-79d1-4e4d-82bf-12d64824e6c0",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "File is subclass of Computer Data",
@@ -3044,7 +3322,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "851e356b-d8ff-4d11-bc4a-0dc9287951ba",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Computer Media is subclass of Computer Data",
@@ -3055,7 +3335,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "65e6d845-e3e6-4c7c-b397-70db3d944c62",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Image is subclass of Computer Media",
@@ -3066,7 +3348,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "727d3780-7416-40ee-a8c5-c687778e7f0a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Video is subclass of Computer Data",
@@ -3077,7 +3361,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2be24bcd-9ebd-46aa-9c5a-92e608cbb95d",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Audio is subclass of Computer Data",
@@ -3088,7 +3374,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c448e463-1ef5-483c-8105-f7a06bac812e",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Relation is subclass of link",
@@ -3099,7 +3387,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "61944e18-f258-4f78-8826-1815734fb04e",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is a biological parent is related to is a father of",
@@ -3110,7 +3400,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c54bfe69-598c-4232-86cd-37edb9926ef7",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is a biological parent is related to is a mother of",
@@ -3121,7 +3413,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "0ea3d4e2-33d1-4f94-950f-f6ae899b98b2",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Collection is subclass of Something",
@@ -3132,7 +3426,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "3f51e2fe-7185-4243-b5fd-cf9a79e772b8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Group is subclass of Collection",
@@ -3143,7 +3439,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "109563cd-b6b5-4cd2-b56c-6b3eb8ece619",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Music band is of class Group",
@@ -3154,7 +3452,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f987ac59-a620-4697-ac94-91caa6b790fa",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Place is subclass of Something",
@@ -3165,7 +3465,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "cff2484f-e3f4-4f18-9072-e84a09e24ca8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Restaurant, club, bar is subclass of Place",
@@ -3176,7 +3478,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "6b656bdf-d3f9-4951-8a94-0fdecbf39e6e",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Performance is subclass of Event",
@@ -3187,7 +3491,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "531e194d-786d-4078-87d1-a12bbc54eb3b",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Trip is subclass of Event",
@@ -3198,7 +3504,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "6993759d-793a-485d-a832-98745b35a012",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is related to is related to is an evidence of",
@@ -3209,7 +3517,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "69e8d9da-e2bf-4d5b-961c-f69c066b81c4",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Thing",
@@ -3220,7 +3530,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "064e03a8-6af6-4fd5-99ce-2fb188aaba91",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Product",
@@ -3231,7 +3543,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1d0efe67-2db3-4153-ab70-7673438ed3eb",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Group",
@@ -3242,7 +3556,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "420e206d-4874-4937-bb2e-ccd6e99dd9f1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Car is subclass of Vehicle",
@@ -3253,7 +3569,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "eaeb5c73-f8ac-43c3-9c46-dc591512a180",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is related to is related to owned by",
@@ -3264,7 +3582,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "7ba3eda5-4e99-4b0f-baa9-1d76f8276f36",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Event",
@@ -3275,7 +3595,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "9a71f444-371e-4e78-a561-5b7819626714",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3286,7 +3608,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b369881b-b874-4648-912b-9af532f51bc8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3297,7 +3621,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "d029d3e8-61b7-455a-addf-cfc5d7355595",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3308,7 +3634,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f8447fe0-deb9-409d-ba76-23fe549d3a8a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3319,7 +3647,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "8261c7aa-68f7-40db-a6f3-bf7210677e69",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3330,7 +3660,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a5767894-2b1a-4f52-ac95-9cb01a8b5378",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3341,7 +3673,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4d77eb25-3c12-4d8b-b99c-db126fcc374a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3352,7 +3686,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a0a02128-a979-4d6e-85b4-0928b39bb66e",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3363,7 +3699,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "8a6757ba-832d-4912-8eac-8e404538856a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3374,7 +3712,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "91b584ab-c10b-47e3-a5ea-928339c0e185",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Functional place is a child of Квартира",
@@ -3385,7 +3725,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "370b8a6e-dd16-4d8f-828b-11776dbf3a91",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3396,7 +3738,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "06f83bc8-1675-4d7b-b1ad-d9b544ded580",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Water area",
@@ -3407,7 +3751,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "38e58b6a-1d76-489e-8766-b959b657fdb6",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Place",
@@ -3418,7 +3764,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "fa5a2373-b894-4054-a079-4e96f10ad7c7",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Event",
@@ -3429,7 +3777,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a1cb237b-948f-403d-9813-0153fad2e019",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Disaster",
@@ -3440,7 +3790,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c061d5d0-cd66-4b45-a299-7e6571f3fcbf",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Subclass of Event",
@@ -3451,7 +3803,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "3f4d7781-9247-4812-a963-e28050cb30fb",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Object is of class",
@@ -3462,7 +3816,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "486fec91-dc38-4dad-8724-dbbb80a04c91",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Object is of class",
@@ -3473,7 +3829,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b42e6d07-9b75-4003-b61f-404beed79ec1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Event",
@@ -3484,7 +3842,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "140b95ab-9600-4cc5-bd1b-f2771d5d78ff",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Object is of class",
@@ -3495,7 +3855,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "80166818-bb87-47b0-a3f4-81ca8ac1f652",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Object is of class",
@@ -3506,7 +3868,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "e557e517-8737-43bc-8dc7-6651f81eda67",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Thing",
@@ -3517,7 +3881,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "0368be97-4734-41c6-a538-244e22049a7f",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Piece of art or work",
@@ -3528,7 +3894,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "7c3b8efd-9baf-4e1f-93a1-37acd87c4897",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is related to is related to knows of",
@@ -3539,7 +3907,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4d791bbe-fa67-4273-b540-f03ffaf507c0",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is related to is related to is an author of",
@@ -3550,7 +3920,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "6ce279ee-041c-4d56-8d11-55914dbe795c",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "features is related to is present as actor in ",
@@ -3561,7 +3933,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b55c559b-8dbb-4d7a-80e9-9d8f53c0b7d2",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "features is related to is present as viewer in",
@@ -3572,7 +3946,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2b3f5fc1-bb56-4a08-8bc1-fefd29d31008",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Something",
@@ -3583,7 +3959,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "003b6476-2441-4a24-a293-a134484cc37a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Musician is a child of Character",
@@ -3594,7 +3972,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "de2b36a0-6607-4de6-a374-aa8897e12195",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Writer is a child of Character",
@@ -3605,7 +3985,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b8ec8c5f-c457-4c34-b82d-e4309e08e1ff",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Something is a child of Document",
@@ -3616,7 +3998,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ff9a5433-9258-430c-8513-ac7a2dc1c1a7",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Object is of class",
@@ -3627,7 +4011,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b857d271-6639-46dc-9274-c66f2e9aefa5",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Access group is a child of System",
@@ -3638,7 +4024,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "56f3e244-02ce-44ff-b195-9d2a7cfcaa27",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Water area",
@@ -3649,7 +4037,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "cb599b42-2357-4263-a34c-b9855d6d7a33",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Vehicle",
@@ -3660,7 +4050,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ed9d0f74-95ba-4784-8500-ff37b9a793b1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Event",
@@ -3671,7 +4063,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "8c6d65ea-450d-43a1-b6ef-3478d64627c1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Music Equipment",
@@ -3682,7 +4076,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "e37dade3-2eab-4928-aa36-5d6b00c0d531",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Music Instrument",
@@ -3693,7 +4089,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "867aa297-5cdf-4c3f-bdae-97dbdfde2b37",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Product",
@@ -3704,7 +4102,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b12a1dc0-fc3b-4395-a7ab-609eada333ed",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Music equipment",
@@ -3715,7 +4115,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "8fd38b7a-61e4-41b8-8ef7-320fbc823208",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is related to is related to is a manufacturer of",
@@ -3726,7 +4128,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "dd14cf3d-4c5b-44f5-90e5-401630a8f4ea",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Это гитара",
@@ -3737,7 +4141,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2f564664-11d6-46e2-9c27-9a7a8a855d37",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "This is child of Guitar processor",
@@ -3748,7 +4154,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2f8ab698-9d71-40f2-a755-29172a3c0a72",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"System\" is subclass of \"Everything\"",
@@ -3759,7 +4167,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a11abab3-1c65-4b39-9691-96d5f45f598d",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "User is a child of System",
@@ -3770,7 +4180,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c0454bf8-3f05-4d1e-a1a0-2674e8d4dc9b",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Functional place is a child of Place",
@@ -3781,7 +4193,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f949c8b4-1e1c-40c6-8785-5fada8a41762",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Music is a child of Piece of art or work",
@@ -3792,7 +4206,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1190e598-bc04-45fe-932c-83ab0768888a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "List is a child of Collection",
@@ -3803,7 +4219,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "87ec836e-090a-432e-ac5a-519286615d88",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Music Performance Set list is a child of List",
@@ -3814,7 +4232,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "13af0d72-6816-4a96-a8bc-cf7fea439a94",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Vessel is a child of Product",
@@ -3825,7 +4245,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "880f06c9-5a5e-4767-ae00-9de1e6f5204e",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Yacht is a child of Vessel",
@@ -3836,7 +4258,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2032798d-3263-45e5-835c-80449fc23de5",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Opel Zafira B is a child of Car",
@@ -3847,7 +4271,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c5cbfd95-45b3-4d2f-9620-533de32e928a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is a part of is a child of Link",
@@ -3858,7 +4284,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1572cbf4-265d-4922-bbd4-bf6e5d64f92f",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Task is a child of Something",
@@ -3869,7 +4297,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "00077249-7ba8-4096-b1c9-4ad587fbed85",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "List is a child of Task list",
@@ -3880,7 +4310,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "9917e4c6-0ef2-4074-8e36-d63af55f3844",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Illness is a child of Event",
@@ -3891,7 +4323,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "64787ae3-a3dd-43ea-8bea-77becfc2dea1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Спортивная секция is a child of Group",
@@ -3902,7 +4336,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ac7995b2-952d-49fd-b458-ff1de49bc238",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Group read access is subclass of System",
@@ -3913,7 +4349,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "08e4e497-4a15-4f02-98be-4f78748a8537",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Belongs to user group is subclass of System",
@@ -3924,7 +4362,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "29e4b808-91cd-425b-b13b-2b4cad402cd2",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Server is subclass of System",
@@ -3935,7 +4375,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "86256a69-4f40-41cb-bc82-602f66837b20",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Snipe is a child of Yacht",
@@ -3946,7 +4388,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2d8e3c63-3f96-484d-a335-21b24f5a3b50",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Notebook is a child of Computing Device",
@@ -3957,7 +4401,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "c8f1103a-57a7-4f96-9ef2-2f24a0da4ee1",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Property is a child of System",
@@ -3968,7 +4414,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2bf6e5c3-ec1e-4c42-9a37-ee0835efdd6f",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Language is a child of System",
@@ -3979,7 +4427,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "0415e2e9-7f17-43c0-b242-499f69d39445",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Ленинградская область is of class Region",
@@ -3990,7 +4440,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ec28bf56-48e8-4b02-8faf-f2f4b55d811c",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Выборг is of class City",
@@ -4001,7 +4453,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "5eecb199-3625-42ab-8665-dc436a7875b3",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": null,
@@ -4012,7 +4466,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "3d305bc6-8a36-44d0-9ec8-6ac895c27327",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Hierarchy\" is subclass of \"Link\"",
@@ -4023,7 +4479,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "6e4c349c-7156-4ec9-941d-e5a29b5f4007",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Containment\" is subclass of \"Link\"",
@@ -4034,7 +4492,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1e251203-317a-4111-9213-f4d1e676bcde",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Equivalence\" is subclass of \"Link\"",
@@ -4045,7 +4505,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "0eb1a626-e377-4f15-8e58-4048865d5f7c",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Time\" is subclass of \"Link\"",
@@ -4056,7 +4518,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "3b25b324-6161-4c6d-a516-63bd94e1ca51",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is involved in\" is subclass of \"Link\"",
@@ -4067,7 +4531,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1f6cc05a-7a9d-4adf-8d71-bd68b5e875e8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a superclass of\" is subclass of \"Hierarchy\"",
@@ -4078,7 +4544,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "cf44a07f-a2c7-4171-8519-32fe60835850",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is of class\" is subclass of \"Hierarchy\"",
@@ -4089,7 +4557,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "555f50a7-bcee-4666-b338-908aaa116797",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is inside is related to is inside",
@@ -4100,7 +4570,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "67cddf6e-b722-4dbf-8616-ce0adbf4a13c",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "is stored in is related to is stored in",
@@ -4111,7 +4583,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "600da6d6-153a-4cb2-98b8-06fefffd7ee0",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Link to source\" is subclass of \"Containment\"",
@@ -4122,7 +4596,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1e57b40c-bb28-42c3-a423-1d41f7f46923",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is also known as\" is subclass of \"Equivalence\"",
@@ -4133,7 +4609,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "cf5b3d94-a348-4738-be83-ae1c539e5d20",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a duplicate of\" is subclass of \"Equivalence\"",
@@ -4144,7 +4622,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "200abe21-1002-44ba-b094-e40721191f87",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"meanwhile\" is subclass of \"Time\"",
@@ -4155,7 +4635,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f3054b8c-5d5f-4c41-abe4-62af2e291bbc",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"followed by\" is subclass of \"Time\"",
@@ -4166,7 +4648,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "6f21b136-1f4a-4619-ae0e-1c2f4634e8b8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a member Of\" is subclass of \"is involved in\"",
@@ -4177,7 +4661,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ceec3f71-36ab-4953-88e2-de9429c20767",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "Walk is a child of Event",
@@ -4188,7 +4674,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "5369703e-22d0-4c27-b10f-1996dd5ca6f6",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "прочитал is a child of Знакомство",
@@ -4199,7 +4687,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a586411f-14bb-46f0-a1fd-9a38ed6ba8b8",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "посмотрел is a child of Знакомство",
@@ -4210,7 +4700,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "b54e6d8b-1af8-450b-9867-60229ef4c8e2",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "увидел is a child of Знакомство",
@@ -4221,7 +4713,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "9b27b954-9bc0-464a-89f6-e826ea00641f",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "послушал is a child of Знакомство",
@@ -4232,7 +4726,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "639b52f0-1b85-4d83-aab3-2f3b8d784fa5",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "услышал is a child of Знакомство",
@@ -4243,7 +4739,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "08262902-4e36-414c-8434-905d1c7bbe7b",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "любит is a child of Знакомство",
@@ -4254,7 +4752,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f11df7bc-e332-45f7-a6ab-cb2834769bed",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "интересуется is a child of Знакомство",
@@ -4265,7 +4765,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "ae51c340-9f55-463c-8f8f-10635d74ad04",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "ознакомился is a child of Знакомство",
@@ -4276,7 +4778,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a5daa9b8-30ef-4e9e-adfd-10be475474a3",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "стал свидетелем is a child of Знакомство",
@@ -4287,7 +4791,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1e460ecd-3b89-4b37-be8b-ec2fcce9c9cc",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Kinship\" is subclass of \"Link\"",
@@ -4298,7 +4804,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4a073c81-81c7-4cf2-9a5c-0ad67416f2c4",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a biological parent\" is subclass of \"Kinship\"",
@@ -4309,7 +4817,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "1366c3c2-4550-45b3-8660-3a6250d1d6bf",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a stepfather of\" is subclass of \"Kinship\"",
@@ -4320,7 +4830,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "652d3f63-945e-4ffc-ad5e-f21ba2e0a13a",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a stepmother of\" is subclass of \"Kinship\"",
@@ -4331,7 +4843,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "f68d31f2-4e20-43b8-b3d4-962b15362a18",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"is a relative of\" is subclass of \"Kinship\"",
@@ -4342,7 +4856,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "503ddd67-2583-461d-be97-a459e9078074",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             },
             {
                 "translation": "\"Married to\" is subclass of \"Kinship\"",
@@ -4353,7 +4869,9 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "13e482a6-0f85-4dcb-97d0-c272abfb2f59",
-                "deleted": false
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
             }
         ],
         "classes": [

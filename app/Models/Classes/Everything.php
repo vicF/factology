@@ -72,6 +72,14 @@ class Everything
     public const TIME_FORMAT = 'Y-m-d H:i:s';
     public const DATABASE_TIME_FORMAT = 'YmdHis';
 
+    /** Link date columns persisted by addLink/updateLink when present. */
+    public const LINK_DATE_FIELDS = [
+        'link_start',
+        'link_end',
+        'link_start_meta',
+        'link_end_meta',
+    ];
+
     public string $template = 'partials.object.view.main.properties';
     public string $additional_template = ''; //'partials.object.view.additional.properties';
 
@@ -84,12 +92,12 @@ class Everything
         'description_translations',
         'data',
         'end',
-        'end_variety',
+        'end_meta',
         'name',
         'name_translations',
         'public',
         'start',
-        'start_variety',
+        'start_meta',
         'thing_id',
         'type',
         'owner',
@@ -105,7 +113,7 @@ class Everything
         'data',
         'end',
         'end_date',
-        'end_variety',
+        'end_meta',
         'name',
         'name_translations',
         'public',
@@ -113,7 +121,7 @@ class Everything
         'record_updated',
         'start',
         'start_date',
-        'start_variety',
+        'start_meta',
         'thing_id',
         'type',
         'owner',
@@ -358,12 +366,17 @@ class Everything
             $thing['owner_name'] = DB::table('things')->where('thing_id', $thing['owner'])->value('name');
         }
 
+        // Both endpoint names are exposed with a single contract so the
+        // frontend can render either direction without knowing which endpoint
+        // is the current object: `name` is always other_thing_id's name and
+        // `one_name` always one_thing_id's name (same as ApiController::search).
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('other_thing.public as target_public')
             ->limit(50);
@@ -372,7 +385,8 @@ class Everything
         ->where('links.other_thing_id', $thing['thing_id'])
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
@@ -658,7 +672,7 @@ class Everything
                 $data[$jsonField]['lang'] = FieldLanguage::detect($data[$plainField] ?? null);
             }
         }
-        foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+        foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
             if (array_key_exists($jsonField, $data)) {
                 $value = $data[$jsonField];
                 if (is_array($value) || is_object($value)) {
@@ -693,7 +707,7 @@ class Everything
 
             // Localization JSON columns are only written when present in the request,
             // so an update that omits them never wipes existing translations/data.
-            foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+            foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
                 if (array_key_exists($jsonField, $data)) {
                     $upsertData[$jsonField] = $data[$jsonField];
                 }
@@ -814,14 +828,20 @@ class Everything
     {
         $this->assertParentKindConsistent($link);
         $this->setLinkTranslation($link);
+        $update = [
+            'one_thing_id'   => $link['one_thing_id'],
+            'link_type_id'   => $link['link_type_id'],
+            'other_thing_id' => $link['other_thing_id'],
+            'translation'    => $link['translation'],
+        ];
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $update[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
         return DB::table('links')
             ->where('link_id', $link['link_id'])
-            ->update([
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-                'translation'    => $link['translation'],
-            ]);
+            ->update($update);
     }
 
     public function addLink(array $link): bool
@@ -871,13 +891,19 @@ class Everything
         }
 
         // Insert new link with generated UUID
-        return DB::table('links')->insert([
+        $insert = [
             'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
             'one_thing_id'  => $link['one_thing_id'],
             'link_type_id'  => $link['link_type_id'],
             'other_thing_id'=> $link['other_thing_id'],
             'translation'   => $link['translation'],
-        ]);
+        ];
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $insert[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
+        return DB::table('links')->insert($insert);
     }
 
     /**
@@ -1330,35 +1356,6 @@ class Everything
         $second = substr($thingId, 1, 1);
         //return $first . $second . $thingId . '.jpg';
         return ($webLink ? DIRECTORY_SEPARATOR : ('public' . DIRECTORY_SEPARATOR)) . 'thumbs' . DIRECTORY_SEPARATOR . $first . DIRECTORY_SEPARATOR . $second . DIRECTORY_SEPARATOR . $thingId . '.jpg';
-    }
-
-    public static function echoDateWithVariety($object, $type = 'start')
-    {
-        if ($type === 'end') {
-            $dateName = 'end_date';
-            $varietyName = 'end_variety';
-        } else {
-            $dateName = 'start_date';
-            $varietyName = 'start_variety';
-        }
-        $date = $object->$dateName;
-        if (empty($object->$varietyName)) {
-            echo $date;
-        } elseif ($object->$varietyName < 10000) {  // @todo  make it more exact
-            echo $date;
-        } elseif ($object->$varietyName < 240000) {
-            echo $date . ' (+1 hour)';
-        } elseif ($object->$varietyName < 31000000) {
-            [$date] = explode(' ', $date);
-            echo $date . ' (+1 day)';
-        } elseif ($object->$varietyName <= 10000000000) {
-            [$date] = explode('-', $date);
-            echo $date . " (+1 year)";
-        } else {
-            $years = floor($object->$varietyName / 10000000000);
-            [$date] = explode('-', $date);
-            echo $date . " (+$years years)";
-        }
     }
 
     public function createWithLinks()

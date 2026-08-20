@@ -53,9 +53,15 @@ const generateLinkDescription = (link, object) => {
 
     const objectIsOne = object.thing_id === link.one_thing_id;
 
+    // The API provides both endpoint names: link.name is the name of
+    // other_thing_id and link.one_name the name of one_thing_id. The current
+    // object's own name is always available. (In the edit modal neither server
+    // name is passed, so the fallbacks are the current object's name or
+    // 'Unknown' — the LinkedObject preload fills the cache and this computed
+    // re-resolves.)
     const oneName = objectIsOne
         ? resolveName(link.one_thing_id, objectName(object))
-        : resolveName(link.one_thing_id, link.name);
+        : resolveName(link.one_thing_id, link.one_name);
 
     const otherName = objectIsOne
         ? resolveName(link.other_thing_id, link.name)

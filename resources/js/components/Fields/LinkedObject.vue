@@ -84,6 +84,34 @@
                 ></textarea>
             </div>
 
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <FlexibleDateField
+                        side="start"
+                        :start="link.link_start"
+                        :end="link.link_end"
+                        :startMeta="link.link_start_meta"
+                        :endMeta="link.link_end_meta"
+                        :isEditable="true"
+                        :label="$t('Link start')"
+                        @update:value="applyLinkStartDate"
+                    />
+                </div>
+                <div class="col-md-6">
+                    <FlexibleDateField
+                        side="end"
+                        :start="link.link_start"
+                        :end="link.link_end"
+                        :startMeta="link.link_start_meta"
+                        :endMeta="link.link_end_meta"
+                        :isEditable="true"
+                        :label="$t('Link end')"
+                        :disabled="startSpansDates"
+                        @update:value="applyLinkEndDate"
+                    />
+                </div>
+            </div>
+
             <!-- Auto‑generated preview with safe fallback -->
             <div class="form-group"
                  v-if="currentObject && link.one_thing_id && link.other_thing_id && link.link_type_id">
@@ -131,6 +159,7 @@ import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
+import FlexibleDateField from './FlexibleDateField.vue';
 import { CLASS_TYPE, LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
@@ -187,9 +216,37 @@ const contextOneThingId = computed(() => {
     return link.value.one_thing_id || props.currentObject?.thing_id;
 });
 
-const link = ref({ ...props.link });
+const link = ref({
+    link_start: null,
+    link_end: null,
+    link_start_meta: null,
+    link_end_meta: null,
+    ...props.link,
+});
 if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
+}
+
+// ── link dates ─────────────────────────────────────────────────
+// Mirrors EditObject's thing date handling: the Start field owns both
+// columns for spanning qualifiers (between/alternatives/before), so the
+// End field is disabled while one is active.
+const startSpansDates = computed(() => {
+    const q = link.value.link_start_meta?.qualifier;
+    return q === 'between' || q === 'alternatives' || q === 'before';
+});
+
+function applyLinkStartDate({ start, end, meta }) {
+    link.value.link_start = start || null;
+    link.value.link_start_meta = meta || null;
+    if (end != null && end !== '') {
+        link.value.link_end = end;
+    }
+}
+
+function applyLinkEndDate({ start, end, meta }) {
+    link.value.link_end = end || null;
+    link.value.link_end_meta = meta || null;
 }
 
 // The current object is pinned to this row (EditObject passes

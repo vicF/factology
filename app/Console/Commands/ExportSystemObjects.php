@@ -30,7 +30,7 @@ class ExportSystemObjects extends Command
     private const THING_COLUMNS = [
         'thing_id', 'name', 'type', 'description',
         'name_translations', 'description_translations',
-        'start', 'end', 'start_variety', 'end_variety',
+        'start', 'end', 'start_meta', 'end_meta',
         'record_created', 'record_updated', 'owner', 'public', 'deleted', 'data',
         'abstract',
     ];
@@ -42,7 +42,8 @@ class ExportSystemObjects extends Command
     private const LINK_COLUMNS = [
         'translation', 'one_thing_id', 'link_type_id', 'other_thing_id',
         'public', 'link_start', 'link_end',
-        'link_start_variety', 'link_end_variety', 'link_uuid', 'deleted',
+        'link_start_meta', 'link_end_meta',
+        'link_uuid', 'deleted',
     ];
 
     public function handle(): int
@@ -68,7 +69,7 @@ class ExportSystemObjects extends Command
                 $row = array_intersect_key((array) $thing, array_flip(self::THING_COLUMNS));
                 // Postgres jsonb columns arrive as strings via PDO; decode them
                 // so the export file holds real JSON objects.
-                foreach (['data', 'name_translations', 'description_translations'] as $col) {
+                foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $col) {
                     if (isset($row[$col]) && is_string($row[$col])) {
                         $row[$col] = json_decode($row[$col]);
                     }
@@ -88,7 +89,13 @@ class ExportSystemObjects extends Command
             ->orderBy('link_id')
             ->get()
             ->map(function ($link) {
-                return array_intersect_key((array) $link, array_flip(self::LINK_COLUMNS));
+                $row = array_intersect_key((array) $link, array_flip(self::LINK_COLUMNS));
+                foreach (['link_start_meta', 'link_end_meta'] as $jsonField) {
+                    if (is_string($row[$jsonField] ?? null)) {
+                        $row[$jsonField] = json_decode($row[$jsonField]);
+                    }
+                }
+                return $row;
             })
             ->all();
 

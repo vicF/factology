@@ -1,9 +1,14 @@
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest' // Explicit imports for stability
 import LinkedObject from '@/components/Fields/LinkedObject.vue'
 import ObjectField from '@/components/Fields/ObjectField.vue'
 import { useObjectCacheStore } from '@/stores/objectCache'
+import i18n from '@/lang/i18n'
+
+// FlexibleDateField (rendered inside every link row) uses `useI18n()`, which
+// requires the i18n plugin to be installed on the mounting app.
+config.global.plugins = [i18n]
 
 // 1. Mock the store module at the top level
 vi.mock('@/stores/objectCache', () => ({
@@ -293,6 +298,35 @@ describe('LinkedObject', () => {
 
         const targetField = wrapper.findComponent(ObjectField)
         expect(targetField.props('excludeUuid')).toBe('current-id')
+    })
+
+    it('renders an incoming link preview with distinct endpoints (no self-link)', async () => {
+        // The edited object is other_thing_id; the stored one_thing_id is the
+        // actual other participant. Its name comes from `one_name` (the API's
+        // link.name is the other_thing_id name and would self-reference here).
+        const wrapper = mount(LinkedObject, {
+            props: {
+                link: {
+                    one_thing_id: 'victor',
+                    other_thing_id: 'trip',
+                    link_type_id: 'involved-in',
+                    name: 'Поездка в Новгород 2026', // other_thing_id name
+                    one_name: 'Виктор Фокин',        // one_thing_id name
+                    translation: '',
+                    link_id: 1,
+                },
+                currentObject: { thing_id: 'trip', name: 'Поездка в Новгород 2026' },
+                index: 0,
+            }
+        })
+        await nextTick()
+
+        const preview = wrapper.find('.generated-preview')
+        expect(preview.exists()).toBe(true)
+        const text = preview.text().replace(/\s+/g, ' ').trim()
+        expect(text).toContain('Виктор Фокин')
+        expect(text).toContain('Поездка в Новгород 2026')
+        expect(text).not.toContain('Поездка в Новгород 2026 → участвует в Поездка в Новгород 2026')
     })
 
     it('focusSecondObject focuses the second-object selector input', async () => {
