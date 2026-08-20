@@ -33,3 +33,19 @@
     border: 3px solid #1e3b8a;
     box-shadow: 0 0 0 1px rgba(30, 59, 138, 0.4);
 }
+
+/* Permanent object-name label attached to pins on the Map tab. */
+.object-map-tooltip {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    color: #212529;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    white-space: nowrap;
+}
+.object-map-tooltip::before {
+    display: none; /* no arrow — a plain label looks cleaner */
+}

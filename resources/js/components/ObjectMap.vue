@@ -55,8 +55,17 @@ const renderFeatures = () => {
     const bounds = L.latLngBounds([])
     for (const f of features.value) {
         const geoLayer = L.geoJSON(f.geometry, {
-            pointToLayer: (geoJsonPoint, latlng) =>
-                L.marker(latlng, { icon: f.isRoot ? rootIcon : relatedIcon }),
+            pointToLayer: (geoJsonPoint, latlng) => {
+                const marker = L.marker(latlng, { icon: f.isRoot ? rootIcon : relatedIcon })
+                // Permanent label with the object's name next to the pin.
+                marker.bindTooltip(escapeHtml(objectName(f) || t('Unnamed')), {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -8],
+                    className: 'object-map-tooltip',
+                })
+                return marker
+            },
             style: () => ({
                 color: f.isRoot ? '#1e3b8a' : '#1e7e34',
                 weight: 3,
