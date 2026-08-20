@@ -66,6 +66,134 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Properties suggested for a class: things P linked to the class via a
+     * PROPERTY_APPLIES_TO link ("is a property of class"), plus properties
+     * linked to any ancestor class whose own `inherited` flag (data.inherited,
+     * default true) allows propagation. Used by the edit form to offer fields
+     * (e.g. Coordinates) for objects of that class.
+     *
+     * @param string $id class thing_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function classProperties($id)
+    {
+        // Walk up the LINK_TO_PARENT chain to collect the class + ancestors.
+        $classIds = [];
+        $queue = [$id];
+        $visited = [];
+        while ($queue && count($visited) < 20) {
+            $cid = array_shift($queue);
+            if (isset($visited[$cid])) {
+                continue;
+            }
+            $visited[$cid] = true;
+            $classIds[] = $cid;
+            // Hierarchy convention: one_thing_id = parent/superclass,
+            // other_thing_id = child/subclass — so a class's parents are links
+            // where other_thing_id = this class.
+            $parents = DB::table('links')
+                ->where('other_thing_id', $cid)
+                ->where('link_type_id', UUID::LINK_TO_PARENT)
+                ->where('deleted', false)
+                ->pluck('one_thing_id');
+            foreach ($parents as $parent) {
+                if (!isset($visited[$parent])) {
+                    $queue[] = $parent;
+                }
+            }
+        }
+
+        // Property ids directly linked to the class (always apply).
+        $directIds = array_flip(DB::table('links')
+            ->where('link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->where('other_thing_id', $id)
+            ->where('deleted', false)
+            ->pluck('one_thing_id')
+            ->all());
+
+        $rows = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->whereIn('l.other_thing_id', $classIds)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations', 't.data')
+            ->get();
+
+        $properties = [];
+        foreach ($rows as $row) {
+            $propId = $row->thing_id;
+            if (isset($properties[$propId])) {
+                continue;
+            }
+            $data = $row->data ?? null;
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+            $inherited = !is_array($data) || !array_key_exists('inherited', $data)
+                ? true
+                : (bool) $data['inherited'];
+            // Directly linked properties always apply; ancestor-linked ones only
+            // when the property's own inherited flag allows it.
+            if (!isset($directIds[$propId]) && !$inherited) {
+                continue;
+            }
+            $translations = $row->name_translations ?? null;
+            if (is_string($translations)) {
+                $translations = json_decode($translations, true) ?: null;
+            }
+            $properties[$propId] = [
+                'thing_id'          => $propId,
+                'name'              => $row->name ?? null,
+                'name_translations' => $translations,
+                'inherited'         => (bool) $inherited,
+            ];
+        }
+
+        return response()->json(
+            [
+                'data'    => array_values($properties),
+                'success' => true
+            ]);
+    }
+
+    /**
+     * All property definitions in the system (things of class Property) —
+     * for the edit form's "Add property" picker.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function properties()
+    {
+        $properties = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('l.other_thing_id', UUID::PROPERTY_CLASS)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations')
+            ->get()
+            ->map(function ($row) {
+                $translations = $row->name_translations ?? null;
+                if (is_string($translations)) {
+                    $translations = json_decode($translations, true) ?: null;
+                }
+                return [
+                    'thing_id'          => $row->thing_id,
+                    'name'              => $row->name ?? null,
+                    'name_translations' => $translations,
+                ];
+            })
+            ->values();
+
+        return response()->json(
+            [
+                'data'    => $properties,
+                'success' => true
+            ]);
+    }
+
 
     /**
      * Store object

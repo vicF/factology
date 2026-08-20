@@ -430,4 +430,64 @@ class RelatedObjectsTest extends TestCase
         $this->assertNotNull($link['link_name']);
         $this->assertEquals($b, $link['target']['thing_id']);
     }
+
+    /** @test */
+    public function target_carries_geo_for_coordinate_properties()
+    {
+        $owner = $this->actingOwner();
+        $a = $this->createThing('Alpha Geo', $owner);
+        $b = $this->createThing('Bravo Geo', $owner, [
+            'data' => json_encode([
+                'properties' => [
+                    'prop-1' => ['lat' => 55.7558, 'lng' => 37.6173],
+                    'prop-2' => ['value' => 'not geo'],
+                ],
+            ]),
+        ]);
+        $c = $this->createThing('Charlie Geo', $owner);
+        $this->createLink($a, $b);
+        $this->createLink($a, $c);
+
+        $detail = $this->getDetail($a, 1);
+
+        $bLink = collect($detail['links'])->firstWhere('target.thing_id', $b);
+        $this->assertEquals(
+            [
+                [
+                    'geometry'    => ['type' => 'Point', 'coordinates' => [37.6173, 55.7558]],
+                    'property_id' => 'prop-1',
+                ],
+            ],
+            $bLink['target']['geo']
+        );
+
+        // A target without coordinates gets an empty array.
+        $cLink = collect($detail['links'])->firstWhere('target.thing_id', $c);
+        $this->assertSame([], $cLink['target']['geo']);
+    }
+
+    /** @test */
+    public function root_detail_payload_carries_geo()
+    {
+        $owner = $this->actingOwner();
+        $a = $this->createThing('Alpha Root Geo', $owner, [
+            'data' => json_encode([
+                'properties' => [
+                    'prop-1' => ['lat' => 48.8566, 'lng' => 2.3522],
+                ],
+            ]),
+        ]);
+
+        $detail = $this->getDetail($a);
+
+        $this->assertEquals(
+            [
+                [
+                    'geometry'    => ['type' => 'Point', 'coordinates' => [2.3522, 48.8566]],
+                    'property_id' => 'prop-1',
+                ],
+            ],
+            $detail['geo']
+        );
+    }
 }

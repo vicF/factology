@@ -1,0 +1,51 @@
+/* Shared Leaflet pin styles (see resources/js/utils/leaflet.js). */
+.geo-marker {
+    background: transparent;
+    border: none;
+}
+
+.geo-pin {
+    width: 20px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.geo-pin-root {
+    background: #4a6bff;
+    border: 2px solid #1e3b8a;
+}
+
+.geo-pin-related {
+    background: #28a745;
+    border: 2px solid #1e7e34;
+}
+
+/* Draggable vertex handle used while editing LineString/Polygon geometries. */
+.geo-vertex-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #1e3b8a;
+    box-shadow: 0 0 0 1px rgba(30, 59, 138, 0.4);
+}
+
+/* Permanent object-name label attached to pins on the Map tab. */
+.object-map-tooltip {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    color: #212529;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    white-space: nowrap;
+}
+.object-map-tooltip::before {
+    display: none; /* no arrow — a plain label looks cleaner */
+}

@@ -81,6 +81,10 @@ class UUID
     public const LANG_EN = 'b1b1b1b1-0011-4000-8000-000000000001';
     public const LANG_RU = 'b1b1b1b1-0012-4000-8000-000000000001';
 
+    // ── Geo system objects (Coordinates property, linked to the Place class) ──
+    public const PLACE_CLASS = 'dc006cda-047a-4862-acf7-e215355b6890';
+    public const COORDINATES_PROPERTY = 'c1c1c1c1-0002-4000-8000-000000000001';
+
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,

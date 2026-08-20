@@ -31,6 +31,137 @@
                                 />
                             </div>
 
+                            <!-- Properties: suggested by class + manually attached, with editors -->
+                            <template v-if="formData.type === THING_TYPE">
+                                <!-- Inherited flag for property definitions -->
+                                <div v-if="isPropertyDefinition" class="mb-3 form-check">
+                                    <input
+                                        id="inheritedFlag"
+                                        v-model="inheritedFlag"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="inheritedFlag">{{ $t('Inherited') }}</label>
+                                    <small class="form-text text-muted d-block">{{ $t('Apply to subclasses of the linked classes') }}</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label v-if="displayedProperties.length" class="form-label d-block">{{ $t('Properties') }}</label>
+                                    <div v-for="p in displayedProperties" :key="p.thing_id" class="border rounded p-2 mb-2 bg-light">
+                                        <label class="form-label small mb-1">{{ objectName(p) || $t('Unnamed') }}</label>
+
+                                        <!-- Coordinates editor -->
+                                        <template v-if="p.thing_id === geoPropertyId">
+                                            <div class="row g-2">
+                                                <div class="col">
+                                                    <label class="form-label small mb-1">{{ $t('Latitude') }}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        v-model.number="geoForm.coordinates[1]"
+                                                    />
+                                                </div>
+                                                <div class="col">
+                                                    <label class="form-label small mb-1">{{ $t('Longitude') }}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        v-model.number="geoForm.coordinates[0]"
+                                                    />
+                                                </div>
+                                                <div v-if="geoForm.type === 'Point'" class="col">
+                                                    <label class="form-label small mb-1">{{ $t('Height (m)') }}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="any"
+                                                        class="form-control form-control-sm"
+                                                        v-model.number="geoHeight"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <select v-model="geoType" class="form-select form-select-sm mt-2">
+                                                <option v-for="gtype in GEO_TYPES" :key="gtype" :value="gtype">
+                                                    {{ $t(gtype) }}
+                                                </option>
+                                            </select>
+                                            <textarea
+                                                v-if="geoForm.type !== 'Point'"
+                                                v-model="geoJsonDraft"
+                                                class="form-control form-control-sm mt-2 font-monospace"
+                                                rows="4"
+                                                @input="onGeoJsonInput"
+                                            ></textarea>
+                                            <div v-if="geoJsonError" class="text-danger small mt-1">{{ geoJsonError }}</div>
+                                            <GeoPicker
+                                                ref="geoPickerRef"
+                                                v-model="geoForm"
+                                                :clickable="geoClickable"
+                                                @clicked="onGeoPickerClick"
+                                                class="mt-2"
+                                            />
+                                            <small class="text-muted d-block mt-1">{{ geoClickHint }}</small>
+                                            <div v-if="geoForm.type !== 'Point'" class="d-flex gap-2 mt-2">
+                                                <button
+                                                    v-if="geoForm.type === 'Polygon' && canFinishPolygon"
+                                                    type="button"
+                                                    class="btn btn-outline-secondary btn-sm"
+                                                    @click="finishPolygon"
+                                                >
+                                                    {{ $t('Finish') }}
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="clearGeo">
+                                                    {{ $t('Clear') }}
+                                                </button>
+                                            </div>
+                                        </template>
+
+                                        <!-- Generic text editor for other properties -->
+                                        <input
+                                            v-else
+                                            v-model="formData.data.properties[p.thing_id]"
+                                            class="form-control form-control-sm"
+                                            :placeholder="$t('Value')"
+                                        />
+                                    </div>
+
+                                    <!-- Add property -->
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="togglePropertyPicker">
+                                        <i class="bi bi-plus-lg me-1"></i>{{ $t('Add property') }}
+                                    </button>
+                                    <div v-if="showPropertyPicker" class="border rounded p-2 mt-2 bg-light">
+                                        <input
+                                            v-model="propertyFilter"
+                                            class="form-control form-control-sm"
+                                            :placeholder="$t('Search')"
+                                        />
+                                        <div class="list-group mt-1" style="max-height:200px; overflow:auto;">
+                                            <button
+                                                v-for="p in filteredProperties"
+                                                :key="p.thing_id"
+                                                type="button"
+                                                class="list-group-item list-group-item-action py-1"
+                                                @click="attachProperty(p.thing_id)"
+                                            >{{ objectName(p) || $t('Unnamed') }}</button>
+                                            <div v-if="!filteredProperties.length" class="text-muted small p-2">
+                                                {{ $t('No results found') }}
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <input
+                                                v-model="newPropertyName"
+                                                class="form-control form-control-sm"
+                                                :placeholder="$t('New property')"
+                                            />
+                                            <button type="button" class="btn btn-primary btn-sm" @click="createProperty">
+                                                {{ $t('Create & add') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
                             <!-- Parent field for Class (2) and Link type (4) — classes
                                  pick class parents, link types pick link-type parents -->
                             <div class="mb-3" v-if="formData.type === CLASS_TYPE || formData.type === LINK_TYPE">
@@ -366,7 +497,9 @@ import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { useAuthStore } from '@/stores/auth';
 import { UUID } from '../constants/uuid';
-import { currentLocale, changeSourceLang } from '../utils/localized.js';
+import { currentLocale, changeSourceLang, objectName } from '../utils/localized.js';
+import { GEO_TYPES, appendVertex, closePolygon, extractCoordinates, isGeoPropertyName, isLegacyLatLng, latLngToPoint, stripBlankCoords } from '../utils/geo.js';
+import GeoPicker from './GeoPicker.vue';
 import { loadLanguages } from '../localization/languageCatalog.js';
 
 const objectsStore = useObjectsStore();
@@ -396,6 +529,15 @@ const router = useRouter();
 // Computed
 const isEditMode = computed(() => !!props.object);
 
+// The properties map must be a plain object (thing_id => value). Legacy
+// objects may carry `properties` as an array (old list format); writing
+// string keys onto an array silently drops them during JSON serialization,
+// so coerce arrays to an empty object.
+const normalizePropertiesMap = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return value;
+};
+
 // Refs
 const formData = ref({
     thing_id: isEditMode.value ? (props.object.thing_id || props.object.id || uuidv4()) : uuidv4(),
@@ -409,7 +551,7 @@ const formData = ref({
     type: props.params.type || 3,
     owner: isEditMode.value ? (props.object.owner || '') : '',
     data: isEditMode.value && props.object.data && typeof props.object.data === 'object'
-        ? { ...props.object.data, properties: props.object.data.properties || {} }
+        ? { ...props.object.data, properties: normalizePropertiesMap(props.object.data.properties) }
         : { properties: {} },
 });
 
@@ -733,6 +875,348 @@ const handleClassLinkRemove = () => {
     classLinkData.value.other_thing_id = '';
     classLinkData.value.link_id = null;
 };
+
+// ── Properties (suggested by class + manually attached) ─────────────────
+// Properties are things of the seeded "Property" class linked to a class via
+// the PROPERTY_APPLIES_TO link type ("is a property of class"; recursively
+// inherited from ancestors when the property's own `inherited` flag allows).
+// The edit form offers those, plus an "Add property" picker for any property
+// in the system. Coordinate-shaped properties get the Coordinates
+// (GeoJSON) editor; others a plain text value.
+const suggestedProperties = ref([]);
+const knownProperties = ref({});   // thing_id -> { thing_id, name, name_translations, inherited }
+const allProperties = ref([]);     // every property definition (for the picker)
+const showPropertyPicker = ref(false);
+const propertyFilter = ref('');
+const newPropertyName = ref('');
+const geoPropertyId = ref(null);
+const geoPickerRef = ref(null);
+let lastSuggestedClassId = null;
+
+const registerProperties = (list) => {
+    for (const p of list || []) {
+        if (p && p.thing_id) knownProperties.value[p.thing_id] = p;
+    }
+};
+
+const loadSuggestedProperties = async (classId) => {
+    // The class selector can re-emit the same id during init/render; the
+    // property list for a class is static, so skip an identical refetch.
+    if (classId === lastSuggestedClassId) return;
+    lastSuggestedClassId = classId;
+    if (!classId) {
+        suggestedProperties.value = [];
+        resolveGeoPropertyId();
+        return;
+    }
+    try {
+        const res = await axios.get(`/class/${classId}/properties`);
+        suggestedProperties.value = res.data?.data ?? [];
+    } catch (e) {
+        console.error('[EditObject] failed to load suggested properties:', e);
+        suggestedProperties.value = [];
+    }
+    registerProperties(suggestedProperties.value);
+    resolveGeoPropertyId();
+};
+
+// Properties shown in the editor: suggested ones first, then any manually
+// attached ones (keys present in data.properties).
+const displayedProperties = computed(() => {
+    const ids = [];
+    const props = [];
+    const push = (p) => {
+        if (!p || !p.thing_id || ids.includes(p.thing_id)) return;
+        ids.push(p.thing_id);
+        props.push(p);
+    };
+    for (const p of suggestedProperties.value) push(p);
+    for (const id of Object.keys(formData.value.data?.properties || {})) {
+        push(knownProperties.value[id]);
+    }
+    return props;
+});
+
+// Register placeholder entries for attached property ids we know nothing about
+// (e.g. legacy objects), so the generic editor rows render even without a fetch.
+watch(() => Object.keys(formData.value.data?.properties || {}), (keys) => {
+    for (const id of keys) {
+        if (!knownProperties.value[id]) {
+            knownProperties.value[id] = { thing_id: id, name: null, name_translations: null };
+        }
+    }
+}, { immediate: true });
+
+// Pick which property gets the Coordinates editor: an existing
+// coordinate-shaped value first (legacy + unlinked properties), otherwise the
+// first known property whose name suggests coordinates — but only when it has
+// no value yet, so an existing plain-text value is never hijacked.
+const resolveGeoPropertyId = () => {
+    const existing = extractCoordinates(formData.value.data?.properties);
+    if (existing.length) {
+        geoPropertyId.value = existing[0].property_id;
+        return;
+    }
+    const byName = Object.values(knownProperties.value).find((p) => {
+        if (!isGeoPropertyName(p.name)) return false;
+        const v = formData.value.data.properties[p.thing_id];
+        return v === undefined || v === null || v === '';
+    });
+    geoPropertyId.value = byName?.thing_id ?? null;
+};
+
+// The geo editor binds to the object's property value as a GeoJSON geometry.
+// Mutations (lat/lng/height inputs) happen in place; GeoPicker and the JSON
+// textarea replace the object via the setter. The getter seeds the entry and
+// converts legacy { lat, lng } values to a Point.
+const geoForm = computed({
+    get: () => {
+        const id = geoPropertyId.value;
+        const props = formData.value.data.properties;
+        if (!id) return { type: 'Point', coordinates: [null, null] };
+        let value = props[id];
+        if (isLegacyLatLng(value)) {
+            value = latLngToPoint(value);
+            props[id] = value;
+        }
+        if (value === undefined || value === null || value === '') {
+            value = { type: 'Point', coordinates: [null, null] };
+            props[id] = value;
+        }
+        return value;
+    },
+    set: (value) => {
+        if (geoPropertyId.value) formData.value.data.properties[geoPropertyId.value] = value;
+        // Keep the raw GeoJSON draft in sync when the geometry changed from
+        // outside the textarea (e.g. vertex drags), but never clobber the
+        // user's own typing: a draft that parses to the same geometry is left as-is.
+        if (value?.type && value.type !== 'Point') {
+            let stale = true;
+            if (geoJsonDraft.value) {
+                try {
+                    stale = JSON.stringify(JSON.parse(geoJsonDraft.value)) !== JSON.stringify(value);
+                } catch (e) {
+                    stale = true; // unparseable draft → not from a committed geometry
+                }
+            }
+            if (stale) geoJsonDraft.value = JSON.stringify(value, null, 2);
+        }
+    },
+});
+
+// Optional elevation (3rd coordinate element) — Point only.
+const geoHeight = computed({
+    get: () => (geoForm.value?.type === 'Point' ? (geoForm.value.coordinates?.[2] ?? null) : null),
+    set: (v) => {
+        if (geoForm.value?.type === 'Point') geoForm.value.coordinates[2] = v;
+    },
+});
+
+const defaultCoordinates = (type) => {
+    switch (type) {
+        case 'Point': return [null, null];
+        case 'LineString': return [[null, null], [null, null]];
+        case 'Polygon': return [[[null, null], [null, null], [null, null], [null, null]]];
+        case 'MultiPoint': return [[null, null]];
+        case 'MultiLineString': return [[[null, null], [null, null]]];
+        case 'MultiPolygon': return [[[[null, null], [null, null], [null, null], [null, null]]]];
+        default: return [null, null];
+    }
+};
+
+// Geometry type selector: changing type resets coordinates to a template.
+const geoType = computed({
+    get: () => geoForm.value?.type ?? 'Point',
+    set: (type) => {
+        const next = { type, coordinates: defaultCoordinates(type) };
+        geoForm.value = next;
+        if (type !== 'Point') geoJsonDraft.value = JSON.stringify(next, null, 2);
+        geoJsonError.value = '';
+    },
+});
+
+// Raw GeoJSON editor for non-Point geometries (live-validated).
+const geoJsonDraft = ref('');
+const geoJsonError = ref('');
+
+const onGeoJsonInput = (event) => {
+    const raw = String(event.target.value || '').trim();
+    if (!raw) {
+        geoJsonError.value = '';
+        return;
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && GEO_TYPES.includes(parsed.type)
+            && Array.isArray(parsed.coordinates)) {
+            geoForm.value = parsed;
+            geoJsonError.value = '';
+        } else {
+            geoJsonError.value = t('Invalid GeoJSON');
+        }
+    } catch (e) {
+        geoJsonError.value = t('Invalid GeoJSON');
+    }
+};
+
+// Sync the JSON draft when a non-Point geometry appears (load / type change).
+watch(() => geoForm.value?.type, (type) => {
+    if (type && type !== 'Point') {
+        geoJsonDraft.value = JSON.stringify(geoForm.value, null, 2);
+        geoJsonError.value = '';
+    }
+});
+
+// ── Click-to-build vertex editing ──────────────────────────────────────────
+// Map clicks build the geometry: a click sets a Point, appends a vertex to a
+// LineString/MultiPoint, or appends a vertex to a Polygon ring (Finish closes
+// the ring). MultiLineString/MultiPolygon stay textarea-only.
+const CLICK_BUILD_TYPES = ['Point', 'MultiPoint', 'LineString', 'Polygon'];
+
+const geoClickable = computed(() => CLICK_BUILD_TYPES.includes(geoForm.value?.type));
+
+const onGeoPickerClick = ({ lat, lng }) => {
+    const next = appendVertex(geoForm.value, lng, lat);
+    if (!next) return;
+    geoForm.value = next;
+    if (next.type !== 'Point') geoJsonDraft.value = JSON.stringify(next, null, 2);
+};
+
+const finishPolygon = () => {
+    const next = closePolygon(geoForm.value);
+    if (next !== geoForm.value) {
+        geoForm.value = next;
+        geoJsonDraft.value = JSON.stringify(next, null, 2);
+    }
+};
+
+const clearGeo = () => {
+    const type = geoForm.value?.type || 'Point';
+    const next = { type, coordinates: defaultCoordinates(type) };
+    geoForm.value = next;
+    if (type !== 'Point') geoJsonDraft.value = JSON.stringify(next, null, 2);
+    geoJsonError.value = '';
+};
+
+// "Finish" is offered while a polygon ring is open (≥3 vertices, not closed).
+const canFinishPolygon = computed(() => {
+    const geometry = geoForm.value;
+    if (!geometry || geometry.type !== 'Polygon') return false;
+    const ring = stripBlankCoords(geometry.coordinates?.[0]);
+    if (ring.length < 3) return false;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    return !(first[0] === last[0] && first[1] === last[1]);
+});
+
+const geoClickHint = computed(() => {
+    const type = geoForm.value?.type;
+    if (type === 'Point') return t('Click the map to set coordinates');
+    if (type === 'MultiPoint' || type === 'LineString' || type === 'Polygon') {
+        return t('Click the map to add points');
+    }
+    return t('Edit GeoJSON below');
+});
+
+const ensureAllProperties = async () => {
+    if (allProperties.value.length) return;
+    try {
+        const res = await axios.get('/properties');
+        allProperties.value = res.data?.data ?? [];
+        registerProperties(allProperties.value);
+    } catch (e) {
+        console.error('[EditObject] failed to load properties:', e);
+    }
+};
+
+const togglePropertyPicker = async () => {
+    showPropertyPicker.value = !showPropertyPicker.value;
+    if (showPropertyPicker.value) await ensureAllProperties();
+};
+
+const filteredProperties = computed(() => {
+    const q = propertyFilter.value.trim().toLowerCase();
+    const attached = new Set(Object.keys(formData.value.data?.properties || {}));
+    return allProperties.value.filter((p) => {
+        if (attached.has(p.thing_id)) return false;
+        if (!q) return true;
+        return String(p.name || '').toLowerCase().includes(q);
+    });
+});
+
+const attachProperty = (propId) => {
+    const props = formData.value.data.properties;
+    if (!(propId in props)) props[propId] = '';
+    showPropertyPicker.value = false;
+    propertyFilter.value = '';
+    resolveGeoPropertyId();
+};
+
+// Inline "create a new property" — a Property-class object via the store endpoint.
+const createProperty = async () => {
+    const name = newPropertyName.value.trim();
+    if (!name) return;
+    const thingId = uuidv4();
+    try {
+        await axios.post(`/object/${thingId}`, {
+            thing_id: thingId,
+            name,
+            type: THING_TYPE,
+            public: 1,
+            class: {
+                one_thing_id: thingId,
+                link_type_id: LINK_TO_CLASS,
+                other_thing_id: UUID.PROPERTY_CLASS,
+                public: 1,
+            },
+        });
+        const created = { thing_id: thingId, name, name_translations: null };
+        registerProperties([created]);
+        allProperties.value = [...allProperties.value, created];
+        newPropertyName.value = '';
+        attachProperty(thingId);
+    } catch (e) {
+        console.error('[EditObject] failed to create property:', e);
+    }
+};
+
+// Re-fetch suggested properties whenever the chosen class changes.
+watch(() => classLinkData.value.other_thing_id, (newId) => {
+    loadSuggestedProperties(newId);
+});
+
+// "Inherited" flag on property definitions: stored as data.inherited (default
+// true) — controls whether the property propagates to a class's subclasses.
+const isPropertyDefinition = computed(() =>
+    formData.value.type === THING_TYPE
+    && !!classLinkData.value.other_thing_id
+    && classLinkData.value.other_thing_id === UUID.PROPERTY_CLASS
+);
+
+const inheritedFlag = computed({
+    get: () => formData.value.data.inherited ?? true,
+    set: (v) => { formData.value.data.inherited = v; },
+});
+
+// Drop untouched property values (empty Point geometry / empty string) so the
+// editor never persists junk entries when the user saved without input.
+const sanitizeGeoProperties = () => {
+    const props = formData.value.data?.properties;
+    if (!props || typeof props !== 'object') return;
+    for (const [id, value] of Object.entries(props)) {
+        if (value === '' || value === null || value === undefined) {
+            delete props[id];
+            continue;
+        }
+        if (typeof value === 'object' && !Array.isArray(value) && value.type === 'Point') {
+            const c = value.coordinates;
+            const blank = !Array.isArray(c) || c.length < 2
+                || c[0] === null || c[1] === null || c[0] === '' || c[1] === '';
+            if (blank) delete props[id];
+        }
+    }
+};
+
 const handleParentLinkUpdate = ({ data }) => {
     parentLinkData.value = { ...parentLinkData.value, ...data };
 };
@@ -946,6 +1430,7 @@ const submitForm = async () => {
             }
             return out;
         };
+        sanitizeGeoProperties();
 
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
@@ -1096,6 +1581,11 @@ onMounted(async () => {
     if (modalElement) {
         modalInstance = new Modal(modalElement);
         modalElement.addEventListener('hide.bs.modal', handleHideModal);
+        // The GeoPicker mini-map mounts inside a hidden Bootstrap modal; give it
+        // its real size once the modal is visible so tiles/markers lay out.
+        modalElement.addEventListener('shown.bs.modal', () => {
+            if (geoPickerRef.value) geoPickerRef.value.invalidate();
+        });
         modalElement.addEventListener('hidden.bs.modal', () => {
             const wasForcedHide = isForcedHide;
             isForcedHide = false;
@@ -1145,7 +1635,7 @@ watch(() => props.object, (newObject, oldObject) => {
         type: props.params.type || 3,
         owner: newObject.owner || '',
         data: newObject.data && typeof newObject.data === 'object'
-            ? { ...newObject.data, properties: newObject.data.properties || {} }
+            ? { ...newObject.data, properties: normalizePropertiesMap(newObject.data.properties) }
             : { properties: {} },
     };
     initLocalization(newObject);

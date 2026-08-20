@@ -132,6 +132,7 @@ describe('EditObject', () => {
 
         expect(document.querySelectorAll('.linked-object').length).toBe(0)
         expect(formButtons().map(b => b.textContent.trim())).toEqual([
+            'Add property',
             'Add',
             '🕒',
             '?',
@@ -490,6 +491,41 @@ describe('EditObject', () => {
         await flushPromises()
 
         expect(document.activeElement).toBe(mainForm().querySelector('input[type="url"]'))
+    })
+
+    // ── Legacy array properties map ──
+
+    it('normalizes a legacy array properties map and saves a point into it', async () => {
+        // Objects created before the properties map format may carry
+        // `data.properties` as an array (old list). Writing a property by id
+        // onto an array is dropped by JSON.stringify, so the form must coerce
+        // it to a plain object before the user can save a coordinate point.
+        await mountEditObject({
+            object: {
+                thing_id: EDIT_ID,
+                name: 'Legacy Dacha',
+                type: 3,
+                data: { properties: [] },
+            },
+        })
+
+        expect(Array.isArray(wrapper.vm.formData.data.properties)).toBe(false)
+
+        // What the geo editor / "Add property" would attach.
+        wrapper.vm.formData.data.properties['geo-prop-id'] = {
+            type: 'Point',
+            coordinates: [30.5, 59.5],
+        }
+        await nextTick()
+
+        submitForm()
+        await flushPromises()
+
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const [, body] = axios.put.mock.calls[0]
+        expect(body.data.properties).toEqual({
+            'geo-prop-id': { type: 'Point', coordinates: [30.5, 59.5] },
+        })
     })
 
     // ── Owner (system ownership) — admins only ──
