@@ -347,7 +347,7 @@ class Everything
         }
 
         // Decode JSON columns from PostgreSQL (query builder returns them as strings)
-        foreach (['data', 'name_translations', 'description_translations'] as $jsonField) {
+        foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
             if (isset($thing[$jsonField]) && is_string($thing[$jsonField])) {
                 $thing[$jsonField] = json_decode($thing[$jsonField], true);
             }
@@ -413,6 +413,16 @@ class Everything
             ->union($second)
             ->orderBy('link_start')
             ->get()
+            ->map(function ($link) {
+                // Decode the flexible-date meta JSON the same way as the thing columns.
+                foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+                    if (isset($link->{$metaField}) && is_string($link->{$metaField})) {
+                        $link->{$metaField} = json_decode($link->{$metaField}, true);
+                    }
+                }
+                return $link;
+            })
+            ->values()
             ->toArray();
 
         // Decode the link type's translations (jsonb comes back as a string).
