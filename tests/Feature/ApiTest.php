@@ -629,9 +629,14 @@ class ApiTest extends TestCase
         $user->save();
         Sanctum::actingAs($user, ['*']);
 
+        // ApiTest shares one persistent DB across runs — use a unique per-run
+        // suffix so the top-100 search limit and leftover objects from earlier
+        // runs never hide the NULL-start fixture (it sorts last).
+        $suffix = substr(uuid_create(), 0, 8);
+
         // "before 1500" — open start, bound end.
         $before1500 = $this->createTestObject($user, [
-            'name'     => 'Flexible Before 1500',
+            'name'     => "Flexible Before 1500 $suffix",
             'start'    => null,
             'end'      => '15000101000000',
             'end_meta' => ['qualifier' => 'before', 'precision' => 'year'],
@@ -639,7 +644,7 @@ class ApiTest extends TestCase
 
         // "between 1600 and 1700" — both bounds set.
         $between1600_1700 = $this->createTestObject($user, [
-            'name'       => 'Flexible Between 1600 and 1700',
+            'name'       => "Flexible Between 1600 and 1700 $suffix",
             'start'      => '16000101000000',
             'end'        => '17000101000000',
             'start_meta' => ['qualifier' => 'between', 'precision' => 'year'],
@@ -647,7 +652,7 @@ class ApiTest extends TestCase
 
         // "after 1800" — open end.
         $after1800 = $this->createTestObject($user, [
-            'name'       => 'Flexible After 1800',
+            'name'       => "Flexible After 1800 $suffix",
             'start'      => '18000101000000',
             'end'        => null,
             'start_meta' => ['qualifier' => 'after', 'precision' => 'year'],
@@ -657,6 +662,7 @@ class ApiTest extends TestCase
         $res = $this->postJson('/api/v1/object', [
             'date_from' => '14500101000000',
             'date_to'   => '16500101000000',
+            'search'    => $suffix,
         ]);
         $res->assertStatus(200);
         $ids = collect($res->json('things'))->pluck('thing_id');
@@ -668,6 +674,7 @@ class ApiTest extends TestCase
         $res = $this->postJson('/api/v1/object', [
             'date_from' => '16500101000000',
             'date_to'   => '17500101000000',
+            'search'    => $suffix,
         ]);
         $res->assertStatus(200);
         $ids = collect($res->json('things'))->pluck('thing_id');
@@ -712,6 +719,15 @@ class ApiTest extends TestCase
         $this->assertSame('between', json_decode($row->end_meta, true)['qualifier']);
         $this->assertSame('15000101000000', $row->start);
         $this->assertSame('16000101000000', $row->end);
+
+        // The detail (GET) endpoint must return the meta decoded as an object —
+        // the edit modal re-sends it verbatim and the store validates start_meta
+        // as an array, so a raw JSON string here would fail on the next save.
+        $detail = $this->getApi('/api/v1/object/' . $uniqueId);
+        $this->assertIsArray($detail['data']['start_meta']);
+        $this->assertSame('approx', $detail['data']['start_meta']['qualifier']);
+        $this->assertIsArray($detail['data']['end_meta']);
+        $this->assertSame('between', $detail['data']['end_meta']['qualifier']);
     }
 
     /**
