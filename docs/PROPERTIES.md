@@ -24,9 +24,9 @@ The key is the `thing_id` of the property-definition object (a thing of class
 | Plain scalar | number / string / boolean | `"70"` |
 | Value + unit | `{ "value": ..., "unit": ... }` | `{ "value": 70, "unit": "kg" }` |
 | Localized text | `{ "lang": "<code>", "<code>": "text", ... }` | `{ "lang": "en", "ru": "Санкт-Петербург" }` |
-| **Earth Coordinates** | GeoJSON geometry (see below) | `{ "type": "Point", "coordinates": [30.3351, 59.9343] }` |
+| **Coordinates** | GeoJSON geometry (see below) | `{ "type": "Point", "coordinates": [30.3351, 59.9343] }` |
 
-### Earth Coordinates (GeoJSON)
+### Coordinates (GeoJSON)
 
 Coordinates are stored as a **GeoJSON geometry** and detected **by value
 shape** — no hardcoded property id. Supported types: `Point`, `MultiPoint`,
@@ -42,13 +42,15 @@ GeoJSON's `[lng, lat]` with an optional 3rd element for **height/elevation**
 ```
 
 Legacy `{ "lat": ..., "lng": ... }` values are still recognized and treated as a
-Point.
+Point. The geometry may carry a `body` foreign member (default `earth`) for
+objects on other celestial bodies — reserved for future per-body maps.
 
 - PHP: `App\Services\GeoProperties::extract($properties)` returns
   `[{ geometry, property_id }]`.
 - JS: `resources/js/utils/geo.js` — `extractCoordinates(propertiesMap)`,
   `isGeoJsonGeometry`, `isLegacyLatLng`, `isGeoPropertyName`, `buildMapFeatures`,
-  `pointToLatLng` / `latLngToPoint`.
+  `latLngToPoint`, plus vertex editing helpers `stripBlankCoords`, `appendVertex`,
+  `closePolygon`.
 - The backend adds a derived `geo` array (`[{ geometry, property_id }]`) to the
   object-detail payload (`app/Models/Classes/Everything.php`) and to each
   related-object `target` (`app/Services/RelatedObjectsResolver.php::buildTarget`),
@@ -60,13 +62,13 @@ Point.
 ## Creating a property and linking it to a class
 
 1. Create an object of class **Property** (`b1b1b1b1-0001-4000-8000-000000000001`),
-   e.g. name it "Earth Coordinates".
+   e.g. name it "Coordinates".
 2. Link it to a target class with link type **is a property of class**
    (`b1b1b1b1-0003-4000-8000-000000000001`, `PROPERTY_APPLIES_TO`): property
    thing → class thing.
 
 The edit form then offers the property when editing objects of that class (via
-`GET /api/v1/class/{id}/properties`). The coordinate-named one gets the Earth
+`GET /api/v1/class/{id}/properties`). The coordinate-named one gets the
 Coordinates editor (point + geometry + height); other properties get a plain
 text value. When nothing is pre-linked, the edit form's **Add property** picker
 (`GET /api/v1/properties`) can attach any existing property or create a new one.
@@ -79,8 +81,11 @@ of the linked class. `classProperties` walks up the class hierarchy
 (LINK_TO_PARENT links) and includes a property if it is linked to the class
 directly, or to any ancestor while `inherited` is true. Editing a
 Property-class object shows an **Inherited** checkbox for this flag. Setting
-inherited on "Earth Coordinates" and linking it to a top class (even
-`Everything`) makes it available on every subclass.
+inherited on "Coordinates" and linking it to a class makes it available on that
+class's subclasses. The seeded `GeoCoordinatesSeeder` links inherited
+"Coordinates" to the system **Place** class, so every place-like class (cities,
+buildings, mountains, craters — on Earth or any other body) gets the field
+suggested, while any object can still carry coordinates via "Add property".
 
 Example (mirrors `LocalizationSeeder`):
 
@@ -104,6 +109,12 @@ Seeded once by `LocalizationSeeder` (idempotent upserts):
 | `LANGUAGE_CLASS` | `b1b1b1b1-0002-4000-8000-000000000001` | class of language objects |
 | `PROPERTY_APPLIES_TO` | `b1b1b1b1-0003-4000-8000-000000000001` | link type "is a property of class" |
 | `LANG_EN` / `LANG_RU` | `b1b1b1b1-0011/0012-...` | seeded languages |
+
+`GeoCoordinatesSeeder` (runs from `DatabaseSeeder`) seeds the **Coordinates**
+property (class Property, `data.inherited = true`) and the `PROPERTY_APPLIES_TO`
+link `Coordinates → Place` (`PLACE_CLASS`, the system class that groups City,
+Country, Planet, Building, house, ...). `COORDINATES_PROPERTY` and `PLACE_CLASS`
+are constants in `app/Models/Data/UUID.php`.
 
 Keep the constants in sync between `app/Models/Data/UUID.php` and
 `resources/js/constants/uuid.js`.

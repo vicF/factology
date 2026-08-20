@@ -60,9 +60,10 @@ class ClassPropertiesTest extends TestCase
     private function createChildClass(string $parentClassId, string $name = 'City'): string
     {
         $classId = $this->createClass($name);
+        // Hierarchy convention: one_thing_id = parent/superclass, other = child.
         DB::table('links')->insert([
-            'one_thing_id'   => $classId,
-            'other_thing_id' => $parentClassId,
+            'one_thing_id'   => $parentClassId,
+            'other_thing_id' => $classId,
             'link_type_id'   => UUID::LINK_TO_PARENT,
             'public'         => 1,
             'deleted'        => 0,

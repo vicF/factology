@@ -8,11 +8,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Seeded system objects for the Earth Coordinates feature:
- *  - "Place on Earth" class — top-level container for objects with a location
- *  - "Earth Coordinates" property definition (class Property, inherited=true)
- *  - PROPERTY_APPLIES_TO link: Earth Coordinates -> Place on Earth
- *  - LINK_TO_PARENT link: Place on Earth -> Everything
+ * Seeded system objects for the coordinates feature:
+ *  - "Coordinates" property definition (class Property, inherited=true)
+ *  - PROPERTY_APPLIES_TO link: Coordinates -> Place
+ *
+ * "Place" itself is a system class already seeded from
+ * resources/js/localDb/system-objects.json (superclass of City, Country,
+ * Planet, Building, house, ...). Linking "Coordinates" to it makes the field
+ * suggested for every place-like class — on Earth or any other body — while any
+ * object can still carry coordinates via "Add property" (detection is by value
+ * shape, not by class).
  *
  * Idempotent (upserts), like LocalizationSeeder.
  */
@@ -22,59 +27,37 @@ class GeoCoordinatesSeeder extends Seeder
     {
         $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
 
-        // "Place on Earth" class.
+        // "Coordinates" property definition (class Property, inherited=true).
         DB::table('things')->upsert(
             [
-                'thing_id'          => UUID::PLACE_ON_EARTH_CLASS,
-                'name'              => 'Place on Earth',
-                'description'       => 'Top-level class for objects that have a location on Earth.',
-                'type'              => UUID::G_CLASS,
-                'public'            => true,
-                'server_uuid'       => $serverUuid,
-                'name_translations' => json_encode(['lang' => 'en', 'ru' => 'Место на Земле']),
-            ],
-            ['thing_id'],
-            ['name', 'description', 'public', 'server_uuid', 'name_translations']
-        );
-
-        // "Earth Coordinates" property definition (class Property, inherited=true).
-        DB::table('things')->upsert(
-            [
-                'thing_id'          => UUID::EARTH_COORDINATES_PROPERTY,
-                'name'              => 'Earth Coordinates',
-                'description'       => 'Geographic location as a GeoJSON geometry (point, line, polygon, ...).',
+                'thing_id'          => UUID::COORDINATES_PROPERTY,
+                'name'              => 'Coordinates',
+                'description'       => 'Location as a GeoJSON geometry (point, line, polygon, ...) on any celestial body (Earth by default).',
                 'type'              => UUID::G_THING,
                 'public'            => true,
                 'server_uuid'       => $serverUuid,
-                'name_translations' => json_encode(['lang' => 'en', 'ru' => 'Координаты на Земле']),
+                'name_translations' => json_encode(['lang' => 'en', 'ru' => 'Координаты']),
                 'data'              => json_encode(['inherited' => true]),
             ],
             ['thing_id'],
             ['name', 'description', 'public', 'server_uuid', 'name_translations', 'data']
         );
 
-        // Class membership: Earth Coordinates is a Property.
+        // Class membership: Coordinates is a Property.
         $this->upsertLink(
-            UUID::EARTH_COORDINATES_PROPERTY,
+            UUID::COORDINATES_PROPERTY,
             UUID::LINK_TO_CLASS,
             UUID::PROPERTY_CLASS,
-            '"Earth Coordinates" is of class Property'
+            '"Coordinates" is of class Property'
         );
 
-        // Hierarchy: Place on Earth is a subclass of Everything.
+        // The property applies to Place — and, being inherited, to all its
+        // subclasses (cities, buildings, mountains, craters ... on any body).
         $this->upsertLink(
-            UUID::PLACE_ON_EARTH_CLASS,
-            UUID::LINK_TO_PARENT,
-            UUID::EVERYTHING,
-            '"Place on Earth" is subclass of "Everything"'
-        );
-
-        // The property applies to the class — and, being inherited, to its subclasses.
-        $this->upsertLink(
-            UUID::EARTH_COORDINATES_PROPERTY,
+            UUID::COORDINATES_PROPERTY,
             UUID::PROPERTY_APPLIES_TO,
-            UUID::PLACE_ON_EARTH_CLASS,
-            'Earth Coordinates is a property of class Place on Earth'
+            UUID::PLACE_CLASS,
+            'Coordinates is a property of class Place'
         );
     }
 

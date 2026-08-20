@@ -50,7 +50,7 @@
                                     <div v-for="p in displayedProperties" :key="p.thing_id" class="border rounded p-2 mb-2 bg-light">
                                         <label class="form-label small mb-1">{{ objectName(p) || $t('Unnamed') }}</label>
 
-                                        <!-- Earth Coordinates editor -->
+                                        <!-- Coordinates editor -->
                                         <template v-if="p.thing_id === geoPropertyId">
                                             <div class="row g-2">
                                                 <div class="col">
@@ -837,7 +837,7 @@ const handleClassLinkRemove = () => {
 // the PROPERTY_APPLIES_TO link type ("is a property of class"; recursively
 // inherited from ancestors when the property's own `inherited` flag allows).
 // The edit form offers those, plus an "Add property" picker for any property
-// in the system. Coordinate-shaped properties get the Earth Coordinates
+// in the system. Coordinate-shaped properties get the Coordinates
 // (GeoJSON) editor; others a plain text value.
 const suggestedProperties = ref([]);
 const knownProperties = ref({});   // thing_id -> { thing_id, name, name_translations, inherited }
@@ -903,7 +903,7 @@ watch(() => Object.keys(formData.value.data?.properties || {}), (keys) => {
     }
 }, { immediate: true });
 
-// Pick which property gets the Earth Coordinates editor: an existing
+// Pick which property gets the Coordinates editor: an existing
 // coordinate-shaped value first (legacy + unlinked properties), otherwise the
 // first known property whose name suggests coordinates — but only when it has
 // no value yet, so an existing plain-text value is never hijacked.

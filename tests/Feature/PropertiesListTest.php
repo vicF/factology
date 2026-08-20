@@ -55,7 +55,7 @@ class PropertiesListTest extends TestCase
 
         $properties = $this->getProperties();
 
-        // Includes the seeded "Earth Coordinates" property too.
+        // Includes the seeded "Coordinates" property too.
         $ids = array_column($properties, 'thing_id');
         $this->assertContains($geo, $ids);
         $this->assertContains($weight, $ids);

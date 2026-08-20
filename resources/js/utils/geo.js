@@ -1,6 +1,6 @@
 // resources/js/utils/geo.js
 //
-// Detection/extraction of "Earth Coordinates" stored as object properties.
+// Detection/extraction of "Coordinates" stored as object properties.
 //
 // Coordinates live in an object's `data.properties` map as a GeoJSON geometry:
 // `{ <propertyThingId>: { type, coordinates } }` where `coordinates` use

@@ -68,7 +68,7 @@ class ApiController extends BaseController
      * PROPERTY_APPLIES_TO link ("is a property of class"), plus properties
      * linked to any ancestor class whose own `inherited` flag (data.inherited,
      * default true) allows propagation. Used by the edit form to offer fields
-     * (e.g. Earth Coordinates) for objects of that class.
+     * (e.g. Coordinates) for objects of that class.
      *
      * @param string $id class thing_id
      * @return \Illuminate\Http\JsonResponse
@@ -86,11 +86,14 @@ class ApiController extends BaseController
             }
             $visited[$cid] = true;
             $classIds[] = $cid;
+            // Hierarchy convention: one_thing_id = parent/superclass,
+            // other_thing_id = child/subclass — so a class's parents are links
+            // where other_thing_id = this class.
             $parents = DB::table('links')
-                ->where('one_thing_id', $cid)
+                ->where('other_thing_id', $cid)
                 ->where('link_type_id', UUID::LINK_TO_PARENT)
                 ->where('deleted', false)
-                ->pluck('other_thing_id');
+                ->pluck('one_thing_id');
             foreach ($parents as $parent) {
                 if (!isset($visited[$parent])) {
                     $queue[] = $parent;

@@ -9,8 +9,9 @@ use Tests\TestCase;
 use Tests\Traits\SafeRefreshDatabase;
 
 /**
- * GeoCoordinatesSeeder: "Place on Earth" class + "Earth Coordinates" property,
- * wired so the property is suggested (inherited) for place-like classes.
+ * GeoCoordinatesSeeder: "Coordinates" property definition linked to the system
+ * "Place" class, so the field is suggested (inherited) for place-like classes
+ * — on Earth or any other body.
  */
 class GeoCoordinatesSeederTest extends TestCase
 {
@@ -19,46 +20,43 @@ class GeoCoordinatesSeederTest extends TestCase
     /** @test */
     public function seeds_geo_system_objects()
     {
-        $this->assertDatabaseHas('things', ['thing_id' => UUID::PLACE_ON_EARTH_CLASS, 'type' => UUID::G_CLASS]);
-        $this->assertDatabaseHas('things', ['thing_id' => UUID::EARTH_COORDINATES_PROPERTY, 'type' => UUID::G_THING]);
+        // "Place" is a system class seeded from system-objects.json.
+        $this->assertDatabaseHas('things', ['thing_id' => UUID::PLACE_CLASS, 'type' => UUID::G_CLASS]);
+        $this->assertDatabaseHas('things', ['thing_id' => UUID::COORDINATES_PROPERTY, 'type' => UUID::G_THING]);
 
         $this->assertDatabaseHas('links', [
-            'one_thing_id'   => UUID::EARTH_COORDINATES_PROPERTY,
+            'one_thing_id'   => UUID::COORDINATES_PROPERTY,
             'link_type_id'   => UUID::PROPERTY_APPLIES_TO,
-            'other_thing_id' => UUID::PLACE_ON_EARTH_CLASS,
+            'other_thing_id' => UUID::PLACE_CLASS,
         ]);
         $this->assertDatabaseHas('links', [
-            'one_thing_id'   => UUID::PLACE_ON_EARTH_CLASS,
-            'link_type_id'   => UUID::LINK_TO_PARENT,
-            'other_thing_id' => UUID::EVERYTHING,
-        ]);
-        $this->assertDatabaseHas('links', [
-            'one_thing_id'   => UUID::EARTH_COORDINATES_PROPERTY,
+            'one_thing_id'   => UUID::COORDINATES_PROPERTY,
             'link_type_id'   => UUID::LINK_TO_CLASS,
             'other_thing_id' => UUID::PROPERTY_CLASS,
         ]);
 
-        $data = DB::table('things')->where('thing_id', UUID::EARTH_COORDINATES_PROPERTY)->value('data');
+        $data = DB::table('things')->where('thing_id', UUID::COORDINATES_PROPERTY)->value('data');
         $this->assertIsString($data);
         $this->assertTrue((bool) (json_decode($data, true)['inherited'] ?? false));
     }
 
     /** @test */
-    public function a_subclass_of_place_on_earth_gets_the_inherited_property()
+    public function a_subclass_of_place_gets_the_inherited_property()
     {
-        // A class whose parent is "Place on Earth" must inherit Earth Coordinates.
+        // A class whose parent is "Place" must inherit Coordinates.
         $childClass = uuid_create();
         DB::table('things')->insert([
             'thing_id'    => $childClass,
-            'name'        => 'Dacha',
+            'name'        => 'Mountain',
             'type'        => UUID::G_CLASS,
             'public'      => 1,
             'deleted'     => 0,
             'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
         ]);
+        // Hierarchy convention: one_thing_id = parent/superclass, other = child.
         DB::table('links')->insert([
-            'one_thing_id'   => $childClass,
-            'other_thing_id' => UUID::PLACE_ON_EARTH_CLASS,
+            'one_thing_id'   => UUID::PLACE_CLASS,
+            'other_thing_id' => $childClass,
             'link_type_id'   => UUID::LINK_TO_PARENT,
             'public'         => 1,
             'deleted'        => 0,
@@ -70,7 +68,7 @@ class GeoCoordinatesSeederTest extends TestCase
 
         $properties = $res->json('data');
         $this->assertCount(1, $properties);
-        $this->assertEquals(UUID::EARTH_COORDINATES_PROPERTY, $properties[0]['thing_id']);
+        $this->assertEquals(UUID::COORDINATES_PROPERTY, $properties[0]['thing_id']);
         $this->assertTrue($properties[0]['inherited']);
     }
 }
