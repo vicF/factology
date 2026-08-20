@@ -59,9 +59,12 @@ const generateLinkDescription = (link, object) => {
     // name is passed, so the fallbacks are the current object's name or
     // 'Unknown' — the LinkedObject preload fills the cache and this computed
     // re-resolves.)
+    // Related/recursive links from RelatedObjectsResolver carry `target`
+    // (the child endpoint) but no `one_name` — prefer `target.name` so the
+    // non-common endpoint resolves instead of falling back to "Unknown".
     const oneName = objectIsOne
         ? resolveName(link.one_thing_id, objectName(object))
-        : resolveName(link.one_thing_id, link.one_name);
+        : resolveName(link.one_thing_id, link.target?.name ?? link.one_name);
 
     const otherName = objectIsOne
         ? resolveName(link.other_thing_id, link.name)
