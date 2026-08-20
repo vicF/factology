@@ -17,6 +17,12 @@
                     </div>
                     <div class="modal-body">
                         <form @submit.prevent="submitForm">
+                            <!-- Warning when editing another user's object -->
+                            <div v-if="isEditMode && isOtherOwnerObject" class="alert alert-warning mb-3" role="alert">
+                                <i class="bi bi-person-exclamation me-1"></i>
+                                {{ $t('You are editing an object that belongs to {owner}.', { owner: (object.owner_name || $t('another user')) }) }}
+                            </div>
+
                             <!-- Class field for Thing type (type 3) -->
                             <div class="mb-3" v-if="formData.type === 3">
                                 <LinkedObject
@@ -393,6 +399,13 @@ const router = useRouter();
 
 // Computed
 const isEditMode = computed(() => !!props.object);
+
+// True when the object being edited belongs to a different account than the
+// current user — warns inside the modal (not on the view page).
+const isOtherOwnerObject = computed(() =>
+    isEditMode.value && props.object?.owner &&
+    props.object.owner !== authStore.user?.thing_id
+);
 
 // Refs
 const formData = ref({
