@@ -39,4 +39,24 @@ describe('LinkDescription', () => {
         expect(text).toContain('Current Object')
         expect(text).not.toContain('Current Object — is involved in — Current Object')
     })
+
+    it('resolves the one endpoint from target.name when one_name is absent (related/recursive links)', () => {
+        // RelatedObjectsResolver links carry `target` (the child endpoint) but
+        // no `one_name`. When the current object is other_thing_id, the one
+        // endpoint must resolve from target.name instead of "Unknown".
+        const link = {
+            ...linkType,
+            one_thing_id: 'one',
+            other_thing_id: 'current',
+            name: 'Victor', // resolver's `name` = target (child) name
+            one_name: undefined,
+            target: { thing_id: 'one', name: 'Victor' },
+        }
+        const object = { thing_id: 'current', name: 'Current Object' }
+        const wrapper = mount(LinkDescription, { props: { link, object } })
+        const text = textOf(wrapper)
+        expect(text).toContain('Victor')
+        expect(text).toContain('Current Object')
+        expect(text).not.toContain('Unknown')
+    })
 })

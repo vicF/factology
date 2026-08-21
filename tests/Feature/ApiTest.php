@@ -383,6 +383,80 @@ class ApiTest extends TestCase
         $this->assertFalse($ids->contains($classId), 'A class node must not leak into the results');
     }
 
+    public function testLinkTypeSearchAttachesTaxonomyCategory(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A nested link type (mother → biological parent → Kinship) resolves to
+        // its abstract base category, with localized name available.
+        $res = $this->postJson('/api/v1/object', ['search' => 'mother', 'type' => [UUID::G_LINK]]);
+        $res->assertStatus(200);
+        $mother = collect($res->json('things'))->firstWhere('name', 'is a mother of');
+        $this->assertNotNull($mother, 'is a mother of should be found');
+        $this->assertSame('Kinship', $mother['category_name']);
+        $this->assertSame('Родственные отношения', $mother['category_translations']['ru'] ?? null);
+
+        // A link type directly under the Link root gets itself as the category.
+        $res2 = $this->postJson('/api/v1/object', ['search' => 'related to', 'type' => [UUID::G_LINK]]);
+        $res2->assertStatus(200);
+        $related = collect($res2->json('things'))->firstWhere('name', 'is related to');
+        $this->assertSame('is related to', $related['category_name'] ?? null);
+    }
+
+    public function testParentLinkKindConsistencyIsEnforced(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $classId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Class',
+            'type' => UUID::G_CLASS,
+        ]);
+        $linkTypeId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Link',
+            'type' => UUID::G_LINK,
+        ]);
+
+        $linkUri = '/api/v1/link';
+        $kinship = 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde'; // abstract Kinship base (link kind)
+
+        // 1. A class may not hang under a link type.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $classId,
+        ])->assertStatus(422);
+
+        // 2. A link type may not hang under a plain class.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(422);
+
+        // 3. Same-kind edges still work: a link type under a link-type parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+
+        // 4. And a class under a class parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $classId,
+        ])->assertStatus(200);
+
+        // 5. Structural-root exception: a link type under System stays allowed.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SYSTEM,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();
@@ -565,6 +639,68 @@ class ApiTest extends TestCase
         // Clean up - authenticate as owner again to delete the object
         Sanctum::actingAs($owner, ['*']);
         $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Test that non-admin users cannot delete another user's object
+     */
+    public function testUserCannotDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $otherUser = $this->createTestUser()->getUser();
+        $otherUser->thing_id = $this->createUserThing($otherUser);
+        $otherUser->save();
+
+        Sanctum::actingAs($otherUser, ['*']);
+        $response = $this->deleteJson('/api/v1/object/' . $thingId);
+        $this->assertEquals(403, $response->getStatusCode(),
+            'Expected 403 Forbidden when a non-admin user tries to delete another user\'s object');
+
+        // Verify the object was NOT deleted
+        $this->assertDatabaseHas('things', [
+            'thing_id' => $thingId,
+        ]);
+
+        // Clean up as owner
+        Sanctum::actingAs($owner, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Test that admins can delete another user's object
+     */
+    public function testAdminCanDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $admin = $this->createTestUser()->getUser();
+        $admin->thing_id = $this->createUserThing($admin);
+        $admin->is_admin = true;
+        $admin->save();
+
+        // Admin deletes the owner's object
+        Sanctum::actingAs($admin, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+
+        // Verify the object was deleted
+        $this->assertDatabaseMissing('things', [
+            'thing_id' => $thingId,
+        ]);
     }
 
     /**

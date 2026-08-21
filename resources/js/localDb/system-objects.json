@@ -1,7 +1,7 @@
 {
     "version": 1,
     "scope": "system",
-    "exported_at": "2026-08-18T15:36:04+00:00",
+    "exported_at": "2026-08-20T10:49:15+00:00",
     "general_types": [
         {
             "id": 1,
@@ -43,6 +43,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Аудио",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -62,6 +69,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "listened to",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -79,6 +91,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Snipe",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -96,23 +115,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
-                "abstract": false,
-                "start_meta": null,
-                "end_meta": null
-            },
-            {
-                "thing_id": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
-                "name": "Виктор Фокин",
-                "type": 3,
-                "description": "Это я",
-                "start": "19720530210000",
-                "end": null,
-                "record_created": "2020-05-28 20:54:22",
-                "record_updated": "2021-03-30 07:19:43",
-                "owner": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
-                "public": false,
-                "deleted": false,
-                "data": null,
+                "name_translations": {
+                    "ru": "также известен как",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -130,6 +139,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является дубликатом",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -147,6 +163,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Событие",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -166,6 +189,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "is interested in",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -183,6 +211,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Транспортное средство",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -200,6 +235,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Город",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -217,6 +259,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Эквивалентность",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Тождество, синонимия и дубликаты",
+                    "lang": "en"
+                },
                 "abstract": true,
                 "start_meta": null,
                 "end_meta": null
@@ -234,6 +284,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Время",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Временной порядок и одновременность",
+                    "lang": "en"
+                },
                 "abstract": true,
                 "start_meta": null,
                 "end_meta": null
@@ -252,6 +310,14 @@
                 "deleted": false,
                 "data": {
                     "properties": []
+                },
+                "name_translations": {
+                    "ru": "Хранится в",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Ссылка на место хранения файла",
+                    "lang": "en"
                 },
                 "abstract": false,
                 "start_meta": null,
@@ -272,6 +338,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "выступает в",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -289,6 +362,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Спортивная секция",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -306,6 +386,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Блокнот",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -323,6 +410,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Компания, бренд",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -340,6 +434,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Страна",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -359,6 +460,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "loves",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -376,6 +482,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Задача",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -393,6 +506,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Деревня",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -410,6 +530,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Системное событие",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -427,6 +554,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является отцом",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -444,6 +578,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "связан с",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -463,6 +604,14 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "является мачехой",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Женщина, вступившая в брак с отцом, но не являющаяся биологической матерью",
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -480,6 +629,13 @@
                 "public": false,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "присутствует как зритель на",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -497,6 +653,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является надклассом",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Объект является более общим классом/категорией (надклассом), чем связанный объект",
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -514,6 +678,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Катастрофа",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -531,6 +702,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Планета",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -550,6 +728,14 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Что-то",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Базовый класс",
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -567,6 +753,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "следует за",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Происходит позже по времени",
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -586,6 +780,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Прогулка",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -603,6 +804,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Изображение",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -620,6 +828,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Связь",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -637,6 +852,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Человек",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -654,6 +876,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Фотосессия",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -671,6 +900,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Компьютерные данные",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -688,6 +924,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "принадлежит",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -705,6 +948,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Автомобиль",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -722,6 +972,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Галактика",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -739,6 +996,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Список",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -756,6 +1020,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является доказательством",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -773,6 +1044,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Папка",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -790,6 +1068,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Музыка",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -807,6 +1092,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Музыкальное оборудование",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -824,6 +1116,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Здание, дом",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -841,6 +1140,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Opel Zafira B",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -858,6 +1164,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Файл",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -875,6 +1188,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Ресторан, клуб, бар",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -892,6 +1212,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Функциональное место",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -909,6 +1236,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Море",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -926,6 +1260,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является автором",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -943,6 +1284,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Пользователь",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -960,6 +1308,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Произведение искусства",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -977,6 +1332,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Коллекция",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -994,6 +1356,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является участником",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1013,6 +1382,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "familiarized with",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1030,6 +1404,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Живое существо",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1047,6 +1428,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Иерархия",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Отношения иерархии и классификации (надкласс-подкласс, экземпляр-класс)",
+                    "lang": "en"
+                },
                 "abstract": true,
                 "start_meta": null,
                 "end_meta": null
@@ -1064,6 +1453,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Загородное место",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1081,6 +1477,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Выступление",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1098,6 +1501,14 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Включение",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Отношения часть-целое и пространственное включение",
+                    "lang": "en"
+                },
                 "abstract": true,
                 "start_meta": null,
                 "end_meta": null
@@ -1115,6 +1526,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Судно",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1132,6 +1550,13 @@
                 "public": false,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Список задач",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1149,6 +1574,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Озеро",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1166,6 +1598,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Проживание в",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1183,6 +1622,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Epiphone Riviera",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1202,6 +1648,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "saw",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1221,6 +1672,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Музыкант",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1238,6 +1696,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Звёздная система",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1255,6 +1720,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "участвует в",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1272,6 +1744,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Обслуживание, ремонт",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1289,6 +1768,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Сет-лист музыкального выступления",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1306,6 +1792,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является производителем",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1323,6 +1816,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Гитара",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1342,6 +1842,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Внутри",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1359,6 +1866,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Музыкальный инструмент",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1376,6 +1890,13 @@
                 "public": false,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Всё",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1393,6 +1914,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Отметка о прибытии",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1410,6 +1938,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Болезнь",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1427,6 +1962,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Документ",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1446,6 +1988,14 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "является родственником",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Состоит в родственной связи",
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1463,6 +2013,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Регион",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1482,6 +2039,12 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "lang": "ru"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1499,6 +2062,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Системный владелец",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1516,6 +2086,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Встреча",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1533,6 +2110,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Компьютерные носители",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1550,6 +2134,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Континент",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1569,6 +2160,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Писатель",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1586,6 +2184,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Спортивная активность",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1605,6 +2210,14 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Родственные отношения",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Семейные и родственные связи (родители, дети, супруги, родственники)",
+                    "lang": "en"
+                },
                 "abstract": true,
                 "start_meta": null,
                 "end_meta": null
@@ -1622,6 +2235,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "en": "Acquaintance",
+                    "lang": "ru"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1640,6 +2260,13 @@
                 "deleted": false,
                 "data": {
                     "properties": []
+                },
+                "name_translations": {
+                    "ru": "Свойство",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
                 },
                 "abstract": false,
                 "start_meta": null,
@@ -1660,6 +2287,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Язык",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1677,6 +2311,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является свойством класса",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1694,6 +2335,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "тем временем",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1713,6 +2361,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "heard",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1732,6 +2385,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "witnessed",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1749,6 +2407,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является матерью",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1766,6 +2431,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Объект",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1783,6 +2455,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Система",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1800,6 +2479,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Группа",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1817,6 +2503,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "принадлежит классу",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1834,6 +2527,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Товар",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1851,6 +2551,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Группа доступа",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1870,6 +2577,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "read",
+                    "lang": "ru"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1887,6 +2601,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Музыкальная группа, артист",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1904,6 +2625,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "ZOOM 707II",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1921,6 +2649,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Улица, дорога",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1938,6 +2673,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Яхта",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1955,6 +2697,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Ссылка на источник",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1972,6 +2721,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Видео",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -1989,6 +2745,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Велосипед",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2006,6 +2769,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Квартира",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2023,6 +2793,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Гитарный процессор",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2040,6 +2817,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Место",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2059,6 +2843,11 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "en": "watched",
+                    "lang": "ru"
+                },
+                "description_translations": null,
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2076,6 +2865,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Принадлежит группе пользователей",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2095,6 +2891,12 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "lang": "ru"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2112,6 +2914,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Поездка",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2129,6 +2938,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является частью",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2146,6 +2962,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Групповой доступ на чтение",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2163,6 +2986,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Вычислительное устройство",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2170,7 +3000,7 @@
             {
                 "thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
                 "name": "Married to",
-                "type": 2,
+                "type": 4,
                 "description": "состоит в браке с",
                 "start": null,
                 "end": null,
@@ -2180,6 +3010,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "В браке с",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2197,6 +3034,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "является биологическим родителем",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2215,6 +3059,14 @@
                 "deleted": false,
                 "data": {
                     "properties": []
+                },
+                "name_translations": {
+                    "ru": "является отчимом",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "ru": "Мужчина, вступивший в брак с матерью, но не являющийся биологическим отцом",
+                    "lang": "en"
                 },
                 "abstract": false,
                 "start_meta": null,
@@ -2235,6 +3087,13 @@
                 "data": {
                     "properties": []
                 },
+                "name_translations": {
+                    "ru": "Персонаж",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2252,6 +3111,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Сервер",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2269,6 +3135,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Акватория",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2286,6 +3159,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Пожар",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2303,6 +3183,13 @@
                 "public": true,
                 "deleted": false,
                 "data": null,
+                "name_translations": {
+                    "ru": "Книга",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
@@ -2357,19 +3244,6 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "4b41403b-ac90-45f4-826b-306c1c73e8ab",
-                "deleted": false,
-                "link_start_meta": null,
-                "link_end_meta": null
-            },
-            {
-                "translation": "Victor Fokin is Human",
-                "one_thing_id": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
-                "link_type_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
-                "other_thing_id": "4c8ee41a-9912-4dff-8b44-7779a66e4fcf",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_uuid": "d826997b-2176-4474-9d16-0cddbbbe2e19",
                 "deleted": false,
                 "link_start_meta": null,
                 "link_end_meta": null
@@ -3454,19 +4328,6 @@
                 "link_end_meta": null
             },
             {
-                "translation": "Married to is a child of Link",
-                "one_thing_id": "4b27fd0c-d8be-425c-a529-2186b2589e76",
-                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
-                "other_thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_uuid": "b4719ffe-e892-45b7-a806-afbc40f05bdf",
-                "deleted": false,
-                "link_start_meta": null,
-                "link_end_meta": null
-            },
-            {
                 "translation": "Спортивная секция is a child of Group",
                 "one_thing_id": "c0e229b8-6e56-45ee-b454-71e557cdb191",
                 "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
@@ -3527,19 +4388,6 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "2d8e3c63-3f96-484d-a335-21b24f5a3b50",
-                "deleted": false,
-                "link_start_meta": null,
-                "link_end_meta": null
-            },
-            {
-                "translation": "is of class User",
-                "one_thing_id": "0ac1b13b-acbf-4246-bed4-8f0c2a8b2546",
-                "link_type_id": "c217c185-742f-4a9f-8e69-acea2b4f5aea",
-                "other_thing_id": "664e746e-8f37-4f80-ba78-734424eab2a6",
-                "public": true,
-                "link_start": null,
-                "link_end": null,
-                "link_uuid": "d5d45614-879f-4de5-bd77-114e86165628",
                 "deleted": false,
                 "link_start_meta": null,
                 "link_end_meta": null
@@ -4008,6 +4856,19 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "503ddd67-2583-461d-be97-a459e9078074",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null
+            },
+            {
+                "translation": "\"Married to\" is subclass of \"Kinship\"",
+                "one_thing_id": "b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "eb8fbbab-1f92-42e6-b878-0519b9652ab6",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "13e482a6-0f85-4dcb-97d0-c272abfb2f59",
                 "deleted": false,
                 "link_start_meta": null,
                 "link_end_meta": null

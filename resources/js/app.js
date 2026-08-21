@@ -5,6 +5,7 @@ import '../css/app.css';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
+import { useObjectHistoryStore } from './stores/objectHistory';
 import { dateFromDb } from './utils/dateUtils.js';
 const pinia = createPinia();
 
@@ -156,4 +157,12 @@ app.config.globalProperties.$hasOtherTranslations = localized.hasOtherTranslatio
     await authStore.fetchSettings();
 
     app.mount('#app');
+
+    // Fire-and-forget: warm this user's dropdown lists (link types, things,
+    // classes) in the background so the first dropdown of the session opens
+    // instantly. Local history is shown immediately; this refresh keeps the
+    // local cache in sync with the server without blocking any UI.
+    if (authStore.token && authStore.user?.thing_id) {
+        useObjectHistoryStore(pinia).preloadFromServer();
+    }
 })();

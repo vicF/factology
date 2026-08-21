@@ -30,10 +30,12 @@ class DatabaseSeeder extends Seeder
         // Bootstrap things + default classes + system-owned objects.
         // Upsert by thing_id so reruns converge with the file.
         foreach ($system['things'] as $thing) {
-            // The export stores the `data` JSON column decoded; re-encode it for
-            // the query builder (which does not auto-cast arrays to JSON).
-            if (is_array($thing['data'] ?? null)) {
-                $thing['data'] = json_encode($thing['data']);
+            // The export stores JSON columns decoded; re-encode them for the
+            // query builder (which does not auto-cast arrays to JSON).
+            foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonCol) {
+                if (is_array($thing[$jsonCol] ?? null)) {
+                    $thing[$jsonCol] = json_encode($thing[$jsonCol]);
+                }
             }
             // The legacy variety columns were dropped; ignore any stale export
             // file that still carries them.
@@ -42,8 +44,9 @@ class DatabaseSeeder extends Seeder
                 array_merge($thing, ['server_uuid' => $serverUuid]),
                 ['thing_id'],
                 [
-                    'name', 'description', 'type', 'public', 'deleted',
-                    'owner', 'start', 'end',
+                    'name', 'description', 'name_translations', 'description_translations',
+                    'type', 'public', 'deleted',
+                    'owner', 'start', 'end', 'start_meta', 'end_meta',
                     'data', 'server_uuid', 'abstract',
                 ]
             );
@@ -53,12 +56,13 @@ class DatabaseSeeder extends Seeder
         foreach ($system['links'] as $link) {
             unset($link['link_id']); // let fresh installs auto-increment link_id
             unset($link['link_start_variety'], $link['link_end_variety']); // dropped columns
+            unset($link['translation']); // dropped column — LinkDescription renders the relation
             DB::table('links')->upsert(
                 $link,
                 ['link_uuid'],
                 [
                     'one_thing_id', 'link_type_id', 'other_thing_id',
-                    'translation', 'public', 'deleted',
+                    'description', 'public', 'deleted',
                     'link_start', 'link_end',
                 ]
             );
@@ -86,7 +90,6 @@ class DatabaseSeeder extends Seeder
                     'one_thing_id'   => $server->thing_id,
                     'link_type_id'   => UUID::LINK_TO_CLASS,
                     'other_thing_id' => UUID::G_SERVER_CLASS,
-                    'translation'    => $server->name . ' is of class Server',
                 ]);
             }
         }
@@ -103,6 +106,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed localization system objects (Property/Language classes + languages)
         $this->call(LocalizationSeeder::class);
+
+        // Seed geo system objects (Coordinates property linked to the Place class)
+        $this->call(GeoCoordinatesSeeder::class);
     }
 
     /**

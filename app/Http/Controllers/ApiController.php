@@ -6,6 +6,7 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\RelatedObjectsResolver;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
 use Fokin\Facts\Data\Era;
@@ -44,10 +45,12 @@ class ApiController extends BaseController
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function get($id)
+    public function get($id, Request $request)
     {
         try {
-            $data = Everything::getDataById($id);
+            $depth = (int) $request->query('depth', 0);
+            $depth = min(max($depth, 0), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+            $data = Everything::getDataById($id, $depth);
             return response()->json(
                 [
                     'data'    => $data,
@@ -61,6 +64,134 @@ class ApiController extends BaseController
                     'message' => 'Failed to serialize object data'
                 ], 500);
         }
+    }
+
+    /**
+     * Properties suggested for a class: things P linked to the class via a
+     * PROPERTY_APPLIES_TO link ("is a property of class"), plus properties
+     * linked to any ancestor class whose own `inherited` flag (data.inherited,
+     * default true) allows propagation. Used by the edit form to offer fields
+     * (e.g. Coordinates) for objects of that class.
+     *
+     * @param string $id class thing_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function classProperties($id)
+    {
+        // Walk up the LINK_TO_PARENT chain to collect the class + ancestors.
+        $classIds = [];
+        $queue = [$id];
+        $visited = [];
+        while ($queue && count($visited) < 20) {
+            $cid = array_shift($queue);
+            if (isset($visited[$cid])) {
+                continue;
+            }
+            $visited[$cid] = true;
+            $classIds[] = $cid;
+            // Hierarchy convention: one_thing_id = parent/superclass,
+            // other_thing_id = child/subclass — so a class's parents are links
+            // where other_thing_id = this class.
+            $parents = DB::table('links')
+                ->where('other_thing_id', $cid)
+                ->where('link_type_id', UUID::LINK_TO_PARENT)
+                ->where('deleted', false)
+                ->pluck('one_thing_id');
+            foreach ($parents as $parent) {
+                if (!isset($visited[$parent])) {
+                    $queue[] = $parent;
+                }
+            }
+        }
+
+        // Property ids directly linked to the class (always apply).
+        $directIds = array_flip(DB::table('links')
+            ->where('link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->where('other_thing_id', $id)
+            ->where('deleted', false)
+            ->pluck('one_thing_id')
+            ->all());
+
+        $rows = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->whereIn('l.other_thing_id', $classIds)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations', 't.data')
+            ->get();
+
+        $properties = [];
+        foreach ($rows as $row) {
+            $propId = $row->thing_id;
+            if (isset($properties[$propId])) {
+                continue;
+            }
+            $data = $row->data ?? null;
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+            $inherited = !is_array($data) || !array_key_exists('inherited', $data)
+                ? true
+                : (bool) $data['inherited'];
+            // Directly linked properties always apply; ancestor-linked ones only
+            // when the property's own inherited flag allows it.
+            if (!isset($directIds[$propId]) && !$inherited) {
+                continue;
+            }
+            $translations = $row->name_translations ?? null;
+            if (is_string($translations)) {
+                $translations = json_decode($translations, true) ?: null;
+            }
+            $properties[$propId] = [
+                'thing_id'          => $propId,
+                'name'              => $row->name ?? null,
+                'name_translations' => $translations,
+                'inherited'         => (bool) $inherited,
+            ];
+        }
+
+        return response()->json(
+            [
+                'data'    => array_values($properties),
+                'success' => true
+            ]);
+    }
+
+    /**
+     * All property definitions in the system (things of class Property) —
+     * for the edit form's "Add property" picker.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function properties()
+    {
+        $properties = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('l.other_thing_id', UUID::PROPERTY_CLASS)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations')
+            ->get()
+            ->map(function ($row) {
+                $translations = $row->name_translations ?? null;
+                if (is_string($translations)) {
+                    $translations = json_decode($translations, true) ?: null;
+                }
+                return [
+                    'thing_id'          => $row->thing_id,
+                    'name'              => $row->name ?? null,
+                    'name_translations' => $translations,
+                ];
+            })
+            ->values();
+
+        return response()->json(
+            [
+                'data'    => $properties,
+                'success' => true
+            ]);
     }
 
 
@@ -318,6 +449,8 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // The translation column no longer exists; ignore stale payloads.
+        unset($data['translation']);
         // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
         foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
             if (isset($data[$metaField]) && is_array($data[$metaField])) {
@@ -337,6 +470,18 @@ class ApiController extends BaseController
                 'success' => false,
                 'message' => 'Abstract link types cannot be used to create a link',
                 'errors'  => ['link_type_id' => 'This link type is abstract and only groups its children.'],
+            ], 422);
+        }
+        // Classes and link types form two separate trees — a "is a superclass of"
+        // edge may only connect same-kind endpoints (except the structural roots).
+        if (($data['link_type_id'] ?? null) === UUID::LINK_TO_PARENT
+            && !empty($data['one_thing_id'])
+            && !empty($data['other_thing_id'])
+            && !$this->isParentKindConsistent($data['one_thing_id'], $data['other_thing_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Classes and link types form separate trees — the parent must be of the same kind as the child.',
+                'errors'  => ['other_thing_id' => 'Cannot set a class/link-type of the other kind as the parent.'],
             ], 422);
         }
         if(!empty($data['link_id'])) {
@@ -363,10 +508,10 @@ class ApiController extends BaseController
                 if ($existing) {
                     $sameDirection = $existing->one_thing_id === $data['one_thing_id']
                         && $existing->other_thing_id === $data['other_thing_id'];
-                    if ($sameDirection && !empty($data['translation'])) {
+                    if ($sameDirection && array_key_exists('description', $data)) {
                         DB::table('links')
                             ->where('link_id', $existing->link_id)
-                            ->update(['translation' => $data['translation']]);
+                            ->update(['description' => $data['description']]);
                     }
                     $data['link_id'] = $existing->link_id;
                     return response()->json(
@@ -388,6 +533,28 @@ class ApiController extends BaseController
                 'data'    => $data,
                 'success' => true
             ]);
+    }
+
+    /**
+     * Whether a "is a superclass of" edge between $parentId and $childId keeps
+     * the class/link-tree invariant: both endpoints must be the same kind (both
+     * link types or both non-link), unless the parent is a structural root that
+     * hosts the other kind by design (Everything → Link, System → system links).
+     */
+    private function isParentKindConsistent(string $parentId, string $childId): bool
+    {
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return true; // an endpoint is not in the DB yet — don't pre-empt a later failure
+        }
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return true;
+        }
+        return in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true);
     }
 
     /**
@@ -562,6 +729,125 @@ class ApiController extends BaseController
     }
 
     /**
+     * Per-user "quick lists" for the object / link-type / class dropdowns.
+     *
+     * Returns the link types, things and classes this user uses most, derived
+     * from links attached to objects they own. Short user lists are padded with
+     * globally popular objects of the same type so a fresh user still gets a
+     * useful dropdown. The client fetches this once at app load and seeds its
+     * local history cache from it, so opening a dropdown makes no per-open
+     * network request — the server is only hit when the user searches.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function suggestLists(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $userThingId = Auth::user()->thing_id;
+        $limit = 30;
+
+        // Rank the values of $column by how often they appear in links whose
+        // subject (one_thing_id) is an object owned by the current user.
+        $rankOwned = function (string $column, bool $whereNotNull = false) use ($userThingId, $limit) {
+            $query = DB::table('links as l')
+                ->join('things as o', function ($join) use ($userThingId) {
+                    $join->on('o.thing_id', '=', 'l.one_thing_id')
+                        ->where('o.owner', '=', $userThingId)
+                        ->where('o.deleted', false);
+                })
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE')
+                ->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($limit);
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->get()->pluck('id')->all();
+        };
+
+        // Link types the user uses most.
+        $linkTypeIds = $rankOwned('link_type_id');
+        // Things the user links to most (the other end of their links).
+        $thingIds    = $rankOwned('other_thing_id', true);
+        // Classes the user's own things belong to (LINK_TO_CLASS links).
+        $classIds = DB::table('links as l')
+            ->join('things as o', function ($join) use ($userThingId) {
+                $join->on('o.thing_id', '=', 'l.one_thing_id')
+                    ->where('o.owner', '=', $userThingId)
+                    ->where('o.deleted', false);
+            })
+            ->select('l.other_thing_id as id', DB::raw('COUNT(*) as cnt'))
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->whereRaw('l.deleted IS NOT TRUE')
+            ->whereNotNull('l.other_thing_id')
+            ->groupBy('l.other_thing_id')
+            ->orderByDesc('cnt')
+            ->limit($limit)
+            ->get()
+            ->pluck('id')
+            ->all();
+
+        // Pad short user lists with globally popular objects of the same type —
+        // only when the user's own usage does not already fill the list, so a
+        // well-established user never pays for the global GROUP BY queries.
+        $globalRank = function (string $column, int $needed, bool $linkToClassOnly = false, bool $whereNotNull = false) {
+            if ($needed <= 0) {
+                return [];
+            }
+            $query = DB::table('links as l')
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE');
+            if ($linkToClassOnly) {
+                $query->where('l.link_type_id', UUID::LINK_TO_CLASS);
+            }
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($needed)
+                ->get()
+                ->pluck('id')
+                ->all();
+        };
+
+        $linkTypeIds = array_merge($linkTypeIds, $globalRank('link_type_id', $limit - count($linkTypeIds)));
+        $thingIds    = array_merge($thingIds, $globalRank('other_thing_id', $limit - count($thingIds), false, true));
+        $classIds    = array_merge($classIds, $globalRank('other_thing_id', $limit - count($classIds), true, true));
+
+        // Resolve full thing rows, keeping the ranked order and applying the
+        // standard visibility scope (abstract system objects are excluded, same
+        // as the search endpoint).
+        $resolve = function (array $ids) {
+            $ids = array_values(array_filter(array_unique($ids)));
+            if (!$ids) {
+                return [];
+            }
+            $rows = DB::table('things')
+                ->auth()
+                ->where('things.deleted', false)
+                ->where('things.abstract', false)
+                ->whereIn('things.thing_id', $ids)
+                ->get()
+                ->keyBy('thing_id');
+            $ordered = [];
+            foreach ($ids as $id) {
+                if ($rows->has((string) $id)) {
+                    $ordered[] = $rows[(string) $id];
+                }
+            }
+            return $ordered;
+        };
+
+        return response()->json([
+            'links'   => ThingResource::collection($resolve($linkTypeIds)),
+            'things'  => ThingResource::collection($resolve($thingIds)),
+            'classes' => ThingResource::collection($resolve($classIds)),
+        ]);
+    }
+
+    /**
      * Toggle favorite status for an object.
      *
      * Creates or deletes a MY_FAVORITE link between the current user and the target object.
@@ -590,7 +876,6 @@ class ApiController extends BaseController
             'one_thing_id'  => $userThingId,
             'link_type_id'  => $linkTypeId,
             'other_thing_id'=> $id,
-            'translation'   => 'Favorite',
             'public'        => 0,
         ]);
 
@@ -842,11 +1127,20 @@ class ApiController extends BaseController
         // dedupe.)
         $data = $query->groupBy('things.thing_id')->limit(100)->get();
 
+        // Link-type results carry their taxonomy base category (the abstract
+        // base they hang under, e.g. "Kinship", "Hierarchy") so the picker can
+        // group them.
+        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
+        if (in_array(UUID::G_LINK, $requestTypes, true)) {
+            $this->attachLinkTypeCategories($data);
+        }
+
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
+                ->addSelect('link_types.name_translations as link_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
@@ -861,11 +1155,92 @@ class ApiController extends BaseController
                 ->get()->toArray();
         }
 
+        // Multilevel related objects: attach direct related links (with a
+        // shallow resolved `target`) to each result thing. Deeper levels are
+        // fetched on demand via GET /object/{id}?depth=N.
+        $depth = (int) ($requestBody['depth'] ?? RelatedObjectsResolver::DEFAULT_SEARCH_DEPTH);
+        $depth = min(max($depth, 0), RelatedObjectsResolver::SEARCH_DEPTH_CAP);
+
+        $linksByRoot = $depth > 0
+            ? (new RelatedObjectsResolver)->forMany($ids, RelatedObjectsResolver::SEARCH_BREADTH)
+            : [];
+
+        $things = $data->map(function ($thing) use ($linksByRoot) {
+            if (isset($linksByRoot[$thing->thing_id])) {
+                $thing->links = $linksByRoot[$thing->thing_id];
+            }
+            return $thing;
+        });
+
         return response()->json([
-            'things' => ThingResource::collection($data),
+            'things' => ThingResource::collection($things),
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Attach the taxonomy base category to link-type search results so the
+     * picker can group them (e.g. "Kinship", "Hierarchy"). The base is the
+     * direct child of the Link root that the link type hangs under; for link
+     * types directly under Link it is the link type itself. Link types that
+     * are not part of the tree (system-internal ones) get no category.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachLinkTypeCategories($things): void
+    {
+        $bases = DB::table('links')
+            ->join('things as t', 't.thing_id', '=', 'links.other_thing_id')
+            ->where('links.one_thing_id', UUID::LINK)
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('t.type', UUID::G_LINK)
+            ->where('t.deleted', false)
+            ->get(['t.thing_id', 't.name', 't.name_translations'])
+            ->keyBy('thing_id');
+
+        if ($bases->isEmpty()) {
+            return;
+        }
+
+        // child => parent edges among link types (any depth).
+        $parents = DB::table('links')
+            ->join('things as p', 'p.thing_id', '=', 'links.one_thing_id')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('p.type', UUID::G_LINK)->where('p.deleted', false)
+            ->where('c.type', UUID::G_LINK)->where('c.deleted', false)
+            ->pluck('links.one_thing_id', 'links.other_thing_id');
+
+        foreach ($things as $thing) {
+            if ((int) $thing->type !== UUID::G_LINK) {
+                continue;
+            }
+            $base = $this->resolveLinkBase($thing->thing_id, $bases, $parents);
+            if ($base) {
+                $thing->category_id           = $base->thing_id;
+                $thing->category_name         = $base->name;
+                $thing->category_translations = $base->name_translations;
+            }
+        }
+    }
+
+    private function resolveLinkBase(string $thingId, $bases, $parents): ?object
+    {
+        if (isset($bases[$thingId])) {
+            return $bases[$thingId];
+        }
+        $node  = $thingId;
+        $guard = 0;
+        while (isset($parents[$node]) && $guard++ < 20) {
+            $node = $parents[$node];
+            if (isset($bases[$node])) {
+                return $bases[$node];
+            }
+        }
+        return null;
     }
 
     /**
@@ -960,7 +1335,7 @@ class ApiController extends BaseController
         $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type = ? THEN 0 ELSE 1 END';
 
         $rawSql = "
-    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, translation, public, name_translations) AS (
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, public, name_translations) AS (
         SELECT
             c.name,
             1,
@@ -968,7 +1343,6 @@ class ApiController extends BaseController
             CAST(NULL AS UUID),
             c.description,
             c.type,
-            CAST(NULL AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM things c
@@ -983,7 +1357,6 @@ class ApiController extends BaseController
             l.one_thing_id,
             c.description,
             c.type,
-            CAST(l.translation AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM descendants d

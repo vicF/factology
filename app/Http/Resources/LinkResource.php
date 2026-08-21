@@ -13,8 +13,7 @@ class LinkResource extends JsonResource
             'one_thing_id'   => $this->one_thing_id ?? null,
             'other_thing_id' => $this->other_thing_id ?? null,
             'link_type_id'   => $this->link_type_id ?? null,
-            'translation'    => $this->translation ?? null,
-            'description'    => $this->description ?? null,   // <-- safe fallback
+            'description'    => $this->description ?? null,
             'public'         => isset($this->public) ? (bool) $this->public : null,
             'link_start'     => $this->link_start ?? null,
             'link_end'       => $this->link_end ?? null,
@@ -25,6 +24,11 @@ class LinkResource extends JsonResource
             'name'           => $this->name ?? null,
             'one_name'       => $this->one_name ?? null,
             'link_name'      => $this->link_name ?? null,     // from link_types.name
+            'link_name_translations' => isset($this->link_name_translations)
+                ? (is_string($this->link_name_translations)
+                    ? (json_decode($this->link_name_translations, true) ?: null)
+                    : $this->link_name_translations)
+                : null,
         ];
     }
 

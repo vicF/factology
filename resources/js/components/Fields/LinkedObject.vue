@@ -77,7 +77,7 @@
 
             <div class="form-group">
                 <textarea
-                    v-model="link.translation"
+                    v-model="link.description"
                     class="form-control"
                     :placeholder="$t('Enter description...')"
                     rows="2"
@@ -141,7 +141,8 @@
                 v-model="link.other_thing_id"
                 :isEditable="true"
                 :label="targetLabel"
-                :type="CLASS_TYPE"
+                :type="parentTargetType"
+                :includeAbstract="props.objectType === LINK_TYPE"
                 :contextObjectType="contextObjectType"
                 :contextLinkTypeId="contextLinkTypeId"
                 :contextOneThingId="contextOneThingId"
@@ -191,6 +192,10 @@ const effectiveObjectType = computed(() => {
     if (props.currentObject?.type === CLASS_TYPE) return CLASS_TYPE;
     return THING_TYPE;
 });
+
+// Kind of the target picker for the single-field (parent) mode: classes pick
+// class parents, link types pick link-type parents.
+const parentTargetType = computed(() => props.objectType || CLASS_TYPE);
 
 const contextObjectType = computed(() => {
     return effectiveObjectType.value;
@@ -330,7 +335,7 @@ const openCreateObjectModal = () => {
             targetComponent: 'linked-object',
             index: props.index,
             linkTypeUuid: link.value.link_type_id,
-            comment: link.value.translation
+            comment: link.value.description
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -353,7 +358,7 @@ const handleLinkCreated = async (data) => {
             await nextTick();
             link.value.other_thing_id = newId;
             if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
-            if (data.comment !== undefined) link.value.translation = data.comment;
+            if (data.comment !== undefined) link.value.description = data.comment;
 
             // No need to preload – the object is already created and cached by the modal
             emit('update', {

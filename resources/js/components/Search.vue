@@ -98,28 +98,25 @@
                                         class="result-links-section"
                                     >
                                         <div class="links-container">
-                                            <div class="links-title">
-                                                <span>🔗 Related</span>
-                                                <span class="links-count">({{ thing.links.length }})</span>
+                                            <div v-if="shownAll.has(thing.thing_id)" class="links-list">
+                                                <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" :parent="thing" />
                                             </div>
-                                            <div class="links-list">
+                                            <div v-else class="links-list">
                                                 <div
                                                     v-for="(link, linkIndex) in thing.links.slice(0, 3)"
                                                     :key="`${link.link_type_id}-${linkIndex}`"
                                                     class="link-item"
                                                 >
-                                                    <RouterLink :to="{ name: 'object', params: { uid: link.link_type_id } }" class="link-type-icon">
-                                                        <Image :node-id="link.link_type_id" width="14px" />
-                                                    </RouterLink>
-                                                    <span class="link-arrow">→</span>
-                                                    <RouterLink :to="{ name: 'object', params: { uid: getOtherThingId(link, thing.thing_id) } }" class="link-target">
-                                                        <Image :node-id="getOtherThingId(link, thing.thing_id)" width="14px" class="link-icon" />
-                                                        <span class="link-name">{{ truncateText(getOtherThingName(link, thing.thing_id) || 'Related', 30) }}</span>
-                                                    </RouterLink>
+                                                    <LinkDescription :link="link" :object="thing" size="small" hide-object-name />
                                                 </div>
-                                                <div v-if="thing.links.length > 3" class="more-links">
+                                                <button
+                                                    v-if="thing.links.length > 3"
+                                                    class="more-links"
+                                                    type="button"
+                                                    @click="toggleShowAll(thing.thing_id)"
+                                                >
                                                     +{{ thing.links.length - 3 }} more
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -161,6 +158,9 @@ import { FlexibleDate } from '../utils/flexibleDate.js';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
+import RelatedList from "./RelatedList.vue";
+import LinkDescription from "./LinkDescription.vue";
+import { useRelatedExpansion } from "../composables/useRelatedExpansion";
 
 const props = defineProps({
     searchText: String,
@@ -179,6 +179,31 @@ const objects = ref([]);
 const loaded = ref(false);
 const validationErrors = ref({});
 const processing = ref(false);
+
+const { loadDeeper } = useRelatedExpansion();
+
+// Per-result unfold state for the Related panel ("+N more" → show all direct links).
+const shownAll = ref(new Set());
+const toggleShowAll = (thingId) => {
+    const set = new Set(shownAll.value);
+    if (set.has(thingId)) {
+        set.delete(thingId);
+    } else {
+        set.add(thingId);
+    }
+    shownAll.value = set;
+};
+
+// Load one more level of related objects for a link target on demand.
+const expandTarget = async (link) => {
+    const targetId = link.target?.thing_id;
+    if (!targetId) return;
+    try {
+        link.target.links = await loadDeeper(targetId, 1);
+    } catch (error) {
+        console.error('Search.vue - failed to load deeper related objects:', error);
+    }
+};
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
@@ -329,13 +354,15 @@ const exportData = async () => {
     }
 };
 
-// Monotonic id so an out-of-order response from an earlier request (e.g. the
-// mount-time search vs. the tree's late auto-selection) never overwrites newer
-// results.
+// Monotonic request sequence: only the latest search request may apply its
+// response. Search fires on mount (empty filter → everything, slow) and again
+// once the class-tree default selection lands (filtered, fast). Without this
+// guard the mount request's late response would overwrite the filtered results
+// with the unfiltered list seconds later.
 let searchRequestSeq = 0;
+
 const getObjects = async () => {
     const requestId = ++searchRequestSeq;
-
     let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
@@ -377,6 +404,9 @@ const getObjects = async () => {
         const response = await axios.post('/object', body);
         if (requestId !== searchRequestSeq) return; // stale response
 
+        // A newer search superseded this one — its response will render instead.
+        if (requestId !== searchRequestSeq) return;
+
         validationErrors.value = {};
 
         if (typeof response.data === 'string') {
@@ -391,17 +421,18 @@ const getObjects = async () => {
             objects.value = response.data.things || response.data || [];
         }
     } catch (error) {
-        if (requestId !== searchRequestSeq) return; // stale error
+        // Ignore failures from requests that were superseded by a newer search.
+        if (requestId !== searchRequestSeq) return;
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors || {};
         }
         objects.value = [];
     } finally {
-        if (requestId === searchRequestSeq) {
-            processing.value = false;
-            loaded.value = true;
-        }
+        // Only the latest request owns the processing/loaded flags.
+        if (requestId !== searchRequestSeq) return;
+        processing.value = false;
+        loaded.value = true;
     }
 };
 

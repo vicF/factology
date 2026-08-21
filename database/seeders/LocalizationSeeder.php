@@ -55,8 +55,8 @@ class LocalizationSeeder extends Seeder
         }
 
         // Class hierarchy: Property and Language are subclasses of Everything
-        $this->upsertLink(UUID::EVERYTHING, UUID::LINK_TO_PARENT, UUID::PROPERTY_CLASS, '"Property" is subclass of "Everything"');
-        $this->upsertLink(UUID::EVERYTHING, UUID::LINK_TO_PARENT, UUID::LANGUAGE_CLASS, '"Language" is subclass of "Everything"');
+        $this->upsertLink(UUID::EVERYTHING, UUID::LINK_TO_PARENT, UUID::PROPERTY_CLASS);
+        $this->upsertLink(UUID::EVERYTHING, UUID::LINK_TO_PARENT, UUID::LANGUAGE_CLASS);
 
         // Language objects
         $languages = [
@@ -85,7 +85,7 @@ class LocalizationSeeder extends Seeder
                 ['thing_id'],
                 ['name', 'description', 'public', 'server_uuid', 'name_translations', 'data']
             );
-            $this->upsertLink($lang['thing_id'], UUID::LINK_TO_CLASS, UUID::LANGUAGE_CLASS, '"' . $lang['name'] . '" is of class Language');
+            $this->upsertLink($lang['thing_id'], UUID::LINK_TO_CLASS, UUID::LANGUAGE_CLASS);
         }
     }
 
@@ -93,7 +93,7 @@ class LocalizationSeeder extends Seeder
      * Idempotent link upsert: matches on (one_thing_id, link_type_id, other_thing_id).
      * link_uuid is required (NOT NULL) and therefore generated for new rows.
      */
-    private function upsertLink(string $one, string $type, string $other, string $translation): void
+    private function upsertLink(string $one, string $type, string $other): void
     {
         $link = DB::table('links')
             ->where('one_thing_id', $one)
@@ -104,13 +104,12 @@ class LocalizationSeeder extends Seeder
         if ($link) {
             DB::table('links')
                 ->where('link_id', $link->link_id)
-                ->update(['translation' => $translation, 'public' => true]);
+                ->update(['public' => true]);
         } else {
             DB::table('links')->insert([
                 'one_thing_id'   => $one,
                 'link_type_id'   => $type,
                 'other_thing_id' => $other,
-                'translation'    => $translation,
                 'public'         => true,
                 'link_uuid'      => (string) Str::uuid(),
             ]);

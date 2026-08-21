@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getDb, clearAll } from '@/localDb/index';
 import { seedLocalDb } from '@/localDb/seeder';
+import { saveLink } from '@/localDb/links';
 import { UUID } from '@/constants/uuid';
 import { handleLocalApiCall, handleLocalLinkCall } from '@/localDb/apiHandler';
 
@@ -39,7 +40,7 @@ describe('Local API link enrichment (mirrors server LinkResource)', () => {
         const toSomething = obj.links.find(l => l.other_thing_id === UUID.SOMETHING);
         expect(toSomething).toBeTruthy();
         expect(toSomething.name).toBe('Something');
-        expect(toSomething.link_name).toBe('is a parent of');
+        expect(toSomething.link_name).toBe('is a superclass of');
     });
 
     it('resolves names for links found via other_thing_id too', async () => {
@@ -98,7 +99,7 @@ describe('Local API class tree (mirrors server searchTree)', () => {
         expect(names).toContain('City');
         expect(names).toContain('Vehicle');
         expect(names).toContain('Guitar');
-        expect(names).toContain('is a parent of'); // link type node under Link
+        expect(names).toContain('is a superclass of'); // link type node under Link
         // Orphans (not reachable from Everything) are excluded, like the server
         expect(names).not.toContain('Married to');
         expect(names).not.toContain('meanwhile');
@@ -292,5 +293,81 @@ describe('Local API link creation (POST /link)', () => {
         const stored = await getDb().links.get(res.data.data.link_id);
         expect(stored).toBeTruthy();
         expect(stored.other_thing_id).toBe(UUID.SOMETHING);
+    });
+});
+
+describe('Local API multilevel related (mirrors server depth)', () => {
+    const A = 'aaaaaaaa-0000-4000-a000-0000000000a1';
+    const B = 'aaaaaaaa-0000-4000-a000-0000000000a2';
+    const C = 'aaaaaaaa-0000-4000-a000-0000000000a3';
+
+    beforeEach(async () => {
+        await clearAll();
+        await seedLocalDb();
+        for (const [id, name] of [[A, 'Alpha'], [B, 'Bravo'], [C, 'Charlie']]) {
+            await handleLocalApiCall('post', `/object/${id}`, JSON.stringify({
+                name,
+                type: UUID.G_THING,
+                public: 1,
+            }), CONTEXT);
+        }
+        await saveLink({ link_id: 'lnk-ab', one_thing_id: A, other_thing_id: B, link_type_id: UUID.LINK_TO_PARENT, public: 1 });
+        await saveLink({ link_id: 'lnk-bc', one_thing_id: B, other_thing_id: C, link_type_id: UUID.LINK_TO_PARENT, public: 1 });
+    });
+
+    it('GET /object/{id}?depth=2 returns nested target.links', async () => {
+        const res = await handleLocalApiCall('get', `/object/${A}?depth=2`);
+        const obj = res.data.data;
+
+        const bLink = obj.links.find(l => l.target?.thing_id === B);
+        expect(bLink).toBeTruthy();
+        expect(bLink.target.links).toBeDefined();
+        expect(bLink.target.links.some(l => l.target?.thing_id === C)).toBe(true);
+        // Nested targets are shallow — no deeper recursion beyond the requested depth
+        const cLink = bLink.target.links.find(l => l.target?.thing_id === C);
+        expect(cLink.target.links).toBeUndefined();
+    });
+
+    it('default depth 1 returns shallow targets (no nesting)', async () => {
+        const res = await handleLocalApiCall('get', `/object/${A}`);
+        const obj = res.data.data;
+
+        const bLink = obj.links.find(l => l.target?.thing_id === B);
+        expect(bLink).toBeTruthy();
+        expect(bLink.target.links).toBeUndefined();
+    });
+
+    it('cuts cycles so a thing appears once at its lowest level', async () => {
+        // Add A-C chord: A-B, B-C, A-C
+        await saveLink({ link_id: 'lnk-ac', one_thing_id: A, other_thing_id: C, link_type_id: UUID.LINK_TO_PARENT, public: 1 });
+
+        const res = await handleLocalApiCall('get', `/object/${A}?depth=4`);
+        const obj = res.data.data;
+
+        // A's direct targets: B and C
+        const directTargets = obj.links.map(l => l.target?.thing_id).sort();
+        expect(directTargets).toEqual([B, C].sort());
+
+        // B's deeper links are cut — both A and C are already at level 1,
+        // so B (a recursed node) carries an empty target.links.
+        const bLink = obj.links.find(l => l.target?.thing_id === B);
+        expect(bLink.target.links).toEqual([]);
+    });
+
+    it('search with depth in the body attaches related links', async () => {
+        const res = await handleLocalApiCall('post', '/object', JSON.stringify({ depth: 1 }));
+        const thing = res.data.things.find(t => t.thing_id === A);
+
+        expect(thing.links).toBeDefined();
+        expect(thing.links.length).toBeGreaterThan(0);
+        expect(thing.links[0].target).toBeDefined();
+        expect(thing.links[0].target.name).toBeTruthy();
+    });
+
+    it('search with depth 0 disables related links', async () => {
+        const res = await handleLocalApiCall('post', '/object', JSON.stringify({ depth: 0 }));
+        const thing = res.data.things.find(t => t.thing_id === A);
+
+        expect(thing.links).toBeUndefined();
     });
 });

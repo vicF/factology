@@ -8,7 +8,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
-import { objectName } from '../utils/localized.js';
+import { fieldText, objectName } from '../utils/localized.js';
 
 const props = defineProps({
     link: {
@@ -27,6 +27,13 @@ const props = defineProps({
     customClass: {
         type: String,
         default: ''
+    },
+    // When true, the endpoint matching `object` is rendered as a compact
+    // "*" marker instead of its name — used in related-items lists where the
+    // common object would otherwise be repeated on every row.
+    hideObjectName: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -52,18 +59,30 @@ const generateLinkDescription = (link, object) => {
     // name is passed, so the fallbacks are the current object's name or
     // 'Unknown' — the LinkedObject preload fills the cache and this computed
     // re-resolves.)
+    // Related/recursive links from RelatedObjectsResolver carry `target`
+    // (the child endpoint) but no `one_name` — prefer `target.name` so the
+    // non-common endpoint resolves instead of falling back to "Unknown".
     const oneName = objectIsOne
         ? resolveName(link.one_thing_id, objectName(object))
-        : resolveName(link.one_thing_id, link.one_name);
+        : resolveName(link.one_thing_id, link.target?.name ?? link.one_name);
 
     const otherName = objectIsOne
         ? resolveName(link.other_thing_id, link.name)
         : resolveName(link.other_thing_id, objectName(object));
 
-    const linkTypeName = resolveName(link.link_type_id, link.link_name);
+    // Prefer the payload's translated link-type name (link_type thing's
+    // name_translations), then the cache, then the plain English name.
+    const linkTypeName = fieldText(link.link_name, link.link_name_translations)
+        || resolveName(link.link_type_id, link.link_name);
 
-    const oneLink = `<a href="/object/${link.one_thing_id}">${oneName}<!-- (one)--></a>`
-    const otherLink = `<a href="/object/${link.other_thing_id}">${otherName}<!-- (other)--></a>`
+    // Space-saving marker for the endpoint that equals the passed object.
+    const marker = '<span class="link-common-marker">*</span>';
+    const oneIsObject = link.one_thing_id === object.thing_id;
+    const oneText = oneIsObject && props.hideObjectName ? marker : oneName;
+    const otherText = !oneIsObject && props.hideObjectName ? marker : otherName;
+
+    const oneLink = `<a href="/object/${link.one_thing_id}">${oneText}<!-- (one)--></a>`
+    const otherLink = `<a href="/object/${link.other_thing_id}">${otherText}<!-- (other)--></a>`
 
     parts.push(oneLink)
     parts.push(' → ')
@@ -124,5 +143,9 @@ const sizeClass = computed(() => {
     --bs-link-color-rgb: none !important;
     --bs-link-opacity: none !important;
     --bs-link-hover-color-rgb: none !important;
+}
+
+.link-common-marker {
+    font-weight: bold;
 }
 </style>

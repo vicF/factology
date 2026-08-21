@@ -13,7 +13,6 @@ class StoreLinkRequest extends FormRequest
             'one_thing_id'    => 'required|string|uuid',
             'other_thing_id'  => 'required|string|uuid',
             'link_type_id'    => 'required|string|uuid',
-            'translation'     => 'nullable|string|max:255',
             'description'     => 'nullable|string|max:1000',
             'public'          => 'nullable|integer|in:0,1',
         ];

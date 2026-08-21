@@ -80,7 +80,9 @@ vi.mock('../resources/js/localization/languageCatalog.js', () => ({
 
 const EDIT_ID = 'existing-object-id'
 const NEW_OBJECT_ID = 'brand-new-object-id'
-const DEFAULT_LINK_TYPE = '4b27fd0c-d8be-425c-a529-2186b2589e76'
+const DEFAULT_LINK_TYPE = 'c217c185-742f-4a9f-8e69-acea2b4f5aea' // LINK_TO_CLASS (is of class)
+const REGULAR_LINK_TYPE = 'eca6d324-8ccd-45a1-b8ad-4a2f4bc72d08' // is a biological parent (a plain link type)
+const NEW_LINK_DEFAULT = '2da45f14-69c6-4d56-9f2f-809fda14abf5' // is related to — default for new link rows
 const OBJECT = { thing_id: EDIT_ID, name: 'Existing Object', type: 3 }
 
 // The whole modal is teleported to <body>, so query the rendered DOM directly.
@@ -131,6 +133,7 @@ describe('EditObject', () => {
 
         expect(document.querySelectorAll('.linked-object').length).toBe(0)
         expect(formButtons().map(b => b.textContent.trim())).toEqual([
+            'Add property',
             'Add',
             '🕒',
             '?',
@@ -227,6 +230,90 @@ describe('EditObject', () => {
         expect(buttons.some(b => b.textContent.trim() === 'Swap')).toBe(true)
     })
 
+    it('keeps the swapped link direction after swapping a locked row', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        // The new row is locked to the edited object; the user picks the other end.
+        const firstSlot = document.querySelector('.linked-object .form-control-plaintext')
+        expect(firstSlot.textContent).toContain('Existing Object')
+        wrapper.vm.linkedObjects[0].other_thing_id = 'other-object-id'
+        await nextTick()
+        await flushPromises()
+
+        // Swap: the edited object should move to the second slot.
+        const swapButton = [...document.querySelectorAll('.linked-object button')]
+            .find(b => b.textContent.trim() === 'Swap')
+        expect(swapButton.hasAttribute('disabled')).toBe(false)
+        swapButton.click()
+        await nextTick()
+        await flushPromises()
+
+        // The row's direction is now reversed and the first slot became editable.
+        expect(wrapper.vm.linkedObjects[0].one_thing_id).toBe('other-object-id')
+        expect(wrapper.vm.linkedObjects[0].other_thing_id).toBe(EDIT_ID)
+        expect(document.querySelector('.linked-object input[name="one_thing"]')).toBeTruthy()
+        // The edited object moved to the second slot, where it stays read-only.
+        expect(document.querySelector('.linked-object input[name="other_thing"]')).toBeNull()
+        const secondSlot = document.querySelector('.linked-object .form-control-plaintext')
+        expect(secondSlot.textContent).toContain('Existing Object')
+
+        // Saving the object carries the swapped direction to the backend.
+        submitForm()
+        await flushPromises()
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const [url, body] = axios.put.mock.calls[0]
+        expect(url).toBe(`/object/${EDIT_ID}`)
+        expect(body.links_to_add).toEqual([
+            {
+                one_thing_id: 'other-object-id',
+                link_type_id: NEW_LINK_DEFAULT,
+                other_thing_id: EDIT_ID,
+                description: '',
+                public: 0,
+            },
+        ])
+    })
+
+    it('enables Swap once a linked object is created into the empty slot', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        clickButton('Add Link')
+        await nextTick()
+
+        const swapButton = () =>
+            [...document.querySelectorAll('.linked-object button')].find(b => b.textContent.trim() === 'Swap')
+        // Only one end is filled yet, so Swap is disabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(true)
+
+        // Clicking "Create" opens the create-object modal (App.vue stacks it on
+        // top of this one); a saved object comes back via the link-created event.
+        const createButton = [...document.querySelectorAll('.linked-object .flex-button')]
+            .find(b => b.textContent.includes('Create'))
+        createButton.click()
+        await nextTick()
+
+        const openCalls = eventBusMock.emit.mock.calls.filter(c => c[0] === 'open-create-modal')
+        expect(openCalls.length).toBe(1)
+        const payload = openCalls[0][1]
+        expect(payload.callback.type).toBe('link-created')
+
+        eventBusMock.emit('link-created', {
+            requestId: payload.callback.requestId,
+            newObjectId: NEW_OBJECT_ID,
+            newObjectName: 'Created Author',
+            index: 0,
+            linkTypeUuid: payload.callback.linkTypeUuid,
+            comment: '',
+        })
+        await flushPromises()
+
+        // Both ends are now filled → Swap becomes enabled.
+        expect(swapButton().hasAttribute('disabled')).toBe(false)
+    })
+
     it('fills a link with a newly created object instead of an existing one', async () => {
         await mountEditObject({ object: OBJECT })
 
@@ -277,7 +364,7 @@ describe('EditObject', () => {
         expect(body.links_to_add).toEqual([
             {
                 one_thing_id: EDIT_ID,
-                link_type_id: DEFAULT_LINK_TYPE,
+                link_type_id: NEW_LINK_DEFAULT,
                 other_thing_id: NEW_OBJECT_ID,
                 description: '',
                 public: 0,
@@ -286,11 +373,13 @@ describe('EditObject', () => {
     })
 
     it('carries link start/end dates into the saved links_to_update payload', async () => {
+        // A regular link type — an existing LINK_TO_CLASS link would be routed
+        // to the special "Class" field instead of links_to_update.
         const initialLinkedObjects = [{
             link_id: 42,
             one_thing_id: EDIT_ID,
             other_thing_id: 'other-object-id',
-            link_type_id: DEFAULT_LINK_TYPE,
+            link_type_id: REGULAR_LINK_TYPE,
             description: '',
             link_start: '20260811120000',
             link_end: '20260811220000',
@@ -314,8 +403,8 @@ describe('EditObject', () => {
             link_id: 42,
             one_thing_id: EDIT_ID,
             other_thing_id: 'other-object-id',
-            link_type_id: DEFAULT_LINK_TYPE,
-            translation: '',
+            link_type_id: REGULAR_LINK_TYPE,
+            description: '',
             link_start: '20260811120000',
             link_end: '20260811220000',
             link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
@@ -403,6 +492,41 @@ describe('EditObject', () => {
         await flushPromises()
 
         expect(document.activeElement).toBe(mainForm().querySelector('input[type="url"]'))
+    })
+
+    // ── Legacy array properties map ──
+
+    it('normalizes a legacy array properties map and saves a point into it', async () => {
+        // Objects created before the properties map format may carry
+        // `data.properties` as an array (old list). Writing a property by id
+        // onto an array is dropped by JSON.stringify, so the form must coerce
+        // it to a plain object before the user can save a coordinate point.
+        await mountEditObject({
+            object: {
+                thing_id: EDIT_ID,
+                name: 'Legacy Dacha',
+                type: 3,
+                data: { properties: [] },
+            },
+        })
+
+        expect(Array.isArray(wrapper.vm.formData.data.properties)).toBe(false)
+
+        // What the geo editor / "Add property" would attach.
+        wrapper.vm.formData.data.properties['geo-prop-id'] = {
+            type: 'Point',
+            coordinates: [30.5, 59.5],
+        }
+        await nextTick()
+
+        submitForm()
+        await flushPromises()
+
+        expect(axios.put).toHaveBeenCalledTimes(1)
+        const [, body] = axios.put.mock.calls[0]
+        expect(body.data.properties).toEqual({
+            'geo-prop-id': { type: 'Point', coordinates: [30.5, 59.5] },
+        })
     })
 
     // ── Owner (system ownership) — admins only ──

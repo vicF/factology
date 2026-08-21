@@ -12,6 +12,7 @@
 //    plain scalar, a `{ lang-code: text }` localized map, or `{ value, unit }`.
 
 import { i18n } from '../lang/i18n';
+import { isGeoJsonGeometry } from './geo.js';
 
 /** Current UI locale from vue-i18n. */
 export function currentLocale() {
@@ -139,6 +140,7 @@ function pushString(out, value) {
 function collectValue(out, value) {
     if (value == null) return;
     if (typeof value === 'object') {
+        if (isGeoJsonGeometry(value)) return; // coordinates aren't searchable text
         if ('value' in value) {
             // structured { value, unit, ... } — collect the value once, then the
             // remaining metadata keys (unit etc.), skipping the reserved keys.

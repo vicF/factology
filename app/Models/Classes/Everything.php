@@ -9,6 +9,8 @@ namespace App\Models\Classes;
 
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
+use App\Services\GeoProperties;
+use App\Services\RelatedObjectsResolver;
 use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
 use InvalidArgumentException;
@@ -312,7 +314,7 @@ class Everything
      * Returns data and links to display object on the web
      * @return void
      */
-    public static function getDataById($id): array
+    public static function getDataById($id, int $depth = 0): array
     {
         LOG::debug('retrieving object data for id: ' . $id);
         $class = self::getClassDataByObjectId($id);
@@ -320,7 +322,7 @@ class Everything
 
         try {
             /** @var Everything $className */
-            return $className::getClassSpecificDataById($id, $class);
+            return $className::getClassSpecificDataById($id, $class, $depth);
 
             /*$thing = $className::_getRow($id)->first();
             // Keep date in db format to be able to compare
@@ -331,7 +333,7 @@ class Everything
         }
     }
 
-    public static function getClassSpecificDataById($id, $class): array
+    public static function getClassSpecificDataById($id, $class, int $depth = 0): array
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
@@ -351,6 +353,20 @@ class Everything
                 $thing[$jsonField] = json_decode($thing[$jsonField], true);
             }
         }
+
+        // Legacy objects may store data.properties as a list (old format); the
+        // property map must be an object (thing_id => value) so clients can
+        // attach values by property id. An empty list normalizes to an empty object.
+        if (isset($thing['data']['properties']) && $thing['data']['properties'] === []) {
+            $thing['data']['properties'] = new \stdClass();
+        }
+
+        // Geographic coordinates carried by the object's properties (by value shape).
+        $thing['geo'] = GeoProperties::extract(
+            isset($thing['data']['properties']) && is_array($thing['data']['properties'])
+                ? $thing['data']['properties']
+                : null
+        );
 
         // Clean up class object: extract just relevant info, excluding heavy json from c.data
         $thing['class'] = $class ? [
@@ -376,6 +392,7 @@ class Everything
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('other_thing.public as target_public')
             ->limit(50);
 
@@ -385,6 +402,7 @@ class Everything
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('one_thing.public as target_public')
             ->limit(50);
 
@@ -421,6 +439,34 @@ class Everything
             })
             ->values()
             ->toArray();
+
+        // Decode the link type's translations (jsonb comes back as a string).
+        foreach ($thing['links'] as &$flatLink) {
+            if (isset($flatLink->link_name_translations) && is_string($flatLink->link_name_translations)) {
+                $decoded = json_decode($flatLink->link_name_translations, true);
+                $flatLink->link_name_translations = $decoded ?: null;
+            }
+        }
+        unset($flatLink);
+
+        // Multilevel related objects: when a depth is requested, resolve the
+        // nested tree of related objects and attach a `target` (with nested
+        // `target.links` at deeper levels) onto the matching flat link rows.
+        // Additive only — the flat fields above are untouched, so existing
+        // consumers (edit form, links section) keep working unchanged.
+        if ($depth > 0 && !empty($thing['links'])) {
+            $related = (new RelatedObjectsResolver)->forObject($id, $depth, RelatedObjectsResolver::BREADTH_CAP);
+            $relatedByLinkId = [];
+            foreach ($related as $rel) {
+                $relatedByLinkId[$rel['link_id']] = $rel['target'];
+            }
+            foreach ($thing['links'] as &$link) {
+                if (isset($relatedByLinkId[$link->link_id])) {
+                    $link->target = $relatedByLinkId[$link->link_id];
+                }
+            }
+            unset($link);
+        }
 
         // Annotations pointing to URLs instead of internal objects.
         // The whole list is returned; the frontend diffs it on save.
@@ -747,54 +793,18 @@ class Everything
 
     public function setClass(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is of class $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
         return $this->setLink($classLink);
     }
 
     public function setParent(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['one_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is a child of $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
         return $this->setLink($classLink);
     }
 
-    protected function setLinkTranslation(array &$link): void
-    {
-        if (empty($link['translation'])) {
-            try {
-                $linkedObjectName = $this->getObjectNameByUid($link['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for object {$link['other_thing_id']}", 500, $e);
-            }
-            switch ($link['link_type_id']) {
-                case UUID::LINK_TO_CLASS:
-                    $link['translation'] = "{$this->name} is of class $linkedObjectName";
-                    break;
-                default:
-                    $link['translation'] = "{$this->name} is related to $linkedObjectName";
-            }
-
-        }
-    }
-
     public function setLink(array $link): bool
     {
-        //$this->setLinkTranslation($link);
         if (@$link['link_id']) {
             // update
             return $this->updateLink($link);
@@ -805,13 +815,15 @@ class Everything
 
     public function updateLink($link): int
     {
-        $this->setLinkTranslation($link);
+        $this->assertParentKindConsistent($link);
         $update = [
             'one_thing_id'   => $link['one_thing_id'],
             'link_type_id'   => $link['link_type_id'],
             'other_thing_id' => $link['other_thing_id'],
-            'translation'    => $link['translation'],
         ];
+        if (array_key_exists('description', $link)) {
+            $update['description'] = $link['description'];
+        }
         foreach (self::LINK_DATE_FIELDS as $field) {
             if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
                 $update[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
@@ -824,7 +836,6 @@ class Everything
 
     public function addLink(array $link): bool
     {
-        $this->setLinkTranslation($link);
         // Ensure that both ids are in place
         if(empty($link['one_thing_id']) && empty($link['other_thing_id'])) {
             throw new InvalidArgumentException('Link object ids (one_thing_id, other_thing_id) are empty ');
@@ -839,6 +850,8 @@ class Everything
             && DB::table('things')->where('thing_id', $link['link_type_id'])->value('abstract')) {
             throw new InvalidArgumentException("Link type {$link['link_type_id']} is abstract and cannot be used to create a link");
         }
+
+        $this->assertParentKindConsistent($link);
 
         // Check if link already exists by unique constraint — the endpoint pair
         // is matched in EITHER direction, so adding the reverse of an existing
@@ -856,14 +869,18 @@ class Everything
             ->first();
 
         if ($existing) {
-            // Update existing — preserve link_uuid. Only re-word the translation
-            // when the existing row already points the same way; a reverse match
-            // keeps its own direction-specific wording.
-            $sameDirection = $existing->one_thing_id === $link['one_thing_id']
-                && $existing->other_thing_id === $link['other_thing_id'];
-            return DB::table('links')
-                ->where('link_id', $existing->link_id)
-                ->update(['translation' => $sameDirection ? $link['translation'] : $existing->translation]) > 0;
+            // Update existing — preserve link_uuid. Description (if provided)
+            // applies regardless of direction.
+            $existingUpdate = [];
+            if (array_key_exists('description', $link)) {
+                $existingUpdate['description'] = $link['description'];
+            }
+            if ($existingUpdate) {
+                return DB::table('links')
+                    ->where('link_id', $existing->link_id)
+                    ->update($existingUpdate) > 0;
+            }
+            return true;
         }
 
         // Insert new link with generated UUID
@@ -872,14 +889,60 @@ class Everything
             'one_thing_id'  => $link['one_thing_id'],
             'link_type_id'  => $link['link_type_id'],
             'other_thing_id'=> $link['other_thing_id'],
-            'translation'   => $link['translation'],
         ];
+        if (array_key_exists('description', $link)) {
+            $insert['description'] = $link['description'];
+        }
         foreach (self::LINK_DATE_FIELDS as $field) {
             if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
                 $insert[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
             }
         }
         return DB::table('links')->insert($insert);
+    }
+
+    /**
+     * The class hierarchy (under Everything/Something) and the link taxonomy
+     * (under Link) are two separate trees. A "is a superclass of" edge may only
+     * connect nodes of the same kind — a class/thing cannot hang under a link
+     * type, and a link type cannot hang under a class. The only exceptions are
+     * the structural roots that host the other kind by design (Everything hosts
+     * the Link taxonomy root; System hosts system-internal link types).
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertParentKindConsistent(array $link): void
+    {
+        if (($link['link_type_id'] ?? null) !== UUID::LINK_TO_PARENT) {
+            return;
+        }
+        $parentId = $link['one_thing_id'] ?? null;
+        $childId  = $link['other_thing_id'] ?? null;
+        if (empty($parentId) || empty($childId)) {
+            return; // partial link — normalized by the caller
+        }
+
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return; // an endpoint is not in the DB yet — let the insert fail naturally
+        }
+
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return; // same kind — fine
+        }
+        if (in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true)) {
+            return; // structural roots may host the other kind
+        }
+
+        $kind = fn (bool $isLink) => $isLink ? 'link type' : 'class';
+        throw new InvalidArgumentException(
+            "Cannot set a {$kind($parentIsLink)} as the parent of a {$kind($childIsLink)} — "
+            . 'classes and link types form separate trees.'
+        );
     }
 
     public function setAsChildOf($parentClass): bool
@@ -965,7 +1028,6 @@ class Everything
     protected function _getLinkDataFromPost($link)
     {
         $res = [
-            'translation'    => $link['description'],
             Thing::ID        => $this->{Thing::ID},
             'link_type_id'   => $link['type'],
             'other_thing_id' => $link['uuid'],

@@ -449,6 +449,12 @@
     border-top: 1px dashed #dee2e6;
 }
 
+/* Related lists render LinkDescription at .text-small (0.875rem) by default;
+   keep the compact related-link text smaller to match .link-item. */
+.links-list .link-description {
+    font-size: 0.7rem !important;
+}
+
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
@@ -647,4 +653,30 @@
     .result-info-section {
         margin-top: -2px;
     }
+}
+
+/* Link-type label shown before the target in related-object rows. */
+.link-item-type {
+    font-size: 0.6rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+}
+
+.link-item-arrow {
+    color: #adb5bd;
+    font-size: 0.65rem;
+}
+
+/* .more-links is styled as a div; as a button it needs a reset so the
+   "+N more" toggles (search + object page) render as plain links. */
+button.more-links {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
 }

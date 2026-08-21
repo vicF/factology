@@ -49,6 +49,7 @@
                 :depth="depth + 1"
                 :checked-items="checkedItems"
                 :public="node.public"
+                :type="node.type"
                 @update-checked="handleCheckedUpdate"
             ></tree-menu>
         </div>
@@ -62,7 +63,7 @@ import axios from 'axios';
 import { useSearchStore } from '../stores/search';
 import { useObjectsStore } from '../stores/objects';
 import { eventBus } from '../eventBus';
-import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TO_PARENT } from '../constants.js';
+import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
 import { useUiStore } from '../stores/ui';
 import { fieldText } from '../utils/localized.js';
@@ -106,6 +107,10 @@ const props = defineProps({
     },
     translations: {
         type: Object,
+        default: null
+    },
+    type: {
+        type: Number,
         default: null
     }
 });
@@ -213,20 +218,22 @@ const onCheckboxChange = () => {
     eventBus.emit('trigger-search');
 };
 
-// Create a subclass (Class type)
+// Create a subclass (Class type) — or a sub link type when the parent node is
+// a link type (a more specific relationship, e.g. "knows of" → "read a book").
 const openCreateSubclassModal = () => {
-    console.log('TreeMenu.vue - Creating subclass of:', props.name);
+    const isLinkTypeNode = props.type === LINK_TYPE;
+    console.log(`TreeMenu.vue - Creating ${isLinkTypeNode ? 'link type' : 'subclass'} of:`, props.name);
     const initialLinkedObjects = [];
     if (props.id) {
         initialLinkedObjects.push({
             one_thing_id: props.id,
             link_type_id: LINK_TO_PARENT,
-            description: `Subclass of ${props.name}`,
+            description: `${isLinkTypeNode ? 'Link type' : 'Subclass'} of ${props.name}`,
         });
     }
     const payload = {
-        title: `Create Subclass of "${props.name}"`,
-        params: { type: CLASS_TYPE },
+        title: `Create ${isLinkTypeNode ? 'Link Type' : 'Subclass'} of "${props.name}"`,
+        params: { type: isLinkTypeNode ? LINK_TYPE : CLASS_TYPE },
         initialLinkedObjects,
         callback: {
             type: 'class-created',

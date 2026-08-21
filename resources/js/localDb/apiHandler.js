@@ -40,6 +40,11 @@ function newLinkId() {
 /** Base path to strip from URLs */
 const API_PREFIX = '/object';
 
+// Multilevel related-object limits (mirror App\Services\RelatedObjectsResolver).
+const DEPTH_CAP = 6;
+const SEARCH_BREADTH = 5;
+const BREADTH_CAP = 8;
+
 /**
  * Handle /user endpoint (auth check).
  * In offline mode, returns a local anonymous user.
@@ -73,7 +78,14 @@ export async function seedDemoData() {
  * @returns {object} { data: {...}, status: 200 } or throws
  */
 export async function handleLocalApiCall(method, url, data = null, context = {}) {
-    const normalizedUrl = url.replace(API_PREFIX, '').replace(/^\/+/, '');
+    // `depth` may arrive as a query string (GET /object/{id}?depth=N).
+    const [pathPart, queryPart] = String(url).split('?');
+    const depthParam = queryPart ? new URLSearchParams(queryPart).get('depth') : null;
+    const depth = depthParam != null
+        ? Math.min(Math.max(parseInt(depthParam, 10) || 0, 0), DEPTH_CAP)
+        : 1;
+
+    const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
     // ── /object (POST - search) ──────────────────────────────────────
@@ -85,7 +97,7 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     const id = parts[0];
 
     if (method === 'get') {
-        return handleGet(id);
+        return handleGet(id, depth);
     }
 
     if (method === 'post') {
@@ -164,17 +176,21 @@ async function handleSearch(body) {
         return String(va).localeCompare(String(vb)) * sortDir;
     });
 
-    // Enrich with links + resolved class info
+    // Enrich with links + resolved class info. `depth` mirrors the server:
+    // depth 0 → no links, depth 1 → direct related (breadth-capped), deeper →
+    // nested target.links.
+    const parsedDepth = parseInt(params.depth ?? '1', 10);
+    const depth = Number.isNaN(parsedDepth) ? 1 : Math.min(Math.max(parsedDepth, 0), DEPTH_CAP);
+
     const thingsWithLinks = [];
     for (const obj of results) {
-        const links = await enrichLinks(
-            await listLinksForThing(obj.thing_id),
-            obj.thing_id,
-        );
+        const links = depth > 0
+            ? await enrichNested(await listLinksForThing(obj.thing_id), obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
+            : undefined;
         thingsWithLinks.push({
             ...obj,
             class: await resolveClassInfo(obj.thing_id),
-            links: links.length > 0 ? links : undefined,
+            links: links && links.length > 0 ? links : undefined,
         });
     }
 
@@ -210,20 +226,26 @@ async function resolveClassInfo(thingId) {
     };
 }
 
-async function handleGet(id) {
+async function handleGet(id, depth = 1) {
     const obj = await getObject(id);
     if (!obj) {
         throw { response: { status: 404, data: { message: 'Not found' } } };
     }
 
-    const links = await enrichLinks(await listLinksForThing(id), id);
+    // depth 1 (default) → direct related links with a resolved `target`;
+    // depth >= 2 → nested target.links, mirroring GET /object/{id}?depth=N.
+    // The top level stays unlimited (all direct links are returned, like the
+    // server's flat list); only deeper levels are breadth-capped.
+    const links = depth > 0
+        ? await enrichNested(await listLinksForThing(id), id, depth, null, BREADTH_CAP, Infinity)
+        : undefined;
 
     return {
         data: {
             data: {
                 ...obj,
                 class: await resolveClassInfo(id),
-                links: links.length > 0 ? links : undefined,
+                links: links && links.length > 0 ? links : undefined,
             },
             success: true,
         },
@@ -307,7 +329,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: thingId,
             link_type_id: UUID.LINK_TO_CLASS,
             other_thing_id: cls.other_thing_id,
-            translation: cls.description || cls.translation || '',
+            description: cls.description || '',
             public: cls.public ?? 1,
         }, { skipChangeLog: true });
     }
@@ -321,7 +343,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: parent.one_thing_id,
             link_type_id: UUID.LINK_TO_PARENT,
             other_thing_id: parent.other_thing_id || thingId,
-            translation: parent.description || parent.translation || '',
+            description: parent.description || '',
             public: parent.public ?? 1,
         }, { skipChangeLog: true });
     }
@@ -333,7 +355,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: link.one_thing_id || thingId,
             link_type_id: link.link_type_id,
             other_thing_id: link.other_thing_id,
-            translation: link.description || link.translation || '',
+            description: link.description || '',
             public: link.public ?? 0,
         }, { skipChangeLog: true });
     }
@@ -345,7 +367,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: link.one_thing_id || thingId,
             link_type_id: link.link_type_id,
             other_thing_id: link.other_thing_id,
-            translation: link.description || link.translation || '',
+            description: link.description || '',
             public: link.public ?? 0,
         }, { skipChangeLog: true });
     }
@@ -436,10 +458,125 @@ async function enrichLinks(links, currentThingId) {
             name: target?.name ?? link.name ?? null,
             one_name: source?.name ?? link.one_name ?? null,
             link_name: linkType?.name ?? link.link_name ?? null,
+            link_name_translations: linkType?.name_translations ?? link.link_name_translations ?? null,
             type: target?.type ?? link.type,
             target_public: target?.public ?? link.target_public,
+            // Resolved other endpoint, mirroring the server's `link.target`.
+            target: target ? {
+                thing_id: target.thing_id,
+                name: target.name ?? null,
+                name_translations: target.name_translations ?? null,
+                type: target.type ?? null,
+                class: null,
+                public: target.public ?? null,
+                description: target.description ?? null,
+            } : undefined,
         };
     });
+}
+
+/**
+ * Rank raw links by "richness" (target has description/data) → recency
+ * (link_start desc, fallback target _updatedAt desc) → name, then cap to the
+ * breadth limit. Mirrors the server's RelatedObjectsResolver ordering.
+ */
+async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
+    if (!rawLinks || rawLinks.length === 0) return [];
+    const enriched = await enrichLinks(rawLinks, currentThingId);
+
+    const targetIds = enriched.map(l => l.target?.thing_id).filter(Boolean);
+    const objs = await getDb().objects.bulkGet(targetIds);
+    const objById = {};
+    for (const o of objs) {
+        if (o) objById[o.thing_id] = o;
+    }
+
+    enriched.sort((a, b) => {
+        const ta = objById[a.target?.thing_id];
+        const tb = objById[b.target?.thing_id];
+        const ra = richnessOf(ta);
+        const rb = richnessOf(tb);
+        if (ra !== rb) return rb - ra;
+
+        const la = a.link_start ?? null;
+        const lb = b.link_start ?? null;
+        if (la != null && lb == null) return -1;
+        if (lb != null && la == null) return 1;
+        if (la != null && lb != null) return Number(lb) - Number(la);
+
+        const ua = ta?._updatedAt ?? 0;
+        const ub = tb?._updatedAt ?? 0;
+        if (ua !== ub) return ub - ua;
+
+        return String(a.target?.name ?? '').localeCompare(String(b.target?.name ?? ''));
+    });
+
+    return enriched.slice(0, breadth);
+}
+
+function richnessOf(obj) {
+    if (!obj) return 0;
+    const hasDescription = typeof obj.description === 'string' && obj.description.trim() !== '';
+    const hasData = obj.data && typeof obj.data === 'object' && Object.keys(obj.data).length > 0;
+    return hasDescription || hasData ? 1 : 0;
+}
+
+/**
+ * Recursively enrich links with nested `target.links` up to `remainingDepth`.
+ * Mirrors the server's BFS:
+ *  - the top level accepts every link (no cross-root dedupe),
+ *  - self-links are dropped,
+ *  - at deeper levels a thing already visited (placed at a lower level) is cut,
+ *  - only the top `breadth` links at a node get nested children.
+ *
+ * @param {Array} rawLinks        links of `currentThingId` from listLinksForThing
+ * @param {string} currentThingId
+ * @param {number} remainingDepth 1 = direct only, >=2 = nested target.links
+ * @param {Set|null} visited      pass null for the top level
+ * @param {number} breadth        max links per node at deeper levels
+ * @param {number|null} topLevelLimit cap for the top level (Infinity = all,
+ *                                   e.g. GET /object/{id}; SEARCH_BREADTH for
+ *                                   search results)
+ */
+async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = null, breadth = BREADTH_CAP, topLevelLimit = null) {
+    const isTopLevel = visited === null;
+    if (isTopLevel) {
+        visited = new Set([currentThingId]);
+    }
+
+    const limit = topLevelLimit != null ? topLevelLimit : breadth;
+    const ranked = await rankLinksForBreadth(rawLinks, currentThingId, limit);
+    if (remainingDepth <= 1 || ranked.length === 0) return ranked;
+
+    // Children of this whole level, so deeper recursion dedupes against them.
+    const childIds = new Set();
+    for (const link of ranked) {
+        const tid = link.target?.thing_id;
+        if (tid && tid !== currentThingId) childIds.add(tid);
+    }
+
+    const result = [];
+    for (let i = 0; i < ranked.length; i++) {
+        const link = ranked[i];
+        const tid = link.target?.thing_id;
+        if (!tid || tid === currentThingId) {
+            continue; // self-link — never returned
+        }
+        if (!isTopLevel && visited.has(tid)) {
+            continue; // already placed at a lower level — cut (server dedupe)
+        }
+        if (i < breadth) {
+            const nextVisited = new Set([...visited, ...childIds]);
+            const childLinks = await listLinksForThing(tid);
+            const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null);
+            // Recursed links always carry `target.links` (possibly empty) —
+            // mirrors the server, so the frontend can distinguish a resolved
+            // but empty node from one that was never loaded.
+            link.target.links = nested;
+        }
+        result.push(link);
+    }
+    return result;
 }
 
 /**
@@ -506,7 +643,6 @@ async function buildClassTree(classObjects) {
             type: obj.type,
             public: obj.public || 0,
             nodes: children,
-            translation: null,
             parent_id: parentId,
         };
     }

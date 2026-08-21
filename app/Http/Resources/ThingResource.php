@@ -8,7 +8,7 @@ class ThingResource extends JsonResource
 {
     public function toArray($request)
     {
-        return [
+        $out = [
             'thing_id'                => $this->thing_id,
             'name'                    => $this->name,
             'name_translations'       => $this->decodeJson($this->name_translations ?? null),
@@ -25,6 +25,17 @@ class ThingResource extends JsonResource
             'deleted'                 => (bool) $this->deleted,
             'data'                    => $this->decodeJson($this->data ?? null),
         ];
+        // Only emitted when the search resolver attached per-thing links.
+        if (isset($this->links)) {
+            $out['links'] = $this->links;
+        }
+        // Taxonomy base category for link-type results (grouping in the picker).
+        if (isset($this->category_id)) {
+            $out['category_id']           = $this->category_id;
+            $out['category_name']         = $this->category_name;
+            $out['category_translations'] = $this->decodeJson($this->category_translations ?? null);
+        }
+        return $out;
     }
 
     /**

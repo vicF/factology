@@ -35,7 +35,7 @@ const makeObject = (t) => ({
 
 const makeLink = (l) => ({
     link_id: `seed-${l.one}-${l.other}`,
-    translation: l.translation,
+    description: l.description || null,
     one_thing_id: l.one,
     link_type_id: UUID.LINK_TO_PARENT,
     other_thing_id: l.other,
