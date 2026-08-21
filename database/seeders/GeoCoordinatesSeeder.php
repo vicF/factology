@@ -47,8 +47,7 @@ class GeoCoordinatesSeeder extends Seeder
         $this->upsertLink(
             UUID::COORDINATES_PROPERTY,
             UUID::LINK_TO_CLASS,
-            UUID::PROPERTY_CLASS,
-            '"Coordinates" is of class Property'
+            UUID::PROPERTY_CLASS
         );
 
         // The property applies to Place — and, being inherited, to all its
@@ -56,13 +55,12 @@ class GeoCoordinatesSeeder extends Seeder
         $this->upsertLink(
             UUID::COORDINATES_PROPERTY,
             UUID::PROPERTY_APPLIES_TO,
-            UUID::PLACE_CLASS,
-            'Coordinates is a property of class Place'
+            UUID::PLACE_CLASS
         );
     }
 
     /** Idempotent link upsert: matches on (one_thing_id, link_type_id, other_thing_id). */
-    private function upsertLink(string $one, string $type, string $other, string $translation): void
+    private function upsertLink(string $one, string $type, string $other): void
     {
         $link = DB::table('links')
             ->where('one_thing_id', $one)
@@ -73,13 +71,12 @@ class GeoCoordinatesSeeder extends Seeder
         if ($link) {
             DB::table('links')
                 ->where('link_id', $link->link_id)
-                ->update(['translation' => $translation, 'public' => true]);
+                ->update(['public' => true]);
         } else {
             DB::table('links')->insert([
                 'one_thing_id'   => $one,
                 'link_type_id'   => $type,
                 'other_thing_id' => $other,
-                'translation'    => $translation,
                 'public'         => true,
                 'link_uuid'      => (string) Str::uuid(),
             ]);

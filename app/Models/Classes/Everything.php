@@ -793,54 +793,18 @@ class Everything
 
     public function setClass(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is of class $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
         return $this->setLink($classLink);
     }
 
     public function setParent(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['one_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is a child of $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
         return $this->setLink($classLink);
     }
 
-    protected function setLinkTranslation(array &$link): void
-    {
-        if (empty($link['translation'])) {
-            try {
-                $linkedObjectName = $this->getObjectNameByUid($link['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for object {$link['other_thing_id']}", 500, $e);
-            }
-            switch ($link['link_type_id']) {
-                case UUID::LINK_TO_CLASS:
-                    $link['translation'] = "{$this->name} is of class $linkedObjectName";
-                    break;
-                default:
-                    $link['translation'] = "{$this->name} is related to $linkedObjectName";
-            }
-
-        }
-    }
-
     public function setLink(array $link): bool
     {
-        //$this->setLinkTranslation($link);
         if (@$link['link_id']) {
             // update
             return $this->updateLink($link);
@@ -852,13 +816,14 @@ class Everything
     public function updateLink($link): int
     {
         $this->assertParentKindConsistent($link);
-        $this->setLinkTranslation($link);
         $update = [
             'one_thing_id'   => $link['one_thing_id'],
             'link_type_id'   => $link['link_type_id'],
             'other_thing_id' => $link['other_thing_id'],
-            'translation'    => $link['translation'],
         ];
+        if (array_key_exists('description', $link)) {
+            $update['description'] = $link['description'];
+        }
         foreach (self::LINK_DATE_FIELDS as $field) {
             if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
                 $update[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
@@ -871,7 +836,6 @@ class Everything
 
     public function addLink(array $link): bool
     {
-        $this->setLinkTranslation($link);
         // Ensure that both ids are in place
         if(empty($link['one_thing_id']) && empty($link['other_thing_id'])) {
             throw new InvalidArgumentException('Link object ids (one_thing_id, other_thing_id) are empty ');
@@ -905,14 +869,18 @@ class Everything
             ->first();
 
         if ($existing) {
-            // Update existing — preserve link_uuid. Only re-word the translation
-            // when the existing row already points the same way; a reverse match
-            // keeps its own direction-specific wording.
-            $sameDirection = $existing->one_thing_id === $link['one_thing_id']
-                && $existing->other_thing_id === $link['other_thing_id'];
-            return DB::table('links')
-                ->where('link_id', $existing->link_id)
-                ->update(['translation' => $sameDirection ? $link['translation'] : $existing->translation]) > 0;
+            // Update existing — preserve link_uuid. Description (if provided)
+            // applies regardless of direction.
+            $existingUpdate = [];
+            if (array_key_exists('description', $link)) {
+                $existingUpdate['description'] = $link['description'];
+            }
+            if ($existingUpdate) {
+                return DB::table('links')
+                    ->where('link_id', $existing->link_id)
+                    ->update($existingUpdate) > 0;
+            }
+            return true;
         }
 
         // Insert new link with generated UUID
@@ -921,8 +889,10 @@ class Everything
             'one_thing_id'  => $link['one_thing_id'],
             'link_type_id'  => $link['link_type_id'],
             'other_thing_id'=> $link['other_thing_id'],
-            'translation'   => $link['translation'],
         ];
+        if (array_key_exists('description', $link)) {
+            $insert['description'] = $link['description'];
+        }
         foreach (self::LINK_DATE_FIELDS as $field) {
             if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
                 $insert[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
@@ -1058,7 +1028,6 @@ class Everything
     protected function _getLinkDataFromPost($link)
     {
         $res = [
-            'translation'    => $link['description'],
             Thing::ID        => $this->{Thing::ID},
             'link_type_id'   => $link['type'],
             'other_thing_id' => $link['uuid'],

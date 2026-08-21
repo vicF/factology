@@ -312,7 +312,7 @@ describe('LinkedObject', () => {
                     link_type_id: 'involved-in',
                     name: 'Поездка в Новгород 2026', // other_thing_id name
                     one_name: 'Виктор Фокин',        // one_thing_id name
-                    translation: '',
+                    description: '',
                     link_id: 1,
                 },
                 currentObject: { thing_id: 'trip', name: 'Поездка в Новгород 2026' },

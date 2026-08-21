@@ -65,7 +65,6 @@ class UserClass extends Everything
                 'one_thing_id'   => $userThingId,
                 'link_type_id'   => UUID::LINK_TO_CLASS,
                 'other_thing_id' => UUID::USER,
-                'translation'    => "user-{$this->name} is of class User",
             ]);
             $this->user = User::create([
                 'name'     => $this->name,

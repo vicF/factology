@@ -434,7 +434,7 @@ class ExportImportController extends BaseController
     private function buildLinkData(array $link): array
     {
         $fields = ['link_uuid', 'one_thing_id', 'link_type_id', 'other_thing_id',
-                   'translation', 'public', 'link_start', 'link_end',
+                   'description', 'public', 'link_start', 'link_end',
                    'link_start_meta', 'link_end_meta',
                    'deleted'];
 

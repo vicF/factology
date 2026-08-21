@@ -204,7 +204,6 @@ class TestDatabaseController extends Controller
                 'one_thing_id'   => \Fokin\Facts\Data\UUID::SOMETHING,
                 'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_PARENT,
                 'other_thing_id' => $testClassId,
-                'translation'    => '"Test Class" is subclass of "Something"',
             ]);
 
             // 2. Create public test objects of that class
@@ -217,13 +216,11 @@ class TestDatabaseController extends Controller
                 'one_thing_id'   => $testObjectId,
                 'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_CLASS,
                 'other_thing_id' => $testClassId,
-                'translation'    => '"Test Object Alpha" is of class "Test Class"',
             ]);
             DB::table('links')->insert([
                 'one_thing_id'   => $testObject2Id,
                 'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_CLASS,
                 'other_thing_id' => $testClassId,
-                'translation'    => '"Test Object Beta" is of class "Test Class"',
             ]);
 
             return response()->json([

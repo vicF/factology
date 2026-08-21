@@ -373,7 +373,7 @@
                                     one_thing_id: item.one_thing_id || formData.thing_id,
                                     other_thing_id: item.other_thing_id,
                                     link_type_id: item.link_type_id,
-                                    translation: item.translation,
+                                    description: item.description,
                                     link_id: item.link_id,
                                     link_start: item.link_start,
                                     link_end: item.link_end,
@@ -807,7 +807,7 @@ const classLinkData = ref({
     one_thing_id: formData.value.thing_id,
     other_thing_id: '',
     link_type_id: LINK_TO_CLASS,
-    translation: '',
+    description: '',
     link_id: null,
 });
 
@@ -815,7 +815,7 @@ const parentLinkData = ref({
     one_thing_id: formData.value.thing_id,
     other_thing_id: '',
     link_type_id: LINK_TO_PARENT,
-    translation: '',
+    description: '',
     link_id: null,
 });
 
@@ -1246,14 +1246,14 @@ const initializeData = () => {
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
         link_type_id: LINK_TO_CLASS,
-        translation: '',
+        description: '',
         link_id: null,
     };
     parentLinkData.value = {
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
         link_type_id: LINK_TO_PARENT,
-        translation: '',
+        description: '',
         link_id: null,
     };
 
@@ -1263,7 +1263,7 @@ const initializeData = () => {
             one_thing_id: item.one_thing_id || '',
             other_thing_id: item.other_thing_id || '',
             link_type_id: item.link_type_id || '',
-            translation: item.description || item.translation || '',
+            description: item.description || '',
             link_id: item.linkId ?? item.link_id ?? null,
             link_start: item.link_start || null,
             link_end: item.link_end || null,
@@ -1283,7 +1283,7 @@ const initializeData = () => {
             if (parentId) {
                 parentLinkData.value.other_thing_id = parentId;
                 parentLinkData.value.link_id = linkItem.link_id;
-                parentLinkData.value.translation = linkItem.translation;
+                parentLinkData.value.description = linkItem.description;
             }
             console.log('[EditObject] parentLinkData set to:', JSON.parse(JSON.stringify(parentLinkData.value)));
             return;
@@ -1309,7 +1309,7 @@ const initializeData = () => {
                 }
                 parentLinkData.value.other_thing_id = parentId;
                 parentLinkData.value.link_id = parentLinkFromLinks.link_id;
-                parentLinkData.value.translation = parentLinkFromLinks.translation || '';
+                parentLinkData.value.description = parentLinkFromLinks.description || '';
                 console.log('[EditObject] parentLinkData updated from existing links:', JSON.parse(JSON.stringify(parentLinkData.value)));
             }
         }
@@ -1348,7 +1348,7 @@ const addNewLinkedObject = async () => {
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
         link_type_id: LINK_TO_RELATED,
-        translation: '',
+        description: '',
         link_id: null,
         link_start: null,
         link_end: null,
@@ -1441,7 +1441,7 @@ const submitForm = async () => {
                 one_thing_id: item.one_thing_id || formData.value.thing_id,
                 link_type_id: item.link_type_id,
                 other_thing_id: item.other_thing_id,
-                description: item.translation || '',
+                description: item.description || '',
                 public: 0,
                 ...linkDateFields(item),
             }));
@@ -1473,7 +1473,7 @@ const submitForm = async () => {
                 one_thing_id: formData.value.thing_id,
                 link_type_id: LINK_TO_CLASS,
                 other_thing_id: classLinkData.value.other_thing_id,
-                description: classLinkData.value.translation || '',
+                description: classLinkData.value.description || '',
                 link_id: classLinkData.value.link_id || undefined,
                 public: 1,
             };
@@ -1484,7 +1484,7 @@ const submitForm = async () => {
                 one_thing_id: parentLinkData.value.other_thing_id,
                 link_type_id: LINK_TO_PARENT,
                 other_thing_id: formData.value.thing_id,
-                description: parentLinkData.value.translation || '',
+                description: parentLinkData.value.description || '',
                 link_id: parentLinkData.value.link_id || undefined,
                 public: 1,
             };
@@ -1500,7 +1500,7 @@ const submitForm = async () => {
                     one_thing_id: item.one_thing_id || formData.value.thing_id,
                     other_thing_id: item.other_thing_id,
                     link_type_id: item.link_type_id,
-                    translation: item.translation,
+                    description: item.description,
                     ...linkDateFields(item),
                 }));
             if (linksToUpdate.length > 0) payload.links_to_update = linksToUpdate;

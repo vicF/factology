@@ -178,7 +178,7 @@ const buildGraphData = (object) => {
                 id: link.link_id != null ? String(link.link_id) : `l-${parentId}-${target.thing_id}`,
                 from: parentId,
                 to: target.thing_id,
-                text: link.translation || link.link_name || t('connected'),
+                text: link.link_name || t('connected'),
                 color: '#28a745'
             })
             if (target.links && target.links.length) {

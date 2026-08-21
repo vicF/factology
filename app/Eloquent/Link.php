@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $one_thing_id
  * @property $link_type_id
  * @property $other_thing_id
- * @property $translation
+ * @property $description
  * @method static \Illuminate\Database\Query\Builder ofClass($class)
  */
 class Link extends Model
@@ -32,7 +32,7 @@ class Link extends Model
         'one_thing_id',
         'link_type_id',
         'other_thing_id',
-        'translation',
+        'description',
     ];
 
     public function scopeOfClass($query, $class)

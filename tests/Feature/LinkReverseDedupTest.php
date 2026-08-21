@@ -101,7 +101,6 @@ class LinkReverseDedupTest extends TestCase
             'one_thing_id'   => $a,
             'other_thing_id' => $b,
             'link_type_id'   => UUID::PRESENT,
-            'translation'    => 'A is involved in B',
         ])->assertOk();
 
         // Reverse B -> PRESENT -> A must reuse the existing row, not duplicate.
@@ -109,7 +108,6 @@ class LinkReverseDedupTest extends TestCase
             'one_thing_id'   => $b,
             'other_thing_id' => $a,
             'link_type_id'   => UUID::PRESENT,
-            'translation'    => 'B is involved in A',
         ])->assertOk();
 
         $this->assertSingleLink($a, $b);
