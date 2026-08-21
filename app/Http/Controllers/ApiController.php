@@ -1456,7 +1456,7 @@ class ApiController extends BaseController
             l.one_thing_id,
             c.description,
             c.type,
-            CAST(l.translation AS VARCHAR(255)),
+            CAST(l.description AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM descendants d
