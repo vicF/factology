@@ -77,7 +77,7 @@
 
             <div class="form-group">
                 <textarea
-                    v-model="link.translation"
+                    v-model="link.description"
                     class="form-control"
                     :placeholder="$t('Enter description...')"
                     rows="2"
@@ -335,7 +335,7 @@ const openCreateObjectModal = () => {
             targetComponent: 'linked-object',
             index: props.index,
             linkTypeUuid: link.value.link_type_id,
-            comment: link.value.translation
+            comment: link.value.description
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -358,7 +358,7 @@ const handleLinkCreated = async (data) => {
             await nextTick();
             link.value.other_thing_id = newId;
             if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
-            if (data.comment !== undefined) link.value.translation = data.comment;
+            if (data.comment !== undefined) link.value.description = data.comment;
 
             // No need to preload – the object is already created and cached by the modal
             emit('update', {

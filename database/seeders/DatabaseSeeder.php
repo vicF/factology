@@ -56,12 +56,13 @@ class DatabaseSeeder extends Seeder
         foreach ($system['links'] as $link) {
             unset($link['link_id']); // let fresh installs auto-increment link_id
             unset($link['link_start_variety'], $link['link_end_variety']); // dropped columns
+            unset($link['translation']); // dropped column — LinkDescription renders the relation
             DB::table('links')->upsert(
                 $link,
                 ['link_uuid'],
                 [
                     'one_thing_id', 'link_type_id', 'other_thing_id',
-                    'translation', 'public', 'deleted',
+                    'description', 'public', 'deleted',
                     'link_start', 'link_end',
                 ]
             );
@@ -89,7 +90,6 @@ class DatabaseSeeder extends Seeder
                     'one_thing_id'   => $server->thing_id,
                     'link_type_id'   => UUID::LINK_TO_CLASS,
                     'other_thing_id' => UUID::G_SERVER_CLASS,
-                    'translation'    => $server->name . ' is of class Server',
                 ]);
             }
         }

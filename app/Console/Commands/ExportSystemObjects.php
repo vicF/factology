@@ -40,7 +40,7 @@ class ExportSystemObjects extends Command
      * and must be regenerated on fresh installs).
      */
     private const LINK_COLUMNS = [
-        'translation', 'one_thing_id', 'link_type_id', 'other_thing_id',
+        'description', 'one_thing_id', 'link_type_id', 'other_thing_id',
         'public', 'link_start', 'link_end',
         'link_start_meta', 'link_end_meta',
         'link_uuid', 'deleted',

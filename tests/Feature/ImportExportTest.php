@@ -262,7 +262,7 @@ class ImportExportTest extends TestCase
                         'one_thing_id' => $oneThingId,
                         'link_type_id' => UUID::LINK_TO_PARENT,
                         'other_thing_id' => $otherThingId,
-                        'translation'  => 'Imported link',
+                        'description'  => 'Imported link',
                         'public'       => true,
                         'deleted'      => false,
                     ],

@@ -13,8 +13,7 @@ class LinkResource extends JsonResource
             'one_thing_id'   => $this->one_thing_id ?? null,
             'other_thing_id' => $this->other_thing_id ?? null,
             'link_type_id'   => $this->link_type_id ?? null,
-            'translation'    => $this->translation ?? null,
-            'description'    => $this->description ?? null,   // <-- safe fallback
+            'description'    => $this->description ?? null,
             'public'         => isset($this->public) ? (bool) $this->public : null,
             'link_start'     => $this->link_start ?? null,
             'link_end'       => $this->link_end ?? null,

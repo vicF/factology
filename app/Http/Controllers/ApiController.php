@@ -449,6 +449,8 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // The translation column no longer exists; ignore stale payloads.
+        unset($data['translation']);
         // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
         foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
             if (isset($data[$metaField]) && is_array($data[$metaField])) {
@@ -506,10 +508,10 @@ class ApiController extends BaseController
                 if ($existing) {
                     $sameDirection = $existing->one_thing_id === $data['one_thing_id']
                         && $existing->other_thing_id === $data['other_thing_id'];
-                    if ($sameDirection && !empty($data['translation'])) {
+                    if ($sameDirection && array_key_exists('description', $data)) {
                         DB::table('links')
                             ->where('link_id', $existing->link_id)
-                            ->update(['translation' => $data['translation']]);
+                            ->update(['description' => $data['description']]);
                     }
                     $data['link_id'] = $existing->link_id;
                     return response()->json(
@@ -874,7 +876,6 @@ class ApiController extends BaseController
             'one_thing_id'  => $userThingId,
             'link_type_id'  => $linkTypeId,
             'other_thing_id'=> $id,
-            'translation'   => 'Favorite',
             'public'        => 0,
         ]);
 
@@ -1334,7 +1335,7 @@ class ApiController extends BaseController
         $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type = ? THEN 0 ELSE 1 END';
 
         $rawSql = "
-    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, translation, public, name_translations) AS (
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, public, name_translations) AS (
         SELECT
             c.name,
             1,
@@ -1342,7 +1343,6 @@ class ApiController extends BaseController
             CAST(NULL AS UUID),
             c.description,
             c.type,
-            CAST(NULL AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM things c
@@ -1357,7 +1357,6 @@ class ApiController extends BaseController
             l.one_thing_id,
             c.description,
             c.type,
-            CAST(l.translation AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM descendants d

@@ -329,7 +329,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: thingId,
             link_type_id: UUID.LINK_TO_CLASS,
             other_thing_id: cls.other_thing_id,
-            translation: cls.description || cls.translation || '',
+            description: cls.description || '',
             public: cls.public ?? 1,
         }, { skipChangeLog: true });
     }
@@ -343,7 +343,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: parent.one_thing_id,
             link_type_id: UUID.LINK_TO_PARENT,
             other_thing_id: parent.other_thing_id || thingId,
-            translation: parent.description || parent.translation || '',
+            description: parent.description || '',
             public: parent.public ?? 1,
         }, { skipChangeLog: true });
     }
@@ -355,7 +355,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: link.one_thing_id || thingId,
             link_type_id: link.link_type_id,
             other_thing_id: link.other_thing_id,
-            translation: link.description || link.translation || '',
+            description: link.description || '',
             public: link.public ?? 0,
         }, { skipChangeLog: true });
     }
@@ -367,7 +367,7 @@ async function processLinksForObject(thingId, data) {
             one_thing_id: link.one_thing_id || thingId,
             link_type_id: link.link_type_id,
             other_thing_id: link.other_thing_id,
-            translation: link.description || link.translation || '',
+            description: link.description || '',
             public: link.public ?? 0,
         }, { skipChangeLog: true });
     }
@@ -643,7 +643,6 @@ async function buildClassTree(classObjects) {
             type: obj.type,
             public: obj.public || 0,
             nodes: children,
-            translation: null,
             parent_id: parentId,
         };
     }

@@ -202,7 +202,6 @@ class RelatedObjectsResolver
                 'one_thing_id'   => $link->one_thing_id,
                 'other_thing_id' => $link->other_thing_id,
                 'link_type_id'   => $link->link_type_id,
-                'translation'    => $link->translation ?? null,
                 'description'    => $link->description ?? null,
                 'public'         => $link->public !== null ? (bool) $link->public : null,
                 'link_start'     => $link->link_start ?? null,

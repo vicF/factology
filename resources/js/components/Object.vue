@@ -226,8 +226,8 @@
                                                 <LinkDescription :link="link" :object="object" size="small" />
                                             </div>
 
-                                            <div v-if="link.translation" class="link-translation mt-1">
-                                                {{ link.translation }}
+                                            <div v-if="link.description" class="link-comment mt-1">
+                                                {{ link.description }}
                                             </div>
 
                                             <div v-if="authenticated && editMode" class="link-actions">
@@ -707,7 +707,7 @@ const openCreateLinkModal = () => {
         one_thing_id: object.value.thing_id,
         other_thing_id: null,
         link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
-        translation: '',
+        description: '',
         link_id: null,
         link_start: null,
         link_end: null,
@@ -766,7 +766,7 @@ const updateLink = async (linkData) => {
             one_thing_id: linkData.one_thing_id,
             other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
-            translation: linkData.translation,
+            description: linkData.description,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
             link_start_meta: linkData.link_start_meta,
@@ -791,7 +791,7 @@ const createLink = async (linkData) => {
             one_thing_id: linkData.one_thing_id,
             other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
-            translation: linkData.translation,
+            description: linkData.description,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
             link_start_meta: linkData.link_start_meta,
@@ -831,7 +831,7 @@ const linkRecords = computed(() => {
         one_thing_id: link.one_thing_id,
         other_thing_id: link.other_thing_id,
         link_type_id: link.link_type_id,
-        description: link.translation || '',
+        description: link.description || '',
         link_id: link.link_id,
         // Flexible-date columns (canonical strings + jsonb meta) so the
         // edit-modal link rows can edit them.
@@ -1007,7 +1007,7 @@ watch(() => object.value, (newObject) => {
 .owner-link:hover {
     color: #6c757d;
 }
-.link-translation {
+.link-comment {
     font-size: 0.75rem;
     color: #6c757d;
     font-style: italic;

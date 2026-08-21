@@ -449,6 +449,12 @@
     border-top: 1px dashed #dee2e6;
 }
 
+/* Related lists render LinkDescription at .text-small (0.875rem) by default;
+   keep the compact related-link text smaller to match .link-item. */
+.links-list .link-description {
+    font-size: 0.7rem !important;
+}
+
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;

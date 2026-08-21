@@ -98,10 +98,6 @@
                                         class="result-links-section"
                                     >
                                         <div class="links-container">
-                                            <div class="links-title">
-                                                <span>🔗 Related</span>
-                                                <span class="links-count">({{ thing.links.length }})</span>
-                                            </div>
                                             <div v-if="shownAll.has(thing.thing_id)" class="links-list">
                                                 <RelatedList :links="thing.links" :level="1" :on-expand="expandTarget" :parent="thing" />
                                             </div>

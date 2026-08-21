@@ -404,7 +404,7 @@ describe('EditObject', () => {
             one_thing_id: EDIT_ID,
             other_thing_id: 'other-object-id',
             link_type_id: REGULAR_LINK_TYPE,
-            translation: '',
+            description: '',
             link_start: '20260811120000',
             link_end: '20260811220000',
             link_start_meta: { qualifier: 'exact', era: 'gregorian', precision: 'minute' },
