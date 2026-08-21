@@ -30,17 +30,23 @@ class DatabaseSeeder extends Seeder
         // Bootstrap things + default classes + system-owned objects.
         // Upsert by thing_id so reruns converge with the file.
         foreach ($system['things'] as $thing) {
-            // The export stores the `data` JSON column decoded; re-encode it for
-            // the query builder (which does not auto-cast arrays to JSON).
-            if (is_array($thing['data'] ?? null)) {
-                $thing['data'] = json_encode($thing['data']);
+            // The export stores JSON columns decoded; re-encode them for the
+            // query builder (which does not auto-cast arrays to JSON).
+            foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonCol) {
+                if (is_array($thing[$jsonCol] ?? null)) {
+                    $thing[$jsonCol] = json_encode($thing[$jsonCol]);
+                }
             }
+            // The legacy variety columns were dropped; ignore any stale export
+            // file that still carries them.
+            unset($thing['start_variety'], $thing['end_variety']);
             DB::table('things')->upsert(
                 array_merge($thing, ['server_uuid' => $serverUuid]),
                 ['thing_id'],
                 [
-                    'name', 'description', 'type', 'public', 'deleted',
-                    'owner', 'start', 'end', 'start_variety', 'end_variety',
+                    'name', 'description', 'name_translations', 'description_translations',
+                    'type', 'public', 'deleted',
+                    'owner', 'start', 'end', 'start_meta', 'end_meta',
                     'data', 'server_uuid', 'abstract',
                 ]
             );
@@ -49,13 +55,14 @@ class DatabaseSeeder extends Seeder
         // Class hierarchy + membership links (stable link_uuid as the upsert key).
         foreach ($system['links'] as $link) {
             unset($link['link_id']); // let fresh installs auto-increment link_id
+            unset($link['link_start_variety'], $link['link_end_variety']); // dropped columns
             DB::table('links')->upsert(
                 $link,
                 ['link_uuid'],
                 [
                     'one_thing_id', 'link_type_id', 'other_thing_id',
                     'translation', 'public', 'deleted',
-                    'link_start', 'link_end', 'link_start_variety', 'link_end_variety',
+                    'link_start', 'link_end',
                 ]
             );
         }

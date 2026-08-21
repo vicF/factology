@@ -9,6 +9,8 @@ use App\Models\Classes\Media;
 use App\Services\RelatedObjectsResolver;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
+use Fokin\Facts\Data\Era;
+use Fokin\Facts\Data\FlexibleDate;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ApiController extends BaseController
@@ -299,6 +302,20 @@ class ApiController extends BaseController
      */
     public function store(Request $request): \Illuminate\Http\JsonResponse
     {
+        // Normalize raw date values to canonical form BEFORE validation so the
+        // end>=start check compares chronologically-correct padded values
+        // (a raw '20260817' would otherwise sort below canonical '20260811120000'
+        // in bccomp) and no legacy-style unpadded digits re-enter the DB.
+        $normalizedDates = [];
+        foreach (['start', 'end'] as $dateField) {
+            $raw = $request->input($dateField);
+            if ($raw !== null && $raw !== '') {
+                $normalizedDates[$dateField] = self::normalizeDateField($raw);
+            }
+        }
+        if ($normalizedDates) {
+            $request->merge($normalizedDates);
+        }
         $validated = $request->validate([
             /**
              * UUID of the main object
@@ -322,7 +339,7 @@ class ApiController extends BaseController
              * Start date/time as numeric string: YYYYMMDDHHMMSS
              * @example 20260228111234
              */
-            'start' => ['nullable', 'string', 'regex:/^\d*$/'],
+            'start' => ['nullable', 'string', 'regex:/^-?\d*$/'],
 
             /**
              * End date/time as numeric string: YYYYMMDDHHMMSS
@@ -331,13 +348,33 @@ class ApiController extends BaseController
             'end' => [
                 'nullable',
                 'string',
-                'regex:/^\d*$/',
+                'regex:/^-?\d*$/',
                 function ($attribute, $value, $fail) use ($request) {
-                    if ($request->has('start') && $value < $request->start) {
+                    if ($request->has('start') && $request->start !== null && bccomp($value, $request->start) < 0) {
                         $fail('The end date must be after the start date.');
                     }
                 },
             ],
+
+            /**
+             * Flexible-date display metadata for the start/end bounds.
+             * Shape: { qualifier, era, precision, alternatives: [...], comment }.
+             */
+            'start_meta' => ['nullable', 'array'],
+            'start_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'start_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'start_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'start_meta.alternatives' => ['nullable', 'array'],
+            'start_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'start_meta.comment' => ['nullable', 'string', 'max:500'],
+
+            'end_meta' => ['nullable', 'array'],
+            'end_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'end_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'end_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'end_meta.alternatives' => ['nullable', 'array'],
+            'end_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'end_meta.comment' => ['nullable', 'string', 'max:500'],
 
             /**
              * Public flag (0 or 1)
@@ -485,6 +522,24 @@ class ApiController extends BaseController
     }
 
     /**
+     * Normalize a raw date digit string to its canonical padded form
+     * ('2026081112' → '20260811120000'). Canonical values (length ≥ 11:
+     * variable year + exactly 10-digit MMDDHHMMSS tail) pass through, so the
+     * flexible-date frontend (which always sends canonical values) is unaffected.
+     */
+    private static function normalizeDateField(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        if (strlen(ltrim($value, '-')) >= 11) {
+            return $value;
+        }
+        $parsed = FlexibleDate::parse($value);
+        return $parsed !== null && $parsed->value !== null ? $parsed->value : $value;
+    }
+
+    /**
      * Store link
      *
      * @param \Illuminate\Http\Request $request
@@ -493,6 +548,18 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
+        foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+            if (isset($data[$metaField]) && is_array($data[$metaField])) {
+                $data[$metaField] = json_encode($data[$metaField]);
+            }
+        }
+        // Normalize raw link date values to canonical form.
+        foreach (['link_start', 'link_end'] as $dateField) {
+            if (isset($data[$dateField]) && $data[$dateField] !== null && $data[$dateField] !== '') {
+                $data[$dateField] = self::normalizeDateField($data[$dateField]);
+            }
+        }
         // Abstract link types are grouping containers, never real relations.
         if (!empty($data['link_type_id'])
             && DB::table('things')->where('thing_id', $data['link_type_id'])->value('abstract')) {
@@ -500,6 +567,18 @@ class ApiController extends BaseController
                 'success' => false,
                 'message' => 'Abstract link types cannot be used to create a link',
                 'errors'  => ['link_type_id' => 'This link type is abstract and only groups its children.'],
+            ], 422);
+        }
+        // Classes and link types form two separate trees — a "is a superclass of"
+        // edge may only connect same-kind endpoints (except the structural roots).
+        if (($data['link_type_id'] ?? null) === UUID::LINK_TO_PARENT
+            && !empty($data['one_thing_id'])
+            && !empty($data['other_thing_id'])
+            && !$this->isParentKindConsistent($data['one_thing_id'], $data['other_thing_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Classes and link types form separate trees — the parent must be of the same kind as the child.',
+                'errors'  => ['other_thing_id' => 'Cannot set a class/link-type of the other kind as the parent.'],
             ], 422);
         }
         if(!empty($data['link_id'])) {
@@ -551,6 +630,28 @@ class ApiController extends BaseController
                 'data'    => $data,
                 'success' => true
             ]);
+    }
+
+    /**
+     * Whether a "is a superclass of" edge between $parentId and $childId keeps
+     * the class/link-tree invariant: both endpoints must be the same kind (both
+     * link types or both non-link), unless the parent is a structural root that
+     * hosts the other kind by design (Everything → Link, System → system links).
+     */
+    private function isParentKindConsistent(string $parentId, string $childId): bool
+    {
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return true; // an endpoint is not in the DB yet — don't pre-empt a later failure
+        }
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return true;
+        }
+        return in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true);
     }
 
     /**
@@ -1070,12 +1171,18 @@ class ApiController extends BaseController
                     ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
             });
         }
-        // Date range filter
+        // Date range filter — interval-overlap semantics so flexible dates
+        // (before/after/between with open bounds) match correctly:
+        //   [thing.start, thing.end] ∩ [date_from, date_to] ≠ ∅
         if (!empty($requestBody['date_from'])) {
-            $query->where('start', '>=', $requestBody['date_from']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.end')->orWhere('things.end', '>=', $requestBody['date_from']);
+            });
         }
         if (!empty($requestBody['date_to'])) {
-            $query->where('start', '<=', $requestBody['date_to']);
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.start')->orWhere('things.start', '<=', $requestBody['date_to']);
+            });
         }
         // Owner filter — exact UUID match when possible, ILIKE fallback
         if (!empty($requestBody['owner'])) {
@@ -1096,26 +1203,49 @@ class ApiController extends BaseController
             'start'   => 'start',
             'name'    => 'name',
         ];
-        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'updated'] ?? 'record_updated';
+        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'start'] ?? 'start';
         $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        // When sorting by a date column, undated objects (NULL) must go last
+        // regardless of direction — Postgres would otherwise put them first on
+        // DESC. Column names come from the fixed map above, so this is safe.
+        // Plain numeric sort is chronologically correct for canonical values:
+        // value = year × 10^10 + MMDDHHMMSS tail, monotonic in the year for
+        // both positive and negative (BC) values. The backfill migration makes
+        // every stored start/end canonical, so no zero-extension is needed.
+        if ($sortCol === 'start') {
+            $query->orderByRaw('start ' . $sortDir . ' NULLS LAST');
+        } else {
+            $query->orderBy($sortCol, $sortDir);
+        }
         // groupBy(thing_id): the class filter (and favorites join) can match
         // an object through several links at once; group by the PK so each
         // object appears exactly once. (Postgres accepts selecting the other
         // columns because they are functionally dependent on the PK, and it
         // works even though things.data is plain `json`, which DISTINCT can't
         // dedupe.)
-        $data = $query->groupBy('things.thing_id')->orderBy($sortCol, $sortDir)->limit(100)->get();
+        $data = $query->groupBy('things.thing_id')->limit(100)->get();
+
+        // Link-type results carry their taxonomy base category (the abstract
+        // base they hang under, e.g. "Kinship", "Hierarchy") so the picker can
+        // group them.
+        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
+        if (in_array(UUID::G_LINK, $requestTypes, true)) {
+            $this->attachLinkTypeCategories($data);
+        }
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
-                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
                 ->addSelect('link_types.name_translations as link_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
                     $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as one_side', function ($join) {
+                    $join->on('links.one_thing_id', '=', 'one_side.thing_id');
                 })
                 ->leftJoin('things as link_types', function ($join) {
                     $join->on('links.link_type_id', '=', 'link_types.thing_id');
@@ -1145,6 +1275,70 @@ class ApiController extends BaseController
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Attach the taxonomy base category to link-type search results so the
+     * picker can group them (e.g. "Kinship", "Hierarchy"). The base is the
+     * direct child of the Link root that the link type hangs under; for link
+     * types directly under Link it is the link type itself. Link types that
+     * are not part of the tree (system-internal ones) get no category.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachLinkTypeCategories($things): void
+    {
+        $bases = DB::table('links')
+            ->join('things as t', 't.thing_id', '=', 'links.other_thing_id')
+            ->where('links.one_thing_id', UUID::LINK)
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('t.type', UUID::G_LINK)
+            ->where('t.deleted', false)
+            ->get(['t.thing_id', 't.name', 't.name_translations'])
+            ->keyBy('thing_id');
+
+        if ($bases->isEmpty()) {
+            return;
+        }
+
+        // child => parent edges among link types (any depth).
+        $parents = DB::table('links')
+            ->join('things as p', 'p.thing_id', '=', 'links.one_thing_id')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('p.type', UUID::G_LINK)->where('p.deleted', false)
+            ->where('c.type', UUID::G_LINK)->where('c.deleted', false)
+            ->pluck('links.one_thing_id', 'links.other_thing_id');
+
+        foreach ($things as $thing) {
+            if ((int) $thing->type !== UUID::G_LINK) {
+                continue;
+            }
+            $base = $this->resolveLinkBase($thing->thing_id, $bases, $parents);
+            if ($base) {
+                $thing->category_id           = $base->thing_id;
+                $thing->category_name         = $base->name;
+                $thing->category_translations = $base->name_translations;
+            }
+        }
+    }
+
+    private function resolveLinkBase(string $thingId, $bases, $parents): ?object
+    {
+        if (isset($bases[$thingId])) {
+            return $bases[$thingId];
+        }
+        $node  = $thingId;
+        $guard = 0;
+        while (isset($parents[$node]) && $guard++ < 20) {
+            $node = $parents[$node];
+            if (isset($bases[$node])) {
+                return $bases[$node];
+            }
+        }
+        return null;
     }
 
     /**

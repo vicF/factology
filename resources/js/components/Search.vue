@@ -40,6 +40,11 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
+                                <div v-if="groupLabels[thingIndex]" class="date-group-header">
+                                    <span class="date-group-line"></span>
+                                    <span class="date-group-label">{{ groupLabels[thingIndex] }}</span>
+                                    <span class="date-group-line"></span>
+                                </div>
                                 <div class="result-content">
                                     <!-- LEFT: icon only -->
                                     <div class="result-icon-section">
@@ -81,10 +86,7 @@
         <span v-if="thing.start || thing.end" class="inline-date" style="margin-right: 8px;">
 
                                                 📅
-                                                <template v-if="thing.start">{{ formatDateShort(thing.start) }}</template>
-                                                <template v-if="thing.start && thing.end"> → </template>
-                                                <template v-else-if="thing.end">{{ $t('until') }} </template>
-                                                <template v-if="thing.end">{{ formatDateShort(thing.end) }}</template>
+                                                {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -124,7 +126,9 @@
                                     </div>
                                 </div>
 
-                                <div v-if="thingIndex < objects.length - 1" class="result-separator"></div>
+                                <!-- A group boundary already draws its own labeled
+                                     separator line — don't stack a plain one on it. -->
+                                <div v-if="thingIndex < objects.length - 1 && !groupLabels[thingIndex + 1]" class="result-separator"></div>
                             </div>
                         </div>
                     </div>
@@ -146,13 +150,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { eventBus } from "../eventBus";
 import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
+import { currentLocale } from '../utils/localized.js';
+import { FlexibleDate } from '../utils/flexibleDate.js';
 import Image from "./Image.vue";
 import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
@@ -205,6 +211,47 @@ const expandTarget = async (link) => {
 
 // Filter param keys for URL sync
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
+
+// ── Date-group delimiters (only meaningful when sorting by start date) ──────
+function dateGroupKey(start) {
+    if (!start) return null;
+    // Decode via the canonical components so huge years (variable-length year
+    // in the digit string) group under their real year, not its first 4 digits.
+    const c = FlexibleDate.componentsFromCanonical(String(start));
+    if (!c) return null;
+    if (FlexibleDate.precisionFromValue(String(start)) === 'year') return 'y' + c.y;
+    return 'm' + c.y + '-' + String(c.m).padStart(2, '0');
+}
+
+function dateGroupLabel(key) {
+    if (!key) return null;
+    if (key[0] === 'y') {
+        const y = Number(key.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = key.match(/^m(-?\d+)-(\d{2})$/);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const locale = currentLocale();
+    const label = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
+}
+
+// Header label aligned with each result row (null = no header before it).
+const groupLabels = computed(() => {
+    const labels = new Array(objects.value.length).fill(null);
+    if (searchStore.sortBy !== 'start') return labels;
+    let prevKey = null;
+    objects.value.forEach((thing, i) => {
+        const key = dateGroupKey(thing.start);
+        if (key !== prevKey) {
+            labels[i] = dateGroupLabel(key);
+            prevKey = key;
+        }
+    });
+    return labels;
+});
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 let quickMode = false;
@@ -271,17 +318,17 @@ const getOtherThingId = (link, currentThingId) => {
     return thingId === currentThingId ? link.other_thing_id : thingId;
 };
 
+// API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one matching the target.
+const getOtherThingName = (link, currentThingId) => {
+    const targetId = getOtherThingId(link, currentThingId);
+    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+};
+
 const truncateText = (text, maxLength) => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
-};
-
-const formatDateShort = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' });
 };
 
 const exportData = async () => {
@@ -311,7 +358,15 @@ const exportData = async () => {
     }
 };
 
+// Monotonic request sequence: only the latest search request may apply its
+// response. Search fires on mount (empty filter → everything, slow) and again
+// once the class-tree default selection lands (filtered, fast). Without this
+// guard the mount request's late response would overwrite the filtered results
+// with the unfiltered list seconds later.
+let searchRequestSeq = 0;
+
 const getObjects = async () => {
+    const requestId = ++searchRequestSeq;
     let type = [];
     if (searchStore.typeThing) type.push(3);
     if (searchStore.typeClass) type.push(2);
@@ -351,6 +406,10 @@ const getObjects = async () => {
         }
 
         const response = await axios.post('/object', body);
+        if (requestId !== searchRequestSeq) return; // stale response
+
+        // A newer search superseded this one — its response will render instead.
+        if (requestId !== searchRequestSeq) return;
 
         validationErrors.value = {};
 
@@ -366,12 +425,16 @@ const getObjects = async () => {
             objects.value = response.data.things || response.data || [];
         }
     } catch (error) {
+        // Ignore failures from requests that were superseded by a newer search.
+        if (requestId !== searchRequestSeq) return;
         console.error('Search.vue - Error:', error);
         if (error.response?.status === 422) {
             validationErrors.value = error.response.data.errors || {};
         }
         objects.value = [];
     } finally {
+        // Only the latest request owns the processing/loaded flags.
+        if (requestId !== searchRequestSeq) return;
         processing.value = false;
         loaded.value = true;
     }
@@ -418,3 +481,26 @@ onUnmounted(() => {
     eventBus.off('trigger-search', triggerSearchHandler);
 });
 </script>
+
+<style scoped>
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+
+.date-group-label {
+    white-space: nowrap;
+}
+</style>

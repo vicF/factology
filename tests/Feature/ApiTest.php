@@ -383,6 +383,80 @@ class ApiTest extends TestCase
         $this->assertFalse($ids->contains($classId), 'A class node must not leak into the results');
     }
 
+    public function testLinkTypeSearchAttachesTaxonomyCategory(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A nested link type (mother → biological parent → Kinship) resolves to
+        // its abstract base category, with localized name available.
+        $res = $this->postJson('/api/v1/object', ['search' => 'mother', 'type' => [UUID::G_LINK]]);
+        $res->assertStatus(200);
+        $mother = collect($res->json('things'))->firstWhere('name', 'is a mother of');
+        $this->assertNotNull($mother, 'is a mother of should be found');
+        $this->assertSame('Kinship', $mother['category_name']);
+        $this->assertSame('Родственные отношения', $mother['category_translations']['ru'] ?? null);
+
+        // A link type directly under the Link root gets itself as the category.
+        $res2 = $this->postJson('/api/v1/object', ['search' => 'related to', 'type' => [UUID::G_LINK]]);
+        $res2->assertStatus(200);
+        $related = collect($res2->json('things'))->firstWhere('name', 'is related to');
+        $this->assertSame('is related to', $related['category_name'] ?? null);
+    }
+
+    public function testParentLinkKindConsistencyIsEnforced(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $classId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Class',
+            'type' => UUID::G_CLASS,
+        ]);
+        $linkTypeId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Link',
+            'type' => UUID::G_LINK,
+        ]);
+
+        $linkUri = '/api/v1/link';
+        $kinship = 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde'; // abstract Kinship base (link kind)
+
+        // 1. A class may not hang under a link type.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $classId,
+        ])->assertStatus(422);
+
+        // 2. A link type may not hang under a plain class.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(422);
+
+        // 3. Same-kind edges still work: a link type under a link-type parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+
+        // 4. And a class under a class parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $classId,
+        ])->assertStatus(200);
+
+        // 5. Structural-root exception: a link type under System stays allowed.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SYSTEM,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();
@@ -678,5 +752,265 @@ class ApiTest extends TestCase
             'server_uuid' => $serverUuid,
         ]);
         return $thingId;
+    }
+
+    /**
+     * Flexible dates: search uses interval-overlap so before/after/between
+     * dates match correctly.
+     */
+    public function testSearchDateIntervalOverlap(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs — use a unique per-run
+        // suffix so the top-100 search limit and leftover objects from earlier
+        // runs never hide the NULL-start fixture (it sorts last).
+        $suffix = substr(uuid_create(), 0, 8);
+
+        // "before 1500" — open start, bound end.
+        $before1500 = $this->createTestObject($user, [
+            'name'     => "Flexible Before 1500 $suffix",
+            'start'    => null,
+            'end'      => '15000101000000',
+            'end_meta' => ['qualifier' => 'before', 'precision' => 'year'],
+        ]);
+
+        // "between 1600 and 1700" — both bounds set.
+        $between1600_1700 = $this->createTestObject($user, [
+            'name'       => "Flexible Between 1600 and 1700 $suffix",
+            'start'      => '16000101000000',
+            'end'        => '17000101000000',
+            'start_meta' => ['qualifier' => 'between', 'precision' => 'year'],
+        ]);
+
+        // "after 1800" — open end.
+        $after1800 = $this->createTestObject($user, [
+            'name'       => "Flexible After 1800 $suffix",
+            'start'      => '18000101000000',
+            'end'        => null,
+            'start_meta' => ['qualifier' => 'after', 'precision' => 'year'],
+        ]);
+
+        // Window 1450–1650: before-1500 and between-1600-1700 overlap; after-1800 does not.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '14500101000000',
+            'date_to'   => '16500101000000',
+            'search'    => $suffix,
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($before1500), 'A "before 1500" date must match the 1450–1650 window');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1450–1650 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1450–1650 window');
+
+        // Window 1650–1750: only between-1600-1700 overlaps.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '16500101000000',
+            'date_to'   => '17500101000000',
+            'search'    => $suffix,
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1650–1750 window');
+        $this->assertFalse($ids->contains($before1500), 'A "before 1500" date must not match the 1650–1750 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1650–1750 window');
+    }
+
+    /**
+     * Flexible dates: start_meta/end_meta survive a store round-trip.
+     */
+    public function testCreateWithFlexibleDateMeta(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start'      => '15000101000000',
+            'end'        => '16000101000000',
+            'start_meta' => [
+                'qualifier' => 'approx',
+                'precision' => 'year',
+                'era'       => 'gregorian',
+            ],
+            'end_meta' => [
+                'qualifier' => 'between',
+                'precision' => 'year',
+            ],
+        ]);
+
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+        $this->assertSame('approx', $json['data']['start_meta']['qualifier']);
+        $this->assertSame('between', $json['data']['end_meta']['qualifier']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('approx', json_decode($row->start_meta, true)['qualifier']);
+        $this->assertSame('between', json_decode($row->end_meta, true)['qualifier']);
+        $this->assertSame('15000101000000', $row->start);
+        $this->assertSame('16000101000000', $row->end);
+
+        // The detail (GET) endpoint must return the meta decoded as an object —
+        // the edit modal re-sends it verbatim and the store validates start_meta
+        // as an array, so a raw JSON string here would fail on the next save.
+        $detail = $this->getApi('/api/v1/object/' . $uniqueId);
+        $this->assertIsArray($detail['data']['start_meta']);
+        $this->assertSame('approx', $detail['data']['start_meta']['qualifier']);
+        $this->assertIsArray($detail['data']['end_meta']);
+        $this->assertSame('between', $detail['data']['end_meta']['qualifier']);
+    }
+
+    /**
+     * Flexible dates: invalid start_meta.qualifier is rejected.
+     */
+    public function testFlexibleDateMetaValidation(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start_meta' => ['qualifier' => 'bogus'],
+        ]);
+        try {
+            $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData, 422);
+            $this->assertArrayHasKey('errors', $json, 'Validation should fail for an invalid start_meta.qualifier');
+            $this->assertArrayHasKey('start_meta.qualifier', $json['errors']);
+        } catch (AssertionFailedError $e) {
+            $this->fail('Expected 422 for invalid start_meta.qualifier: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Flexible dates: BC (negative) start dates are accepted.
+     */
+    public function testBcStartDateAccepted(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '-15000101235959', // 1500 BC
+            'end'      => '15000101000000',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('-15000101235959', $row->start);
+    }
+
+    /**
+     * Raw unpadded date values sent to the API are normalized to canonical
+     * form on save, so legacy-style digit strings never re-enter the database.
+     */
+    public function testStoreNormalizesUnpaddedDates(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '20200101', // raw day-precision
+            'end'      => '20200102',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('20200101000000', $row->start);
+        $this->assertSame('20200102000000', $row->end);
+
+        // Canonical values pass through untouched.
+        $canonicalId = uuid_create();
+        $requestData2 = $this->getDefaultObjectData([
+            'thing_id' => $canonicalId,
+            'start'    => '20260811120000',
+        ]);
+        $this->postApi('/api/v1/object/' . $canonicalId, $requestData2);
+        $row2 = DB::table('things')->where('thing_id', $canonicalId)->first();
+        $this->assertSame('20260811120000', $row2->start);
+    }
+
+    /**
+     * Search defaults to sorting by start date DESC, with undated objects last
+     * (Postgres puts NULLs first on DESC without an explicit NULLS LAST).
+     */
+    public function testSearchDefaultsToStartDateDescending(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs, so use a unique per-run
+        // suffix to avoid matching leftover objects from earlier test runs.
+        $suffix = substr(uuid_create(), 0, 8);
+        $names = [
+            'older'   => "Sort Older $suffix",
+            'middle'  => "Sort Middle $suffix",
+            'newer'   => "Sort Newer $suffix",
+            'undated' => "Sort Undated $suffix",
+        ];
+        $this->createTestObject($user, ['name' => $names['older'], 'start' => '20200101']);
+        $this->createTestObject($user, ['name' => $names['newer'], 'start' => '20220101']);
+        $this->createTestObject($user, ['name' => $names['middle'], 'start' => '20210101']);
+        $this->createTestObject($user, ['name' => $names['undated'], 'start' => null, 'end' => null]);
+
+        // Scope the search to this run's own objects (unique suffix) so the
+        // persistent shared DB and the 100-result limit don't hide them.
+        $res = $this->postJson('/api/v1/object', ['search' => $suffix]);
+        $res->assertStatus(200);
+
+        $ours = collect($res->json('things'))
+            ->whereIn('name', array_values($names))
+            ->pluck('name')
+            ->values()
+            ->all();
+        $this->assertSame([$names['newer'], $names['middle'], $names['older'], $names['undated']], $ours);
+    }
+
+    /**
+     * Link descriptions: the detail endpoint exposes BOTH endpoint names for
+     * every link (`one_name` = one_thing_id's name, `name` = other_thing_id's
+     * name) regardless of direction, so the frontend can render incoming and
+     * outgoing links alike (previously an incoming link lost the one endpoint
+     * and rendered "Unknown").
+     */
+    public function testObjectDetailLinksExposeBothEndpointNames(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $holder = $this->createTestObject($user, ['name' => 'Detail Link Holder']);
+        $target = $this->createTestObject($user, ['name' => 'Detail Link Target']);
+
+        // holder → target: from the target's perspective this is an INCOMING
+        // link, the case that previously dropped the one-endpoint name.
+        $this->putApi('/api/v1/object/' . $holder, array_merge(
+            $this->getFullObjectDataForUpdate($holder),
+            ['links_to_add' => [['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => $target]]],
+        ));
+
+        $json = $this->getApi('/api/v1/object/' . $target);
+        $links = $json['data']['links'] ?? [];
+        $incoming = collect($links)->firstWhere('one_thing_id', $holder);
+        $this->assertNotNull($incoming, 'target should have an incoming link from the holder');
+        $this->assertSame('Detail Link Holder', $incoming['one_name']);
+        $this->assertSame('Detail Link Target', $incoming['name']);
     }
 }

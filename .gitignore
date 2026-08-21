@@ -47,3 +47,4 @@ database/Dumps/convert_mysql2pgsql.php
 database/Dumps/restore_mysql.cmd
 storage/logs/
 .workspace
+bash.exe.stackdump

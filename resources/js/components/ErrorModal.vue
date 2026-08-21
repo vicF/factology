@@ -13,15 +13,27 @@
                 </div>
                 <div class="modal-body">
                     <p class="mb-2">{{ message }}</p>
-                    <div v-if="details" class="mt-2">
+                    <div class="d-flex gap-2 align-items-center">
                         <button
+                            class="btn btn-sm btn-outline-secondary"
+                            @click="copyText"
+                            :title="$t('Copy the error text to the clipboard')"
+                        >
+                            {{ copied ? $t('Copied!') : $t('Copy') }}
+                        </button>
+                        <button
+                            v-if="details"
                             class="btn btn-sm btn-outline-secondary"
                             @click="showDetails = !showDetails"
                         >
                             {{ showDetails ? $t('Hide technical details') : $t('Show technical details') }}
                         </button>
-                        <pre v-if="showDetails" class="mt-2 p-2 bg-light border rounded" style="font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all;">{{ details }}</pre>
                     </div>
+                    <pre
+                        v-if="showDetails"
+                        class="mt-2 p-2 bg-light border rounded selectable"
+                        style="font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all;"
+                    >{{ details }}</pre>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @click="close">{{ $t('Close') }}</button>
@@ -45,7 +57,39 @@ const emit = defineEmits(['close']);
 
 const modalRef = ref(null);
 const showDetails = ref(false);
+const copied = ref(false);
 let bsModal = null;
+
+function copyText() {
+    const text = props.details ? props.message + '\n\n' + props.details : props.message;
+    const done = () => {
+        copied.value = true;
+        setTimeout(() => { copied.value = false; }, 1500);
+    };
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+
+// Clipboard API is unavailable in non-secure contexts — fall back to a
+// hidden textarea + execCommand.
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+    } catch (e) {
+        // ignore — the button still toggles feedback
+    }
+    document.body.removeChild(ta);
+    done();
+}
 
 watch(() => props.show, async (val) => {
     if (val) {

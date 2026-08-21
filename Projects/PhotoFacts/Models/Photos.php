@@ -137,7 +137,7 @@ class Photos
             $join->on('links.link_type_id', '=', DB::raw("'" . UUID::EVIDENCE . "'"));
         })
             ->leftJoin('things AS events', 'links.other_thing_id', 'events.thing_id')
-            ->selectRaw('photo_media.* , things.start as start, things.start_variety, events.name as event_name, events.description as event_description, events.start as event_start, events.end as event_end, events.thing_id as event_thing_id')
+            ->selectRaw('photo_media.* , things.start as start, events.name as event_name, events.description as event_description, events.start as event_start, events.end as event_end, events.thing_id as event_thing_id')
             ->orderBy('events.name')
             ->orderBy('things.description');
         //}

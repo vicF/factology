@@ -3,6 +3,71 @@
 const TIME_FORMAT = 'Y-m-d H:i:s'
 const DATABASE_TIME_FORMAT = 'YmdHis'
 
+// ─── Human date string → DB-encoded numeric string ───
+// Mirrors App\Models\Classes\Everything::dateToDb (padDate, BC clock
+// inversion, huge-year millennium encoding). Deterministic for UTC.
+
+function padDate(date) {
+    const pad = '-01-01 00:00:00'
+    if (!date) return date
+    const sign = date[0] === '-' ? '-' : ''
+    let d = date.replace(/^-/, '')
+    const hyphenPos = d.indexOf('-')
+    if (hyphenPos === -1) return sign + d + pad
+    const remainingPartLength = d.length - hyphenPos
+    if (remainingPartLength < 15) {
+        d += pad.slice(-(15 - remainingPartLength))
+    }
+    return sign + d
+}
+
+function yearHasMoreThan4Digits(date) {
+    date = date.replace(/^-/, '')
+    const hyphenPos = date.indexOf('-')
+    if (hyphenPos > 4) return true
+    if (hyphenPos === -1) return date.length > 4
+    return false
+}
+
+function parseDateTimeParts(str) {
+    const m = /^(-?\d+)-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$/.exec(str)
+    if (m) {
+        return { y: parseInt(m[1], 10), mo: parseInt(m[2], 10), d: parseInt(m[3], 10), h: parseInt(m[4], 10), mi: parseInt(m[5], 10), s: parseInt(m[6], 10) }
+    }
+    const m2 = /^(-?\d+)-(\d{1,2})(?:-(\d{1,2}))?(?:[ T](\d{1,2})(?::(\d{1,2}))?)?$/.exec(str)
+    if (m2) {
+        return { y: parseInt(m2[1], 10), mo: parseInt(m2[2], 10) || 1, d: parseInt(m2[3], 10) || 1, h: parseInt(m2[4], 10) || 0, mi: parseInt(m2[5], 10) || 0, s: 0 }
+    }
+    return null
+}
+
+function formatYmdHis(parts) {
+    if (!parts) return null
+    const pad2 = (n) => String(n).padStart(2, '0')
+    return String(parts.y).padStart(4, '0') + pad2(parts.mo) + pad2(parts.d) + pad2(parts.h) + pad2(parts.mi) + pad2(parts.s)
+}
+
+function correctBeforeBC(number) {
+    const dayInverted = 235959 - Math.abs(parseInt(number.slice(-6), 10))
+    return number.slice(0, -6) + String(dayInverted).padStart(6, '0')
+}
+
+export function dateToDb(date, timeZone = null) {
+    if (date === null || date === undefined) return null
+    date = padDate(String(date))
+    const bc = date[0] === '-'
+    if (bc || yearHasMoreThan4Digits(date)) {
+        let d = date
+        const p = d.indexOf('.')
+        if (p !== -1) d = d.slice(0, p)
+        const millenniums = d.slice(0, -18)
+        const smallDate = '1' + d.slice(-18)
+        const number = millenniums + formatYmdHis(parseDateTimeParts(smallDate)).slice(1)
+        return bc ? correctBeforeBC(number) : number
+    }
+    return formatYmdHis(parseDateTimeParts(date))
+}
+
 export function dateFromDb(input, timeZone = null, format = null) {
     console.log('Date from DB:', input)
 
