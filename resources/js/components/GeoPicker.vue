@@ -1,6 +1,34 @@
 <template>
     <div class="geo-picker" :style="{ height: height + 'px' }">
         <div ref="mapEl" class="geo-picker-map"></div>
+        <div class="geo-search">
+            <div class="geo-search-row">
+                <select v-model="provider" class="geo-search-provider">
+                    <option value="nominatim">OpenStreetMap</option>
+                    <option value="yandex">Yandex</option>
+                </select>
+                <input
+                    v-model="query"
+                    type="text"
+                    class="geo-search-input"
+                    :placeholder="t('Search address')"
+                    @keydown.enter.prevent="search"
+                />
+                <button
+                    type="button"
+                    class="geo-search-btn"
+                    :disabled="searching || !query.trim()"
+                    :title="t('Search')"
+                    @click.stop="search"
+                >
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+            <ul v-if="results.length" class="geo-search-results">
+                <li v-for="(r, i) in results" :key="i" @click.stop="pick(r)">{{ r.name }}</li>
+            </ul>
+            <div v-if="error" class="geo-search-error">{{ error }}</div>
+        </div>
         <button
             v-if="geolocationSupported"
             type="button"
@@ -14,6 +42,7 @@
 </template>
 
 <script setup>
+import axios from 'axios'
 import L from 'leaflet'
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -47,6 +76,46 @@ let suppressClickUntil = 0
 // Geolocation is only available in secure contexts (HTTPS / localhost); the
 // button stays hidden otherwise.
 const geolocationSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator
+
+// ── Address search (forward geocoding via GET /api/v1/geocode) ──────────────
+const query = ref('')
+const provider = ref('nominatim')
+const results = ref([])
+const searching = ref(false)
+const error = ref('')
+
+const search = async () => {
+    const q = query.value.trim()
+    if (!q || searching.value) return
+    searching.value = true
+    error.value = ''
+    results.value = []
+    try {
+        const res = await axios.get('/geocode', { params: { q, provider: provider.value } })
+        results.value = Array.isArray(res.data?.data) ? res.data.data : []
+    } catch (err) {
+        if (err.response?.status === 501) {
+            // Yandex has no configured key — fall back to the free provider.
+            provider.value = 'nominatim'
+            error.value = t('Geocoder API key is not configured')
+        } else {
+            error.value = t('Geocoding failed')
+        }
+    } finally {
+        searching.value = false
+    }
+}
+
+// Center the map on the chosen address and place/report the point through the
+// same `clicked` flow the parent uses for a map click.
+const pick = (r) => {
+    if (!map) return
+    map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16))
+    emit('clicked', { lat: r.lat, lng: r.lng })
+    query.value = r.name
+    results.value = []
+    error.value = ''
+}
 
 // Center the map on the user's position (approximate, browser-reported). When
 // editing a still-empty Point, the coordinate is placed there right away.
@@ -250,6 +319,88 @@ defineExpose({ invalidate })
     width: 100%;
     height: 100%;
     border-radius: 4px;
+}
+
+.geo-search {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1001;
+    width: 250px;
+    max-width: calc(100% - 60px);
+}
+
+.geo-search-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 2px 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.geo-search-provider {
+    border: none;
+    background: transparent;
+    font-size: 0.72rem;
+    color: #495057;
+    max-width: 92px;
+}
+
+.geo-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    font-size: 0.8rem;
+}
+
+.geo-search-btn {
+    border: none;
+    background: transparent;
+    color: #495057;
+    padding: 2px 6px;
+}
+
+.geo-search-btn:disabled {
+    color: #adb5bd;
+}
+
+.geo-search-results {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    max-height: 150px;
+    overflow: auto;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.geo-search-results li {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.geo-search-results li:hover {
+    background: #f1f3f5;
+}
+
+.geo-search-error {
+    margin: 4px 0 0;
+    padding: 4px 8px;
+    background: #ffffff;
+    color: #c0392b;
+    border: 1px solid #f1c1bf;
+    border-radius: 4px;
+    font-size: 0.75rem;
 }
 
 .geo-locate-btn {

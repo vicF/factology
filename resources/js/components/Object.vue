@@ -81,6 +81,8 @@
                         <div v-show="activeTab === 'details'">
 
                             <!-- Main object details (title lives in the header above) -->
+                            <div class="details-grid">
+                                <div class="details-main">
                             <div class="result-item">
                                 <div class="result-content">
                                     <div class="result-icon-section">
@@ -163,6 +165,11 @@
                                     </div>
                                 </div>
                             </div>
+                                </div>
+                                <div v-if="hasGeoPreview" class="details-side">
+                                    <ObjectMapPreview ref="mapPreviewRef" :object="object" />
+                                </div>
+                            </div>
 
                             <!-- Separator before links -->
                             <div v-if="object.links && object.links.length" class="result-separator"></div>
@@ -232,11 +239,11 @@
 
                                         <!-- RIGHT: related items of this link's target (compact, like search results) -->
                                         <div
-                                            v-if="link.target && (relatedItems(link).length > 0 || !Array.isArray(link.target.links))"
+                                            v-if="link.target && relatedItems(link).length > 0"
                                             class="result-links-section"
                                         >
                                             <div class="links-container">
-                                                <div v-if="relatedItems(link).length > 0" class="links-list">
+                                                <div class="links-list">
                                                     <template v-if="!expandedRelatedLinks.has(link.link_id)">
                                                         <div
                                                             v-for="(rl, rlIndex) in relatedItems(link).slice(0, 3)"
@@ -263,14 +270,6 @@
                                                         :parent="link.target"
                                                     />
                                                 </div>
-                                                <button
-                                                    v-else-if="!Array.isArray(link.target.links)"
-                                                    type="button"
-                                                    class="btn btn-outline-secondary btn-sm"
-                                                    @click="toggleLinkRelated(link)"
-                                                >
-                                                    {{ $t('Show related') }}
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -401,17 +400,19 @@ import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
 import Image from "./Image.vue";
+import RelatedList from './RelatedList.vue';
+import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import IconExternal from './icons/IconExternal.vue';
 import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
-import RelatedList from './RelatedList.vue';
-import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import { buildPropertyEntries } from '../utils/properties.js';
+import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 const ObjectMap = defineAsyncComponent(() => import('./ObjectMap.vue'));
+const ObjectMapPreview = defineAsyncComponent(() => import('./ObjectMapPreview.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -450,6 +451,23 @@ const expandLinkTarget = async (link) => {
     }
 };
 
+// Per-link related-subtree visibility on the object page.
+const expandedRelatedLinks = ref(new Set());
+const toggleLinkRelated = async (link) => {
+    const key = link.link_id;
+    const set = new Set(expandedRelatedLinks.value);
+    if (set.has(key)) {
+        set.delete(key);
+        expandedRelatedLinks.value = set;
+        return;
+    }
+    if (!relatedItems(link).length) {
+        await expandLinkTarget(link);
+    }
+    set.add(key);
+    expandedRelatedLinks.value = set;
+};
+
 // ─── Properties shown in the Details tab ────────────────────────────────
 // The object's `data.properties` map holds values keyed by property thing_id.
 // Property names come from GET /api/v1/properties (loaded once, cached across
@@ -477,23 +495,6 @@ const loadPropertyDefinitions = async () => {
 const propertyEntries = computed(() =>
     buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
 );
-
-// Per-link related-subtree visibility on the object page.
-const expandedRelatedLinks = ref(new Set());
-const toggleLinkRelated = async (link) => {
-    const key = link.link_id;
-    const set = new Set(expandedRelatedLinks.value);
-    if (set.has(key)) {
-        set.delete(key);
-        expandedRelatedLinks.value = set;
-        return;
-    }
-    if (!relatedItems(link).length) {
-        await expandLinkTarget(link);
-    }
-    set.add(key);
-    expandedRelatedLinks.value = set;
-};
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 const hoveredLink = ref(null);
@@ -576,6 +577,11 @@ const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
 const mapInitialized = ref(false);
 const mapComponentRef = ref(null);
+const mapPreviewRef = ref(null);
+
+// Whether anything on this page has coordinates (object itself or a related
+// object) — controls the small map preview on the Details tab.
+const hasGeoPreview = computed(() => buildMapFeatures(object.value).length > 0);
 
 const defaultLinkedObjects = computed(() => {
     const links = [];
@@ -861,6 +867,13 @@ watch(() => route.params.uid, (newUid, oldUid) => {
 
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
+    if (newTab === 'details') {
+        // The preview mounts inside a v-show container; Leaflet keeps a stale
+        // size while the tab was hidden, so re-measure on return.
+        nextTick(() => {
+            if (mapPreviewRef.value) mapPreviewRef.value.invalidate();
+        });
+    }
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
             graphInitialized.value = true;
@@ -1014,6 +1027,28 @@ watch(() => object.value, (newObject) => {
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
+}
+/* Details tab: main details on the left, small map preview on the right */
+.details-grid {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+.details-main {
+    flex: 1;
+    min-width: 0;
+}
+.details-side {
+    width: 300px;
+    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .details-grid {
+        flex-direction: column;
+    }
+    .details-side {
+        width: 100%;
+    }
 }
 .properties-section {
     margin-top: 0.25rem;
@@ -1192,8 +1227,6 @@ button.more-links {
     text-align: left;
     cursor: pointer;
 }
-/* The links list shares one grid template so every row's right column
-   (the related items of each link) aligns vertically. */
 .object-link-item .result-content {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr) 260px;
