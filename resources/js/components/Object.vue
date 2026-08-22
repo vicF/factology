@@ -81,6 +81,8 @@
                         <div v-show="activeTab === 'details'">
 
                             <!-- Main object details (title lives in the header above) -->
+                            <div class="details-grid">
+                                <div class="details-main">
                             <div class="result-item">
                                 <div class="result-content">
                                     <div class="result-icon-section">
@@ -161,6 +163,11 @@
                                             <i class="bi bi-geo-alt"></i>
                                         </a>
                                     </div>
+                                </div>
+                            </div>
+                                </div>
+                                <div v-if="hasGeoPreview" class="details-side">
+                                    <ObjectMapPreview ref="mapPreviewRef" :object="object" />
                                 </div>
                             </div>
 
@@ -401,9 +408,11 @@ import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import { buildPropertyEntries } from '../utils/properties.js';
+import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 const ObjectMap = defineAsyncComponent(() => import('./ObjectMap.vue'));
+const ObjectMapPreview = defineAsyncComponent(() => import('./ObjectMapPreview.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -568,6 +577,11 @@ const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
 const mapInitialized = ref(false);
 const mapComponentRef = ref(null);
+const mapPreviewRef = ref(null);
+
+// Whether anything on this page has coordinates (object itself or a related
+// object) — controls the small map preview on the Details tab.
+const hasGeoPreview = computed(() => buildMapFeatures(object.value).length > 0);
 
 const defaultLinkedObjects = computed(() => {
     const links = [];
@@ -853,6 +867,13 @@ watch(() => route.params.uid, (newUid, oldUid) => {
 
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
+    if (newTab === 'details') {
+        // The preview mounts inside a v-show container; Leaflet keeps a stale
+        // size while the tab was hidden, so re-measure on return.
+        nextTick(() => {
+            if (mapPreviewRef.value) mapPreviewRef.value.invalidate();
+        });
+    }
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
             graphInitialized.value = true;
@@ -1006,6 +1027,28 @@ watch(() => object.value, (newObject) => {
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
+}
+/* Details tab: main details on the left, small map preview on the right */
+.details-grid {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+.details-main {
+    flex: 1;
+    min-width: 0;
+}
+.details-side {
+    width: 300px;
+    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .details-grid {
+        flex-direction: column;
+    }
+    .details-side {
+        width: 100%;
+    }
 }
 .properties-section {
     margin-top: 0.25rem;

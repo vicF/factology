@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -192,6 +193,104 @@ class ApiController extends BaseController
                 'data'    => $properties,
                 'success' => true
             ]);
+    }
+
+    /**
+     * Forward geocoding proxy: address → list of { name, lat, lng }.
+     *
+     * Providers:
+     *  - "nominatim" (default): OpenStreetMap's geocoder, free, no key. Called
+     *    server-side with a proper User-Agent per its usage policy.
+     *  - "yandex": better RU street-level coverage; requires
+     *    YANDEX_GEOCODER_KEY env. Returns 501 when the key is not configured.
+     *
+     * @param  Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function geocode(Request $request)
+    {
+        $q = $request->query('q');
+        $provider = $request->query('provider', 'nominatim');
+
+        if (!is_string($q) || trim($q) === '' || mb_strlen($q) > 300) {
+            return response()->json(['success' => false, 'message' => 'Query is required'], 422);
+        }
+        if (!in_array($provider, ['nominatim', 'yandex'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unknown geocoder provider'], 422);
+        }
+        if ($provider === 'yandex' && !config('services.yandex.geocoder_key')) {
+            return response()->json(
+                ['success' => false, 'message' => 'Yandex geocoder API key is not configured (YANDEX_GEOCODER_KEY)'],
+                501
+            );
+        }
+
+        try {
+            $results = $provider === 'yandex'
+                ? $this->geocodeYandex($q)
+                : $this->geocodeNominatim($q);
+        } catch (\Throwable $e) {
+            Log::warning('geocode failed', ['provider' => $provider, 'q' => $q, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Geocoding service unavailable'], 502);
+        }
+
+        return response()->json(['success' => true, 'data' => $results]);
+    }
+
+    private function geocodeNominatim(string $q): array
+    {
+        $res = Http::timeout(12)
+            ->connectTimeout(8)
+            ->withHeaders([
+                'User-Agent' => 'factology/1.0 (local dev; https://factology.local)',
+                'Accept-Language' => 'ru',
+            ])
+            ->get('https://nominatim.openstreetmap.org/search', [
+                'format' => 'jsonv2',
+                'q'      => $q,
+                'limit'  => 5,
+            ]);
+        $res->throw();
+
+        return collect($res->json())
+            ->map(fn ($r) => [
+                'name' => $r['display_name'] ?? $r['name'] ?? '?',
+                'lat'  => (float) ($r['lat'] ?? 0),
+                'lng'  => (float) ($r['lon'] ?? 0),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function geocodeYandex(string $q): array
+    {
+        // The key is checked in geocode() before the try/catch, so this only
+        // guards against a key being removed between the two calls.
+        $key = config('services.yandex.geocoder_key');
+
+        $res = Http::timeout(12)->connectTimeout(8)->get('https://geocode-maps.yandex.ru/1.x/', [
+            'format'  => 'json',
+            'geocode' => $q,
+            'apikey'  => $key,
+            'results' => 5,
+            'lang'    => 'ru_RU',
+        ]);
+        $res->throw();
+
+        $features = $res->json('response.GeoObjectCollection.featureMember') ?? [];
+
+        return collect($features)
+            ->map(function ($f) {
+                $geo = $f['GeoObject'] ?? [];
+                $pos = explode(' ', $geo['Point']['pos'] ?? ''); // "lng lat"
+                return [
+                    'name' => $geo['metaDataProperty']['GeocoderMetaData']['text'] ?? $geo['name'] ?? '?',
+                    'lat'  => (float) ($pos[1] ?? 0),
+                    'lng'  => (float) ($pos[0] ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
 
@@ -1357,6 +1456,7 @@ class ApiController extends BaseController
             l.one_thing_id,
             c.description,
             c.type,
+            CAST(l.description AS VARCHAR(255)),
             c.public,
             c.name_translations
         FROM descendants d
