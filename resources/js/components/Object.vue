@@ -238,11 +238,11 @@
 
                                         <!-- RIGHT: related items of this link's target (compact, like search results) -->
                                         <div
-                                            v-if="link.target && (relatedItems(link).length > 0 || !Array.isArray(link.target.links))"
+                                            v-if="link.target && relatedItems(link).length > 0"
                                             class="result-links-section"
                                         >
                                             <div class="links-container">
-                                                <div v-if="relatedItems(link).length > 0" class="links-list">
+                                                <div class="links-list">
                                                     <template v-if="!expandedRelatedLinks.has(link.link_id)">
                                                         <div
                                                             v-for="(rl, rlIndex) in relatedItems(link).slice(0, 3)"
@@ -269,14 +269,6 @@
                                                         :parent="link.target"
                                                     />
                                                 </div>
-                                                <button
-                                                    v-else-if="!Array.isArray(link.target.links)"
-                                                    type="button"
-                                                    class="btn btn-outline-secondary btn-sm"
-                                                    @click="toggleLinkRelated(link)"
-                                                >
-                                                    {{ $t('Show related') }}
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -407,13 +399,13 @@ import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
 import Image from "./Image.vue";
+import RelatedList from './RelatedList.vue';
+import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import IconExternal from './icons/IconExternal.vue';
 import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import ConfirmModal from './ConfirmModal.vue';
-import RelatedList from './RelatedList.vue';
-import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import { buildPropertyEntries } from '../utils/properties.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
@@ -456,6 +448,23 @@ const expandLinkTarget = async (link) => {
     }
 };
 
+// Per-link related-subtree visibility on the object page.
+const expandedRelatedLinks = ref(new Set());
+const toggleLinkRelated = async (link) => {
+    const key = link.link_id;
+    const set = new Set(expandedRelatedLinks.value);
+    if (set.has(key)) {
+        set.delete(key);
+        expandedRelatedLinks.value = set;
+        return;
+    }
+    if (!relatedItems(link).length) {
+        await expandLinkTarget(link);
+    }
+    set.add(key);
+    expandedRelatedLinks.value = set;
+};
+
 // ─── Properties shown in the Details tab ────────────────────────────────
 // The object's `data.properties` map holds values keyed by property thing_id.
 // Property names come from GET /api/v1/properties (loaded once, cached across
@@ -483,23 +492,6 @@ const loadPropertyDefinitions = async () => {
 const propertyEntries = computed(() =>
     buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
 );
-
-// Per-link related-subtree visibility on the object page.
-const expandedRelatedLinks = ref(new Set());
-const toggleLinkRelated = async (link) => {
-    const key = link.link_id;
-    const set = new Set(expandedRelatedLinks.value);
-    if (set.has(key)) {
-        set.delete(key);
-        expandedRelatedLinks.value = set;
-        return;
-    }
-    if (!relatedItems(link).length) {
-        await expandLinkTarget(link);
-    }
-    set.add(key);
-    expandedRelatedLinks.value = set;
-};
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 const hoveredLink = ref(null);
@@ -1198,8 +1190,6 @@ button.more-links {
     text-align: left;
     cursor: pointer;
 }
-/* The links list shares one grid template so every row's right column
-   (the related items of each link) aligns vertically. */
 .object-link-item .result-content {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr) 260px;
