@@ -432,6 +432,7 @@ import IconPublic from './icons/IconPublic.vue';
 import IconCheck from './icons/IconCheck.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import { buildPropertyEntries } from '../utils/properties.js';
+import { UUID } from '../constants/uuid';
 import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
@@ -622,6 +623,12 @@ const defaultLinkedObjects = computed(() => {
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
 
+// System default owner UUIDs indicate objects that were created without an
+// explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
+// SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
+// may edit/delete such objects.
+const isSystemDefaultOwner = (uid) => uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
+
 // Whether the current user may edit this object's own fields. Admins may edit
 // any object (system-owned ones included); everyone else only their own.
 // Links are always editable by authenticated users, so the Link/Create buttons
@@ -630,7 +637,9 @@ const canEdit = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return !!uid && authStore.user?.thing_id === uid;
+    if (!uid) return false;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
 });
 
 // Delete follows the same rule as edit: admins may delete any object,
@@ -639,17 +648,21 @@ const canDelete = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return !!uid && authStore.user?.thing_id === uid;
+    if (!uid) return false;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
 });
 
 // True when the viewed object belongs to a different account than the current
 // user. Editing/deleting such an object is an admin-only power for now, and the
 // UI warns about it — the check is written generically so it will also cover
 // future non-owner edit permissions.
-const isOtherOwnerObject = computed(() =>
-    authenticated.value && object.value?.owner &&
-    object.value.owner !== authStore.user?.thing_id
-);
+const isOtherOwnerObject = computed(() => {
+    if (!authenticated.value || !object.value?.owner) return false;
+    const uid = object.value.owner;
+    if (isSystemDefaultOwner(uid)) return false;
+    return uid !== authStore.user?.thing_id;
+});
 
 // ── Planned / confirmed dates (things.data JSON) ─────────────────────────
 const plannedDate = computed(() => object.value?.data?.planned || null);
