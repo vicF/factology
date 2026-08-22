@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ExportImportController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\TestDatabaseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -105,6 +106,9 @@ Route::prefix('v1')->group(function () {
         // Export/Import (admin-only, enforced in controller)
         Route::get('/export',                 [ExportImportController::class, 'export']);
         Route::post('/import',                [ExportImportController::class, 'import']);
+
+        // GEDCOM import (any authenticated user imports into their own tree)
+        Route::post('/import/gedcom',         [ImportController::class, 'importGedcom']);
     });
 });
 

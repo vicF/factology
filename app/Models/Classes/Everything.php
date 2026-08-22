@@ -103,6 +103,8 @@ class Everything
         'type',
         'owner',
         'server_uuid',
+        'source_service',
+        'source_external_id',
     ];
 
     protected static ?string $_serverUuid = null;
@@ -127,6 +129,8 @@ class Everything
         'type',
         'owner',
         'server_uuid',
+        'source_service',
+        'source_external_id',
     ];
     public $defaults = ['end' => null, 'public' => 0];
     public $additionalParams = [];

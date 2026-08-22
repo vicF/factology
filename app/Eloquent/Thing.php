@@ -40,7 +40,9 @@ class Thing extends Model
         'end',
         'public',
         'owner',
-        'server_uuid'];
+        'server_uuid',
+        'source_service',
+        'source_external_id'];
 
     /**
      *
