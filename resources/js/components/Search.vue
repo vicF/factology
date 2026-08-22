@@ -40,9 +40,9 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
-                                <div v-if="groupLabels[thingIndex]" class="date-group-header">
+                                <div v-if="groupLabels[thingIndex]" class="date-group-header" :class="{ 'future-divider': typeof groupLabels[thingIndex] === 'object' && groupLabels[thingIndex]?.future }">
                                     <span class="date-group-line"></span>
-                                    <span class="date-group-label">{{ groupLabels[thingIndex] }}</span>
+                                    <span class="date-group-label">{{ typeof groupLabels[thingIndex] === 'string' ? groupLabels[thingIndex] : $t('dates.future') }}</span>
                                     <span class="date-group-line"></span>
                                 </div>
                                 <div class="result-content">
@@ -87,6 +87,15 @@
 
                                                 📅
                                                 {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
+                                                <span v-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
+                                                <template v-if="thing.data?.planned">
+                                                    <span class="planned-badge">
+                                                        {{ $t('dates.planned_on') }} {{ thing.data.planned }}
+                                                    </span>
+                                                    <span v-if="thing.data?.confirmed" class="confirmed-badge">
+                                                        {{ $t('dates.confirmed_on') }} {{ thing.data.confirmed }}
+                                                    </span>
+                                                </template>
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -162,6 +171,30 @@ import RelatedList from "./RelatedList.vue";
 import LinkDescription from "./LinkDescription.vue";
 import { useRelatedExpansion } from "../composables/useRelatedExpansion";
 
+// ── Date helpers ────────────────────────────────────────────────────────
+// Canonical "now" for date comparison (same format as the DB stores).
+function canonicalNow() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${y}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+// Whether the thing's start date is strictly in the future.
+function isFutureDate(thing) {
+    if (!thing.start) return false;
+    return BigInt(String(thing.start)) > BigInt(canonicalNow());
+}
+
+// Whether the thing is happening right now (start ≤ now ≤ end).
+function isOngoing(thing) {
+    if (!thing.start) return false;
+    const now = BigInt(canonicalNow());
+    if (now < BigInt(String(thing.start))) return false;
+    if (!thing.end) return false;
+    return now <= BigInt(String(thing.end));
+}
+
 const props = defineProps({
     searchText: String,
     typeThing: String,
@@ -235,11 +268,21 @@ function dateGroupLabel(key) {
 }
 
 // Header label aligned with each result row (null = no header before it).
+// Returns a string (month/year label) or an object { future: true } for the
+// future divider, or null for no header.
 const groupLabels = computed(() => {
     const labels = new Array(objects.value.length).fill(null);
     if (searchStore.sortBy !== 'start') return labels;
     let prevKey = null;
+    let seenFuture = false;
     objects.value.forEach((thing, i) => {
+        const future = isFutureDate(thing);
+        if (future && !seenFuture) {
+            seenFuture = true;
+            labels[i] = { future: true };
+            prevKey = null;
+            return;
+        }
         const key = dateGroupKey(thing.start);
         if (key !== prevKey) {
             labels[i] = dateGroupLabel(key);
@@ -498,5 +541,58 @@ onUnmounted(() => {
 
 .date-group-label {
     white-space: nowrap;
+}
+
+.future-divider {
+    margin: 20px 0 10px;
+}
+.future-divider .date-group-label {
+    color: #0d6efd;
+    font-weight: 700;
+}
+.future-divider .date-group-line {
+    background: #0d6efd;
+    opacity: 0.4;
+}
+.ongoing-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #198754;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.planned-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #0d6efd;
+    background: rgba(13, 110, 253, 0.1);
+    border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.confirmed-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #198754;
+    background: rgba(25, 135, 84, 0.1);
+    border: 1px solid rgba(25, 135, 84, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
 }
 </style>
