@@ -58,12 +58,6 @@
                             </div>
                         </div>
 
-                        <!-- Warning when editing/deleting another user's object -->
-                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
-                            <i class="bi bi-person-exclamation me-1"></i>
-                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
-                        </div>
-
                         <!-- Tabs -->
                         <ul class="nav nav-tabs justify-content-end mb-3">
                             <li class="nav-item">
