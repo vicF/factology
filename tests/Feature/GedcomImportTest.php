@@ -235,4 +235,42 @@ GEDCOM;
 
         $this->assertEquals(1, $count, 'Only one thing for same fileKey');
     }
+
+    public function testFindDuplicatesEndpointLinksCrossFilePersons(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME John /Smith/
+1 SEX M
+1 BIRT
+2 DATE 12 APR 1856
+0 TRLR
+GEDCOM;
+
+        // Import same person from two "files"
+        (new GedcomImporter($this->ownerThingId, 'file-a'))->import($gedcom);
+        (new GedcomImporter($this->ownerThingId, 'file-b'))->import($gedcom);
+
+        // Run the endpoint
+        $response = $this->postJson('/api/v1/import/find-duplicates');
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $result = $response->json('result');
+        $this->assertGreaterThanOrEqual(1, $result['links_created'], 'Should create at least one DUPLICATE_OF link');
+        $this->assertGreaterThanOrEqual(1, count($result['matches']), 'Should report at least one match');
+
+        // Verify the link actually exists in DB
+        $linkCount = DB::table('links')
+            ->where('link_type_id', UUID::DUPLICATE_OF)
+            ->count();
+        $this->assertGreaterThanOrEqual(1, $linkCount, 'DUPLICATE_OF link should exist in DB');
+
+        // Running again should be a no-op (link already exists)
+        $response2 = $this->postJson('/api/v1/import/find-duplicates');
+        $result2 = $response2->json('result');
+        $this->assertSame(0, $result2['links_created'], 'Second run should create no new links');
+    }
 }

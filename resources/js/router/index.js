@@ -20,6 +20,8 @@ const Search = () => import('@/components/Search.vue')
 
 const Object = () => import('@/components/Object.vue')
 
+const Tools = () => import('@/components/Tools.vue')
+
 
 const routes = [
 
@@ -61,6 +63,14 @@ const routes = [
                 component: Object,
                 meta: {
                     title: `Object`
+                }
+            },
+            {
+                name: "tools",
+                path: "/tools",
+                component: Tools,
+                meta: {
+                    title: `Tools`
                 }
             }
         ]

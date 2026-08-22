@@ -110,6 +110,7 @@ Route::prefix('v1')->group(function () {
 
         // GEDCOM import (any authenticated user imports into their own tree)
         Route::post('/import/gedcom',         [ImportController::class, 'importGedcom']);
+        Route::post('/import/find-duplicates', [ImportController::class, 'findDuplicates']);
     });
 });
 
