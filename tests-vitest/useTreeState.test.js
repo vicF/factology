@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useTreeState, defaultIsOpen, COLLAPSE_FROM_DEPTH } from '@/composables/useTreeState'
+import { useTreeState, defaultIsOpen, COLLAPSE_FROM_DEPTH, _resetCache } from '@/composables/useTreeState'
 
 describe('useTreeState', () => {
     beforeEach(() => {
         localStorage.clear()
+        _resetCache()
     })
 
     it('collapses from the configured depth', () => {
