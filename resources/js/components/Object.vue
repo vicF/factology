@@ -118,21 +118,13 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
-                                                <template v-if="plannedDate">
-                                                    <span class="planned-badge">
-                                                        {{ $t('dates.planned_on') }} {{ plannedDate }}
+                                                <template v-if="isPlanned || confirmedDate">
+                                                    <span v-if="!confirmedDate" class="planned-badge">
+                                                        {{ $t('dates.planned') }}
+                                                        <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
                                                     <button
-                                                        v-if="confirmedDate"
-                                                        class="confirm-badge confirm-badge--done"
-                                                        :title="$t('dates.confirmed_title')"
-                                                        disabled
-                                                    >
-                                                        <IconCheck />
-                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
-                                                    </button>
-                                                    <button
-                                                        v-else-if="canConfirmPlanned"
+                                                        v-if="!confirmedDate && canConfirmPlanned"
                                                         class="confirm-badge"
                                                         :title="$t('dates.confirm_hint')"
                                                         @click="confirmPlanned"
@@ -140,6 +132,14 @@
                                                         <IconCheck />
                                                         {{ $t('dates.confirm') }}
                                                     </button>
+                                                    <span
+                                                        v-else-if="confirmedDate"
+                                                        class="confirm-badge confirm-badge--done"
+                                                        :title="$t('dates.confirmed_title')"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
+                                                    </span>
                                                 </template>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
@@ -664,14 +664,32 @@ const isOtherOwnerObject = computed(() => {
     return uid !== authStore.user?.thing_id;
 });
 
-// ── Planned / confirmed dates (things.data JSON) ─────────────────────────
-const plannedDate = computed(() => object.value?.data?.planned || null);
+// ── Planned / confirmed (things.data JSON + future start) ────────────────
+// Canonical "now" (same digit-string shape as the DB's start column).
+function canonicalNow() {
+    const d = new Date();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
 const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+const markedPlannedDate = computed(() => object.value?.data?.planned || null);
+const hasFutureStart = computed(() =>
+    !!object.value?.start && BigInt(String(object.value.start)) > BigInt(canonicalNow())
+);
+
+// A "plan" is an object with a future start date that hasn't been confirmed
+// yet. Explicitly-marked plans (data.planned) stay plans even after their date
+// passes; unmarked future-dated objects (created before this feature, or via
+// import) are derived as plans from their start date.
+const isPlanned = computed(() =>
+    !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
+);
 
 // The owner (or an admin) may confirm that a planned object happened. Guests
 // and other users only see the static badges.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && plannedDate.value && !confirmedDate.value
+    canEdit.value && isPlanned.value && !confirmedDate.value
 );
 
 const confirmPlanned = async () => {
