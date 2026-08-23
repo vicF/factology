@@ -58,12 +58,6 @@
                             </div>
                         </div>
 
-                        <!-- Warning when editing/deleting another user's object -->
-                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
-                            <i class="bi bi-person-exclamation me-1"></i>
-                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
-                        </div>
-
                         <!-- Tabs -->
                         <ul class="nav nav-tabs justify-content-end mb-3">
                             <li class="nav-item">
@@ -87,6 +81,8 @@
                         <div v-show="activeTab === 'details'">
 
                             <!-- Main object details (title lives in the header above) -->
+                            <div class="details-grid">
+                                <div class="details-main">
                             <div class="result-item">
                                 <div class="result-content">
                                     <div class="result-icon-section">
@@ -122,6 +118,29 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
+                                                <template v-if="isPlanned || confirmedDate">
+                                                    <span v-if="!confirmedDate" class="planned-badge">
+                                                        {{ $t('dates.planned') }}
+                                                        <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
+                                                    </span>
+                                                    <button
+                                                        v-if="!confirmedDate && canConfirmPlanned"
+                                                        class="confirm-badge"
+                                                        :title="$t('dates.confirm_hint')"
+                                                        @click="confirmPlanned"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirm') }}
+                                                    </button>
+                                                    <span
+                                                        v-else-if="confirmedDate"
+                                                        class="confirm-badge confirm-badge--done"
+                                                        :title="$t('dates.confirmed_title')"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
+                                                    </span>
+                                                </template>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
                                         </div>
@@ -167,6 +186,11 @@
                                             <i class="bi bi-geo-alt"></i>
                                         </a>
                                     </div>
+                                </div>
+                            </div>
+                                </div>
+                                <div v-if="hasGeoPreview" class="details-side">
+                                    <ObjectMapPreview ref="mapPreviewRef" :object="object" />
                                 </div>
                             </div>
 
@@ -238,11 +262,11 @@
 
                                         <!-- RIGHT: related items of this link's target (compact, like search results) -->
                                         <div
-                                            v-if="link.target && (relatedItems(link).length > 0 || !Array.isArray(link.target.links))"
+                                            v-if="link.target && relatedItems(link).length > 0"
                                             class="result-links-section"
                                         >
                                             <div class="links-container">
-                                                <div v-if="relatedItems(link).length > 0" class="links-list">
+                                                <div class="links-list">
                                                     <template v-if="!expandedRelatedLinks.has(link.link_id)">
                                                         <div
                                                             v-for="(rl, rlIndex) in relatedItems(link).slice(0, 3)"
@@ -269,14 +293,6 @@
                                                         :parent="link.target"
                                                     />
                                                 </div>
-                                                <button
-                                                    v-else-if="!Array.isArray(link.target.links)"
-                                                    type="button"
-                                                    class="btn btn-outline-secondary btn-sm"
-                                                    @click="toggleLinkRelated(link)"
-                                                >
-                                                    {{ $t('Show related') }}
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -407,17 +423,21 @@ import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
 import Image from "./Image.vue";
+import RelatedList from './RelatedList.vue';
+import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import IconExternal from './icons/IconExternal.vue';
 import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
+import IconCheck from './icons/IconCheck.vue';
 import ConfirmModal from './ConfirmModal.vue';
-import RelatedList from './RelatedList.vue';
-import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import { buildPropertyEntries } from '../utils/properties.js';
+import { UUID } from '../constants/uuid';
+import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
 const ObjectMap = defineAsyncComponent(() => import('./ObjectMap.vue'));
+const ObjectMapPreview = defineAsyncComponent(() => import('./ObjectMapPreview.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -456,6 +476,23 @@ const expandLinkTarget = async (link) => {
     }
 };
 
+// Per-link related-subtree visibility on the object page.
+const expandedRelatedLinks = ref(new Set());
+const toggleLinkRelated = async (link) => {
+    const key = link.link_id;
+    const set = new Set(expandedRelatedLinks.value);
+    if (set.has(key)) {
+        set.delete(key);
+        expandedRelatedLinks.value = set;
+        return;
+    }
+    if (!relatedItems(link).length) {
+        await expandLinkTarget(link);
+    }
+    set.add(key);
+    expandedRelatedLinks.value = set;
+};
+
 // ─── Properties shown in the Details tab ────────────────────────────────
 // The object's `data.properties` map holds values keyed by property thing_id.
 // Property names come from GET /api/v1/properties (loaded once, cached across
@@ -483,23 +520,6 @@ const loadPropertyDefinitions = async () => {
 const propertyEntries = computed(() =>
     buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
 );
-
-// Per-link related-subtree visibility on the object page.
-const expandedRelatedLinks = ref(new Set());
-const toggleLinkRelated = async (link) => {
-    const key = link.link_id;
-    const set = new Set(expandedRelatedLinks.value);
-    if (set.has(key)) {
-        set.delete(key);
-        expandedRelatedLinks.value = set;
-        return;
-    }
-    if (!relatedItems(link).length) {
-        await expandLinkTarget(link);
-    }
-    set.add(key);
-    expandedRelatedLinks.value = set;
-};
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 const hoveredLink = ref(null);
@@ -582,6 +602,11 @@ const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
 const mapInitialized = ref(false);
 const mapComponentRef = ref(null);
+const mapPreviewRef = ref(null);
+
+// Whether anything on this page has coordinates (object itself or a related
+// object) — controls the small map preview on the Details tab.
+const hasGeoPreview = computed(() => buildMapFeatures(object.value).length > 0);
 
 const defaultLinkedObjects = computed(() => {
     const links = [];
@@ -598,6 +623,12 @@ const defaultLinkedObjects = computed(() => {
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
 
+// System default owner UUIDs indicate objects that were created without an
+// explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
+// SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
+// may edit/delete such objects.
+const isSystemDefaultOwner = (uid) => uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
+
 // Whether the current user may edit this object's own fields. Admins may edit
 // any object (system-owned ones included); everyone else only their own.
 // Links are always editable by authenticated users, so the Link/Create buttons
@@ -606,7 +637,9 @@ const canEdit = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return !!uid && authStore.user?.thing_id === uid;
+    if (!uid) return false;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
 });
 
 // Delete follows the same rule as edit: admins may delete any object,
@@ -615,17 +648,65 @@ const canDelete = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    return !!uid && authStore.user?.thing_id === uid;
+    if (!uid) return false;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
 });
 
 // True when the viewed object belongs to a different account than the current
 // user. Editing/deleting such an object is an admin-only power for now, and the
 // UI warns about it — the check is written generically so it will also cover
 // future non-owner edit permissions.
-const isOtherOwnerObject = computed(() =>
-    authenticated.value && object.value?.owner &&
-    object.value.owner !== authStore.user?.thing_id
+const isOtherOwnerObject = computed(() => {
+    if (!authenticated.value || !object.value?.owner) return false;
+    const uid = object.value.owner;
+    if (isSystemDefaultOwner(uid)) return false;
+    return uid !== authStore.user?.thing_id;
+});
+
+// ── Planned / confirmed (things.data JSON + future start) ────────────────
+// Canonical "now" (same digit-string shape as the DB's start column).
+function canonicalNow() {
+    const d = new Date();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+const markedPlannedDate = computed(() => object.value?.data?.planned || null);
+const hasFutureStart = computed(() =>
+    !!object.value?.start && BigInt(String(object.value.start)) > BigInt(canonicalNow())
 );
+
+// A "plan" is an object with a future start date that hasn't been confirmed
+// yet. Explicitly-marked plans (data.planned) stay plans even after their date
+// passes; unmarked future-dated objects (created before this feature, or via
+// import) are derived as plans from their start date.
+const isPlanned = computed(() =>
+    !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
+);
+
+// The owner (or an admin) may confirm that a planned object happened. Guests
+// and other users only see the static badges.
+const canConfirmPlanned = computed(() =>
+    canEdit.value && isPlanned.value && !confirmedDate.value
+);
+
+const confirmPlanned = async () => {
+    if (!object.value) return;
+    try {
+        const res = await axios.patch(`/object/${object.value.thing_id}/confirm`);
+        if (res.data?.data?.confirmed) {
+            object.value.data = {
+                ...(object.value.data || {}),
+                planned: res.data.data.planned || object.value.data?.planned,
+                confirmed: res.data.data.confirmed,
+            };
+        }
+    } catch (error) {
+        console.error('Failed to confirm planned object:', error);
+    }
+};
 
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;
@@ -867,6 +948,13 @@ watch(() => route.params.uid, (newUid, oldUid) => {
 
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
+    if (newTab === 'details') {
+        // The preview mounts inside a v-show container; Leaflet keeps a stale
+        // size while the tab was hidden, so re-measure on return.
+        nextTick(() => {
+            if (mapPreviewRef.value) mapPreviewRef.value.invalidate();
+        });
+    }
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
             graphInitialized.value = true;
@@ -1012,6 +1100,45 @@ watch(() => object.value, (newObject) => {
     color: #6c757d;
     font-style: italic;
 }
+.planned-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #0d6efd;
+    background: rgba(13, 110, 253, 0.1);
+    border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.confirm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #198754;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.confirm-badge:hover {
+    background: #157347;
+}
+.confirm-badge--done {
+    background: #198754;
+    opacity: 0.85;
+    cursor: default;
+}
 .link-actions {
     margin-top: 8px;
     display: flex;
@@ -1020,6 +1147,28 @@ watch(() => object.value, (newObject) => {
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
+}
+/* Details tab: main details on the left, small map preview on the right */
+.details-grid {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+.details-main {
+    flex: 1;
+    min-width: 0;
+}
+.details-side {
+    width: 300px;
+    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .details-grid {
+        flex-direction: column;
+    }
+    .details-side {
+        width: 100%;
+    }
 }
 .properties-section {
     margin-top: 0.25rem;
@@ -1198,8 +1347,6 @@ button.more-links {
     text-align: left;
     cursor: pointer;
 }
-/* The links list shares one grid template so every row's right column
-   (the related items of each link) aligns vertically. */
 .object-link-item .result-content {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr) 260px;

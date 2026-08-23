@@ -124,8 +124,9 @@ export function reportToServer(error) {
     body.requestMethod = error.config.method
   }
 
-  // Fire-and-forget
-  axios.post('/api/v1/client-error', body).catch(() => {})
+  // Fire-and-forget. Relative to axios.baseURL (/api/v1) — a leading-slash
+  // absolute path would get the prefix applied twice (/api/v1/api/v1/...).
+  axios.post('/client-error', body).catch(() => {})
 }
 
 // ── Vue handler ──────────────────────────────────────────────

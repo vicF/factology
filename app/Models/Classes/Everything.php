@@ -701,9 +701,14 @@ class Everything
 
         // Check ownership — admins may save/reassign any object (system ownership, re-owning).
         // Guarded so internal flows without an auth user (e.g. UserClass seeding) still work.
+        // System default owners (VICTOR_FOKIN, SYSTEM_OWNER) are treated as unowned — any
+        // authenticated user may claim them.
         $authUser = auth()->user();
         $isAdmin = $authUser ? (bool) $authUser->is_admin : false;
-        if (!empty($existingRecord) && !$isAdmin && $authUser && $existingRecord->owner != $authUser->thing_id) {
+        $isSystemDefault = $existingRecord && in_array($existingRecord->owner, [
+            UUID::VICTOR_FOKIN, UUID::SYSTEM_OWNER,
+        ], true);
+        if (!empty($existingRecord) && !$isAdmin && $authUser && !$isSystemDefault && $existingRecord->owner != $authUser->thing_id) {
             throw new \Exception('You do not have permission to update this record', 403);
             // Or return response with 403 Forbidden status
         } elseif (empty($this->owner)) {
