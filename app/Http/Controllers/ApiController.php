@@ -338,6 +338,18 @@ class ApiController extends BaseController
             'class.public' => ['nullable', 'integer', 'in:0,1'],
 
             /**
+             * Multiple class relationships (multi-class). Each entry has the
+             * same shape as the singular `class` above. When present, it
+             * replaces the object's full class membership (edit flow diffs).
+             */
+            'classes' => ['sometimes', 'array'],
+            'classes.*.one_thing_id'  => ['required', 'string', 'uuid'],
+            'classes.*.link_type_id'  => ['required', 'string', 'uuid'],
+            'classes.*.other_thing_id' => ['required', 'string', 'uuid'],
+            'classes.*.description'   => ['nullable', 'string', 'max:1000'],
+            'classes.*.public'        => ['nullable', 'integer', 'in:0,1'],
+
+            /**
              * External links (annotations pointing to URLs).
              * Full desired list — the backend diffs it against existing rows.
              */
@@ -369,6 +381,38 @@ class ApiController extends BaseController
             throw ValidationException::withMessages(['owner' => 'Only admins can change ownership.']);
         }
 
+        // Objects (type 3) must belong to at least one class. Applies only on
+        // CREATE (POST): an update (PUT) is a partial patch of an existing
+        // object that already carries its classes, so it must not be blocked.
+        // Internal creation paths (Photos package, ExportImportController, test
+        // user things) bypass this endpoint. Class membership can be declared
+        // via `class`, `classes`, a LINK_TO_CLASS entry in `links_to_add`, or
+        // the legacy transposed `link` payload — any of them satisfies the rule.
+        if ($request->isMethod('post') && (int) $request->input('type') === UUID::G_THING) {
+            $hasClassInfo = !empty($request->input('class')) || !empty($request->input('classes'));
+            if (!$hasClassInfo) {
+                foreach ((array) $request->input('links_to_add', []) as $link) {
+                    if (($link['link_type_id'] ?? null) === UUID::LINK_TO_CLASS) {
+                        $hasClassInfo = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasClassInfo) {
+                foreach ((array) $request->input('link', []) as $link) {
+                    if (($link['type'] ?? null) === UUID::LINK_TO_CLASS) {
+                        $hasClassInfo = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasClassInfo) {
+                throw ValidationException::withMessages([
+                    'classes' => 'Objects must belong to at least one class.',
+                ]);
+            }
+        }
+
         return DB::transaction(static function () use ($request) {
             $model = new Everything($request->toArray());
             try {
@@ -393,7 +437,10 @@ class ApiController extends BaseController
             if ($request->parent) {
                 $model->setParent($request->parent);
             }
-            if ($request->class) {
+            if (!empty($request['classes'])) {
+                // Multi-class: full replacement of the object's class membership.
+                $model->setClasses($request['classes']);
+            } elseif ($request->class) {
                 $model->setClass($request->class);
             }
             if (!empty($request['links'])) { // @TODO likely will not be used
@@ -1127,10 +1174,17 @@ class ApiController extends BaseController
         // dedupe.)
         $data = $query->groupBy('things.thing_id')->limit(100)->get();
 
+        // Attach each result's class membership (multi-class: `classes` array,
+        // `class` = first/primary). Only things have a class; skip for other
+        // type searches (link types, class types) to avoid an unnecessary query.
+        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
+        if (empty($requestTypes) || in_array(UUID::G_THING, $requestTypes, true)) {
+            $this->attachClasses($data);
+        }
+
         // Link-type results carry their taxonomy base category (the abstract
         // base they hang under, e.g. "Kinship", "Hierarchy") so the picker can
         // group them.
-        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
         if (in_array(UUID::G_LINK, $requestTypes, true)) {
             $this->attachLinkTypeCategories($data);
         }
@@ -1177,6 +1231,50 @@ class ApiController extends BaseController
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Attach class membership to search results (multi-class). Each result gets
+     * a `classes` array [{ thing_id, name, name_translations, class_name }] and
+     * `class` = the first/primary class (backward-compat singular shape). One
+     * batched query covers all results.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachClasses($things): void
+    {
+        $ids = $things->pluck('thing_id')->toArray();
+        if (empty($ids)) {
+            return;
+        }
+
+        $rows = DB::table('links')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->leftJoin('classes', 'classes.thing_id', '=', 'c.thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('links.deleted', false)
+            ->where('c.deleted', false)
+            ->whereIn('links.one_thing_id', $ids)
+            // Insertion order → first class is the primary one.
+            ->orderBy('links.link_id')
+            ->select('links.one_thing_id as thing_id', 'c.thing_id as class_thing_id', 'c.name', 'c.name_translations', 'classes.class_name')
+            ->get()
+            ->groupBy('thing_id');
+
+        foreach ($things as $thing) {
+            $classes = ($rows[$thing->thing_id] ?? collect())->map(function ($r) {
+                return [
+                    'thing_id'          => $r->class_thing_id,
+                    'name'              => $r->name,
+                    'name_translations' => is_string($r->name_translations)
+                        ? json_decode($r->name_translations, true)
+                        : ($r->name_translations ?? null),
+                    'class_name'        => $r->class_name,
+                ];
+            })->values()->all();
+            $thing->classes = $classes;
+            $thing->class   = $classes[0] ?? null;
+        }
     }
 
     /**

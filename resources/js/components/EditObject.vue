@@ -17,18 +17,20 @@
                     </div>
                     <div class="modal-body">
                         <form @submit.prevent="submitForm">
-                            <!-- Class field for Thing type (type 3) -->
+                            <!-- Classes (multi-class) for Thing type (type 3) -->
                             <div class="mb-3" v-if="formData.type === 3">
-                                <LinkedObject
-                                    :link="classLinkData"
-                                    :currentObject="{ thing_id: formData.thing_id, name: formData.name }"
-                                    :index="0"
-                                    :singleField="true"
-                                    :fixedLinkTypeUuid="LINK_TO_CLASS"
-                                    :targetLabel="$t('Class')"
-                                    @update="handleClassLinkUpdate"
-                                    @remove="handleClassLinkRemove"
+                                <label class="form-label d-block">{{ $t('Classes') }}</label>
+                                <ObjectField
+                                    v-model="selectedClassIds"
+                                    :multiple="true"
+                                    :type="CLASS_TYPE"
+                                    fieldName="classes"
+                                    :placeholder="$t('Search classes...')"
                                 />
+                                <div v-if="classError" class="text-danger small mt-1">{{ classError }}</div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm mt-1" @click="openCreateClassModal">
+                                    {{ $t('Create new class') }}
+                                </button>
                             </div>
 
                             <!-- Properties: suggested by class + manually attached, with editors -->
@@ -361,6 +363,53 @@
                                 </div>
                             </div>
 
+                            <!-- Multi-link picker: choose a link type once, then
+                                 pick several targets — appends one row per target. -->
+                            <div class="border rounded p-2 mb-3 bg-light">
+                                <label class="form-label small mb-1">{{ $t('Add several links at once') }}</label>
+                                <div class="d-flex align-items-start gap-2">
+                                    <div class="flex-shrink-1" style="min-width: 35%;">
+                                        <ObjectField
+                                            v-model="multiLinkTypeId"
+                                            :type="LINK_TYPE"
+                                            fieldName="multi_link_type"
+                                            :placeholder="$t('Link type...')"
+                                        />
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <ObjectField
+                                            v-model="multiLinkTargets"
+                                            :multiple="true"
+                                            :type="THING_TYPE"
+                                            fieldName="multi_link_targets"
+                                            :placeholder="multiLinkSwapped ? $t('Objects that link to this...') : $t('Target objects...')"
+                                            :excludeUuid="formData.thing_id"
+                                        />
+                                    </div>
+                                    <div class="d-flex flex-column gap-1">
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            @click="multiLinkSwapped = !multiLinkSwapped"
+                                            :title="$t('Swap direction')"
+                                        >
+                                            ↕
+                                        </button>
+                                        <span class="small text-muted text-center" style="font-size:0.65rem;line-height:1">
+                                            {{ multiLinkSwapped ? '← targets' : 'targets →' }}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        @click="applyMultiLink"
+                                        :disabled="!multiLinkTypeId || multiLinkTargets.length === 0"
+                                    >
+                                        {{ $t('Add links') }}
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- Display regular links (not special ones) -->
                             <LinkedObject
                                 v-for="(item, idx) in regularLinks"
@@ -488,6 +537,7 @@ import { useI18n } from 'vue-i18n';
 import TextField from './Fields/TextField.vue';
 import FlexibleDateField from './Fields/FlexibleDateField.vue';
 import LinkedObject from './Fields/LinkedObject.vue';
+import ObjectField from './Fields/ObjectField.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TO_RELATED, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
@@ -802,14 +852,9 @@ watch(() => formData.value.name, (name) => {
     }
 });
 
-// Special links as full objects (same shape as regular links)
-const classLinkData = ref({
-    one_thing_id: formData.value.thing_id,
-    other_thing_id: '',
-    link_type_id: LINK_TO_CLASS,
-    description: '',
-    link_id: null,
-});
+// Class membership (multi-class): an array of LINK_TO_CLASS links. Each entry
+// has the same shape as a regular link. The primary class is the first entry.
+const classLinksData = ref([]);
 
 const parentLinkData = ref({
     one_thing_id: formData.value.thing_id,
@@ -837,7 +882,7 @@ let isForcedHide = false;
 // Unsaved changes tracking
 const originalFormData = ref({});
 const originalLinkedObjects = ref([]);
-const originalClassLink = ref(null);
+const originalClassLinks = ref([]);
 const originalParentLink = ref(null);
 const originalExternalLinks = ref([]);
 
@@ -855,25 +900,64 @@ const hasUnsavedChanges = computed(() => {
     });
 
     const linksChanged = JSON.stringify(originalLinkedObjects.value) !== JSON.stringify(linkedObjects.value);
-    const classLinkChanged = JSON.stringify(originalClassLink.value) !== JSON.stringify(classLinkData.value);
+    const classLinksChanged = JSON.stringify(originalClassLinks.value) !== JSON.stringify(classLinksData.value);
     const parentLinkChanged = JSON.stringify(originalParentLink.value) !== JSON.stringify(parentLinkData.value);
     const externalLinksChanged = JSON.stringify(originalExternalLinks.value) !== JSON.stringify(externalLinks.value);
     const localizationChanged = originalLocalization !== localizationSnapshot();
 
-    return formChanged || linksChanged || classLinkChanged || parentLinkChanged || externalLinksChanged || localizationChanged;
+    return formChanged || linksChanged || classLinksChanged || parentLinkChanged || externalLinksChanged || localizationChanged;
 });
 
 // Regular links (all links except class and parent)
 const regularLinks = computed(() => linkedObjects.value);
 
-// Event handlers
-const handleClassLinkUpdate = ({ data }) => {
-    classLinkData.value = { ...classLinkData.value, ...data };
+// ── Multi-class selector ───────────────────────────────────────────────
+// The ObjectField multi-picker binds to a flat array of class ids; this
+// computed round-trips them against the classLinksData (full link) records.
+const classError = ref('');
+const selectedClassIds = computed({
+    get: () => classLinksData.value.map(l => l.other_thing_id).filter(Boolean),
+    set: (ids) => {
+        classError.value = '';
+        const existing = new Map(classLinksData.value.map(l => [l.other_thing_id, l]));
+        classLinksData.value = (ids || []).map(id => existing.get(id) || {
+            one_thing_id: formData.value.thing_id,
+            other_thing_id: id,
+            link_type_id: LINK_TO_CLASS,
+            description: '',
+            link_id: null,
+        });
+    },
+});
+
+const pendingCreateClassRequestId = ref(null);
+const openCreateClassModal = () => {
+    const requestId = `editobject-class-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    pendingCreateClassRequestId.value = requestId;
+    eventBus.emit('open-create-modal', {
+        title: t('Create new class'),
+        params: { type: CLASS_TYPE },
+        callback: {
+            type: 'link-created',
+            requestId,
+            targetComponent: 'edit-object-classes',
+        },
+    });
 };
 
-const handleClassLinkRemove = () => {
-    classLinkData.value.other_thing_id = '';
-    classLinkData.value.link_id = null;
+// A freshly created class lands in the selection immediately.
+const handleClassCreated = (data) => {
+    if (!data.requestId || data.requestId !== pendingCreateClassRequestId.value) return;
+    const newId = data.newObjectId;
+    pendingCreateClassRequestId.value = null;
+    if (!newId || classLinksData.value.some(l => l.other_thing_id === newId)) return;
+    classLinksData.value.push({
+        one_thing_id: formData.value.thing_id,
+        other_thing_id: newId,
+        link_type_id: LINK_TO_CLASS,
+        description: '',
+        link_id: null,
+    });
 };
 
 // ── Properties (suggested by class + manually attached) ─────────────────
@@ -891,7 +975,7 @@ const propertyFilter = ref('');
 const newPropertyName = ref('');
 const geoPropertyId = ref(null);
 const geoPickerRef = ref(null);
-let lastSuggestedClassId = null;
+let lastSuggestedClassesKey = '';
 
 const registerProperties = (list) => {
     for (const p of list || []) {
@@ -899,19 +983,24 @@ const registerProperties = (list) => {
     }
 };
 
-const loadSuggestedProperties = async (classId) => {
-    // The class selector can re-emit the same id during init/render; the
-    // property list for a class is static, so skip an identical refetch.
-    if (classId === lastSuggestedClassId) return;
-    lastSuggestedClassId = classId;
-    if (!classId) {
+const loadSuggestedProperties = async (classIdArray) => {
+    const key = JSON.stringify(classIdArray || []);
+    if (key === lastSuggestedClassesKey) return;
+    lastSuggestedClassesKey = key;
+    if (!classIdArray || classIdArray.length === 0) {
         suggestedProperties.value = [];
         resolveGeoPropertyId();
         return;
     }
     try {
-        const res = await axios.get(`/class/${classId}/properties`);
-        suggestedProperties.value = res.data?.data ?? [];
+        const responses = await Promise.all(classIdArray.map(cid => axios.get(`/class/${cid}/properties`)));
+        const merged = new Map();
+        for (const res of responses) {
+            for (const p of (res.data?.data ?? [])) {
+                if (p && p.thing_id && !merged.has(p.thing_id)) merged.set(p.thing_id, p);
+            }
+        }
+        suggestedProperties.value = [...merged.values()];
     } catch (e) {
         console.error('[EditObject] failed to load suggested properties:', e);
         suggestedProperties.value = [];
@@ -1180,17 +1269,16 @@ const createProperty = async () => {
     }
 };
 
-// Re-fetch suggested properties whenever the chosen class changes.
-watch(() => classLinkData.value.other_thing_id, (newId) => {
-    loadSuggestedProperties(newId);
-});
+// Re-fetch suggested properties whenever the chosen classes change.
+watch(() => classLinksData.value.map(l => l.other_thing_id).filter(Boolean), (ids) => {
+    loadSuggestedProperties(ids);
+}, { deep: false });
 
 // "Inherited" flag on property definitions: stored as data.inherited (default
 // true) — controls whether the property propagates to a class's subclasses.
 const isPropertyDefinition = computed(() =>
     formData.value.type === THING_TYPE
-    && !!classLinkData.value.other_thing_id
-    && classLinkData.value.other_thing_id === UUID.PROPERTY_CLASS
+    && classLinksData.value.some(l => l.other_thing_id === UUID.PROPERTY_CLASS)
 );
 
 const inheritedFlag = computed({
@@ -1242,13 +1330,7 @@ const initializeData = () => {
     externalLinks.value = [];
 
     // Reset special links
-    classLinkData.value = {
-        one_thing_id: formData.value.thing_id,
-        other_thing_id: '',
-        link_type_id: LINK_TO_CLASS,
-        description: '',
-        link_id: null,
-    };
+    classLinksData.value = [];
     parentLinkData.value = {
         one_thing_id: formData.value.thing_id,
         other_thing_id: '',
@@ -1274,7 +1356,7 @@ const initializeData = () => {
         };
 
         if (formData.value.type === THING_TYPE && item.link_type_id === LINK_TO_CLASS) {
-            classLinkData.value = { ...classLinkData.value, ...linkItem };
+            classLinksData.value.push(linkItem);
             return;
         }
 
@@ -1294,9 +1376,24 @@ const initializeData = () => {
 
     // For edit mode, also read from existing object
     if (isEditMode.value && props.object) {
-        if (formData.value.type === THING_TYPE && props.object.class?.thing_id && !classLinkData.value.other_thing_id) {
-            classLinkData.value.other_thing_id = props.object.class.thing_id;
-            classLinkData.value.link_id = props.object.class?.link_id || null;
+        if (formData.value.type === THING_TYPE) {
+            // Multi-class: `classes` array when present, else the singular
+            // primary `class`. Entries without a link_id are deduped by the
+            // backend (endpoint pair) on save.
+            const existingClasses = Array.isArray(props.object.classes) && props.object.classes.length
+                ? props.object.classes
+                : (props.object.class?.thing_id ? [props.object.class] : []);
+            for (const cls of existingClasses) {
+                if (cls?.thing_id && !classLinksData.value.some(l => l.other_thing_id === cls.thing_id)) {
+                    classLinksData.value.push({
+                        one_thing_id: formData.value.thing_id,
+                        other_thing_id: cls.thing_id,
+                        link_type_id: LINK_TO_CLASS,
+                        description: '',
+                        link_id: cls.link_id || null,
+                    });
+                }
+            }
         }
         if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && props.object.links) {
             const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
@@ -1327,7 +1424,7 @@ const initializeData = () => {
     // Store original state
     originalFormData.value = JSON.parse(JSON.stringify(formData.value));
     originalLinkedObjects.value = JSON.parse(JSON.stringify(linkedObjects.value));
-    originalClassLink.value = JSON.parse(JSON.stringify(classLinkData.value));
+    originalClassLinks.value = JSON.parse(JSON.stringify(classLinksData.value));
     originalParentLink.value = JSON.parse(JSON.stringify(parentLinkData.value));
     originalExternalLinks.value = JSON.parse(JSON.stringify(externalLinks.value));
 
@@ -1367,6 +1464,43 @@ const updateItem = ({ index, data }) => {
 
 const removeItem = (index) => {
     linkedObjects.value.splice(index, 1);
+};
+
+// ── Multi-link picker ──────────────────────────────────────────────────
+// Pick a link type once and several targets; each target becomes its own row
+// in the regular link list (where per-row details can still be edited).
+// The swap toggle reverses the direction: targets become the source objects.
+const multiLinkTypeId = ref('');
+const multiLinkTargets = ref([]);
+const multiLinkSwapped = ref(false);
+
+const applyMultiLink = () => {
+    if (!multiLinkTypeId.value) return;
+    for (const targetId of multiLinkTargets.value) {
+        if (!targetId || targetId === formData.value.thing_id) continue;
+        const [oneId, otherId] = multiLinkSwapped.value
+            ? [targetId, formData.value.thing_id]
+            : [formData.value.thing_id, targetId];
+        // Skip duplicates already present as a row (check both directions).
+        if (linkedObjects.value.some(l =>
+            l.link_type_id === multiLinkTypeId.value
+            && ((l.one_thing_id === oneId && l.other_thing_id === otherId)
+                || (l.one_thing_id === otherId && l.other_thing_id === oneId)))) continue;
+        linkedObjects.value.push({
+            id: uuidv4(),
+            one_thing_id: oneId,
+            other_thing_id: otherId,
+            link_type_id: multiLinkTypeId.value,
+            description: '',
+            link_id: null,
+            link_start: null,
+            link_end: null,
+            link_start_meta: null,
+            link_end_meta: null,
+        });
+    }
+    multiLinkTargets.value = [];
+    multiLinkSwapped.value = false;
 };
 
 const setExternalLinkRef = (key, node) => {
@@ -1468,15 +1602,24 @@ const submitForm = async () => {
             payload.owner = formData.value.owner || undefined;
         }
 
-        if (formData.value.type === THING_TYPE && classLinkData.value.other_thing_id) {
-            payload.class = {
-                one_thing_id: formData.value.thing_id,
-                link_type_id: LINK_TO_CLASS,
-                other_thing_id: classLinkData.value.other_thing_id,
-                description: classLinkData.value.description || '',
-                link_id: classLinkData.value.link_id || undefined,
-                public: 1,
-            };
+        if (formData.value.type === THING_TYPE) {
+            if (classLinksData.value.some(l => l.other_thing_id)) {
+                payload.classes = classLinksData.value
+                    .filter(l => l.other_thing_id)
+                    .map(l => ({
+                        one_thing_id: formData.value.thing_id,
+                        link_type_id: LINK_TO_CLASS,
+                        other_thing_id: l.other_thing_id,
+                        description: l.description || '',
+                        link_id: l.link_id || undefined,
+                        public: 1,
+                    }));
+            } else {
+                // Objects must have at least one class.
+                classError.value = t('Objects must belong to at least one class.');
+                isSubmitting = false;
+                return;
+            }
         }
 
         if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && parentLinkData.value.other_thing_id) {
@@ -1576,6 +1719,7 @@ onMounted(async () => {
     seedExtraLanguages();
     await nextTick();
     if (isAdmin.value) loadOwnerOptions();
+    eventBus.on('link-created', handleClassCreated);
     const modalElement = document.getElementById(modalId);
     const confirmModalElement = document.getElementById(confirmModalId);
     if (modalElement) {
@@ -1616,6 +1760,7 @@ onUnmounted(() => {
     if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
     if (modalInstance) modalInstance.hide();
     if (confirmModalInstance) confirmModalInstance.hide();
+    eventBus.off('link-created', handleClassCreated);
 });
 
 watch(() => props.object, (newObject, oldObject) => {

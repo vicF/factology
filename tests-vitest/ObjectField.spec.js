@@ -227,4 +227,63 @@ describe('ObjectField', () => {
         expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['1'])
         expect(mockStore.getRecent).not.toHaveBeenCalled()
     })
+
+    // ── Multi-select (multiple mode) ────────────────────────────────────
+
+    it('multiple: emits an array and toggles the object out on re-selection', async () => {
+        const wrapper = mount(ObjectField, { props: { modelValue: [], multiple: true } })
+
+        await wrapper.vm.selectObject({ thing_id: 'a', name: 'Alpha', type: THING_TYPE })
+        expect(wrapper.emitted('update:modelValue')).toBeTruthy()
+        expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['a']])
+
+        // Controlled component: the parent (v-model) must round-trip the prop.
+        await wrapper.setProps({ modelValue: ['a'] })
+        await wrapper.vm.selectObject({ thing_id: 'b', name: 'Beta', type: THING_TYPE })
+        expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['a', 'b']])
+
+        // Re-selecting removes the object again (toggle behaviour).
+        await wrapper.setProps({ modelValue: ['a', 'b'] })
+        await wrapper.vm.selectObject({ thing_id: 'a', name: 'Alpha', type: THING_TYPE })
+        expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['b']])
+    })
+
+    it('multiple: renders chips for selected ids and removes one via removeObject', async () => {
+        mockStore.getCachedObject.mockImplementation((id) => ({ thing_id: id, name: `Obj ${id}`, type: THING_TYPE }))
+        const wrapper = mount(ObjectField, {
+            props: { modelValue: ['a', 'b'], multiple: true },
+        })
+
+        const chips = wrapper.findAll('.chip')
+        expect(chips).toHaveLength(2)
+        expect(wrapper.text()).toContain('Obj a')
+        expect(wrapper.text()).toContain('Obj b')
+
+        await wrapper.vm.removeObject('a')
+        expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['b']])
+    })
+
+    it('multiple: hides already-picked objects from the suggestion list', async () => {
+        const suggestions = [
+            { thing_id: 'a', name: 'Alpha', type: THING_TYPE },
+            { thing_id: 'b', name: 'Beta', type: THING_TYPE },
+        ]
+        mockHistory.getRecentSync.mockReturnValue(suggestions)
+        mockHistory.getRecent.mockResolvedValue(suggestions)
+        mockHistory.getSuggestions.mockResolvedValue(suggestions)
+        const wrapper = mount(ObjectField, {
+            props: { modelValue: ['a'], multiple: true },
+        })
+
+        await wrapper.find('.chip-input').trigger('focus')
+        await flushPromises()
+
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['b'])
+    })
+
+    it('multiple: clearSelection emits an empty array', async () => {
+        const wrapper = mount(ObjectField, { props: { modelValue: ['a', 'b'], multiple: true } })
+        await wrapper.vm.clearSelection()
+        expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([[]])
+    })
 })

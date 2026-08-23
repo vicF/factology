@@ -188,6 +188,7 @@ describe('Local API create/update mirrors server store()', () => {
             type: UUID.G_THING,
             owner: 'aaaaaaaa-0000-4000-a000-00000000000a',
             public: 1,
+            class: { other_thing_id: '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee' }, // City
         }), CONTEXT);
 
         expect(res.data.data.owner).toBe('aaaaaaaa-0000-4000-a000-00000000000a');
@@ -239,14 +240,20 @@ describe('Local API create/update mirrors server store()', () => {
             thing_id: cityClassId,
             name: 'City',
         });
+        expect(res.data.data.classes).toEqual([{
+            thing_id: cityClassId,
+            name: 'City',
+        }]);
     });
 
     it('handles links_to_add / links_to_delete on update', async () => {
         const thingId = '11111111-0000-4000-a000-000000000011';
+        const cityClassId = '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee';
         await handleLocalApiCall('post', `/object/${thingId}`, JSON.stringify({
             name: 'Мона',
             type: UUID.G_THING,
             public: 1,
+            classes: [{ other_thing_id: cityClassId }],
         }), CONTEXT);
 
         // Add a link
@@ -254,6 +261,7 @@ describe('Local API create/update mirrors server store()', () => {
             name: 'Мона',
             type: UUID.G_THING,
             public: 1,
+            classes: [{ other_thing_id: cityClassId }],
             links_to_add: [{
                 link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
                 other_thing_id: UUID.EVERYTHING,
@@ -261,18 +269,20 @@ describe('Local API create/update mirrors server store()', () => {
         }), CONTEXT);
 
         const links = await getDb().links.where('one_thing_id').equals(thingId).toArray();
-        expect(links.length).toBe(1);
+        expect(links.length).toBe(2); // class link + the added link
 
-        // Delete the link by id
+        // Delete the non-class link by id
+        const toDelete = links.find(l => l.link_type_id !== UUID.LINK_TO_CLASS);
         await handleLocalApiCall('put', `/object/${thingId}`, JSON.stringify({
             name: 'Мона',
             type: UUID.G_THING,
             public: 1,
-            links_to_delete: [links[0].link_id],
+            classes: [{ other_thing_id: cityClassId }],
+            links_to_delete: [toDelete.link_id],
         }), CONTEXT);
 
         const after = await getDb().links.where('one_thing_id').equals(thingId).toArray();
-        expect(after.length).toBe(0);
+        expect(after.length).toBe(1); // only the class link remains
     });
 });
 
@@ -309,6 +319,7 @@ describe('Local API multilevel related (mirrors server depth)', () => {
                 name,
                 type: UUID.G_THING,
                 public: 1,
+                classes: [{ other_thing_id: UUID.SOMETHING }],
             }), CONTEXT);
         }
         await saveLink({ link_id: 'lnk-ab', one_thing_id: A, other_thing_id: B, link_type_id: UUID.LINK_TO_PARENT, public: 1 });

@@ -110,10 +110,10 @@
                                             <span>{{ object.public ? $t('Public') : $t('Private') }}</span>
                                         </div>
 
-                                        <div v-if="object.class" class="class-badge">
-                                            <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
-                                            <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                {{ $objectName(object.class) }}
+                                        <div v-for="cls in $getClassesList(object)" :key="cls.thing_id" class="class-badge">
+                                            <Image :node-id="cls.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: cls.thing_id } }" class="class-badge-link">
+                                                {{ $objectName(cls) }}
                                             </RouterLink>
                                         </div>
 

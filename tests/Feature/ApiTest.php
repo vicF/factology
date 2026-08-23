@@ -33,11 +33,13 @@ class ApiTest extends TestCase
             'start'       => date('Ymd', strtotime('-1 day')), // Yesterday in YYYYMMDD format
             'end'         => date('Ymd'), // Today in YYYYMMDD format
             'public'      => 1,
-            'link'        => [
+            'classes'     => [
                 [
-                    'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                    'uuid'        => UUID::SOMETHING,
-                    'description' => 'This test object is of class Something'
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                    'other_thing_id' => UUID::SOMETHING,
+                    'description'    => 'This test object is of class Something',
+                    'public'         => 1,
                 ]
             ]
         ];
@@ -348,6 +350,78 @@ class ApiTest extends TestCase
             $ids->filter(fn ($id) => $id === $thingB)->count(),
             'Object linked to one selected class must appear exactly once'
         );
+    }
+
+    public function testCreateWithMultipleClassesReturnsAllClasses(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $json = $this->postApi('/api/v1/object/' . $uuid, $this->getDefaultObjectData([
+            'thing_id' => $uuid,
+            'name'     => 'Multi Class Object',
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'public' => 1],
+            ],
+        ]));
+
+        // The store() response is the raw model data; the enriched `classes`
+        // array is exposed by the detail endpoint.
+        $detail = $this->getApi('/api/v1/object/' . $uuid);
+        $this->assertSame([UUID::SOMETHING, UUID::EVENT], array_column($detail['data']['classes'], 'thing_id'));
+        // `class` (primary) stays the first entry for backward compatibility.
+        $this->assertSame(UUID::SOMETHING, $detail['data']['class']['thing_id']);
+    }
+
+    public function testCreateThingWithoutClassIsRejected(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $response = $this->postJson('/api/v1/object/' . $uuid, $this->getMinimalObjectData([
+            'thing_id' => $uuid,
+        ]));
+
+        $response->assertStatus(422);
+        $this->assertArrayHasKey('classes', $response->json('errors'));
+    }
+
+    public function testUpdateDiffsRemovedClasses(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $this->postApi('/api/v1/object/' . $uuid, $this->getDefaultObjectData([
+            'thing_id' => $uuid,
+            'name'     => 'To Remove Class',
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'public' => 1],
+            ],
+        ]));
+
+        // Update: drop the Event class — only Something should remain.
+        $this->putApi('/api/v1/object/' . $uuid, [
+            'thing_id' => $uuid,
+            'name'     => 'To Remove Class',
+            'type'     => UUID::G_THING,
+            'public'   => 1,
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+            ],
+        ]);
+
+        $this->assertDatabaseHas('links', [
+            'one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'deleted' => false,
+        ]);
+        // The removed class link is soft-deleted, not hard-deleted.
+        $this->assertDatabaseHas('links', [
+            'one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'deleted' => true,
+        ]);
     }
 
     public function testSearchWithClassesDoesNotReturnClassNodes(): void
@@ -719,9 +793,17 @@ class ApiTest extends TestCase
         $uuid = uuid_create();
         $createUri = '/api/v1/object/' . $uuid;
 
-        // Use minimal data
+        // Use minimal data (objects must still belong to at least one class)
         $minimalData = $this->getMinimalObjectData([
             'thing_id' => $uuid,
+            'classes'  => [
+                [
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::SOMETHING,
+                    'public'         => 1,
+                ],
+            ],
         ]);
 
         $json = $this->postApi($createUri, $minimalData);

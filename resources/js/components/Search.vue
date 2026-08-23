@@ -70,10 +70,10 @@
                                             </div>
                                         </div>
 
-                                        <div v-if="thing.type === 3 && thing.class" class="class-badge">
-                                            <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
-                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
-                                                {{ $objectName(thing.class) }}
+                                        <div v-for="cls in $getClassesList(thing)" :key="cls.thing_id" class="class-badge">
+                                            <Image :node-id="cls.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: cls.thing_id } }" class="class-badge-link">
+                                                {{ $objectName(cls) }}
                                             </RouterLink>
                                         </div>
 
