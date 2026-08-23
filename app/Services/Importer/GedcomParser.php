@@ -79,6 +79,79 @@ class GedcomParser
     }
 
     /**
+     * Parse metadata from the HEAD record of a GEDCOM file.
+     *
+     * GEDCOM HEAD structure:
+     *   0 HEAD
+     *   1 SOUR AppName
+     *     2 NAME AppFullName
+     *     2 VERS 6.1.9
+     *   1 DATE 22 AUG 2026
+     *   1 _DBGUID uuid  (Древо Жизни extension)
+     *
+     * @return array{dbguid: ?string, source_name: ?string, source_fullname: ?string, export_date: ?string}
+     */
+    public static function parseHeadMetadata(string $gedcom): array
+    {
+        $result = [
+            'dbguid'          => null,
+            'source_name'     => null,
+            'source_fullname' => null,
+            'export_date'     => null,
+        ];
+
+        $lines = explode("\n", str_replace("\r\n", "\n", $gedcom));
+        $inHead = false;
+        $inSour = false;
+        $sourLevel = 0;
+
+        foreach ($lines as $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '') {
+                continue;
+            }
+
+            if (!preg_match('/^(\d+)\s*(@(\w+)@)?\s*(\w+)\s*(.*)$/s', $line, $m)) {
+                continue;
+            }
+
+            $level = (int) $m[1];
+            $tag = strtoupper($m[4]);
+            $value = trim($m[5] ?? '');
+
+            if ($level === 0 && $tag === 'HEAD') {
+                $inHead = true;
+                continue;
+            }
+            if ($level === 0 && $inHead) {
+                break; // next level-0 record → HEAD is done
+            }
+
+            if ($tag === 'SOUR' && $level === 1) {
+                $result['source_name'] = $value ?: null;
+                $inSour = true;
+                $sourLevel = 1;
+                continue;
+            }
+            if ($inSour && $level <= $sourLevel) {
+                $inSour = false;
+            }
+            if ($inSour && $tag === 'NAME') {
+                $result['source_fullname'] = $value ?: null;
+            }
+
+            if ($tag === 'DATE' && $level === 1) {
+                $result['export_date'] = $value ?: null;
+            }
+            if ($tag === '_DBGUID' && $level === 1) {
+                $result['dbguid'] = $value ?: null;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Find a child node by tag within a node's children.
      */
     public static function findChild(array $node, string $tag): ?array

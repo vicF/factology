@@ -148,4 +148,47 @@ GEDCOM;
         $this->assertSame(55.7558, $coords['lat']);
         $this->assertSame(37.6173, $coords['lng']);
     }
+
+    public function testParsesHeadMetadata(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 SOUR AgelongTree
+2 NAME Древо Жизни
+2 VERS 6.1.9
+2 CORP Genery.com
+1 CHAR UTF-8
+1 DATE 22 AUG 2026
+1 _DBGUID 5ae97c52-036b-4e3c-b314-6b12c944f3b0
+0 @I1@ INDI
+1 NAME John /Smith/
+0 TRLR
+GEDCOM;
+
+        $meta = GedcomParser::parseHeadMetadata($gedcom);
+
+        $this->assertSame('5ae97c52-036b-4e3c-b314-6b12c944f3b0', $meta['dbguid']);
+        $this->assertSame('AgelongTree', $meta['source_name']);
+        $this->assertSame('Древо Жизни', $meta['source_fullname']);
+        $this->assertSame('22 AUG 2026', $meta['export_date']);
+    }
+
+    public function testParsesHeadMetadataWithoutDbguid(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 SOUR FTM
+2 NAME Family Tree Maker
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME John /Smith/
+0 TRLR
+GEDCOM;
+
+        $meta = GedcomParser::parseHeadMetadata($gedcom);
+
+        $this->assertNull($meta['dbguid']);
+        $this->assertSame('FTM', $meta['source_name']);
+        $this->assertSame('Family Tree Maker', $meta['source_fullname']);
+    }
 }

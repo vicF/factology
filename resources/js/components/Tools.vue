@@ -20,6 +20,10 @@
                                 <td>{{ $t('Imported') }}</td>
                                 <td>{{ importResult.imported }}</td>
                             </tr>
+                            <tr class="table-info">
+                                <td>{{ $t('Updated') }}</td>
+                                <td>{{ importResult.updated }}</td>
+                            </tr>
                             <tr class="table-warning">
                                 <td>{{ $t('Skipped') }}</td>
                                 <td>{{ importResult.skipped }}</td>

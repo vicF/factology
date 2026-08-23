@@ -102,16 +102,17 @@ GEDCOM;
         $result1 = $importer->import($gedcom);
         $this->assertGreaterThan(0, $result1['imported'], 'First import should create records');
 
-        // Second import (same data)
+        // Second import (same data) — updates existing records
         $result2 = $importer->import($gedcom);
         $this->assertSame(0, $result2['imported'], 'Second import should create zero new records');
+        $this->assertGreaterThan(0, $result2['updated'], 'Second import should update existing records');
 
-        // Verify count unchanged after second import
+        // Verify count unchanged after second import (includes source thing)
         $count = DB::table('things')
             ->where('owner', $this->ownerThingId)
             ->where('source_service', 'gedcom')
             ->count();
-        $this->assertSame($result1['imported'], $count, 'Total things should match first import result');
+        $this->assertSame($result1['imported'] + 1, $count, 'Total things should be imported + 1 source thing');
     }
 
     public function testParsesGedcomWithRussianContent(): void
@@ -199,7 +200,7 @@ GEDCOM;
         $persons = DB::table('things')
             ->where('owner', $this->ownerThingId)
             ->where('source_service', 'gedcom')
-            ->where('name', 'John /Smith/')
+            ->where('name', 'John Smith')
             ->get();
 
         $this->assertCount(2, $persons, 'Should have 2 separate persons from different files');
@@ -225,12 +226,13 @@ GEDCOM;
         $result2 = $importer2->import($gedcom);
 
         $this->assertGreaterThan(0, $result1['imported']);
-        $this->assertSame(0, $result2['imported'], 'Same fileKey should dedup');
+        $this->assertSame(0, $result2['imported'], 'Same fileKey should create no new records');
+        $this->assertGreaterThan(0, $result2['updated'], 'Same fileKey should update existing records');
 
         $count = DB::table('things')
             ->where('owner', $this->ownerThingId)
             ->where('source_service', 'gedcom')
-            ->where('name', 'John /Smith/')
+            ->where('name', 'John Smith')
             ->count();
 
         $this->assertEquals(1, $count, 'Only one thing for same fileKey');
@@ -272,5 +274,62 @@ GEDCOM;
         $response2 = $this->postJson('/api/v1/import/find-duplicates');
         $result2 = $response2->json('result');
         $this->assertSame(0, $result2['links_created'], 'Second run should create no new links');
+    }
+
+    public function testImportCreatesSourceThingWithDbguid(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 SOUR AgelongTree
+2 NAME Древо Жизни
+1 CHAR UTF-8
+1 DATE 22 AUG 2026
+1 _DBGUID 5ae97c52-036b-4e3c-b314-6b12c944f3b0
+0 @I1@ INDI
+1 NAME John /Smith/
+1 BIRT
+2 DATE 12 APR 1856
+0 TRLR
+GEDCOM;
+
+        $importer = new GedcomImporter($this->ownerThingId);
+        $result = $importer->import($gedcom);
+
+        $this->assertGreaterThan(0, $result['imported']);
+
+        // Verify source thing exists
+        $source = DB::table('things')
+            ->where('owner', $this->ownerThingId)
+            ->where('source_service', 'gedcom')
+            ->where('source_external_id', 'like', '%/source')
+            ->first();
+        $this->assertNotNull($source, 'Source thing should exist');
+        $this->assertSame('Древо Жизни', $source->name);
+
+        // Verify source thing has _DBGUID in its data
+        $sourceData = json_decode($source->data, true);
+        $this->assertSame('5ae97c52-036b-4e3c-b314-6b12c944f3b0', $sourceData['properties']['source_guid']);
+
+        // Verify imported person has source_guid property
+        $person = DB::table('things')
+            ->where('owner', $this->ownerThingId)
+            ->where('source_service', 'gedcom')
+            ->where('name', 'John Smith')
+            ->first();
+        $this->assertNotNull($person);
+        $personData = json_decode($person->data, true);
+        $this->assertSame('5ae97c52-036b-4e3c-b314-6b12c944f3b0', $personData['properties']['source_guid']);
+
+        // Reimport — source thing should be updated (not duplicated)
+        $result2 = $importer->import($gedcom);
+        $this->assertSame(0, $result2['imported']);
+        $this->assertGreaterThan(0, $result2['updated']);
+
+        $sourceCount = DB::table('things')
+            ->where('owner', $this->ownerThingId)
+            ->where('source_service', 'gedcom')
+            ->where('source_external_id', 'like', '%/source')
+            ->count();
+        $this->assertSame(1, $sourceCount, 'Only one source thing');
     }
 }

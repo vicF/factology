@@ -34,7 +34,7 @@ class DuplicatePersonMatcher
             })
             ->where('things.source_service', 'gedcom')
             ->where('things.deleted', false)
-            ->select('things.thing_id', 'things.name', 'things.data', 'things.owner');
+            ->select('things.thing_id', 'things.name', 'things.data', 'things.start', 'things.owner');
 
         if ($ownerId) {
             $query->where('things.owner', $ownerId);
@@ -52,12 +52,17 @@ class DuplicatePersonMatcher
                 $props = (array) ($p->data->properties ?? []);
             }
 
+            $birthYear = null;
+            if ($p->start !== null) {
+                $birthYear = (int) substr((string) $p->start, 0, 4);
+            }
+
             $records[] = [
                 'thing_id'   => $p->thing_id,
                 'owner'      => $p->owner,
                 'name'       => self::normalizeName($p->name),
                 'sex'        => $props['sex'] ?? null,
-                'birth_year' => $props['birth_year'] ?? null,
+                'birth_year' => $birthYear,
             ];
         }
 
