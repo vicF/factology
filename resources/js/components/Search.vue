@@ -284,14 +284,13 @@ function dateGroupLabel(key) {
 
 // Header label aligned with each result row (null = no header before it).
 // Returns a string (month/year label) or an object { future: boolean }
-// (past divider) or { future: true, dateLabel: string } (first future
+// (past divider) or { future: true, dateLabel: string } (every future
 // date group, renders as "planned in <dateLabel>"), or null for no header.
 const groupLabels = computed(() => {
     const labels = new Array(objects.value.length).fill(null);
     if (searchStore.sortBy !== 'start') return labels;
     let prevKey = null;
     let prevFuture = null;
-    let futureLabeled = false;
     objects.value.forEach((thing, i) => {
         const future = isFutureDate(thing);
         // Boundary between the future and past sections — place the divider at
@@ -302,7 +301,6 @@ const groupLabels = computed(() => {
                 const key = dateGroupKey(thing.start);
                 labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
                 prevKey = key;
-                futureLabeled = true;
             } else {
                 // Entering past section (DESC): show divider
                 labels[i] = { future: false };
@@ -314,10 +312,9 @@ const groupLabels = computed(() => {
         prevFuture = future;
         const key = dateGroupKey(thing.start);
         if (key !== prevKey) {
-            if (future && !futureLabeled) {
-                // First future date group: show "planned in <date>"
+            if (future) {
+                // Every future date group: show "planned in <date>"
                 labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
-                futureLabeled = true;
             } else {
                 labels[i] = dateGroupLabel(key);
             }
