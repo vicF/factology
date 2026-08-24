@@ -402,9 +402,9 @@ GEDCOM;
         $this->assertArrayHasKey('en', $nameTranslations);
         $this->assertArrayHasKey('ru', $nameTranslations);
 
-        // Verify event is linked to person via PRESENT, not LINK_TO_SOURCE
+        // Verify event is linked to person via PRESENT (person → PRESENT → event)
         $presentLink = DB::table('links')
-            ->where('one_thing_id', $event->thing_id)
+            ->where('other_thing_id', $event->thing_id)
             ->where('link_type_id', UUID::PRESENT)
             ->first();
         $this->assertNotNull($presentLink, 'Event should use PRESENT link type');

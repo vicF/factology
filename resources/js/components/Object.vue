@@ -417,6 +417,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
+import { fieldText, currentLocale } from '../utils/localized';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import LinkDescription from './LinkDescription.vue';
@@ -699,7 +700,12 @@ const getLinkTargetId = (link) => {
 // link.one_name = one_thing_id); pick the one that matches the target.
 const getLinkTargetName = (link) => {
     const targetId = getLinkTargetId(link);
-    return targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+    const name = targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+    // Use name_translations for localized display when available
+    if (link.name_translations) {
+        return fieldText(name, link.name_translations, currentLocale());
+    }
+    return name;
 };
 
 const getObject = async () => {

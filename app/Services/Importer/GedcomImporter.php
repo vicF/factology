@@ -464,12 +464,12 @@ class GedcomImporter
             'other_thing_id' => UUID::EVENT,
         ]);
 
-        // PRESENT (участвует в) instead of LINK_TO_SOURCE
+        // PRESENT (участвует в): person → PRESENT → event
         DB::table('links')->insert([
             'link_uuid'     => (string) Str::uuid(),
-            'one_thing_id'  => $thingId,
+            'one_thing_id'  => $personId,
             'link_type_id'  => UUID::PRESENT,
-            'other_thing_id' => $personId,
+            'other_thing_id' => $thingId,
             'description'   => $eventType,
         ]);
 
@@ -622,13 +622,13 @@ class GedcomImporter
             'other_thing_id' => UUID::EVENT,
         ]);
 
-        // PRESENT instead of LINK_TO_SOURCE for both spouses
+        // PRESENT: spouse → PRESENT → marriage event
         foreach ([$husbandId, $wifeId] as $spouseId) {
             DB::table('links')->insert([
                 'link_uuid'     => (string) Str::uuid(),
-                'one_thing_id'  => $thingId,
+                'one_thing_id'  => $spouseId,
                 'link_type_id'  => UUID::PRESENT,
-                'other_thing_id' => $spouseId,
+                'other_thing_id' => $thingId,
                 'description'   => 'spouse',
             ]);
         }

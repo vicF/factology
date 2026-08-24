@@ -9,7 +9,7 @@ return new class extends Migration
 {
     private const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
     private const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';
-    private const SOMETHING = '3e15244c-a9e1-4a91-a0ca-1c65722a64df';
+    private const SYSTEM = 'c0b920d7-8b14-43a4-a28a-16115d0bee9e';
     private const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
     private const CONTAINMENT = '79762fd7-e52d-4401-8010-fda9a7e81aa0';
     private const OWNER = '0ac1b13b-acbf-4246-bed4-8f0c2a8b2546';
@@ -44,17 +44,17 @@ return new class extends Migration
             ]);
         }
 
-        // 4. Link GEDCOM class under Something
-        if ($this->thingExists(self::SOMETHING) && $this->thingExists(self::GEDCOM_CLASS) && $this->thingExists(self::LINK_TO_PARENT)) {
+        // 4. Link GEDCOM class under System
+        if ($this->thingExists(self::SYSTEM) && $this->thingExists(self::GEDCOM_CLASS) && $this->thingExists(self::LINK_TO_PARENT)) {
             $existing = DB::table('links')
-                ->where('one_thing_id', self::SOMETHING)
+                ->where('one_thing_id', self::SYSTEM)
                 ->where('link_type_id', self::LINK_TO_PARENT)
                 ->where('other_thing_id', self::GEDCOM_CLASS)
                 ->first();
             if (!$existing) {
                 DB::table('links')->insert([
                     'link_uuid'     => (string) Illuminate\Support\Str::uuid(),
-                    'one_thing_id'  => self::SOMETHING,
+                    'one_thing_id'  => self::SYSTEM,
                     'link_type_id'  => self::LINK_TO_PARENT,
                     'other_thing_id' => self::GEDCOM_CLASS,
                     'public'        => true,
@@ -62,17 +62,24 @@ return new class extends Migration
             }
         }
 
-        // 5. Create "imported from" link type
+        // 5. Create "imported from" link type with translations
         if (!$this->thingExists(self::IMPORTED_FROM)) {
             DB::table('things')->insert([
-                'thing_id'    => self::IMPORTED_FROM,
-                'name'        => 'imported from',
-                'type'        => self::G_LINK,
-                'description' => 'Ссылка на внешний источник данных, из которого был импортирован объект',
-                'public'      => true,
-                'owner'       => self::OWNER,
-                'server_uuid' => self::SERVER_UUID,
+                'thing_id'             => self::IMPORTED_FROM,
+                'name'                 => 'imported from',
+                'type'                 => self::G_LINK,
+                'description'          => 'Объект был импортирован из внешнего источника данных',
+                'name_translations'    => json_encode(['lang' => 'en', 'ru' => 'импортирован из']),
+                'public'               => true,
+                'owner'                => self::OWNER,
+                'server_uuid'          => self::SERVER_UUID,
             ]);
+        } else {
+            // Ensure name_translations is set on existing record
+            DB::table('things')
+                ->where('thing_id', self::IMPORTED_FROM)
+                ->whereNull('name_translations')
+                ->update(['name_translations' => json_encode(['lang' => 'en', 'ru' => 'импортирован из'])]);
         }
 
         // 6. Link "imported from" under Containment base
@@ -106,7 +113,7 @@ return new class extends Migration
 
         // Remove GEDCOM class and its hierarchy link
         DB::table('links')
-            ->where('one_thing_id', self::SOMETHING)
+            ->where('one_thing_id', self::SYSTEM)
             ->where('link_type_id', self::LINK_TO_PARENT)
             ->where('other_thing_id', self::GEDCOM_CLASS)
             ->delete();

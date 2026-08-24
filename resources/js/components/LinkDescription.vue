@@ -46,6 +46,14 @@ const resolveName = (id, fallback) => {
     return fallback || 'Unknown';
 };
 
+// Names from the API link payload may carry name_translations; resolve them.
+const resolveLinkName = (name, nameTranslations, fallback) => {
+    if (nameTranslations) {
+        return fieldText(name, nameTranslations) || fallback || name;
+    }
+    return fallback || name || 'Unknown';
+};
+
 const generateLinkDescription = (link, object) => {
     if (!link) return ''
 
@@ -67,7 +75,7 @@ const generateLinkDescription = (link, object) => {
         : resolveName(link.one_thing_id, link.target?.name ?? link.one_name);
 
     const otherName = objectIsOne
-        ? resolveName(link.other_thing_id, link.name)
+        ? resolveLinkName(link.name, link.name_translations, link.name)
         : resolveName(link.other_thing_id, objectName(object));
 
     // Prefer the payload's translated link-type name (link_type thing's

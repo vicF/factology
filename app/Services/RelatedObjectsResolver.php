@@ -207,6 +207,7 @@ class RelatedObjectsResolver
                 'link_start'     => $link->link_start ?? null,
                 'link_end'       => $link->link_end ?? null,
                 'name'                    => $target['name'] ?? null,
+                'name_translations'        => $target['name_translations'] ?? null,
                 'link_name'               => $link->link_name ?? null,
                 'link_name_translations'  => $link->link_name_translations ?? null,
                 'target'                  => $target,
@@ -298,7 +299,7 @@ class RelatedObjectsResolver
         }
 
         $rows = DB::table('links as l')
-            ->select('l.one_thing_id', 'c.thing_id as class_id', 'c.name as class_name')
+            ->select('l.one_thing_id', 'c.thing_id as class_id', 'c.name as class_name', 'c.name_translations as class_name_translations')
             ->join('things as c', 'c.thing_id', '=', 'l.other_thing_id')
             ->where('l.link_type_id', UUID::LINK_TO_CLASS)
             ->whereIn('l.one_thing_id', $childIds)
@@ -308,9 +309,14 @@ class RelatedObjectsResolver
 
         $classes = [];
         foreach ($rows as $row) {
+            $translations = $row->class_name_translations ?? null;
+            if (is_string($translations)) {
+                $translations = json_decode($translations, true) ?: null;
+            }
             $classes[$row->one_thing_id] = [
-                'thing_id' => $row->class_id,
-                'name'     => $row->class_name,
+                'thing_id'          => $row->class_id,
+                'name'              => $row->class_name,
+                'name_translations' => $translations,
             ];
         }
 
