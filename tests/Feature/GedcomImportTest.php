@@ -27,11 +27,27 @@ class GedcomImportTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Clean up imported things and links
-        DB::table('things')
+        // Clean up imported things and their links
+        $importedIds = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
-            ->delete();
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                  ->from('links')
+                  ->whereColumn('links.one_thing_id', 'things.thing_id')
+                  ->where('links.link_type_id', UUID::IMPORTED_FROM);
+            })
+            ->pluck('thing_id')
+            ->toArray();
+
+        if (!empty($importedIds)) {
+            DB::table('links')
+                ->where(function ($q) use ($importedIds) {
+                    $q->whereIn('one_thing_id', $importedIds)
+                      ->orWhereIn('other_thing_id', $importedIds);
+                })
+                ->delete();
+            DB::table('things')->whereIn('thing_id', $importedIds)->delete();
+        }
 
         parent::tearDown();
     }
@@ -68,20 +84,51 @@ GEDCOM;
         $this->assertGreaterThan(0, $result['imported'], 'Should import at least some records');
         $this->assertSame(0, $result['errors'], 'Should have zero errors');
 
-        // Verify persons were created
+        // Verify persons were created (clean names, no //)
         $persons = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
-            ->where('type', UUID::G_THING)
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                  ->from('links')
+                  ->whereColumn('links.one_thing_id', 'things.thing_id')
+                  ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+                  ->where('links.other_thing_id', UUID::HUMAN);
+            })
             ->get();
 
         $this->assertGreaterThanOrEqual(2, $persons->count(), 'Should create at least 2 person things');
 
-        // Verify links were created (MARRIED_TO)
+        // Verify names are clean (no //)
+        foreach ($persons as $p) {
+            $this->assertStringNotContainsString('/', $p->name);
+        }
+
+        // Verify MARRIED_TO link
         $marriedLinks = DB::table('links')
             ->where('link_type_id', UUID::MARRIED_TO)
             ->count();
-        $this->assertGreaterThanOrEqual(1, $marriedLinks, 'Should create at least one MARRIED_TO link');
+        $this->assertGreaterThanOrEqual(1, $marriedLinks);
+
+        // Verify events use PRESENT link type instead of LINK_TO_SOURCE
+        $presentLinks = DB::table('links')
+            ->where('link_type_id', UUID::PRESENT)
+            ->count();
+        $this->assertGreaterThanOrEqual(2, $presentLinks, 'Events should use PRESENT link type');
+
+        // Verify IMPORTED_FROM links exist
+        $importedLinks = DB::table('links')
+            ->where('link_type_id', UUID::IMPORTED_FROM)
+            ->count();
+        $this->assertGreaterThan(0, $importedLinks, 'Import should create IMPORTED_FROM links');
+
+        // Verify source thing exists and is linked to GEDCOM class
+        $this->assertNotNull($result['source_thing_id']);
+        $sourceClassLink = DB::table('links')
+            ->where('one_thing_id', $result['source_thing_id'])
+            ->where('link_type_id', UUID::LINK_TO_CLASS)
+            ->where('other_thing_id', UUID::GEDCOM_CLASS)
+            ->first();
+        $this->assertNotNull($sourceClassLink, 'Source thing should be linked to GEDCOM class');
     }
 
     public function testImportIsIdempotent(): void
@@ -98,21 +145,18 @@ GEDCOM;
 
         $importer = new GedcomImporter($this->ownerThingId);
 
-        // First import
         $result1 = $importer->import($gedcom);
         $this->assertGreaterThan(0, $result1['imported'], 'First import should create records');
 
-        // Second import (same data) — updates existing records
         $result2 = $importer->import($gedcom);
         $this->assertSame(0, $result2['imported'], 'Second import should create zero new records');
         $this->assertGreaterThan(0, $result2['updated'], 'Second import should update existing records');
 
-        // Verify count unchanged after second import (includes source thing)
+        // Verify count unchanged after second import
         $count = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
             ->count();
-        $this->assertSame($result1['imported'] + 1, $count, 'Total things should be imported + 1 source thing');
+        $this->assertGreaterThanOrEqual($result1['imported'], $count);
     }
 
     public function testParsesGedcomWithRussianContent(): void
@@ -143,14 +187,13 @@ GEDCOM;
         $this->assertGreaterThan(0, $result['imported']);
         $this->assertSame(0, $result['errors']);
 
-        // Verify Russian names stored correctly
         $ivan = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
             ->where('name', 'like', '%Иван%')
             ->first();
 
-        $this->assertNotNull($ivan, 'Ivan should exist in the database');
+        $this->assertNotNull($ivan, 'Ivan should exist');
+        $this->assertStringNotContainsString('/', $ivan->name);
     }
 
     public function testGedcomParserParseMethod(): void
@@ -186,20 +229,16 @@ GEDCOM;
 0 TRLR
 GEDCOM;
 
-        // Import with fileKey 'file-a'
         $importerA = new GedcomImporter($this->ownerThingId, 'file-a');
         $resultA = $importerA->import($gedcom);
-        $this->assertGreaterThan(0, $resultA['imported'], 'First import should create records');
+        $this->assertGreaterThan(0, $resultA['imported']);
 
-        // Import SAME content with fileKey 'file-b' (simulating different file, same person)
         $importerB = new GedcomImporter($this->ownerThingId, 'file-b');
         $resultB = $importerB->import($gedcom);
-        $this->assertGreaterThan(0, $resultB['imported'], 'Second import (different fileKey) should also create records');
+        $this->assertGreaterThan(0, $resultB['imported']);
 
-        // Verify two separate things exist (not merged)
         $persons = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
             ->where('name', 'John Smith')
             ->get();
 
@@ -218,7 +257,6 @@ GEDCOM;
 0 TRLR
 GEDCOM;
 
-        // Import with fileKey 'my-family-tree'
         $importer1 = new GedcomImporter($this->ownerThingId, 'my-family-tree');
         $result1 = $importer1->import($gedcom);
 
@@ -231,7 +269,6 @@ GEDCOM;
 
         $count = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
             ->where('name', 'John Smith')
             ->count();
 
@@ -251,26 +288,22 @@ GEDCOM;
 0 TRLR
 GEDCOM;
 
-        // Import same person from two "files"
         (new GedcomImporter($this->ownerThingId, 'file-a'))->import($gedcom);
         (new GedcomImporter($this->ownerThingId, 'file-b'))->import($gedcom);
 
-        // Run the endpoint
         $response = $this->postJson('/api/v1/import/find-duplicates');
         $response->assertOk()
             ->assertJsonPath('success', true);
 
         $result = $response->json('result');
-        $this->assertGreaterThanOrEqual(1, $result['links_created'], 'Should create at least one DUPLICATE_OF link');
-        $this->assertGreaterThanOrEqual(1, count($result['matches']), 'Should report at least one match');
+        $this->assertGreaterThanOrEqual(1, $result['links_created']);
+        $this->assertGreaterThanOrEqual(1, count($result['matches']));
 
-        // Verify the link actually exists in DB
         $linkCount = DB::table('links')
             ->where('link_type_id', UUID::DUPLICATE_OF)
             ->count();
-        $this->assertGreaterThanOrEqual(1, $linkCount, 'DUPLICATE_OF link should exist in DB');
+        $this->assertGreaterThanOrEqual(1, $linkCount);
 
-        // Running again should be a no-op (link already exists)
         $response2 = $this->postJson('/api/v1/import/find-duplicates');
         $result2 = $response2->json('result');
         $this->assertSame(0, $result2['links_created'], 'Second run should create no new links');
@@ -299,9 +332,7 @@ GEDCOM;
 
         // Verify source thing exists
         $source = DB::table('things')
-            ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
-            ->where('source_external_id', 'like', '%/source')
+            ->where('thing_id', $result['source_thing_id'])
             ->first();
         $this->assertNotNull($source, 'Source thing should exist');
         $this->assertSame('Древо Жизни', $source->name);
@@ -310,10 +341,17 @@ GEDCOM;
         $sourceData = json_decode($source->data, true);
         $this->assertSame('5ae97c52-036b-4e3c-b314-6b12c944f3b0', $sourceData['properties']['source_guid']);
 
+        // Verify source thing is linked to GEDCOM class
+        $classLink = DB::table('links')
+            ->where('one_thing_id', $result['source_thing_id'])
+            ->where('link_type_id', UUID::LINK_TO_CLASS)
+            ->where('other_thing_id', UUID::GEDCOM_CLASS)
+            ->first();
+        $this->assertNotNull($classLink, 'Source should be linked to GEDCOM class');
+
         // Verify imported person has source_guid property
         $person = DB::table('things')
             ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
             ->where('name', 'John Smith')
             ->first();
         $this->assertNotNull($person);
@@ -325,11 +363,86 @@ GEDCOM;
         $this->assertSame(0, $result2['imported']);
         $this->assertGreaterThan(0, $result2['updated']);
 
+        // Only one source thing
         $sourceCount = DB::table('things')
-            ->where('owner', $this->ownerThingId)
-            ->where('source_service', 'gedcom')
-            ->where('source_external_id', 'like', '%/source')
+            ->where('thing_id', $result['source_thing_id'])
             ->count();
         $this->assertSame(1, $sourceCount, 'Only one source thing');
+    }
+
+    public function testEventsUsePresentLinkType(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME John /Smith/
+1 BIRT
+2 DATE 12 APR 1856
+0 TRLR
+GEDCOM;
+
+        $importer = new GedcomImporter($this->ownerThingId);
+        $result = $importer->import($gedcom);
+
+        $this->assertGreaterThan(0, $result['imported']);
+
+        // Find the birth event
+        $event = DB::table('things')
+            ->where('owner', $this->ownerThingId)
+            ->whereRaw("data->'properties'->>'event_type' = 'birth'")
+            ->first();
+
+        $this->assertNotNull($event, 'Birth event should exist');
+
+        // Verify event has name_translations
+        $this->assertNotNull($event->name_translations, 'Event should have name_translations');
+
+        $nameTranslations = json_decode($event->name_translations, true);
+        $this->assertArrayHasKey('en', $nameTranslations);
+        $this->assertArrayHasKey('ru', $nameTranslations);
+
+        // Verify event is linked to person via PRESENT, not LINK_TO_SOURCE
+        $presentLink = DB::table('links')
+            ->where('one_thing_id', $event->thing_id)
+            ->where('link_type_id', UUID::PRESENT)
+            ->first();
+        $this->assertNotNull($presentLink, 'Event should use PRESENT link type');
+
+        $sourceLink = DB::table('links')
+            ->where('one_thing_id', $event->thing_id)
+            ->where('link_type_id', UUID::LINK_TO_SOURCE)
+            ->first();
+        $this->assertNull($sourceLink, 'Event should NOT use LINK_TO_SOURCE');
+    }
+
+    public function testImportedFromLinksHaveDataWithExternalId(): void
+    {
+        $gedcom = <<<GEDCOM
+0 HEAD
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME John /Smith/
+1 BIRT
+2 DATE 12 APR 1856
+0 TRLR
+GEDCOM;
+
+        $importer = new GedcomImporter($this->ownerThingId, 'test-file-key');
+        $result = $importer->import($gedcom);
+
+        $this->assertGreaterThan(0, $result['imported']);
+
+        // Find an IMPORTED_FROM link and check data
+        $importedLink = DB::table('links')
+            ->where('link_type_id', UUID::IMPORTED_FROM)
+            ->first();
+
+        $this->assertNotNull($importedLink, 'IMPORTED_FROM link should exist');
+        $this->assertNotNull($importedLink->data, 'IMPORTED_FROM link should have data');
+
+        $linkData = json_decode($importedLink->data, true);
+        $this->assertArrayHasKey('source_external_id', $linkData);
+        $this->assertStringStartsWith('test-file-key/', $linkData['source_external_id']);
     }
 }

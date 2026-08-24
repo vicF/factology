@@ -93,4 +93,8 @@ export const UUID = {
     PROPERTY_APPLIES_TO: 'b1b1b1b1-0003-4000-8000-000000000001',
     LANG_EN:           'b1b1b1b1-0011-4000-8000-000000000001',
     LANG_RU:           'b1b1b1b1-0012-4000-8000-000000000001',
+
+    // ── GEDCOM import system objects ──
+    GEDCOM_CLASS:      '10b04205-aecb-406d-befc-c6362f7ac9fb',
+    IMPORTED_FROM:     '7e58df61-3f99-4a82-9f0d-555a56abfb69',
 };

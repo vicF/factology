@@ -90,6 +90,10 @@ class UUID
     public const PLACE_CLASS = 'dc006cda-047a-4862-acf7-e215355b6890';
     public const COORDINATES_PROPERTY = 'c1c1c1c1-0002-4000-8000-000000000001';
 
+    // ── GEDCOM import system objects ──
+    public const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
+    public const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';
+
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,

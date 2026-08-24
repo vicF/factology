@@ -10,21 +10,15 @@ use Illuminate\Support\Str;
 /**
  * Import GEDCOM 5.5.1 data into factology things/links.
  *
- * Mapping:
- *   INDI  → HUMAN thing (name, sex, birth/death as flexible dates)
- *   FAM   → links (FATHER/MOTHER → MARRIED_TO between parents, CHIL → child_of)
- *   BIRT/DEAT/MARR → EVENT things linked to the relevant HUMAN
- *   PLAC  → PLACE_CLASS things linked to events
+ * Each import creates a GEDCOM source thing (instance of the GEDCOM class).
+ * Imported things are linked to this source via the IMPORTED_FROM link type,
+ * with `data: { "source_external_id": "@I1@" }` on the link.
  *
- * Idempotent: uses (owner, source_service='gedcom', source_external_id) for dedup.
- * Each import is namespaced by a $fileKey so the same person from different
- * files becomes a separate thing (see DUPLICATE_OF linking for cross-file
- * identity resolution).
+ * Dedup: on reimport, existing IMPORTED_FROM links for this source are
+ * matched by data.source_external_id → existing records are updated.
  */
 class GedcomImporter
 {
-    private const SOURCE_SERVICE = 'gedcom';
-
     private string $ownerId;
     private string $fileKey;
     private int $imported = 0;
@@ -34,18 +28,10 @@ class GedcomImporter
     private array $errorDetails = [];
     private array $personIdMap = []; // GEDCOM @id → factology thing_id
     private array $placeCache = []; // place name → factology thing_id
-    private ?string $sourceThingId = null; // thing_id of the source object
-    private ?string $sourceGuid = null; // _DBGUID from HEAD
+    private ?string $sourceThingId = null;
+    private ?string $sourceGuid = null;
+    private array $existingSourceLinks = []; // source_external_id → thing_id (preloaded)
 
-    /**
-     * @param string $ownerId  UUID of the owning person thing
-     * @param string|null $fileKey  Unique identifier for this import file.
-     *     Auto-generated from content hash if omitted. Use the same key to
-     *     re-import the same file idempotently; use different keys for
-     *     different files so each creates separate things.
-     * @param string|null $fileContent  Raw file content (used to compute
-     *     fileKey when not provided, or for the hash).
-     */
     public function __construct(
         string $ownerId,
         ?string $fileKey = null,
@@ -55,31 +41,21 @@ class GedcomImporter
         $this->fileKey = $fileKey ?? self::computeFileKey($fileContent ?? '');
     }
 
-    /**
-     * Derive a deterministic file key from content.
-     * First 16 hex chars of SHA-256.
-     */
     public static function computeFileKey(string $content): string
     {
         return substr(hash('sha256', $content), 0, 16);
     }
 
-    /**
-     * Build a namespaced external ID unique per-file-per-record.
-     */
     private function externalId(string $localId): string
     {
         return $this->fileKey . '/' . $localId;
     }
 
     /**
-     * Parse a GEDCOM string and import all records.
-     *
      * @return array{imported: int, updated: int, skipped: int, errors: int, details: array, source_thing_id: ?string}
      */
     public function import(string $gedcomContent): array
     {
-        // Reset counters for each import call (same instance may be reused)
         $this->imported = 0;
         $this->updated = 0;
         $this->skipped = 0;
@@ -89,8 +65,8 @@ class GedcomImporter
         $this->placeCache = [];
         $this->sourceThingId = null;
         $this->sourceGuid = null;
+        $this->existingSourceLinks = [];
 
-        // Parse HEAD metadata for source tracking
         $headMeta = GedcomParser::parseHeadMetadata($gedcomContent);
         $this->sourceGuid = $headMeta['dbguid'];
 
@@ -98,8 +74,11 @@ class GedcomImporter
         $records = $parser->parse($gedcomContent);
 
         DB::transaction(function () use ($records, $headMeta) {
-            // Create (or update) the source thing representing this import file
-            $this->sourceThingId = $this->ensureSourceThing($headMeta);
+            // Create or update the GEDCOM source thing
+            $this->sourceThingId = $this->ensureGedcomSource($headMeta);
+
+            // Preload existing IMPORTED_FROM links for this source
+            $this->preloadExistingSourceLinks();
 
             foreach ($records as $record) {
                 if ($record['tag'] === 'INDI') {
@@ -119,27 +98,32 @@ class GedcomImporter
         });
 
         return [
-            'imported'       => $this->imported,
-            'updated'        => $this->updated,
-            'skipped'        => $this->skipped,
-            'errors'         => $this->errors,
-            'details'        => $this->errorDetails,
+            'imported'        => $this->imported,
+            'updated'         => $this->updated,
+            'skipped'         => $this->skipped,
+            'errors'          => $this->errors,
+            'details'         => $this->errorDetails,
             'source_thing_id' => $this->sourceThingId,
         ];
     }
 
     /**
-     * Create or update the source thing representing this import file.
-     * Links to EVIDENCE class.
+     * Find or create a GEDCOM source thing (instance of GEDCOM class).
+     * Deduped by fileKey stored in data.properties.
      */
-    private function ensureSourceThing(array $headMeta): ?string
+    private function ensureGedcomSource(array $headMeta): ?string
     {
-        $sourceExternalId = $this->externalId('source');
-
+        // Find existing source by file_key in data properties
         $existing = DB::table('things')
             ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $sourceExternalId)
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                  ->from('links')
+                  ->whereColumn('links.one_thing_id', 'things.thing_id')
+                  ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+                  ->where('links.other_thing_id', UUID::GEDCOM_CLASS);
+            })
+            ->whereRaw("cast(data as json)->'properties'->>'file_key' = ?", [$this->fileKey])
             ->first();
 
         $sourceName = $headMeta['source_fullname']
@@ -159,20 +143,17 @@ class GedcomImporter
         $properties['file_key'] = $this->fileKey;
 
         $data = [
-            'name'               => $sourceName,
-            'type'               => UUID::G_THING,
-            'owner'              => $this->ownerId,
-            'public'             => false,
-            'deleted'            => false,
-            'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $sourceExternalId,
-            'data'               => json_encode(['properties' => $properties]),
+            'name'        => $sourceName,
+            'type'        => UUID::G_THING,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
+            'data'        => json_encode(['properties' => $properties]),
         ];
 
         if ($existing) {
             DB::table('things')->where('thing_id', $existing->thing_id)->update($data);
-            $this->updated++;
             return $existing->thing_id;
         }
 
@@ -180,15 +161,65 @@ class GedcomImporter
         $data['thing_id'] = $thingId;
         DB::table('things')->insert($data);
 
+        // Link to GEDCOM class
         DB::table('links')->insert([
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => UUID::EVIDENCE,
+            'other_thing_id' => UUID::GEDCOM_CLASS,
         ]);
 
         return $thingId;
     }
+
+    /**
+     * Preload all existing IMPORTED_FROM links for this source.
+     * Maps: data.source_external_id → thing_id
+     */
+    private function preloadExistingSourceLinks(): void
+    {
+        if ($this->sourceThingId === null) {
+            return;
+        }
+
+        $links = DB::table('links')
+            ->where('link_type_id', UUID::IMPORTED_FROM)
+            ->where('other_thing_id', $this->sourceThingId)
+            ->get();
+
+        foreach ($links as $link) {
+            if ($link->data !== null) {
+                $linkData = is_string($link->data) ? json_decode($link->data, true) : (array) $link->data;
+                if (isset($linkData['source_external_id'])) {
+                    $this->existingSourceLinks[$linkData['source_external_id']] = $link->one_thing_id;
+                }
+            }
+        }
+    }
+
+    /**
+     * Link a thing to the GEDCOM source via IMPORTED_FROM with data.
+     */
+    private function linkToSource(string $thingId, string $sourceExternalId): void
+    {
+        DB::table('links')->insert([
+            'link_uuid'     => (string) Str::uuid(),
+            'one_thing_id'  => $thingId,
+            'link_type_id'  => UUID::IMPORTED_FROM,
+            'other_thing_id' => $this->sourceThingId,
+            'data'          => json_encode(['source_external_id' => $sourceExternalId]),
+        ]);
+    }
+
+    /**
+     * Check if a thing already exists for this source_external_id via preloaded links.
+     */
+    private function findExisting(string $sourceExternalId): ?string
+    {
+        return $this->existingSourceLinks[$sourceExternalId] ?? null;
+    }
+
+    // ── Person import ──
 
     private function importPerson(array $record): void
     {
@@ -202,15 +233,11 @@ class GedcomImporter
         $nameNode = GedcomParser::findChild($record, 'NAME');
         $rawName = $nameNode ? trim($nameNode['value']) : 'Unknown';
 
-        // Parse GEDCOM sub-fields: GIVN, SURN, _MARNM (Древо Жизни extension)
         $givenName = GedcomParser::childValue($nameNode, 'GIVN');
         $surname = GedcomParser::childValue($nameNode, 'SURN');
         $marriedName = GedcomParser::childValue($nameNode, '_MARNM');
 
-        // Build a clean display name: strip // delimiters, collapse spaces
         $cleanName = self::cleanGedcomName($rawName);
-
-        // If GIVN+SURN are available, use them for a cleaner name
         if ($givenName !== null && $surname !== null) {
             $cleanName = trim($givenName . ' ' . $surname);
         } elseif ($givenName !== null) {
@@ -219,15 +246,9 @@ class GedcomImporter
 
         $sex = GedcomParser::childValue($record, 'SEX');
 
-        $externalId = $this->externalId($gedcomId);
+        $sourceExternalId = $this->externalId($gedcomId);
+        $existingThingId = $this->findExisting($sourceExternalId);
 
-        $existing = DB::table('things')
-            ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $externalId)
-            ->first();
-
-        // Parse birth/death dates as FlexibleDate → start/end columns
         $birthNode = GedcomParser::findChild($record, 'BIRT');
         $deathNode = GedcomParser::findChild($record, 'DEAT');
 
@@ -260,7 +281,6 @@ class GedcomImporter
                     $flexibleDate = FlexibleDate::parse($eventDate);
                     if ($flexibleDate !== null) {
                         $db = $flexibleDate->toDb('start');
-                        // Death date goes into the end column
                         $end = $db['start'];
                         $endMeta = !empty($db['meta']) ? json_encode($db['meta']) : null;
                     }
@@ -286,31 +306,24 @@ class GedcomImporter
         }
 
         $data = [
-            'name'               => $cleanName,
-            'type'               => UUID::G_THING,
-            'start'              => $start,
-            'end'                => $end,
-            'start_meta'         => $startMeta,
-            'end_meta'           => $endMeta,
-            'owner'              => $this->ownerId,
-            'public'             => false,
-            'deleted'            => false,
-            'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $externalId,
-            'data'               => !empty($properties) ? json_encode(['properties' => $properties]) : null,
+            'name'        => $cleanName,
+            'type'        => UUID::G_THING,
+            'start'       => $start,
+            'end'         => $end,
+            'start_meta'  => $startMeta,
+            'end_meta'    => $endMeta,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
+            'data'        => !empty($properties) ? json_encode(['properties' => $properties]) : null,
         ];
 
-        if ($existing) {
-            // Update existing record with new data
-            DB::table('things')->where('thing_id', $existing->thing_id)->update($data);
-            $this->personIdMap[$gedcomId] = $existing->thing_id;
+        if ($existingThingId) {
+            DB::table('things')->where('thing_id', $existingThingId)->update($data);
+            $this->personIdMap[$gedcomId] = $existingThingId;
             $this->updated++;
-
-            // Still ensure events are created/updated for existing persons
-            // (skipping events for brevity — they'll be handled by the event loop below)
-            // But we do need to re-create events if they don't exist
-            $this->ensurePersonEvents($birthNode, $deathNode, $record, $existing->thing_id, $cleanName);
+            $this->ensurePersonEvents($birthNode, $deathNode, $record, $existingThingId, $cleanName);
             return;
         }
 
@@ -325,6 +338,8 @@ class GedcomImporter
             'link_type_id'  => UUID::LINK_TO_CLASS,
             'other_thing_id' => UUID::HUMAN,
         ]);
+
+        $this->linkToSource($thingId, $sourceExternalId);
 
         if ($birthNode) {
             $this->importPersonEvent($birthNode, $thingId, $cleanName, 'BIRT', 'birth');
@@ -342,10 +357,6 @@ class GedcomImporter
         $this->imported++;
     }
 
-    /**
-     * Ensure BIRT/DEAT/OCCU/RESI events exist for an existing person.
-     * Called on reimport when the person already exists — creates missing events.
-     */
     private function ensurePersonEvents(?array $birthNode, ?array $deathNode, array $record, string $personId, string $cleanName): void
     {
         if ($birthNode) {
@@ -362,6 +373,8 @@ class GedcomImporter
         }
     }
 
+    // ── Person event import ──
+
     private function importPersonEvent(array $eventNode, string $personId, string $personName, string $gedcomTag, string $eventType): void
     {
         $dateNode = GedcomParser::findChild($eventNode, 'DATE');
@@ -373,12 +386,7 @@ class GedcomImporter
         $note = $noteNode ? GedcomParser::getFullValue($noteNode) : null;
 
         $eventExternalId = $this->findEventExternalId($personId, $eventNode, $gedcomTag);
-
-        $existing = DB::table('things')
-            ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $eventExternalId)
-            ->first();
+        $existingThingId = $this->findExisting($eventExternalId);
 
         $start = null;
         $end = null;
@@ -395,14 +403,36 @@ class GedcomImporter
             }
         }
 
-        $eventName = sprintf('%s: %s', ucfirst($eventType), $personName);
+        // Build event name + translations
+        $eventTypeLabel = ucfirst($eventType);
+        $eventName = sprintf('%s: %s', $eventTypeLabel, $personName);
+
+        $eventTypeLabels = [
+            'birth' => ['en' => 'Birth', 'ru' => 'Рождение'],
+            'death' => ['en' => 'Death', 'ru' => 'Смерть'],
+            'occupation' => ['en' => 'Occupation', 'ru' => 'Работа'],
+            'residence' => ['en' => 'Residence', 'ru' => 'Проживание'],
+        ];
+        $label = $eventTypeLabels[$eventType] ?? ['en' => $eventTypeLabel, 'ru' => $eventTypeLabel];
+
+        $nameTranslations = [
+            'lang' => 'en',
+            'en'   => sprintf('%s: %s', $label['en'], $personName),
+            'ru'   => sprintf('%s: %s', $label['ru'], $personName),
+        ];
+
         $description = $note;
         if ($placeName !== null) {
             $description = $description ? $description . "\nPlace: " . $placeName : 'Place: ' . $placeName;
         }
 
+        $eventProperties = [
+            'event_type' => $eventType,
+        ];
+
         $data = [
             'name'               => $eventName,
+            'name_translations'  => json_encode($nameTranslations),
             'type'               => UUID::G_THING,
             'description'        => $description,
             'start'              => $start,
@@ -413,12 +443,11 @@ class GedcomImporter
             'public'             => false,
             'deleted'            => false,
             'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $eventExternalId,
+            'data'               => json_encode(['properties' => $eventProperties]),
         ];
 
-        if ($existing) {
-            DB::table('things')->where('thing_id', $existing->thing_id)->update($data);
+        if ($existingThingId) {
+            DB::table('things')->where('thing_id', $existingThingId)->update($data);
             $this->updated++;
             return;
         }
@@ -435,13 +464,16 @@ class GedcomImporter
             'other_thing_id' => UUID::EVENT,
         ]);
 
+        // PRESENT (участвует в) instead of LINK_TO_SOURCE
         DB::table('links')->insert([
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
-            'link_type_id'  => UUID::LINK_TO_SOURCE,
+            'link_type_id'  => UUID::PRESENT,
             'other_thing_id' => $personId,
             'description'   => $eventType,
         ]);
+
+        $this->linkToSource($thingId, $eventExternalId);
 
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
@@ -455,6 +487,8 @@ class GedcomImporter
             }
         }
     }
+
+    // ── Family import ──
 
     private function importFamily(array $record): void
     {
@@ -517,12 +551,7 @@ class GedcomImporter
         $eventDate = $dateNode ? GedcomParser::parseGedcomDate($dateNode['value']) : null;
 
         $eventExternalId = $this->externalId($familyGedcomId . '-marriage');
-
-        $existing = DB::table('things')
-            ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $eventExternalId)
-            ->first();
+        $existingThingId = $this->findExisting($eventExternalId);
 
         $start = null;
         $end = null;
@@ -541,8 +570,24 @@ class GedcomImporter
 
         $placeName = $placeNode ? GedcomParser::extractPlaceName($placeNode) : null;
 
+        // Get spouse names for the marriage title
+        $husbandName = DB::table('things')->where('thing_id', $husbandId)->value('name') ?? '';
+        $wifeName = DB::table('things')->where('thing_id', $wifeId)->value('name') ?? '';
+        $marriageName = sprintf('Свадьба: %s, %s', $husbandName, $wifeName);
+
+        $nameTranslations = [
+            'lang' => 'ru',
+            'en'   => sprintf('Marriage: %s, %s', $husbandName, $wifeName),
+            'ru'   => sprintf('Свадьба: %s, %s', $husbandName, $wifeName),
+        ];
+
+        $eventProperties = [
+            'event_type' => 'marriage',
+        ];
+
         $data = [
-            'name'               => 'Marriage',
+            'name'               => $marriageName,
+            'name_translations'  => json_encode($nameTranslations),
             'type'               => UUID::G_THING,
             'start'              => $start,
             'end'                => $end,
@@ -552,16 +597,15 @@ class GedcomImporter
             'public'             => false,
             'deleted'            => false,
             'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $eventExternalId,
+            'data'               => json_encode(['properties' => $eventProperties]),
         ];
 
         if ($placeName !== null) {
             $data['description'] = 'Place: ' . $placeName;
         }
 
-        if ($existing) {
-            DB::table('things')->where('thing_id', $existing->thing_id)->update($data);
+        if ($existingThingId) {
+            DB::table('things')->where('thing_id', $existingThingId)->update($data);
             $this->updated++;
             return;
         }
@@ -578,15 +622,18 @@ class GedcomImporter
             'other_thing_id' => UUID::EVENT,
         ]);
 
+        // PRESENT instead of LINK_TO_SOURCE for both spouses
         foreach ([$husbandId, $wifeId] as $spouseId) {
             DB::table('links')->insert([
                 'link_uuid'     => (string) Str::uuid(),
                 'one_thing_id'  => $thingId,
-                'link_type_id'  => UUID::LINK_TO_SOURCE,
+                'link_type_id'  => UUID::PRESENT,
                 'other_thing_id' => $spouseId,
                 'description'   => 'spouse',
             ]);
         }
+
+        $this->linkToSource($thingId, $eventExternalId);
 
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
@@ -600,6 +647,8 @@ class GedcomImporter
             }
         }
     }
+
+    // ── GEDCOM SOUR record import ──
 
     private function importSource(array $record): void
     {
@@ -620,28 +669,21 @@ class GedcomImporter
             $description .= 'Publisher: ' . $publisher . "\n";
         }
 
-        $externalId = $this->externalId($gedcomId);
-
-        $existing = DB::table('things')
-            ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $externalId)
-            ->first();
+        $sourceExternalId = $this->externalId($gedcomId);
+        $existingThingId = $this->findExisting($sourceExternalId);
 
         $data = [
-            'name'               => $title,
-            'type'               => UUID::G_THING,
-            'description'        => trim($description) ?: null,
-            'owner'              => $this->ownerId,
-            'public'             => false,
-            'deleted'            => false,
-            'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $externalId,
+            'name'        => $title,
+            'type'        => UUID::G_THING,
+            'description' => trim($description) ?: null,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
         ];
 
-        if ($existing) {
-            DB::table('things')->where('thing_id', $existing->thing_id)->update($data);
+        if ($existingThingId) {
+            DB::table('things')->where('thing_id', $existingThingId)->update($data);
             $this->updated++;
             return;
         }
@@ -657,8 +699,12 @@ class GedcomImporter
             'other_thing_id' => UUID::EVIDENCE,
         ]);
 
+        $this->linkToSource($thingId, $sourceExternalId);
+
         $this->imported++;
     }
+
+    // ── Place management ──
 
     private function findOrCreatePlace(string $placeName, ?array $placeNode): ?string
     {
@@ -671,28 +717,23 @@ class GedcomImporter
             return $this->placeCache[$key];
         }
 
-        $existing = DB::table('things')
-            ->where('owner', $this->ownerId)
-            ->where('source_service', self::SOURCE_SERVICE)
-            ->where('source_external_id', $this->externalId('place:' . $key))
-            ->first();
+        $sourceExternalId = $this->externalId('place:' . $key);
+        $existingThingId = $this->findExisting($sourceExternalId);
 
-        if ($existing) {
-            $this->placeCache[$key] = $existing->thing_id;
-            return $existing->thing_id;
+        if ($existingThingId) {
+            $this->placeCache[$key] = $existingThingId;
+            return $existingThingId;
         }
 
         $thingId = (string) Str::uuid();
         $data = [
-            'thing_id'           => $thingId,
-            'name'               => trim($placeName),
-            'type'               => UUID::G_THING,
-            'owner'              => $this->ownerId,
-            'public'             => false,
-            'deleted'            => false,
-            'server_uuid'        => $this->getServerUuid(),
-            'source_service'     => self::SOURCE_SERVICE,
-            'source_external_id' => $this->externalId('place:' . $key),
+            'thing_id'    => $thingId,
+            'name'        => trim($placeName),
+            'type'        => UUID::G_THING,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
         ];
 
         if ($placeNode !== null) {
@@ -719,9 +760,13 @@ class GedcomImporter
             'other_thing_id' => UUID::PLACE_CLASS,
         ]);
 
+        $this->linkToSource($thingId, $sourceExternalId);
+
         $this->placeCache[$key] = $thingId;
         return $thingId;
     }
+
+    // ── Helpers ──
 
     private function resolvePersonRef(?string $gedcomRef): ?string
     {
@@ -766,11 +811,6 @@ class GedcomImporter
         return $this->externalId($key . '-' . $counters[$key]);
     }
 
-    /**
-     * Strip GEDCOM surname delimiters (//) from a name.
-     * "John /Smith/" → "John Smith"
-     * "Зоя Владимировна /Дмитревская/" → "Зоя Владимировна Дмитревская"
-     */
     private static function cleanGedcomName(string $name): string
     {
         $name = preg_replace('#/#u', '', $name);

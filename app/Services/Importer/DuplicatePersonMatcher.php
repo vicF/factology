@@ -15,9 +15,6 @@ use Illuminate\Support\Str;
  *   1. Normalized name match (case-insensitive, ignores surname slashes)
  *   2. Same sex
  *   3. Birth year within 2 years (or both without birth year)
- *
- * Used by the factology:find-duplicates command and the
- * POST /api/v1/import/find-duplicates endpoint.
  */
 class DuplicatePersonMatcher
 {
@@ -32,8 +29,14 @@ class DuplicatePersonMatcher
                      ->where('links.link_type_id', '=', UUID::LINK_TO_CLASS)
                      ->where('links.other_thing_id', '=', UUID::HUMAN);
             })
-            ->where('things.source_service', 'gedcom')
             ->where('things.deleted', false)
+            // Only include things that have an IMPORTED_FROM link (GEDCOM imports)
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                  ->from('links as l2')
+                  ->whereColumn('l2.one_thing_id', 'things.thing_id')
+                  ->where('l2.link_type_id', UUID::IMPORTED_FROM);
+            })
             ->select('things.thing_id', 'things.name', 'things.data', 'things.start', 'things.owner');
 
         if ($ownerId) {
@@ -150,15 +153,28 @@ class DuplicatePersonMatcher
     }
 
     /**
-     * Return the fileKey portion of a source_external_id ({fileKey}/{@id}).
+     * Return the fileKey portion of the source_external_id stored in the
+     * IMPORTED_FROM link's data ({fileKey}/{@id}).
      */
     private function sourceFileOf(string $thingId): ?string
     {
-        $external = DB::table('things')->where('thing_id', $thingId)->value('source_external_id');
-        if (!$external) {
+        $link = DB::table('links')
+            ->where('one_thing_id', $thingId)
+            ->where('link_type_id', UUID::IMPORTED_FROM)
+            ->first();
+
+        if (!$link || !$link->data) {
             return null;
         }
-        $parts = explode('/', $external, 2);
+
+        $linkData = is_string($link->data) ? json_decode($link->data, true) : (array) $link->data;
+        $externalId = $linkData['source_external_id'] ?? null;
+
+        if (!$externalId) {
+            return null;
+        }
+
+        $parts = explode('/', $externalId, 2);
         return $parts[0] ?? null;
     }
 
