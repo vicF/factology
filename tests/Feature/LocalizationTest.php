@@ -54,6 +54,14 @@ class LocalizationTest extends TestCase
             'start'       => date('Ymd', strtotime('-1 day')),
             'end'         => date('Ymd'),
             'public'      => 1,
+            'classes'     => [
+                [
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::SOMETHING,
+                    'public'         => 1,
+                ],
+            ],
         ], $overrides);
 
         $response = $this->postJson('/api/v1/object/' . $uuid, $data);

@@ -169,6 +169,22 @@ function collectMap(out, map) {
 }
 
 /** All searchable strings of an object (name/description + all translations + property values). */
+/**
+ * Get the list of class objects from an API response (multi-class).
+ * Returns the `classes` array if non-empty, otherwise wraps the singular
+ * `class` in a one-element array, or falls back to an empty array.
+ * This centralises the fallback logic so templates don't repeat it.
+ */
+export function getClassesList(obj) {
+    if (obj && Array.isArray(obj.classes) && obj.classes.length > 0) {
+        return obj.classes;
+    }
+    if (obj && obj.class && obj.class.thing_id) {
+        return [obj.class];
+    }
+    return [];
+}
+
 export function flattenSearchable(obj) {
     const out = [];
     if (!obj) return out;

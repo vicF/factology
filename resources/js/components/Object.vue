@@ -56,6 +56,14 @@
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
                                 <button class="btn btn-danger" @click="deleteObject" :disabled="!canDelete" :title="canDelete ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
+                            <!-- Debug info: shows object owner and permissions -->
+                            <div v-if="object" class="debug-info" style="font-size:10px;color:#999;margin-top:4px;padding:2px 8px;background:#f5f5f5;border-radius:4px;display:inline-block;">
+                                owner: {{ object.owner || 'none' }} |
+                                canEdit: {{ canEdit }} |
+                                canDelete: {{ canDelete }} |
+                                auth: {{ authenticated }} |
+                                uid: {{ authStore.user?.thing_id || 'none' }}
+                            </div>
                         </div>
 
                         <!-- Tabs -->
@@ -106,10 +114,10 @@
                                             <span>{{ object.public ? $t('Public') : $t('Private') }}</span>
                                         </div>
 
-                                        <div v-if="object.class" class="class-badge">
-                                            <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
-                                            <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                {{ $objectName(object.class) }}
+                                        <div v-for="cls in $getClassesList(object)" :key="cls.thing_id" class="class-badge">
+                                            <Image :node-id="cls.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: cls.thing_id } }" class="class-badge-link">
+                                                {{ $objectName(cls) }}
                                             </RouterLink>
                                         </div>
 
@@ -118,21 +126,13 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
-                                                <template v-if="plannedDate">
-                                                    <span class="planned-badge">
-                                                        {{ $t('dates.planned_on') }} {{ plannedDate }}
+                                                <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
+                                                    <span v-if="!confirmedDate && isPlanned" class="planned-badge">
+                                                        {{ $t('dates.planned') }}
+                                                        <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
                                                     <button
-                                                        v-if="confirmedDate"
-                                                        class="confirm-badge confirm-badge--done"
-                                                        :title="$t('dates.confirmed_title')"
-                                                        disabled
-                                                    >
-                                                        <IconCheck />
-                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
-                                                    </button>
-                                                    <button
-                                                        v-else-if="canConfirmPlanned"
+                                                        v-if="!confirmedDate && canConfirmPlanned"
                                                         class="confirm-badge"
                                                         :title="$t('dates.confirm_hint')"
                                                         @click="confirmPlanned"
@@ -140,6 +140,14 @@
                                                         <IconCheck />
                                                         {{ $t('dates.confirm') }}
                                                     </button>
+                                                    <span
+                                                        v-else-if="confirmedDate"
+                                                        class="confirm-badge confirm-badge--done"
+                                                        :title="$t('dates.confirmed_title')"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
+                                                    </span>
                                                 </template>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
@@ -627,8 +635,8 @@ const authenticated = computed(() => authStore?.authenticated || false);
 // System default owner UUIDs indicate objects that were created without an
 // explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
 // SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
-// may edit/delete such objects.
-const isSystemDefaultOwner = (uid) => uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
+// may edit/delete such objects. A null/undefined owner is also unowned.
+const isSystemDefaultOwner = (uid) => !uid || uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
 
 // Whether the current user may edit this object's own fields. Admins may edit
 // any object (system-owned ones included); everyone else only their own.
@@ -638,7 +646,6 @@ const canEdit = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    if (!uid) return false;
     if (isSystemDefaultOwner(uid)) return true;
     return authStore.user?.thing_id === uid;
 });
@@ -649,7 +656,6 @@ const canDelete = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    if (!uid) return false;
     if (isSystemDefaultOwner(uid)) return true;
     return authStore.user?.thing_id === uid;
 });
@@ -665,14 +671,35 @@ const isOtherOwnerObject = computed(() => {
     return uid !== authStore.user?.thing_id;
 });
 
-// ── Planned / confirmed dates (things.data JSON) ─────────────────────────
-const plannedDate = computed(() => object.value?.data?.planned || null);
-const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+// ── Planned / confirmed (things.data JSON + future start) ────────────────
+// Canonical "now" (same digit-string shape as the DB's start column).
+function canonicalNow() {
+    const d = new Date();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
 
-// The owner (or an admin) may confirm that a planned object happened. Guests
-// and other users only see the static badges.
+const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+const markedPlannedDate = computed(() => object.value?.data?.planned || null);
+const hasFutureStart = computed(() =>
+    !!object.value?.start && BigInt(String(object.value.start)) > BigInt(canonicalNow())
+);
+
+// A "plan" is an object with a future start date that hasn't been confirmed
+// yet. Explicitly-marked plans (data.planned) stay plans even after their date
+// passes; unmarked future-dated objects (created before this feature, or via
+// import) are derived as plans from their start date.
+const isPlanned = computed(() =>
+    !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
+);
+
+// The owner (or an admin) may confirm that a planned object happened. This
+// also covers past-dated objects that were auto-detected as plans (had a
+// future start date at creation but no explicit data.planned marker) — once
+// the date passes, isPlanned goes false but the owner should still be able
+// to confirm.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && plannedDate.value && !confirmedDate.value
+    canEdit.value && !confirmedDate.value && (isPlanned.value || (!!object.value?.start && !hasFutureStart.value))
 );
 
 const confirmPlanned = async () => {

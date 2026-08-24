@@ -11,6 +11,11 @@ Object.entries(Icons).forEach(([name, component]) => {
 // Provide a trivial $t for components whose specs don't install a real i18n
 // instance (translations return the key — English catalogs are key-identical).
 config.global.mocks['$t'] = (key) => key
+config.global.mocks['$getClassesList'] = (obj) => {
+    if (obj && Array.isArray(obj.classes) && obj.classes.length > 0) return obj.classes;
+    if (obj && obj.class && obj.class.thing_id) return [obj.class];
+    return [];
+}
 
 // Mock the object cache store completely
 vi.mock('@/stores/objectCache', () => ({

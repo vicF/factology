@@ -289,8 +289,10 @@ class RelatedObjectsResolver
 
     /**
      * Batched class resolution for a set of things via LINK_TO_CLASS links.
+     * Multi-class: every thing gets an array of all its classes (in link order,
+     * first = primary).
      *
-     * @return array [thing_id => ['thing_id' => classId, 'name' => className]]
+     * @return array [thing_id => [['thing_id' => classId, 'name' => className], ...]]
      */
     protected function fetchClasses(array $childIds): array
     {
@@ -305,6 +307,8 @@ class RelatedObjectsResolver
             ->whereIn('l.one_thing_id', $childIds)
             ->where('l.deleted', false)
             ->where('c.deleted', false)
+            // Insertion order → first class is the primary one.
+            ->orderBy('l.link_id')
             ->get();
 
         $classes = [];
@@ -313,7 +317,7 @@ class RelatedObjectsResolver
             if (is_string($translations)) {
                 $translations = json_decode($translations, true) ?: null;
             }
-            $classes[$row->one_thing_id] = [
+            $classes[$row->one_thing_id][] = [
                 'thing_id'          => $row->class_id,
                 'name'              => $row->class_name,
                 'name_translations' => $translations,
@@ -379,7 +383,8 @@ class RelatedObjectsResolver
             'name'              => $row->name ?? null,
             'name_translations' => $nameTranslations,
             'type'              => $row->type !== null ? (int) $row->type : null,
-            'class'             => $class,
+            'classes'           => $class, // multi-class: array of {thing_id, name}
+            'class'             => $class[0] ?? null, // primary class (backward compat)
             'public'            => $row->public !== null ? (bool) $row->public : null,
             'description'       => $description,
             'geo'               => GeoProperties::extract(is_array($data) ? ($data['properties'] ?? null) : null),

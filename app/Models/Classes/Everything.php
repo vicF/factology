@@ -281,6 +281,43 @@ class Everything
     }
 
     /**
+     * All classes an object belongs to (multi-class support), each with the
+     * data needed by the frontend badges: thing_id, name, translations and the
+     * PHP class_name (for model dispatch). Order follows the LINK_TO_CLASS
+     * link insertion order — the first entry is the object's primary class.
+     *
+     * @param string $id object thing_id
+     * @return array
+     */
+    public static function getClassesWithNames($id): array
+    {
+        return DB::table('links')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->leftJoin('classes', 'classes.thing_id', '=', 'c.thing_id')
+            ->where('links.one_thing_id', $id)
+            ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('links.deleted', false)
+            ->where('c.deleted', false)
+            // Deterministic insertion order → the first-created class link is
+            // the object's primary class.
+            ->orderBy('links.link_id')
+            ->select('c.thing_id', 'c.name', 'c.name_translations', 'classes.class_name')
+            ->get()
+            ->map(function ($r) {
+                return [
+                    'thing_id'          => $r->thing_id,
+                    'name'              => $r->name,
+                    'name_translations' => is_string($r->name_translations)
+                        ? json_decode($r->name_translations, true)
+                        : ($r->name_translations ?? null),
+                    'class_name'        => $r->class_name,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param $id
      * @return string
      */
@@ -368,12 +405,12 @@ class Everything
                 : null
         );
 
-        // Clean up class object: extract just relevant info, excluding heavy json from c.data
-        $thing['class'] = $class ? [
-            'thing_id'   => $class->thing_id ?? null,
-            'class_name' => $class->class_name ?? null,
-            'name'       => $class->name ?? null,
-        ] : null;
+        // Clean up class object: extract just relevant info, excluding heavy json from c.data.
+        // An object may belong to several classes (multi-class) — expose them all
+        // via `classes`, keeping `class` as the first/primary one for callers that
+        // still consume the singular shape.
+        $thing['classes'] = self::getClassesWithNames($id);
+        $thing['class']   = $thing['classes'][0] ?? null;
 
         // Resolve the owner's display name (owner references a things.thing_id)
         $thing['owner_name'] = null;
@@ -802,6 +839,47 @@ class Everything
         return $this->setLink($classLink);
     }
 
+    /**
+     * Replace the object's class membership with the given list (multi-class).
+     * Each entry is a LINK_TO_CLASS link payload; entries already linked (by
+     * link_id or by endpoint pair) are updated/reused, and LINK_TO_CLASS links
+     * that are no longer desired are soft-deleted. Non-class links are never
+     * touched.
+     *
+     * @param array $classLinks
+     * @return void
+     */
+    public function setClasses(array $classLinks): void
+    {
+        $desired = [];
+        foreach ($classLinks as $classLink) {
+            if (empty($classLink['other_thing_id'])) {
+                continue;
+            }
+            // A class-membership link always originates from the object being
+            // saved — normalize one_thing_id so a stale/missing client value
+            // never creates a link from the wrong object.
+            $classLink['one_thing_id'] = $this->thing_id;
+            $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
+            $this->setLink($classLink);
+            $desired[$classLink['other_thing_id']] = true;
+        }
+        // Invalidate the cached class list so the diff below reads fresh data.
+        $this->_classes = null;
+        // Diff: soft-delete class links the caller no longer wants (edit flow).
+        foreach ($this->getClassesIds() as $existingClassId) {
+            if (isset($desired[$existingClassId])) {
+                continue;
+            }
+            DB::table('links')
+                ->where('one_thing_id', $this->thing_id)
+                ->where('link_type_id', UUID::LINK_TO_CLASS)
+                ->where('other_thing_id', $existingClassId)
+                ->where('deleted', false)
+                ->update(['deleted' => true]);
+        }
+    }
+
     public function setParent(array $classLink): bool
     {
         $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
@@ -875,8 +953,13 @@ class Everything
 
         if ($existing) {
             // Update existing — preserve link_uuid. Description (if provided)
-            // applies regardless of direction.
+            // applies regardless of direction. A soft-deleted row is resurrected
+            // (the unique index only covers non-deleted rows, so re-adding a
+            // removed class/link would otherwise leave a stale deleted row).
             $existingUpdate = [];
+            if ((bool) $existing->deleted) {
+                $existingUpdate['deleted'] = false;
+            }
             if (array_key_exists('description', $link)) {
                 $existingUpdate['description'] = $link['description'];
             }

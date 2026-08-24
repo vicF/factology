@@ -27,7 +27,37 @@
                         <IconUser v-else width="1.3em" height="1.3em" />
                     </span>
 
+                    <div
+                        v-if="multiple"
+                        class="form-control chips-container"
+                        :data-field-name="fieldName"
+                        @click="openDropdown"
+                    >
+                        <span v-for="obj in selectedObjects" :key="obj.thing_id" class="chip" :data-test-name="obj.name">
+                            {{ objectName(obj) || obj.thing_id }}
+                            <button
+                                type="button"
+                                class="chip-remove"
+                                :title="$t('Remove')"
+                                @click.stop="removeObject(obj.thing_id)"
+                            >
+                                <IconClose width="10" height="10" />
+                            </button>
+                        </span>
+                        <input
+                            ref="inputRef"
+                            type="text"
+                            class="chip-input"
+                            :value="isOpen ? searchText : ''"
+                            :placeholder="isOpen || selectedObjects.length === 0 ? placeholder : ''"
+                            @focus="openDropdown"
+                            @input="onInput"
+                            @keydown.esc="closeDropdown"
+                        />
+                    </div>
+
                     <input
+                        v-else
                         ref="inputRef"
                         type="text"
                         class="form-control"
@@ -42,7 +72,7 @@
                     />
 
                     <button
-                        v-if="allowClear && modelValue"
+                        v-if="allowClear && (multiple ? selectedObjects.length > 0 : modelValue)"
                         class="btn btn-outline-secondary"
                         type="button"
                         @click.stop="clearSelection"
@@ -125,6 +155,13 @@
             </div>
 
             <input
+                v-if="multiple"
+                type="hidden"
+                :name="fieldName"
+                :value="JSON.stringify(modelValue || [])"
+            />
+            <input
+                v-else
                 type="hidden"
                 :name="fieldName"
                 :value="modelValue || ''"
@@ -146,7 +183,15 @@ import axios from 'axios';
 
 const props = defineProps({
     fieldName: String,
-    modelValue: [String, null],
+    // When `multiple` is true this is an array of UUIDs (chips), otherwise a
+    // single UUID.
+    modelValue: [String, Array, null],
+    // Multi-select mode: pick several objects, shown as removable chips.
+    // Selection toggles instead of closing the dropdown. `modelValue` is an array.
+    multiple: {
+        type: Boolean,
+        default: false,
+    },
     isEditable: {
         type: Boolean,
         default: true
@@ -241,6 +286,7 @@ let debounceTimer = null
 
 // ── Computed ───────────────────────────────────────────────────
 const displayValue = computed(() => {
+    if (props.multiple) return ''
     if (props.displayName) return props.displayName
     if (selectedObject.value) return objectName(selectedObject.value)
     if (!props.modelValue) return ''
@@ -250,7 +296,21 @@ const displayValue = computed(() => {
     return props.name || props.modelValue
 })
 
-const hasSelection = computed(() => !!props.modelValue)
+const hasSelection = computed(() => props.multiple ? ((props.modelValue || []).length > 0) : !!props.modelValue)
+
+// Chips for multi-select: resolve each selected id to its cached object so
+// names render. Un-cached ids fall back to the raw id until they're hydrated.
+const selectedObjects = computed(() => {
+    if (!props.multiple) return []
+    return (Array.isArray(props.modelValue) ? props.modelValue : [])
+        .map(id => cacheStore.getCachedObject(id) || { thing_id: id })
+        .filter(obj => obj && obj.thing_id)
+})
+
+const selectedIds = computed(() => {
+    if (!props.multiple) return null
+    return new Set(Array.isArray(props.modelValue) ? props.modelValue : [])
+})
 
 const filteredObjects = computed(() => {
     let results = [];
@@ -268,6 +328,10 @@ const filteredObjects = computed(() => {
     }
     if (props.excludeUuid && results.length) {
         results = results.filter(obj => obj.thing_id !== props.excludeUuid);
+    }
+    // In multi-select mode, hide objects that are already picked.
+    if (props.multiple && selectedIds.value && selectedIds.value.size && results.length) {
+        results = results.filter(obj => !selectedIds.value.has(obj.thing_id));
     }
     return results;
 })
@@ -375,6 +439,11 @@ onUnmounted(() => {
 
 // ── Watch modelValue ──────────────────────────────────────────
 watch(() => props.modelValue, async (newUuid) => {
+    // Multi-select has no single selected object — chips resolve from the cache.
+    if (props.multiple) {
+        selectedObject.value = null
+        return
+    }
     if (!newUuid) {
         selectedObject.value = null
         return
@@ -487,11 +556,9 @@ function selectObject(obj, event) {
     // exclude (e.g. the current object in a link's second-object selector).
     if (props.excludeUuid && obj.thing_id === props.excludeUuid) return
     isClickingDropdown.value = true
-    selectedObject.value = obj
-    // Cache the object so displayValue can resolve its name (suggestions from
-    // /search/options are not otherwise in the object cache).
+    // Cache the object so chips/displayValue can resolve its name (suggestions
+    // from /search/options are not otherwise in the object cache).
     cacheStore.cacheObject(obj.thing_id, obj, obj.type || props.type)
-    emit('update:modelValue', obj.thing_id)
     // Record in history
     historyStore.recordSelection(
         obj.thing_id,
@@ -499,13 +566,41 @@ function selectObject(obj, event) {
         props.contextObjectType,
         props.contextLinkTypeId
     );
+    if (props.multiple) {
+        // Toggle the object in/out of the selection and keep the dropdown open
+        // so the user can keep picking. Clearing the query makes the remaining
+        // suggestion list re-render (filteredObjects excludes picked ids).
+        const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
+        if (current.includes(obj.thing_id)) {
+            emit('update:modelValue', current.filter(id => id !== obj.thing_id))
+        } else {
+            emit('update:modelValue', [...current, obj.thing_id])
+        }
+        searchText.value = ''
+        searchResults.value = []
+        if (debounceTimer) clearTimeout(debounceTimer)
+        nextTick(() => calculateDropdownPosition())
+        setTimeout(() => { isClickingDropdown.value = false }, 100)
+        return
+    }
+    selectedObject.value = obj
+    emit('update:modelValue', obj.thing_id)
     closeDropdown()
     setTimeout(() => { isClickingDropdown.value = false }, 100)
 }
 
+function removeObject(id) {
+    if (!props.multiple) return
+    emit('update:modelValue', (Array.isArray(props.modelValue) ? props.modelValue : []).filter(x => x !== id))
+}
+
 function clearSelection() {
     selectedObject.value = null
-    emit('update:modelValue', null)
+    if (props.multiple) {
+        emit('update:modelValue', [])
+    } else {
+        emit('update:modelValue', null)
+    }
     searchText.value = ''
     isOpen.value = false
 }
@@ -608,6 +703,45 @@ defineExpose({
 .input-group { width: 100%; }
 .input-group-sm .form-control,
 .input-group-sm .btn { font-size: 0.875rem; }
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    cursor: text;
+    min-height: calc(1.8125rem + 2px);
+}
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #e9ecef;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.chip-remove {
+    border: none;
+    background: transparent;
+    padding: 0;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.6;
+    display: inline-flex;
+}
+.chip-remove:hover { opacity: 1; }
+.chip-input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 120px;
+    padding: 1px 4px;
+    font-size: 0.875rem;
+    background: transparent;
+}
 .form-control-plaintext {
     min-height: calc(1.8125rem + 2px);
     padding-top: 0.25rem;

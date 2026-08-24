@@ -29,6 +29,14 @@ class ThingResource extends JsonResource
         if (isset($this->links)) {
             $out['links'] = $this->links;
         }
+        // Class membership attached by the search resolver (multi-class:
+        // `classes` array, `class` = first/primary for backward compat).
+        if (isset($this->classes)) {
+            $out['classes'] = $this->classes;
+        }
+        if (isset($this->class)) {
+            $out['class'] = $this->class;
+        }
         // Taxonomy base category for link-type results (grouping in the picker).
         if (isset($this->category_id)) {
             $out['category_id']           = $this->category_id;

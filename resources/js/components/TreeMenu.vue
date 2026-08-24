@@ -129,6 +129,7 @@ const objectsStore = useObjectsStore();
 // State
 const treeState = useTreeState();
 const showChildren = ref(treeState.isOpen(props.id, props.depth));
+console.log('[TreeMenu] MOUNT', props.id, 'depth', props.depth, 'showChildren:', showChildren.value);
 const showIcons = ref(false);
 
 // ─── Quick visibility toggle state ─────────────────────────────────

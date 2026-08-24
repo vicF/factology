@@ -1,6 +1,15 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { execSync } from 'child_process';
+
+// Build info injected at compile time so the running APK can be identified.
+let buildId = 'dev';
+let buildTime = Date.now();
+try {
+    buildId = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+    buildTime = Date.now();
+} catch (_) { /* not a git repo */ }
 
 // Capacitor-specific Vite config: produces a standalone SPA build.
 // Does NOT use the laravel-vite-plugin — the output goes to dist/ and
@@ -45,6 +54,7 @@ export default defineConfig({
         // Injected at build time by build-android.sh. Empty string => standalone
         // Dexie mode; non-empty => remote server mode (see resources/js/app.js).
         'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL ?? ''),
+        'import.meta.env.VITE_BUILD_ID': JSON.stringify(`b${buildId}-${buildTime}`),
     },
     server: {
         host: '0.0.0.0',

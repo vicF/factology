@@ -40,9 +40,13 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
-                                <div v-if="groupLabels[thingIndex]" class="date-group-header" :class="{ 'future-divider': typeof groupLabels[thingIndex] === 'object' && groupLabels[thingIndex]?.future }">
+                                <div v-if="groupLabels[thingIndex]" class="date-group-header" :class="{ 'future-divider': typeof groupLabels[thingIndex] === 'object' }">
                                     <span class="date-group-line"></span>
-                                    <span class="date-group-label">{{ typeof groupLabels[thingIndex] === 'string' ? groupLabels[thingIndex] : $t('dates.future') }}</span>
+                                    <span class="date-group-label">
+                                        <template v-if="typeof groupLabels[thingIndex] === 'string'">{{ groupLabels[thingIndex] }}</template>
+                                        <template v-else-if="groupLabels[thingIndex].dateLabel">{{ $t('dates.future_in', { date: groupLabels[thingIndex].dateLabel }) }}</template>
+                                        <template v-else>{{ groupLabels[thingIndex].future ? $t('dates.future') : $t('dates.past') }}</template>
+                                    </span>
                                     <span class="date-group-line"></span>
                                 </div>
                                 <div class="result-content">
@@ -70,10 +74,10 @@
                                             </div>
                                         </div>
 
-                                        <div v-if="thing.type === 3 && thing.class" class="class-badge">
-                                            <Image :node-id="thing.class.thing_id" width="12px" class="class-badge-icon" />
-                                            <RouterLink :to="{ name: 'object', params: { uid: thing.class.thing_id } }" class="class-badge-link">
-                                                {{ $objectName(thing.class) }}
+                                        <div v-for="cls in $getClassesList(thing)" :key="cls.thing_id" class="class-badge">
+                                            <Image :node-id="cls.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: cls.thing_id } }" class="class-badge-link">
+                                                {{ $objectName(cls) }}
                                             </RouterLink>
                                         </div>
 
@@ -88,14 +92,16 @@
                                                 📅
                                                 {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                                 <span v-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
-                                                <template v-if="thing.data?.planned">
-                                                    <span class="planned-badge">
-                                                        {{ $t('dates.planned_on') }} {{ thing.data.planned }}
-                                                    </span>
-                                                    <span v-if="thing.data?.confirmed" class="confirmed-badge">
-                                                        {{ $t('dates.confirmed_on') }} {{ thing.data.confirmed }}
-                                                    </span>
-                                                </template>
+                                                <span
+                                                    v-if="isPlanned(thing)"
+                                                    class="planned-badge"
+                                                >
+                                                    {{ $t('dates.planned') }}
+                                                    <template v-if="thing.data?.planned">({{ thing.data.planned }})</template>
+                                                </span>
+                                                <span v-if="thing.data?.confirmed" class="confirmed-badge">
+                                                    {{ $t('dates.confirmed_on') }} {{ thing.data.confirmed }}
+                                                </span>
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -195,6 +201,15 @@ function isOngoing(thing) {
     return now <= BigInt(String(thing.end));
 }
 
+// A "plan" is an object with a future start date that hasn't been confirmed
+// yet. Explicitly-marked plans (data.planned) count even after their date
+// passes; unmarked future-dated objects are derived as plans from their start.
+function isPlanned(thing) {
+    if (thing.data?.confirmed) return false;
+    if (thing.data?.planned) return true;
+    return isFutureDate(thing);
+}
+
 const props = defineProps({
     searchText: String,
     typeThing: String,
@@ -268,24 +283,41 @@ function dateGroupLabel(key) {
 }
 
 // Header label aligned with each result row (null = no header before it).
-// Returns a string (month/year label) or an object { future: true } for the
-// future divider, or null for no header.
+// Returns a string (month/year label) or an object { future: boolean }
+// (past divider) or { future: true, dateLabel: string } (every future
+// date group, renders as "planned in <dateLabel>"), or null for no header.
 const groupLabels = computed(() => {
     const labels = new Array(objects.value.length).fill(null);
     if (searchStore.sortBy !== 'start') return labels;
     let prevKey = null;
-    let seenFuture = false;
+    let prevFuture = null;
     objects.value.forEach((thing, i) => {
         const future = isFutureDate(thing);
-        if (future && !seenFuture) {
-            seenFuture = true;
-            labels[i] = { future: true };
-            prevKey = null;
+        // Boundary between the future and past sections — place the divider at
+        // the start of the second section, whichever sort direction is active.
+        if (prevFuture !== null && future !== prevFuture) {
+            if (future) {
+                // Entering future section (ASC): merge with date label
+                const key = dateGroupKey(thing.start);
+                labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
+                prevKey = key;
+            } else {
+                // Entering past section (DESC): show divider
+                labels[i] = { future: false };
+                prevKey = null;
+            }
+            prevFuture = future;
             return;
         }
+        prevFuture = future;
         const key = dateGroupKey(thing.start);
         if (key !== prevKey) {
-            labels[i] = dateGroupLabel(key);
+            if (future) {
+                // Every future date group: show "planned in <date>"
+                labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
+            } else {
+                labels[i] = dateGroupLabel(key);
+            }
             prevKey = key;
         }
     });
