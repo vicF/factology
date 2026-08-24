@@ -133,6 +133,10 @@
                                         {{ $t('Logout') }}
                                     </a></li>
                                 </template>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li class="dropdown-header text-muted small" style="font-size: 10px; padding: 4px 12px;">
+                                    build {{ buildId }} <span style="cursor:pointer" @click.stop="onBuildIdTap">⚠️</span>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -239,6 +243,17 @@
                 <button class="error-close" @click="removeError(error.id)">×</button>
             </div>
         </div>
+
+        <!-- Floating diagnostic button (always visible) -->
+        <div class="diag-fab" @click="onDiagnostic" title="Show diagnostic info">🔍</div>
+
+        <!-- Diagnostic modal -->
+        <div v-if="showDiagnostic" class="diag-overlay" @click="showDiagnostic = false">
+            <div class="diag-modal" @click.stop>
+                <pre>{{ diagnosticInfo }}</pre>
+                <button class="btn btn-sm btn-primary mt-2" @click="showDiagnostic = false">Close</button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -274,6 +289,36 @@ const objectsStore = useObjectsStore()
 const uiStore = useUiStore()
 const showModal    = ref(false)
 const selectedType = ref('')
+
+// Injected at build time by vite.config.capacitor.js — identifies which APK is running.
+const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
+
+// Debug: diagnostic button (always visible, outside dropdown)
+const showDiagnostic = ref(false)
+const diagnosticInfo = ref('')
+const onDiagnostic = async () => {
+  const auth = authStore
+  let treeInfo = ''
+  try {
+    const { useTreeState } = await import('@/composables/useTreeState')
+    const ts = useTreeState()
+    treeInfo = 'treeState: ' + JSON.stringify(ts._debugState())
+  } catch (_) { treeInfo = 'treeState: (error)' }
+  const info = [
+    `build: ${buildId}`,
+    `route: ${route.path}`,
+    `auth: ${auth.authenticated}`,
+    `thing_id: ${auth.user?.thing_id || 'none'}`,
+    `is_admin: ${auth.user?.is_admin || 'no'}`,
+    `window: ${window.innerWidth}x${window.innerHeight}`,
+    `isMobile: ${window.innerWidth < 768}`,
+    `currentScreen: ${currentScreen.value}`,
+    treeInfo,
+  ].join('\n')
+  diagnosticInfo.value = info
+  showDiagnostic.value = true
+  console.log('[DIAG]', info)
+}
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
 const swipeContainer = ref(null)
@@ -1070,5 +1115,46 @@ body:not(.page-loading) .nav-loading-bar {
     width: 100%;
     opacity: 0;
     transition: width 0.2s ease, opacity 0.4s ease 0.1s;
+}
+
+/* Floating diagnostic button */
+.diag-fab {
+    position: fixed;
+    bottom: 60px;
+    right: 12px;
+    z-index: 99999;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(13, 110, 253, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    user-select: none;
+}
+.diag-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.diag-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.diag-modal pre {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
 }
 </style>

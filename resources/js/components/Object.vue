@@ -56,6 +56,14 @@
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
                                 <button class="btn btn-danger" @click="deleteObject" :disabled="!canDelete" :title="canDelete ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
+                            <!-- Debug info: shows object owner and permissions -->
+                            <div v-if="object" class="debug-info" style="font-size:10px;color:#999;margin-top:4px;padding:2px 8px;background:#f5f5f5;border-radius:4px;display:inline-block;">
+                                owner: {{ object.owner || 'none' }} |
+                                canEdit: {{ canEdit }} |
+                                canDelete: {{ canDelete }} |
+                                auth: {{ authenticated }} |
+                                uid: {{ authStore.user?.thing_id || 'none' }}
+                            </div>
                         </div>
 
                         <!-- Tabs -->
@@ -118,8 +126,8 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
-                                                <template v-if="isPlanned || confirmedDate">
-                                                    <span v-if="!confirmedDate" class="planned-badge">
+                                                <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
+                                                    <span v-if="!confirmedDate && isPlanned" class="planned-badge">
                                                         {{ $t('dates.planned') }}
                                                         <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
@@ -626,8 +634,8 @@ const authenticated = computed(() => authStore?.authenticated || false);
 // System default owner UUIDs indicate objects that were created without an
 // explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
 // SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
-// may edit/delete such objects.
-const isSystemDefaultOwner = (uid) => uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
+// may edit/delete such objects. A null/undefined owner is also unowned.
+const isSystemDefaultOwner = (uid) => !uid || uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
 
 // Whether the current user may edit this object's own fields. Admins may edit
 // any object (system-owned ones included); everyone else only their own.
@@ -637,7 +645,6 @@ const canEdit = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    if (!uid) return false;
     if (isSystemDefaultOwner(uid)) return true;
     return authStore.user?.thing_id === uid;
 });
@@ -648,7 +655,6 @@ const canDelete = computed(() => {
     if (!authenticated.value) return false;
     if (authStore.user?.is_admin) return true;
     const uid = object.value?.owner;
-    if (!uid) return false;
     if (isSystemDefaultOwner(uid)) return true;
     return authStore.user?.thing_id === uid;
 });
@@ -686,10 +692,13 @@ const isPlanned = computed(() =>
     !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
-// The owner (or an admin) may confirm that a planned object happened. Guests
-// and other users only see the static badges.
+// The owner (or an admin) may confirm that a planned object happened. This
+// also covers past-dated objects that were auto-detected as plans (had a
+// future start date at creation but no explicit data.planned marker) — once
+// the date passes, isPlanned goes false but the owner should still be able
+// to confirm.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && isPlanned.value && !confirmedDate.value
+    canEdit.value && !confirmedDate.value && (isPlanned.value || (!!object.value?.start && !hasFutureStart.value))
 );
 
 const confirmPlanned = async () => {
