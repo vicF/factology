@@ -149,6 +149,7 @@ app.config.globalProperties.$objectDescription = localized.objectDescription;
 app.config.globalProperties.$fieldText = localized.fieldText;
 app.config.globalProperties.$resolveLocalized = localized.resolveLocalized;
 app.config.globalProperties.$hasOtherTranslations = localized.hasOtherTranslations;
+app.config.globalProperties.$getClassesList = localized.getClassesList;
 
 (async () => {
     const authStore = useAuthStore();

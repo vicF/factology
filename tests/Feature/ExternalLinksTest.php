@@ -30,6 +30,14 @@ class ExternalLinksTest extends TestCase
             'name'     => 'Object with external links',
             'type'     => UUID::G_THING,
             'public'   => 1,
+            'classes'  => [
+                [
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::SOMETHING,
+                    'public'         => 1,
+                ],
+            ],
         ]);
         $response->assertOk();
 

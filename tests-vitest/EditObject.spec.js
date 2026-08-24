@@ -111,6 +111,19 @@ const mountEditObject = async (props = {}) => {
         },
     })
     await nextTick()
+    // Objects must have at least one class (multi-class rule) — seed a default
+    // so tests can submit; payload checks below only assert the fields they care
+    // about (links_to_add / links_to_update), unaffected by body.classes.
+    if (!wrapper.vm.classLinksData.some(l => l.other_thing_id)) {
+        wrapper.vm.classLinksData.push({
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'default-class-id',
+            link_type_id: DEFAULT_LINK_TYPE,
+            description: '',
+            link_id: null,
+        })
+        await nextTick()
+    }
     return wrapper
 }
 
@@ -133,6 +146,7 @@ describe('EditObject', () => {
 
         expect(document.querySelectorAll('.linked-object').length).toBe(0)
         expect(formButtons().map(b => b.textContent.trim())).toEqual([
+            'Create new class',
             'Add property',
             'Add',
             '🕒',
@@ -141,11 +155,54 @@ describe('EditObject', () => {
             '🕒',
             '?',
             '📅',
+            '↕',
+            'Add links',
             'Add Link',
             'Add External Link',
             'Close',
             'Save',
         ])
+    })
+
+    it('multi-link picker appends one row per target with the chosen link type', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        wrapper.vm.multiLinkTypeId = REGULAR_LINK_TYPE
+        wrapper.vm.multiLinkTargets = ['target-1', 'target-2']
+        wrapper.vm.applyMultiLink()
+
+        expect(wrapper.vm.linkedObjects).toHaveLength(2)
+        expect(wrapper.vm.linkedObjects[0]).toMatchObject({
+            other_thing_id: 'target-1',
+            link_type_id: REGULAR_LINK_TYPE,
+        })
+        expect(wrapper.vm.linkedObjects[1].other_thing_id).toBe('target-2')
+
+        // The targets are cleared after applying, and rows render in the list.
+        expect(wrapper.vm.multiLinkTargets).toEqual([])
+        await nextTick()
+        expect(document.querySelectorAll('.linked-object').length).toBe(2)
+    })
+
+    it('multi-link picker skips duplicates and the current object itself', async () => {
+        await mountEditObject({ object: OBJECT })
+
+        // A row already exists for target-1 + this link type.
+        wrapper.vm.linkedObjects.push({
+            id: 'existing-row',
+            one_thing_id: EDIT_ID,
+            other_thing_id: 'target-1',
+            link_type_id: REGULAR_LINK_TYPE,
+            description: '',
+            link_id: null,
+        })
+
+        wrapper.vm.multiLinkTypeId = REGULAR_LINK_TYPE
+        wrapper.vm.multiLinkTargets = ['target-1', EDIT_ID, 'target-3']
+        wrapper.vm.applyMultiLink()
+
+        // Only target-3 is appended (target-1 is a duplicate, EDIT_ID is self).
+        expect(wrapper.vm.linkedObjects.map(l => l.other_thing_id)).toEqual(['target-1', 'target-3'])
     })
 
     it('duplicates the action row once a link is added', async () => {

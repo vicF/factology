@@ -184,12 +184,18 @@ async function handleSearch(body) {
 
     const thingsWithLinks = [];
     for (const obj of results) {
+        // Class membership (LINK_TO_CLASS) is not a relation — exclude it from
+        // the related-links enrichment (mirrors the server).
+        const relatedLinks = (await listLinksForThing(obj.thing_id))
+            .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
         const links = depth > 0
-            ? await enrichNested(await listLinksForThing(obj.thing_id), obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
+            ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
             : undefined;
+        const classes = await resolveClassesInfo(obj.thing_id);
         thingsWithLinks.push({
             ...obj,
-            class: await resolveClassInfo(obj.thing_id),
+            classes,
+            class: classes[0] ?? null,
             links: links && links.length > 0 ? links : undefined,
         });
     }
@@ -201,29 +207,29 @@ async function handleSearch(body) {
 }
 
 /**
- * Resolve the class of a thing (mirrors the server's class lookup that sets
- * `thing.class = { thing_id, name }`). Classes come from a LINK_TO_CLASS link
- * where one_thing_id is the object and other_thing_id is the class.
+ * Resolve all classes of a thing (multi-class, mirrors the server's `classes`
+ * array; the first entry is the primary `class`). Classes come from
+ * LINK_TO_CLASS links where one_thing_id is the object and other_thing_id is
+ * the class.
  *
  * @param {string} thingId
- * @returns {Promise<object|null>} { thing_id, name } or null
+ * @returns {Promise<Array<{thing_id, name}>>}
  */
-async function resolveClassInfo(thingId) {
+async function resolveClassesInfo(thingId) {
     const db = getDb();
-    const classLink = await db.links
+    const classLinks = await db.links
         .where('one_thing_id')
         .equals(thingId)
         .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
-        .first();
-    if (!classLink?.other_thing_id) return null;
+        .toArray();
 
-    const classObj = await getObject(classLink.other_thing_id);
-    if (!classObj) return null;
-
-    return {
+    const classObjs = await Promise.all(
+        classLinks.map(link => link.other_thing_id ? getObject(link.other_thing_id) : Promise.resolve(null))
+    );
+    return classObjs.filter(Boolean).map(classObj => ({
         thing_id: classObj.thing_id,
         name: classObj.name,
-    };
+    }));
 }
 
 async function handleGet(id, depth = 1) {
@@ -235,16 +241,22 @@ async function handleGet(id, depth = 1) {
     // depth 1 (default) → direct related links with a resolved `target`;
     // depth >= 2 → nested target.links, mirroring GET /object/{id}?depth=N.
     // The top level stays unlimited (all direct links are returned, like the
-    // server's flat list); only deeper levels are breadth-capped.
+    // server's flat list); only deeper levels are breadth-capped. Class
+    // membership (LINK_TO_CLASS) is not a relation — the server excludes it.
+    const relatedLinks = (await listLinksForThing(id))
+        .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
     const links = depth > 0
-        ? await enrichNested(await listLinksForThing(id), id, depth, null, BREADTH_CAP, Infinity)
+        ? await enrichNested(relatedLinks, id, depth, null, BREADTH_CAP, Infinity)
         : undefined;
+
+    const classes = await resolveClassesInfo(id);
 
     return {
         data: {
             data: {
                 ...obj,
-                class: await resolveClassInfo(id),
+                classes,
+                class: classes[0] ?? null,
                 links: links && links.length > 0 ? links : undefined,
             },
             success: true,
@@ -255,11 +267,29 @@ async function handleGet(id, depth = 1) {
 
 /** Link-related payload keys — processed separately, never stored on the object row. */
 const LINK_PAYLOAD_KEYS = [
-    'class', 'parent', 'links_to_add', 'links_to_update', 'links_to_delete', 'external_links',
+    'class', 'classes', 'parent', 'links_to_add', 'links_to_update', 'links_to_delete', 'external_links',
 ];
+
+/**
+ * Objects (type 3) must belong to at least one class. Mirrors the server's
+ * store() validation; only affects user-facing create/update calls.
+ * @throws {object} a 422-shaped error for the axios interceptor to surface
+ */
+function assertThingHasClass(data) {
+    if (Number(data.type) !== 3) return;
+    let hasClassInfo = !!(data.class && data.class.other_thing_id)
+        || (Array.isArray(data.classes) && data.classes.length > 0);
+    if (!hasClassInfo && Array.isArray(data.links_to_add)) {
+        hasClassInfo = data.links_to_add.some(l => l.link_type_id === UUID.LINK_TO_CLASS);
+    }
+    if (!hasClassInfo) {
+        throw { response: { status: 422, data: { errors: { classes: 'Objects must belong to at least one class.' } } } };
+    }
+}
 
 async function handleCreate(id, body, context = {}) {
     const data = typeof body === 'string' ? JSON.parse(body) : body;
+    assertThingHasClass(data);
 
     // Strip link-payload keys so they don't pollute the object record
     // (mirrors the server model's _tableFields whitelist).
@@ -289,6 +319,8 @@ async function handleCreate(id, body, context = {}) {
 
 async function handleUpdate(id, body, context = {}) {
     const data = typeof body === 'string' ? JSON.parse(body) : body;
+    // Note: no at-least-one-class assertion here — an update is a partial patch
+    // of an existing object that already carries its classes (mirrors server).
 
     // Only scalar object fields are persisted; link payloads are handled below.
     const changes = { ...data };
@@ -322,7 +354,43 @@ async function handleUpdate(id, body, context = {}) {
  */
 async function processLinksForObject(thingId, data) {
     // ── class / parent special links ────────────────────────────────
-    if (data.class && data.class.other_thing_id) {
+    // `classes` (multi-class, full replacement) wins over singular `class`,
+    // mirroring the server's setClasses()/setClass() precedence.
+    if (Array.isArray(data.classes)) {
+        const desired = new Set();
+        const db = getDb();
+        for (const cls of data.classes) {
+            if (!cls.other_thing_id) continue;
+            desired.add(cls.other_thing_id);
+            // Reuse an existing class link for the same endpoint pair (like the
+            // server's addLink) so re-saving the same class updates instead of
+            // inserting a duplicate row.
+            const existing = await db.links
+                .where('one_thing_id')
+                .equals(thingId)
+                .and(l => l.link_type_id === UUID.LINK_TO_CLASS && l.other_thing_id === cls.other_thing_id)
+                .first();
+            await saveLink({
+                link_id: cls.link_id || existing?.link_id || newLinkId(),
+                one_thing_id: thingId,
+                link_type_id: UUID.LINK_TO_CLASS,
+                other_thing_id: cls.other_thing_id,
+                description: cls.description || '',
+                public: cls.public ?? 1,
+            }, { skipChangeLog: true });
+        }
+        // Diff: remove class links the caller no longer wants (edit flow).
+        const existingClassLinks = await db.links
+            .where('one_thing_id')
+            .equals(thingId)
+            .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+            .toArray();
+        for (const link of existingClassLinks) {
+            if (!desired.has(link.other_thing_id)) {
+                await deleteLink(link.link_id, { skipChangeLog: true });
+            }
+        }
+    } else if (data.class && data.class.other_thing_id) {
         const cls = data.class;
         await saveLink({
             link_id: cls.link_id || newLinkId(),
@@ -567,7 +635,10 @@ async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = 
         }
         if (i < breadth) {
             const nextVisited = new Set([...visited, ...childIds]);
-            const childLinks = await listLinksForThing(tid);
+            // Class membership is not a relation — exclude it at nested levels
+            // too (mirrors the server).
+            const childLinks = (await listLinksForThing(tid))
+                .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
             const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null);
             // Recursed links always carry `target.links` (possibly empty) —
             // mirrors the server, so the frontend can distinguish a resolved
