@@ -20,21 +20,21 @@ Goals: (1) one identity across all instances, (2) sync chosen objects between ow
 - `identity_id === thing_id` (the person's `things` row). No new account table.
 - First device generates a keypair (WebCrypto Ed25519 signing + X25519/ECDH for E2E). Onboarding: "create new identity" / "I already have one". Recovery paths, user's choice:
   - **Self-custody**: BIP-39-style mnemonic (human-transferable) or **QR** (same-room fast path).
-  - **Social recovery (K-of-N, friends help restore)**: the identity's master secret (from which the keypair derives) is split via **Shamir's Secret Sharing** into N shares; the user picks N trusted friends and a minimum threshold K (e.g. 3-of-5). Each share is **encrypted to that friend's public key** (so only they can read it — consistent with E2E) and stored in the friend's contact record for this user. On key loss, the user proves identity to ≥K friends out-of-band, collects their shares, recombines, and re-derives the keypair. Requires all K in the "all-of-N" variant, or any K of N in the threshold variant.
+  - **Social recovery (K-of-N, friends help restore)**: the identity's master secret — from which **both** keys deterministically derive (Ed25519 signing + X25519/ECDH, e.g. via HKDF subkeys) — is split via **Shamir's Secret Sharing** into N shares; the user picks N trusted friends and a minimum threshold K (e.g. 3-of-5). Each share is **encrypted to that friend's public key** (so only they can read it — consistent with E2E) and stored in the friend's contact record for this user. On key loss, the user proves identity to ≥K friends out-of-band, collects their shares, recombines, and re-derives the keypair. Requires all K in the "all-of-N" variant, or any K of N in the threshold variant.
   - **Server-mediated backup** (optional, for users who accept the trade-off): encrypted recovery blob held by a server, decrypted with a recovery secret.
 - Second device links to the identity: authorized by an already-authenticated device; server keeps a lightweight `devices` table (`device_id → identity_id → public_key`) — public keys only.
 - New server tables: `identity_keys` (`identity_id`, `public_key`, optional `display_name` — the only PII), `devices`. Email+password stays, decoupled: it authenticates a `users` row whose `thing_id` is the identity; identity works without it.
 
 ### 1.2 Multi-server topology (no central server)
 - **Any instance can be a server.** The same API/SyncController code runs on every server instance (a user's local server, a remote public server, the current web app). There is no central authority.
-- **A server is itself an object**: servers are `things` of `type=SERVER` (type 6), identified by `server_uuid` (`settings.server_uuid`). Server objects (uuid, name, url) can be discovered and synced like any other objects — a device knows its configured servers by listing SERVER things.
+- **A server is itself an object**: servers are `things` of `type=SERVER` (type 6), identified by `server_uuid` (`settings.server_uuid`). A server creates its own SERVER thing on setup (`public=false`, migration `2026_07_09_000002`) — private, so it syncs only to its owner's devices. Remote servers may expose a public SERVER thing (uuid, name, url) for discovery, or be added manually. A device knows its configured servers by listing SERVER things + manually configured URLs.
 - A client connects to **N servers at once** (its own local server + several remote ones). `SyncEngine` already iterates multiple `serverIds` (`syncMetadata` is per-server; `pendingChanges` carries `serverId`). Each server's pull/push is independent.
 - **Provenance**: `server_uuid` on every row records the authoritative source. The same public object may legitimately exist on several servers; LWW by updated date resolves drift; the owner field still governs writes.
 
 ### 1.3 Sync (Phases 0 + 2 + 3)
 Two channels:
 - **(a) Private device↔device** (Phase 2): server-as-transient-relay. Device encrypts object bundles to the *receiver's* public key; server stores only ciphertext blobs addressed to a public-key fingerprint, with TTL (`POST /relay/blob`, `GET /relay/blob/{id}`). Works when devices aren't online simultaneously. Content and recipient graph unreadable by the server.
-- **(b) Server object sync** (Phase 0 + 3): owned + public objects ride the same `/sync/pull` + `/sync/push` endpoints, **AuthScope applied server-side** (owner OR public OR group). Global import = read of public data; publish = write of `public=true`. A `subscriptions` store (local) selects which global objects/classes to pull from which server.
+- **(b) Server object sync** (Phase 0 + 3): owned + public objects ride the same `/sync/pull` + `/sync/push` endpoints, **AuthScope applied server-side** (owner OR public OR group). **Home-server rule:** "owned" (private) objects sync only to the identity's *own* server(s) — the servers its account lives on, where its private data already resides (today's web app is the canonical one). Remote/community servers accept only public objects (plus relay blobs), so private plaintext never leaves the owner's own server. Global import = read of public data; publish = write of `public=true`. A `subscriptions` store (local) selects which global objects/classes to pull from which server.
 
 ### 1.4 Sharing (Phase 4)
 - **Friends** = device-local Dexie `friends` store (contact-book style: friend identity_id, my display name, exchanged public key). Friendship is also a `FRIEND_OF` graph link so it syncs between my devices.
@@ -42,7 +42,7 @@ Two channels:
 - New link types `FRIEND_OF`/`SAFE_WITH`; legacy `GROUP_READ_ACCESS`/`BELONGS_TO_USER_GROUP` kept as deprecated read-compat aliases only.
 
 ### 1.5 Server data minimization
-Server stores: public objects, `identity_keys` (public keys + optional display name), `devices`, transient encrypted relay blobs, optional email+password row. Never stores private object plaintext, private keys, friend contact labels, or subscription prefs.
+Server stores: public objects, `identity_keys` (public keys + optional display name), `devices`, transient encrypted relay blobs, optional email+password row. Never stores private object plaintext, private keys, friend contact labels, or subscription prefs. (Exception: the identity's *own* server may hold its private objects, as today's web server does; the minimization guarantee applies to every other server.)
 
 ### 1.6 Encrypted files (Phase 5)
 Extend `ExportImportController` with encrypted mode: AES-GCM envelope + per-file data key wrapped to recipient's public key (hybrid). Metadata header cleartext (recipient fingerprint), all object/link content ciphertext. Decryption only on devices — never on the server. `server_uuid` provenance lives inside ciphertext.
@@ -58,11 +58,12 @@ The client (`SyncEngine.js`/`ConflictResolver.js`) uses `_serverRevision` **only
 
 - **Incremental pull watermark**: client sends `since`; server returns rows with `revision > since` plus `server_timestamp` = max revision. An integer counter is required because timestamps are fragile: `links` has **no** `record_updated` column today, second-precision timestamps can collide (missed rows), and the client's `_markSynced` blindly does `_serverRevision + 1` on accept (corrupts timestamp-based values). Hence an explicit monotonic `revision BIGINT` on both tables, bumped by a shared Postgres sequence + `AFTER INSERT/UPDATE` trigger (single reliable bump point across ApiController/import/seeders).
 - **Conflict/merge policy (Phase 0)**: same owner → **latest by `record_updated` wins** (LWW by updated date — as you specified). No field-level merging in Phase 0; merging is a separate future task (the client `ConflictResolver` exists but stays dormant; the server just rejects older payloads and returns the server version).
+- **Links get a timestamp for LWW parity**: `links` has no `record_updated` today; the Phase 0 migration adds it (mirroring `things`, auto-updated on write) so links LWW by the same updated-date rule as objects. The `revision` counter remains necessary for the watermark (timestamps collide at second precision; `_markSynced` corrupts them) and stays a pure watermark, never a merge key.
 - **Revisions are a counter, not a timestamp, not a merge key.**
 
 ### 2.2 `link_uuid` is the canonical link key
 - The sync layer must treat **`link_uuid`** (immutable, NOT NULL, `gen_random_uuid()` default) as the identity of a link — not `link_id` (auto-increment PK, differs between instances).
-- **Client fix needed**: `SyncEngine._applyServerLink` (line ~375) matches via `getLink(link.link_id)` — change to match by `link_uuid` first (keep the local record's PK on match), and add a `link_uuid` index to the local `links` store in `localDb/schema.js` if absent.
+- **Client fix needed**: `SyncEngine._applyServerLink` (line ~375) matches via `getLink(link.link_id)` — change to match by `link_uuid` first (keep the local record's PK on match), and add a `link_uuid` index to the local `links` store in `localDb/schema.js` if absent. For a link with no local match, generate the local `link_id` with `crypto.randomUUID()` — the server's `link_id` is instance-specific and must never be used as the local PK.
 - Server push matches by `payload.link_uuid`, then unique-triple fallback (as `ExportImportController::import` already does); never regenerates an existing `link_uuid`.
 - Full `link_id`→`link_uuid` replacement as the PK is a follow-up cleanup task, not required for sync.
 
@@ -76,14 +77,14 @@ The client (`SyncEngine.js`/`ConflictResolver.js`) uses `_serverRevision` **only
 ## 3. Phase 0: `/sync/pull` + `/sync/push` (later, in a worktree)
 
 ### Client contract to satisfy (verified in `resources/js/sync/SyncEngine.js`)
-- **pull** — POST `/api/v1/sync/pull` `{ server_id, since }`. Response `{ changes: { objects: [...], links: [...] }, server_timestamp }`. Objects carry `thing_id`, `deleted`, `_serverRevision`, `server_id`. Links carry `link_uuid`, `_serverRevision`.
+- **pull** — POST `/api/v1/sync/pull` `{ server_id, since }`. Response `{ changes: { objects: [...], links: [...] }, server_timestamp }`. Objects carry `thing_id`, `deleted`, `_serverRevision`, `server_id`. Links carry `link_uuid`, `_serverRevision`. The server MUST always include `changes`, even if both arrays are empty — if the key is absent, `SyncEngine.pull` returns early without advancing the pull watermark.
 - **push** — POST `/api/v1/sync/push` `{ server_id, changes: { objects: [{operation, record_id, payload}], links: [...], media: [...] } }`. Response `{ accepted: [record_ids...], conflicts: [{record_id, server_version, reason}], server_timestamp }`. `accepted` echoes the client's `record_id`s.
 
 ### 3.1 Migration
-`add_revision_to_things_and_links`: shared sequence `sync_revision_seq`; `revision BIGINT NOT NULL DEFAULT 0` on `things` and `links`; PL/pgSQL function + `AFTER INSERT OR UPDATE` triggers setting `revision = nextval(...)`.
+`add_revision_to_things_and_links`: shared sequence `sync_revision_seq`; `revision BIGINT NOT NULL DEFAULT 0` on `things` and `links`; `record_updated` added to `links` (mirroring `things`, for LWW); PL/pgSQL function + `AFTER INSERT OR UPDATE` triggers setting `revision = nextval(...)`.
 
 ### 3.2 `app/Http/Controllers/SyncController.php` (auth:sanctum)
-- **pull(server_id, since):** things where `revision > since` AND AuthScope-visible (owner OR public OR group); links where `revision > since` AND (`public` OR caller owns an endpoint), rows carry `link_uuid`. Soft-deleted rows included (`deleted=true`). Response rows: `_serverRevision = revision`, `server_id` = server uuid. `server_timestamp` = max revision seen.
+- **pull(server_id, since):** things where `revision > since` AND AuthScope-visible (owner OR public OR group); links where `revision > since` AND (`public` OR caller owns an endpoint — `links` has no `owner` column; "owns an endpoint" = `one_thing_id`/`other_thing_id` resolves to a thing the caller owns), rows carry `link_uuid`. Soft-deleted rows included (`deleted=true`). Response rows: `_serverRevision = revision`, `server_id` = server uuid. `server_timestamp` = max revision seen.
 - **push(server_id, changes):** per object — match by `thing_id`; ownership check (caller owns, or public/system); exists → LWW by `record_updated`; caller's older → `conflicts[]` with full `server_version` row. New → insert with `server_uuid` = this server's uuid. Per link — match by `payload.link_uuid` then unique-triple; honor soft-delete; never regenerate `link_uuid`. `accepted[]` echoes client `record_id`s. **Media:** acknowledged as accepted, no-op for now (Phase 0 limitation).
 
 ### 3.3 Routes (`routes/api.php`)
