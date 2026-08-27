@@ -102,6 +102,11 @@ describe('buildPropertyEntries', () => {
         expect(entries[0].name).toBe('unknown-id');
     });
 
+    test('GEDCOM sex value is translated from the raw code', () => {
+        const entries = buildPropertyEntries({ sex: 'F' }, [], t);
+        expect(entries[0]).toEqual({ property_id: 'sex', name: 'Sex', text: 'Female', isGeo: false });
+    });
+
     test('null properties yield no entries', () => {
         expect(buildPropertyEntries(null, defs, t)).toEqual([]);
     });

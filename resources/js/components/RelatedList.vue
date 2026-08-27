@@ -38,7 +38,7 @@
                             width="14px"
                             class="related-icon"
                         />
-                        <span class="related-name">{{ truncateName(link.target.name || link.name || t('Related')) }}</span>
+                        <span class="related-name">{{ truncateName(objectName(link.target) || link.name || t('Related')) }}</span>
                     </RouterLink>
                 </template>
                 <span v-else class="related-name related-name--plain">{{ truncateName(link.name || t('Related')) }}</span>
@@ -58,7 +58,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
-import { fieldText } from '../utils/localized.js';
+import { fieldText, objectName } from '../utils/localized.js';
 import Image from './Image.vue';
 import LinkDescription from './LinkDescription.vue';
 

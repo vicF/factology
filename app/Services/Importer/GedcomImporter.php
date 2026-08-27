@@ -239,12 +239,18 @@ class GedcomImporter
 
         $cleanName = self::cleanGedcomName($rawName);
         if ($givenName !== null && $surname !== null) {
-            $cleanName = trim($givenName . ' ' . $surname);
+            // For women with a married name, use it as the primary surname
+            $sex = GedcomParser::childValue($record, 'SEX');
+            if ($sex === 'F' && $marriedName !== null) {
+                $cleanName = trim($givenName . ' ' . $marriedName);
+            } else {
+                $cleanName = trim($givenName . ' ' . $surname);
+            }
         } elseif ($givenName !== null) {
             $cleanName = $givenName;
         }
 
-        $sex = GedcomParser::childValue($record, 'SEX');
+        $sex = $sex ?? GedcomParser::childValue($record, 'SEX');
 
         $sourceExternalId = $this->externalId($gedcomId);
         $existingThingId = $this->findExisting($sourceExternalId);
@@ -470,7 +476,6 @@ class GedcomImporter
             'one_thing_id'  => $personId,
             'link_type_id'  => UUID::PRESENT,
             'other_thing_id' => $thingId,
-            'description'   => $eventType,
         ]);
 
         $this->linkToSource($thingId, $eventExternalId);
@@ -629,7 +634,6 @@ class GedcomImporter
                 'one_thing_id'  => $spouseId,
                 'link_type_id'  => UUID::PRESENT,
                 'other_thing_id' => $thingId,
-                'description'   => 'spouse',
             ]);
         }
 

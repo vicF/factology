@@ -431,6 +431,8 @@ class Everything
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('other_thing.public as target_public')
+            ->addSelect('other_thing.name_translations')
+            ->addSelect('one_thing.name_translations as one_name_translations')
             ->limit(50);
 
         $second = DB::table('links') // other way links
@@ -441,6 +443,8 @@ class Everything
             ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
             ->addSelect('link_types.name_translations as link_name_translations')
             ->addSelect('one_thing.public as target_public')
+            ->addSelect('other_thing.name_translations')
+            ->addSelect('one_thing.name_translations as one_name_translations')
             ->limit(50);
 
         // Only filter linked objects by visibility for non-admin users
@@ -482,6 +486,14 @@ class Everything
             if (isset($flatLink->link_name_translations) && is_string($flatLink->link_name_translations)) {
                 $decoded = json_decode($flatLink->link_name_translations, true);
                 $flatLink->link_name_translations = $decoded ?: null;
+            }
+            if (isset($flatLink->name_translations) && is_string($flatLink->name_translations)) {
+                $decoded = json_decode($flatLink->name_translations, true);
+                $flatLink->name_translations = $decoded ?: null;
+            }
+            if (isset($flatLink->one_name_translations) && is_string($flatLink->one_name_translations)) {
+                $decoded = json_decode($flatLink->one_name_translations, true);
+                $flatLink->one_name_translations = $decoded ?: null;
             }
         }
         unset($flatLink);

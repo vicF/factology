@@ -22,7 +22,9 @@ class LinkResource extends JsonResource
             // name = name of other_thing_id, one_name = name of one_thing_id
             // (both from left joins, so display can name either endpoint).
             'name'           => $this->name ?? null,
+            'name_translations' => $this->decodeJson($this->name_translations ?? null),
             'one_name'       => $this->one_name ?? null,
+            'one_name_translations' => $this->decodeJson($this->one_name_translations ?? null),
             'link_name'      => $this->link_name ?? null,     // from link_types.name
             'link_name_translations' => isset($this->link_name_translations)
                 ? (is_string($this->link_name_translations)

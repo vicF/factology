@@ -1214,8 +1214,8 @@ class ApiController extends BaseController
         if (@$requestBody['search']) {
             $term = '%' . $requestBody['search'] . '%';
             $query->where(function ($query) use ($term) {
-                $query->where('name', 'ilike', $term)
-                    ->orWhere('description', 'ilike', $term)
+                $query->where('things.name', 'ilike', $term)
+                    ->orWhere('things.description', 'ilike', $term)
                     // Match text inside the translation JSON columns too
                     // (skip the reserved "lang" metadata key, which only holds a language code).
                     ->orWhereExists(function ($sub) use ($term) {
@@ -1230,7 +1230,7 @@ class ApiController extends BaseController
                     });
             });
             // Sort source-language name/description matches above translation-only matches
-            $query->orderByRaw('CASE WHEN name ILIKE ? OR description ILIKE ? THEN 0 ELSE 1 END', [$term, $term]);
+            $query->orderByRaw('CASE WHEN things.name ILIKE ? OR things.description ILIKE ? THEN 0 ELSE 1 END', [$term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {
@@ -1352,6 +1352,8 @@ class ApiController extends BaseController
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
                 ->addSelect('link_types.name_translations as link_name_translations')
+                ->addSelect('things.name_translations')
+                ->addSelect('one_side.name_translations as one_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {

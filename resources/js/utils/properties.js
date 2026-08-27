@@ -5,7 +5,39 @@
 // independently of the view.
 
 import { isGeoJsonGeometry, isLegacyLatLng } from './geo.js'
-import { objectName, resolveLocalized } from './localized.js'
+import { objectName, resolveLocalized, currentLocale } from './localized.js'
+
+// Well-known GEDCOM property keys and their display names
+const GEDCOM_PROPERTY_NAMES = {
+    sex:          { en: 'Sex', ru: 'Пол' },
+    given_name:   { en: 'Given name', ru: 'Имя' },
+    surname:      { en: 'Surname', ru: 'Фамилия' },
+    married_name: { en: 'Married name', ru: 'Фамилия после замужества' },
+    source_guid:  { en: 'Source GUID', ru: 'GUID источника' },
+};
+
+// Well-known GEDCOM property VALUES (raw storage → localized display).
+const GEDCOM_PROPERTY_VALUES = {
+    sex: {
+        M: { en: 'Male', ru: 'Мужской' },
+        F: { en: 'Female', ru: 'Женский' },
+        U: { en: 'Unknown', ru: 'Неизвестно' },
+    },
+};
+
+function resolveGedcomPropertyName(key) {
+    const names = GEDCOM_PROPERTY_NAMES[key];
+    if (!names) return null;
+    return names[currentLocale()] || names.en;
+}
+
+function resolveGedcomPropertyValue(key, value) {
+    const map = GEDCOM_PROPERTY_VALUES[key];
+    if (!map) return null;
+    const names = map[value];
+    if (!names) return null;
+    return names[currentLocale()] || names.en;
+}
 
 /** Render a number compactly (5 decimal places), or '' when not finite/empty. */
 export function formatCoord(n) {
@@ -72,8 +104,9 @@ export function buildPropertyEntries(properties, definitions = [], t = (key) => 
     for (const [propertyId, value] of Object.entries(properties)) {
         if (value === '' || value === null || value === undefined) continue;
         const def = defs.find((d) => d.thing_id === propertyId);
-        const name = def ? objectName(def) || def.name || propertyId : propertyId;
-        entries.push({ property_id: propertyId, name, ...formatPropertyValue(value, t) });
+        const name = def ? objectName(def) || def.name || propertyId : (resolveGedcomPropertyName(propertyId) || propertyId);
+        const { text, isGeo } = formatPropertyValue(value, t);
+        entries.push({ property_id: propertyId, name, text: resolveGedcomPropertyValue(propertyId, text) ?? text, isGeo });
     }
     return entries;
 }

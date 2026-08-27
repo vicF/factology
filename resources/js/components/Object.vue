@@ -693,13 +693,11 @@ const isPlanned = computed(() =>
     !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
-// The owner (or an admin) may confirm that a planned object happened. This
-// also covers past-dated objects that were auto-detected as plans (had a
-// future start date at creation but no explicit data.planned marker) — once
-// the date passes, isPlanned goes false but the owner should still be able
-// to confirm.
+// The owner (or an admin) may confirm that a planned object happened.
+// Only objects explicitly marked as plans (data.planned) or with a future
+// start date qualify.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && !confirmedDate.value && (isPlanned.value || (!!object.value?.start && !hasFutureStart.value))
+    canEdit.value && !confirmedDate.value && isPlanned.value
 );
 
 const confirmPlanned = async () => {
@@ -728,9 +726,10 @@ const getLinkTargetId = (link) => {
 const getLinkTargetName = (link) => {
     const targetId = getLinkTargetId(link);
     const name = targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+    const translations = targetId === link.one_thing_id ? link.one_name_translations : link.name_translations;
     // Use name_translations for localized display when available
-    if (link.name_translations) {
-        return fieldText(name, link.name_translations, currentLocale());
+    if (translations) {
+        return fieldText(name, translations, currentLocale());
     }
     return name;
 };
