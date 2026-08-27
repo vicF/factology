@@ -43,5 +43,27 @@
     </div>
   </div>
   <script type="module" src="/resources/js/main.capacitor.js"></script>
+  <script>
+    (function(){
+      var errors = [];
+      function render(){
+        var o = document.getElementById('__error_overlay');
+        if(!o){
+          o = document.createElement('div');
+          o.id = '__error_overlay';
+          o.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;background:#1a1a2e;color:#e0e0e0;font:12px monospace;padding:20px;overflow-y:auto;display:none';
+          o.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0;color:#ff6b6b;font-size:16px">JS Errors</h2><button id="__err_close" style="background:#ff6b6b;border:none;color:white;padding:4px 12px;border-radius:4px;cursor:pointer">Close</button></div><div id="__err_list"></div>';
+          document.body.appendChild(o);
+          document.getElementById('__err_close').onclick = function(){ o.style.display = 'none'; };
+        }
+        document.getElementById('__err_list').innerHTML = errors.map(function(e,i){ return '<div style="margin-bottom:8px;padding:8px;background:#2d2d44;border-radius:4px;border-left:3px solid #ff6b6b"><div style="color:#ff6b6b;font-weight:bold">#'+(i+1)+': '+(e.message||'Unknown')+'</div><div style="color:#a0a0c0;margin-top:4px;white-space:pre-wrap">'+(e.stack||'')+'</div></div>'; }).join('');
+      }
+      function show(){ var o = document.getElementById('__error_overlay'); if(o) o.style.display = 'block'; render(); }
+      window.addEventListener('error', function(e){ errors.push({message:e.message||String(e.error),stack:e.error?.stack||''}); render(); if(errors.length>=3) show(); });
+      window.addEventListener('unhandledrejection', function(e){ var r=e.reason; errors.push({message:r?.message||String(r),stack:r?.stack||''}); render(); if(errors.length>=3) show(); });
+      window.__showErrors = window.__showErrors || show;
+      window.__dismissErrors = function(){ var o = document.getElementById('__error_overlay'); if(o) o.style.display = 'none'; };
+    })();
+  </script>
 </body>
 </html>

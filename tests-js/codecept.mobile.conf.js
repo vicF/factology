@@ -37,6 +37,7 @@ const androidCapabilities = {
         appActivity: 'com.factology.app.MainActivity',
         noReset: false,
         avdLaunchTimeout: 120000,
+        'appium:chromedriverAutodownload': true,
     },
 };
 

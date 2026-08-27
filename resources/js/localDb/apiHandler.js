@@ -85,6 +85,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         ? Math.min(Math.max(parseInt(depthParam, 10) || 0, 0), DEPTH_CAP)
         : 1;
 
+    // Client error reports (from errorTracker.js) — silently ignore in local mode
+    if (pathPart === '/client-error' || pathPart === 'client-error') {
+        return { data: { success: true }, status: 200 };
+    }
+
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
