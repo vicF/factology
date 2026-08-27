@@ -35,6 +35,9 @@ export default defineConfig({
     },
     // Don't copy the Laravel public directory (huge thumbs, PHP files) into the build
     publicDir: false,
+    // Relative asset paths so the build works over file:// (Electron desktop)
+    // as well as https://localhost (Capacitor Android/iOS).
+    base: './',
     build: {
         outDir: 'dist-capacitor',
         emptyOutDir: true,

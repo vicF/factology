@@ -5,6 +5,7 @@
         "build": "vite build",
         "build:capacitor": "vite build --config vite.config.capacitor.js --mode capacitor",
         "build:android": "bash build-android.sh",
+        "build:electron": "bash build-electron.sh",
         "test:vitest": "vitest run --config vitest.config.js",
         "test:vitest-watch": "vitest --config vitest.config.js"
     },
