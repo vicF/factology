@@ -13,7 +13,12 @@ import {
     SYNC_STATUS,
     CHANGE_OP,
 } from '../localDb/index';
-import { saveLink, deleteLink, listLinksForThing, replaceLinksForThing, getLink } from '../localDb/links';
+import {
+    deleteLink,
+    getLink,
+    getLinkByUuid,
+    newLinkId,
+} from '../localDb/links';
 import { hasConflict, resolveConflict, RESOLVE_STRATEGY } from './ConflictResolver';
 import { eventBus } from '../eventBus';
 import { networkMonitor } from '../utils/networkMonitor';
@@ -369,21 +374,37 @@ export class SyncEngine {
     /**
      * Apply a server-side link change to local DB.
      *
-     * @param {object} link — server link record
+     * Links are matched by their canonical `link_uuid`; `link_id` is a
+     * local-only PK that differs between instances and is never trusted.
+     * An existing local record keeps its own PK on match; a brand-new link
+     * receives a locally-minted `link_id` (see `newLinkId`).
+     *
+     * @param {object} link — server link record (carries link_uuid)
      * @returns {Promise<void>}
      */
     async _applyServerLink(link) {
-        const existing = await getLink(link.link_id);
+        let existing = null;
+        if (link.link_uuid) {
+            existing = await getLinkByUuid(link.link_uuid);
+        }
+        // Legacy fallback: server rows that predate link_uuid carry no canonical
+        // key — match on the raw link_id so they still apply at least once.
+        if (!existing && link.link_id) {
+            existing = await getLink(link.link_id);
+        }
+        const linkId = existing ? existing.link_id : newLinkId();
 
         if (link._deleted) {
-            if (!existing || existing._syncStatus === SYNC_STATUS.SERVER_ONLY || existing._syncStatus === SYNC_STATUS.SYNCED) {
-                await deleteLink(link.link_id, { skipChangeLog: true });
+            if (!existing) return; // nothing local to delete
+            if (existing._syncStatus === SYNC_STATUS.SERVER_ONLY || existing._syncStatus === SYNC_STATUS.SYNCED) {
+                await deleteLink(existing.link_id, { skipChangeLog: true });
             }
             return;
         }
 
         const record = {
             ...link,
+            link_id: linkId, // keep/mint the local PK — never the server's
             _syncStatus: existing && existing._syncStatus !== SYNC_STATUS.SERVER_ONLY
                 ? existing._syncStatus
                 : SYNC_STATUS.SERVER_ONLY,
@@ -391,7 +412,10 @@ export class SyncEngine {
             _serverRevision: link._serverRevision || 0,
             _serverId: link._serverId || link.server_id || null,
         };
-        await saveLink(record, { skipChangeLog: true });
+        // Write directly (not via saveLink): saveLink recomputes and clobbers
+        // the sync metadata, and would enqueue a change we don't want here.
+        const db = (await import('../localDb/index')).getDb();
+        await db.links.put(record);
     }
 
     /**
@@ -487,12 +511,15 @@ export class SyncEngine {
             const existing = await getLink(recordId);
             if (!existing) return;
 
-            await saveLink({
+            // Direct put (not saveLink) — saveLink would recompute _syncStatus
+            // and _serverRevision, dropping the SYNCED state we're setting.
+            const db = (await import('../localDb/index')).getDb();
+            await db.links.put({
                 ...existing,
                 _syncStatus: SYNC_STATUS.SYNCED,
                 _localRevision: 0,
                 _serverRevision: (existing._serverRevision || 0) + 1,
-            }, { skipChangeLog: true });
+            });
         }
     }
 
