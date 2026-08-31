@@ -16,6 +16,12 @@ use Illuminate\Support\Str;
  *
  * Dedup: on reimport, existing IMPORTED_FROM links for this source are
  * matched by data.source_external_id → existing records are updated.
+ *
+ * Event types are mapped to specific factology classes (not the generic EVENT):
+ *   BIRT → Birth, DEAT → Death, RESI → Residence In, OCCU → Occupation,
+ *   MARR → Marriage, BURI → Burial, EDUC → Education, CHR → Christening.
+ * Place addresses with street-level specificity create Address-class things;
+ * settlements and localities create Place-class things.
  */
 class GedcomImporter
 {
@@ -31,6 +37,21 @@ class GedcomImporter
     private ?string $sourceThingId = null;
     private ?string $sourceGuid = null;
     private array $existingSourceLinks = []; // source_external_id → thing_id (preloaded)
+
+    /**
+     * Map GEDCOM event tag → factology class UUID.
+     * Keeps generic EVENT as fallback for unmapped tags.
+     */
+    private const EVENT_CLASS_MAP = [
+        'BIRT' => UUID::BIRTH_CLASS,
+        'DEAT' => UUID::DEATH_CLASS,
+        'RESI' => UUID::RESIDENCE_CLASS,
+        'OCCU' => UUID::OCCUPATION_CLASS,
+        'MARR' => UUID::MARRIAGE_CLASS,
+        'BURI' => UUID::BURIAL_CLASS,
+        'EDUC' => UUID::EDUCATION_CLASS,
+        'CHR'  => UUID::CHRISTENING_CLASS,
+    ];
 
     public function __construct(
         string $ownerId,
@@ -239,10 +260,12 @@ class GedcomImporter
 
         $cleanName = self::cleanGedcomName($rawName);
         if ($givenName !== null && $surname !== null) {
-            // For women with a married name, use it as the primary surname
+            // Format: <given patronymic> <surname> (<birth surname>)
+            // For women with a married name, the married name is the primary surname,
+            // and the birth surname (SURN) goes in parentheses.
             $sex = GedcomParser::childValue($record, 'SEX');
-            if ($sex === 'F' && $marriedName !== null) {
-                $cleanName = trim($givenName . ' ' . $marriedName);
+            if ($sex === 'F' && $marriedName !== null && $marriedName !== $surname) {
+                $cleanName = trim($givenName . ' ' . $marriedName . ' (' . $surname . ')');
             } else {
                 $cleanName = trim($givenName . ' ' . $surname);
             }
@@ -359,6 +382,22 @@ class GedcomImporter
         foreach (GedcomParser::findChildren($record, 'RESI') as $eventNode) {
             $this->importPersonEvent($eventNode, $thingId, $cleanName, 'RESI', 'residence');
         }
+        foreach (GedcomParser::findChildren($record, 'BURI') as $eventNode) {
+            $this->importPersonEvent($eventNode, $thingId, $cleanName, 'BURI', 'burial');
+        }
+        foreach (GedcomParser::findChildren($record, 'EDUC') as $eventNode) {
+            $this->importPersonEvent($eventNode, $thingId, $cleanName, 'EDUC', 'education');
+        }
+        foreach (GedcomParser::findChildren($record, 'CHR') as $eventNode) {
+            $this->importPersonEvent($eventNode, $thingId, $cleanName, 'CHR', 'christening');
+        }
+        foreach (GedcomParser::findChildren($record, 'EVEN') as $eventNode) {
+            $this->importPersonEvent($eventNode, $thingId, $cleanName, 'EVEN', 'event');
+        }
+
+        foreach (GedcomParser::findChildren($record, 'OBJE') as $objNode) {
+            $this->importMultimedia($objNode, $thingId, $cleanName);
+        }
 
         $this->imported++;
     }
@@ -376,6 +415,18 @@ class GedcomImporter
         }
         foreach (GedcomParser::findChildren($record, 'RESI') as $eventNode) {
             $this->importPersonEvent($eventNode, $personId, $cleanName, 'RESI', 'residence');
+        }
+        foreach (GedcomParser::findChildren($record, 'BURI') as $eventNode) {
+            $this->importPersonEvent($eventNode, $personId, $cleanName, 'BURI', 'burial');
+        }
+        foreach (GedcomParser::findChildren($record, 'EDUC') as $eventNode) {
+            $this->importPersonEvent($eventNode, $personId, $cleanName, 'EDUC', 'education');
+        }
+        foreach (GedcomParser::findChildren($record, 'CHR') as $eventNode) {
+            $this->importPersonEvent($eventNode, $personId, $cleanName, 'CHR', 'christening');
+        }
+        foreach (GedcomParser::findChildren($record, 'EVEN') as $eventNode) {
+            $this->importPersonEvent($eventNode, $personId, $cleanName, 'EVEN', 'event');
         }
     }
 
@@ -411,21 +462,35 @@ class GedcomImporter
 
         // Build event name + translations
         $eventTypeLabel = ucfirst($eventType);
-        $eventName = sprintf('%s: %s', $eventTypeLabel, $personName);
 
         $eventTypeLabels = [
             'birth' => ['en' => 'Birth', 'ru' => 'Рождение'],
             'death' => ['en' => 'Death', 'ru' => 'Смерть'],
             'occupation' => ['en' => 'Occupation', 'ru' => 'Работа'],
-            'residence' => ['en' => 'Residence', 'ru' => 'Проживание'],
+            'residence' => ['en' => 'Residence In', 'ru' => 'Проживание в'],
+            'burial' => ['en' => 'Burial', 'ru' => 'Похороны'],
+            'education' => ['en' => 'Education', 'ru' => 'Образование'],
+            'christening' => ['en' => 'Christening', 'ru' => 'Крещение'],
         ];
         $label = $eventTypeLabels[$eventType] ?? ['en' => $eventTypeLabel, 'ru' => $eventTypeLabel];
 
-        $nameTranslations = [
-            'lang' => 'en',
-            'en'   => sprintf('%s: %s', $label['en'], $personName),
-            'ru'   => sprintf('%s: %s', $label['ru'], $personName),
-        ];
+        if ($eventType === 'residence' && $placeName !== null) {
+            // Residence In is named after the place, not the person:
+            // "Проживание в Приморский пр. 151"
+            $eventName = sprintf('%s %s', $label['ru'], $placeName);
+            $nameTranslations = [
+                'lang' => 'ru',
+                'en'   => sprintf('%s %s', $label['en'], $placeName),
+                'ru'   => $eventName,
+            ];
+        } else {
+            $eventName = sprintf('%s: %s', $eventTypeLabel, $personName);
+            $nameTranslations = [
+                'lang' => 'en',
+                'en'   => sprintf('%s: %s', $label['en'], $personName),
+                'ru'   => sprintf('%s: %s', $label['ru'], $personName),
+            ];
+        }
 
         $description = $note;
         if ($placeName !== null) {
@@ -435,6 +500,8 @@ class GedcomImporter
         $eventProperties = [
             'event_type' => $eventType,
         ];
+
+        $classId = self::EVENT_CLASS_MAP[$gedcomTag] ?? UUID::EVENT;
 
         $data = [
             'name'               => $eventName,
@@ -467,26 +534,36 @@ class GedcomImporter
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => UUID::EVENT,
+            'other_thing_id' => $classId,
         ]);
 
-        // PRESENT (участвует в): person → PRESENT → event
-        DB::table('links')->insert([
+        // PRESENT (участвует в): person → PRESENT → event, with dates
+        $presentLink = [
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $personId,
             'link_type_id'  => UUID::PRESENT,
             'other_thing_id' => $thingId,
-        ]);
+        ];
+        if ($start !== null) {
+            $presentLink['link_start'] = $start;
+            $presentLink['link_start_meta'] = $startMeta;
+        }
+        if ($end !== null) {
+            $presentLink['link_end'] = $end;
+            $presentLink['link_end_meta'] = $endMeta;
+        }
+        DB::table('links')->insert($presentLink);
 
         $this->linkToSource($thingId, $eventExternalId);
 
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
             if ($placeId !== null) {
+                $linkType = ($eventType === 'residence') ? UUID::INSIDE : UUID::LINK_TO_CLASS;
                 DB::table('links')->insert([
                     'link_uuid'     => (string) Str::uuid(),
                     'one_thing_id'  => $thingId,
-                    'link_type_id'  => UUID::LINK_TO_CLASS,
+                    'link_type_id'  => $linkType,
                     'other_thing_id' => $placeId,
                 ]);
             }
@@ -624,17 +701,26 @@ class GedcomImporter
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => UUID::EVENT,
+            'other_thing_id' => UUID::MARRIAGE_CLASS,
         ]);
 
-        // PRESENT: spouse → PRESENT → marriage event
+        // PRESENT: spouse → PRESENT → marriage event, with dates
         foreach ([$husbandId, $wifeId] as $spouseId) {
-            DB::table('links')->insert([
+            $presentLink = [
                 'link_uuid'     => (string) Str::uuid(),
                 'one_thing_id'  => $spouseId,
                 'link_type_id'  => UUID::PRESENT,
                 'other_thing_id' => $thingId,
-            ]);
+            ];
+            if ($start !== null) {
+                $presentLink['link_start'] = $start;
+                $presentLink['link_start_meta'] = $startMeta;
+            }
+            if ($end !== null) {
+                $presentLink['link_end'] = $end;
+                $presentLink['link_end_meta'] = $endMeta;
+            }
+            DB::table('links')->insert($presentLink);
         }
 
         $this->linkToSource($thingId, $eventExternalId);
@@ -729,6 +815,9 @@ class GedcomImporter
             return $existingThingId;
         }
 
+        $isAddress = $this->isStreetAddress($placeName);
+        $classId = $isAddress ? UUID::ADDRESS_CLASS : UUID::PLACE_CLASS;
+
         $thingId = (string) Str::uuid();
         $data = [
             'thing_id'    => $thingId,
@@ -761,13 +850,44 @@ class GedcomImporter
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => UUID::PLACE_CLASS,
+            'other_thing_id' => $classId,
         ]);
 
         $this->linkToSource($thingId, $sourceExternalId);
 
         $this->placeCache[$key] = $thingId;
         return $thingId;
+    }
+
+    /**
+     * Detect whether a place name is a street-level address vs a settlement.
+     * Street-level addresses contain indicators like пр., проспект, ул., д., дом, etc.
+     */
+    private function isStreetAddress(string $placeName): bool
+    {
+        // Take the most specific part (before the first comma)
+        $specific = trim(explode(',', $placeName)[0]);
+
+        // Street-level indicators (Russian)
+        $streetIndicators = [
+            'пр.', 'проспект', 'проезд', 'ул.', 'улица', 'переулок', 'пер.',
+            'бульвар', 'б-р', 'шоссе', 'наб.', 'набережная', 'площадь', 'пл.',
+            'д.', 'дом', 'корп.', 'корпус', 'кв.', 'квартира',
+        ];
+
+        $lower = mb_strtolower($specific);
+        foreach ($streetIndicators as $indicator) {
+            if (mb_strpos($lower, $indicator) !== false) {
+                return true;
+            }
+        }
+
+        // Contains a number (address number) — likely a street address
+        if (preg_match('/\d+/', $specific)) {
+            return true;
+        }
+
+        return false;
     }
 
     // ── Helpers ──
@@ -813,6 +933,75 @@ class GedcomImporter
         $key = ($gedcomPersonId ?: 'person') . '-' . $gedcomTag;
         $counters[$key] = ($counters[$key] ?? 0) + 1;
         return $this->externalId($key . '-' . $counters[$key]);
+    }
+
+    // ── Multimedia (OBJE) import ──
+
+    private function importMultimedia(array $objNode, string $personId, string $personName): void
+    {
+        $fileNode = GedcomParser::findChild($objNode, 'FILE');
+        $titleNode = GedcomParser::findChild($objNode, 'TITL');
+        $formNode = $fileNode ? GedcomParser::findChild($fileNode, 'FORM') : null;
+
+        if ($fileNode === null) {
+            return;
+        }
+
+        $filePath = $fileNode['value'] ?? '';
+        $title = $titleNode ? trim($titleNode['value']) : basename($filePath);
+        $form = $formNode ? trim($formNode['value']) : null;
+
+        $isPhoto = in_array(mb_strtolower($form ?? ''), ['jpg', 'jpeg', 'gif', 'png', 'bmp', 'tiff', 'webp']);
+
+        if ($filePath === '') {
+            return;
+        }
+
+        $sourceExternalId = $this->externalId('obj:' . $personId . ':' . md5($filePath));
+        $existingThingId = $this->findExisting($sourceExternalId);
+
+        $mediaProperties = [
+            'file_path' => $filePath,
+            'file_format' => $form,
+        ];
+
+        $data = [
+            'name'        => $title,
+            'type'        => UUID::G_THING,
+            'description' => $filePath,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
+            'data'        => json_encode(['properties' => $mediaProperties]),
+        ];
+
+        if ($existingThingId) {
+            DB::table('things')->where('thing_id', $existingThingId)->update($data);
+            $this->updated++;
+            return;
+        }
+
+        $thingId = (string) Str::uuid();
+        $data['thing_id'] = $thingId;
+        DB::table('things')->insert($data);
+        $this->imported++;
+
+        DB::table('links')->insert([
+            'link_uuid'     => (string) Str::uuid(),
+            'one_thing_id'  => $thingId,
+            'link_type_id'  => UUID::LINK_TO_CLASS,
+            'other_thing_id' => $isPhoto ? UUID::PHOTO : UUID::FILE,
+        ]);
+
+        DB::table('links')->insert([
+            'link_uuid'     => (string) Str::uuid(),
+            'one_thing_id'  => $personId,
+            'link_type_id'  => UUID::PRESENT,
+            'other_thing_id' => $thingId,
+        ]);
+
+        $this->linkToSource($thingId, $sourceExternalId);
     }
 
     private static function cleanGedcomName(string $name): string
