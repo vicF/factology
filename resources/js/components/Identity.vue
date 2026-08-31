@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
 import { importExportData } from '../localDb/importData';
@@ -283,6 +283,14 @@ async function importData() {
 function copyMnemonic() {
     navigator.clipboard?.writeText(mnemonic.value);
 }
+
+onMounted(async () => {
+    await identityStore.restore();
+    // A stored identity survives restarts — only the keys need re-unlocking.
+    if (identityStore.identityFile && !identityStore.unlocked) {
+        mode.value = 'unlock';
+    }
+});
 
 function downloadFile(file, filename) {
     const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
