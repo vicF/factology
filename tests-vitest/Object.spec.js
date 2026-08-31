@@ -99,6 +99,7 @@ function mountObject() {
                 $dateFromDb: (d) => d,
                 $resolveLocalized: (x) => x,
                 $fieldText: (x) => x,
+                $flexibleDateFormat: () => 'date',
             },
             provide: { getThumbUrl: () => '' },
         },
@@ -181,5 +182,114 @@ describe('Object view — admin edit/delete on another user\'s object', () => {
 
         expect(deleteButton(wrapper).attributes('disabled')).toBeDefined()
         expect(wrapper.find('.alert-warning').exists()).toBe(false)
+    })
+})
+
+describe('Object view — planned/confirm button', () => {
+    // Canonical YYYYMMDDHHMMSS helpers relative to the real clock so the tests
+    // stay valid regardless of when they run.
+    const pad = (n) => String(n).padStart(2, '0')
+    const canonical = (d) =>
+        `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+    const daysFromNow = (days) => {
+        const d = new Date()
+        d.setDate(d.getDate() + days)
+        return canonical(d)
+    }
+    const createdStamp = () => {
+        const d = new Date()
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    }
+
+    beforeEach(() => {
+        uiState.editMode = true
+        authState.user = { thing_id: 'user-1', name: 'Alice', is_admin: false }
+    })
+
+    const objectWith = (overrides) => ({ ...OBJECT, ...overrides })
+    const confirmButton = (wrapper) => wrapper.find('.confirm-badge:not(.confirm-badge--done)')
+
+    it('hides the confirm button on a backdated record (created after its start)', async () => {
+        axios.get.mockResolvedValue({
+            data: {
+                data: objectWith({
+                    start: daysFromNow(-1),
+                    record_created: createdStamp(),
+                    data: {},
+                }),
+            },
+        })
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(confirmButton(wrapper).exists()).toBe(false)
+        expect(wrapper.find('.planned-badge').exists()).toBe(false)
+    })
+
+    it('shows the confirm button on a past-dated object that was future-dated at creation', async () => {
+        // start is now past, but record_created predates it — the object was a plan.
+        axios.get.mockResolvedValue({
+            data: {
+                data: objectWith({
+                    start: daysFromNow(-1),
+                    record_created: canonical(new Date(Date.now() - 10 * 86400000))
+                        .replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, '$1-$2-$3 $4:$5:$6'),
+                    data: {},
+                }),
+            },
+        })
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(confirmButton(wrapper).exists()).toBe(true)
+    })
+
+    it('shows the confirm button on an explicitly marked plan even after its date passes', async () => {
+        axios.get.mockResolvedValue({
+            data: {
+                data: objectWith({
+                    start: daysFromNow(-1),
+                    record_created: createdStamp(),
+                    data: { planned: '2026-08-01' },
+                }),
+            },
+        })
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(confirmButton(wrapper).exists()).toBe(true)
+    })
+
+    it('shows the confirm button on a future-dated object', async () => {
+        axios.get.mockResolvedValue({
+            data: {
+                data: objectWith({
+                    start: daysFromNow(1),
+                    record_created: createdStamp(),
+                    data: {},
+                }),
+            },
+        })
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(confirmButton(wrapper).exists()).toBe(true)
+    })
+
+    it('hides the confirm button once the object is confirmed', async () => {
+        axios.get.mockResolvedValue({
+            data: {
+                data: objectWith({
+                    start: daysFromNow(-1),
+                    record_created: canonical(new Date(Date.now() - 10 * 86400000))
+                        .replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, '$1-$2-$3 $4:$5:$6'),
+                    data: { planned: '2026-08-01', confirmed: '2026-08-25' },
+                }),
+            },
+        })
+        const wrapper = mountObject()
+        await flushPromises()
+
+        expect(confirmButton(wrapper).exists()).toBe(false)
     })
 })

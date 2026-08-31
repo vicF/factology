@@ -692,13 +692,29 @@ const isPlanned = computed(() =>
     !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
+// Distinguishes a past-dated *plan* from a backdated record. Pre-feature and
+// imported plans carry no data.planned marker, so once their date passes
+// isPlanned() flips false — but they were created while their start was still
+// in the future. An object created *after* its own start date (a backdated
+// record of something that already happened) was never a plan and must not
+// show the confirm button.
+const wasFutureDatedAtCreation = computed(() => {
+    const start = object.value?.start;
+    const created = object.value?.record_created;
+    if (!start || !created) return false;
+    // record_created arrives as "YYYY-MM-DD HH:MM:SS"; normalize to the same
+    // YYYYMMDDHHMMSS digit shape as the DB's start column.
+    const createdCanonical = String(created).replace(/[^\d]/g, '').slice(0, 14);
+    return BigInt(createdCanonical) < BigInt(String(start));
+});
+
 // The owner (or an admin) may confirm that a planned object happened. This
 // also covers past-dated objects that were auto-detected as plans (had a
 // future start date at creation but no explicit data.planned marker) — once
 // the date passes, isPlanned goes false but the owner should still be able
 // to confirm.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && !confirmedDate.value && (isPlanned.value || (!!object.value?.start && !hasFutureStart.value))
+    canEdit.value && !confirmedDate.value && (isPlanned.value || wasFutureDatedAtCreation.value)
 );
 
 const confirmPlanned = async () => {

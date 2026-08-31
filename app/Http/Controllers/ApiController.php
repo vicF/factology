@@ -1229,8 +1229,15 @@ class ApiController extends BaseController
                             ->whereRaw('kv.key <> \'lang\' AND kv.value ILIKE ?', [$term]);
                     });
             });
-            // Sort source-language name/description matches above translation-only matches
-            $query->orderByRaw('CASE WHEN name ILIKE ? OR description ILIKE ? THEN 0 ELSE 1 END', [$term, $term]);
+            // Sort by relevance: source-language NAME matches first (the person
+            // "Маша Фокина" must outrank a photo whose description merely
+            // mentions "Маша"), then source description matches, then
+            // translation-only matches. Within a tier the caller's sort_by
+            // applies (start date for the timeline, name for pickers).
+            $query->orderByRaw('CASE
+                WHEN name ILIKE ? THEN 0
+                WHEN description ILIKE ? THEN 1
+                ELSE 2 END', [$term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {
