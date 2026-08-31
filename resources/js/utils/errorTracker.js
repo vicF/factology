@@ -39,6 +39,17 @@ export function shouldIgnoreError(error) {
   // Auth redirects are handled by the Axios interceptor, not by error UI
   if (error.response?.status === 401) return true
 
+  // A 404 on a GET object fetch just means the object is not visible to the
+  // current user (private / not owner) or doesn't exist. Callers already
+  // treat that as "no object" (objectCache marks it missing, the Object page
+  // renders its own "private or does not exist" screen), so surfacing it as a
+  // global error toast is confusing noise — especially for logged-in users.
+  if (error.response?.status === 404 &&
+      error.config?.method?.toLowerCase() === 'get' &&
+      /^\/object\/[0-9a-fA-F-]{36}/.test(url)) {
+    return true
+  }
+
   // Cancelled / aborted requests
   if (axios.isCancel(error)) return true
   if (error.name === 'CanceledError') return true

@@ -470,6 +470,18 @@ watch(isOpen, (newVal) => {
     if (newVal) nextTick(() => calculateDropdownPosition())
 })
 
+// Multi-select chips need the object to render its name. When the selection
+// is pre-filled (e.g. a class passed in when creating an object from a class
+// page), those ids may not be in the client cache yet — hydrate them so chips
+// show names instead of raw UUIDs. fetchOrGetObject treats a 404 as
+// "not visible/missing" and returns null without surfacing an error.
+watch(() => props.modelValue, async (ids) => {
+    if (!props.multiple || !Array.isArray(ids) || ids.length === 0) return
+    const missing = ids.filter(id => id && !cacheStore.hasCachedObject(id) && !cacheStore.missing?.has?.(id))
+    if (missing.length === 0) return
+    await Promise.allSettled(missing.map(id => cacheStore.fetchOrGetObject(id)))
+}, { immediate: true })
+
 // ── Core functions ────────────────────────────────────────────
 async function loadObjectByUuid(uuid) {
     if (!uuid || uuid.length < 20) return

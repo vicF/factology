@@ -23,6 +23,7 @@ import {
     getObject,
     searchObjects,
     listObjects,
+    matchesSearchText,
     getDb,
     SYNC_STATUS,
 } from './index';
@@ -85,6 +86,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         ? Math.min(Math.max(parseInt(depthParam, 10) || 0, 0), DEPTH_CAP)
         : 1;
 
+    // Client error reports (from errorTracker.js) — silently ignore in local mode
+    if (pathPart === '/client-error' || pathPart === 'client-error') {
+        return { data: { success: true }, status: 200 };
+    }
+
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
@@ -118,7 +124,6 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
 async function handleSearch(body) {
     const params = typeof body === 'string' ? JSON.parse(body) : (body || {});
 
-    let results;
     if (params.tree) {
         // Return class tree built from objects + parent-child links.
         // Mirrors the server (searchTree): classes AND link types that
@@ -131,26 +136,34 @@ async function handleSearch(body) {
         };
     }
 
-    results = await searchObjects(params.search || '', {
-        includeDeleted: false,
-    });
+    const typeFilter = Array.isArray(params.type) ? params.type : (params.type ? [params.type] : []);
+    const searchTerm = (params.search || '').trim().toLowerCase();
 
-    // Filter by type if specified
-    if (params.type && params.type.length > 0) {
-        results = results.filter(o => params.type.includes(o.type));
-    }
-
-    // Filter by checked classes (things linked to any of the selected classes)
+    let results;
     if (params.classes && params.classes.length > 0) {
+        // Mirror the server plan: with a class filter, start from the class
+        // links (like the server's links join) rather than scanning the whole
+        // `type` column. The default search view (a whole subtree checked, no
+        // text) would otherwise read every object of that type from IndexedDB.
         const classIds = new Set(params.classes);
-        const filtered = [];
-        for (const obj of results) {
-            const links = await listLinksForThing(obj.thing_id);
-            const hasClassLink = links.some(l =>
-                l.one_thing_id === obj.thing_id && classIds.has(l.other_thing_id));
-            if (hasClassLink) filtered.push(obj);
-        }
-        results = filtered;
+        const classLinks = await getDb().links
+            .where('other_thing_id')
+            .anyOf([...classIds])
+            .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+            .toArray();
+        const candidateIds = [...new Set(classLinks.map(l => l.one_thing_id))];
+        const candidates = candidateIds.length ? await getDb().objects.bulkGet(candidateIds) : [];
+        results = candidates.filter(obj => obj && !obj.deleted);
+        if (typeFilter.length > 0) results = results.filter(o => typeFilter.includes(o.type));
+        if (searchTerm) results = results.filter(o => matchesSearchText(o, searchTerm));
+    } else {
+        // Search through the Dexie `type` index when a type filter is present —
+        // a full collection scan per keystroke is the dominant cost on large
+        // local DBs.
+        results = await searchObjects(params.search || '', {
+            includeDeleted: false,
+            type: typeFilter,
+        });
     }
 
     // Apply sorting (mirror server ApiController::search):
@@ -176,22 +189,36 @@ async function handleSearch(body) {
         return String(va).localeCompare(String(vb)) * sortDir;
     });
 
+    // Cap at 100 like the server LIMIT 100 — the enrichment below is
+    // per-object, so the cap must come first (it did in the server SQL too).
+    const page = results.slice(0, 100);
+    if (page.length === 0) {
+        return { data: { things: [] }, status: 200 };
+    }
+
     // Enrich with links + resolved class info. `depth` mirrors the server:
     // depth 0 → no links, depth 1 → direct related (breadth-capped), deeper →
     // nested target.links.
     const parsedDepth = parseInt(params.depth ?? '1', 10);
     const depth = Number.isNaN(parsedDepth) ? 1 : Math.min(Math.max(parsedDepth, 0), DEPTH_CAP);
 
+    // Batch the per-object lookups (class membership + related links) into
+    // three queries for the whole page instead of 3 per object.
+    const [classesByThing, linksByThing] = await Promise.all([
+        resolveClassesInfoFor(page.map(o => o.thing_id)),
+        listLinksForThings(page.map(o => o.thing_id)),
+    ]);
+
     const thingsWithLinks = [];
-    for (const obj of results) {
+    for (const obj of page) {
         // Class membership (LINK_TO_CLASS) is not a relation — exclude it from
         // the related-links enrichment (mirrors the server).
-        const relatedLinks = (await listLinksForThing(obj.thing_id))
+        const relatedLinks = (linksByThing.get(obj.thing_id) || [])
             .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
         const links = depth > 0
             ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
             : undefined;
-        const classes = await resolveClassesInfo(obj.thing_id);
+        const classes = classesByThing.get(obj.thing_id) || [];
         thingsWithLinks.push({
             ...obj,
             classes,
@@ -230,6 +257,68 @@ async function resolveClassesInfo(thingId) {
         thing_id: classObj.thing_id,
         name: classObj.name,
     }));
+}
+
+/**
+ * Batch variant of resolveClassesInfo for search results: one links query +
+ * one bulkGet for the whole page. Returns Map<thing_id, classes[]>.
+ * Mirrors the server's batched attachClasses.
+ */
+async function resolveClassesInfoFor(thingIds) {
+    const db = getDb();
+    if (!thingIds.length) return new Map();
+
+    const classLinks = await db.links
+        .where('one_thing_id')
+        .anyOf(thingIds)
+        .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+        .toArray();
+
+    const classIds = [...new Set(classLinks.map(l => l.other_thing_id))];
+    const classObjs = classIds.length ? await db.objects.bulkGet(classIds) : [];
+    const byId = {};
+    for (const c of classObjs) {
+        if (c) byId[c.thing_id] = c;
+    }
+
+    const map = new Map();
+    for (const l of classLinks) {
+        const c = byId[l.other_thing_id];
+        if (!c) continue;
+        if (!map.has(l.one_thing_id)) map.set(l.one_thing_id, []);
+        map.get(l.one_thing_id).push({ thing_id: c.thing_id, name: c.name });
+    }
+    return map;
+}
+
+/**
+ * Batch variant of listLinksForThing for many things at once: one query per
+ * endpoint column (two total), deduped within each thing's bucket. Returns
+ * Map<thing_id, links[]> — a link linking two result objects lands in both
+ * buckets, exactly like the per-thing `.or()` query did.
+ */
+async function listLinksForThings(thingIds) {
+    const db = getDb();
+    if (!thingIds.length) return new Map();
+
+    const [byOne, byOther] = await Promise.all([
+        db.links.where('one_thing_id').anyOf(thingIds).toArray(),
+        db.links.where('other_thing_id').anyOf(thingIds).toArray(),
+    ]);
+
+    const bucket = new Map(); // thing_id -> Map<link_id, link>
+    const push = (link, tid) => {
+        if (!bucket.has(tid)) bucket.set(tid, new Map());
+        bucket.get(tid).set(link.link_id, link);
+    };
+    for (const l of byOne) push(l, l.one_thing_id);
+    for (const l of byOther) push(l, l.other_thing_id);
+
+    const map = new Map();
+    for (const [tid, linksById] of bucket) {
+        map.set(tid, [...linksById.values()]);
+    }
+    return map;
 }
 
 async function handleGet(id, depth = 1) {

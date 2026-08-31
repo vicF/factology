@@ -80,7 +80,16 @@ export async function seedLocalDb() {
 
     const everything = await db.objects.get(UUID.EVERYTHING);
     const cityClass = await db.objects.get(CITY_CLASS_ID);
-    if (everything && cityClass) {
+
+    // Fully seeded = sentinel objects exist AND the current link set is present.
+    // The count check matters: installs seeded by an older APK keep their old
+    // link set (adb install -r preserves app data), so if the hierarchy grew
+    // since then the tree would be permanently incomplete.
+    const expectedLinks = BOOTSTRAP_LINKS.length + CLASS_LINKS.length;
+    const seedLinkCount = await db.links
+        .filter(l => l.link_id?.startsWith('seed-'))
+        .count();
+    if (everything && cityClass && seedLinkCount >= expectedLinks) {
         return; // Fully seeded
     }
 
@@ -95,8 +104,11 @@ export async function seedLocalDb() {
         }
         console.log('[Seeder] Seeding bootstrap objects...');
     } else {
-        // Upgrade: bootstrap things already exist, add classes + links
-        console.log('[Seeder] Upgrading: adding web class hierarchy...');
+        // Upgrade: bootstrap things already exist, top up classes + links.
+        // (Also reached when the object sentinels exist but the link set is
+        // stale — e.g. a DB seeded by an older APK with fewer links.)
+        console.log('[Seeder] Upgrading: topping up class hierarchy (' +
+            seedLinkCount + '/' + expectedLinks + ' links present)...');
     }
 
     for (const c of CLASSES) {

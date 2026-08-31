@@ -5,6 +5,8 @@ import {
     saveLink,
     deleteLink,
     getLink,
+    getLinkByUuid,
+    newLinkId,
     listLinksForThing,
     replaceLinksForThing,
 } from '@/localDb/links';
@@ -106,6 +108,32 @@ describe('LocalDB — Link CRUD', () => {
 
     it('deletes non-existent link without error', async () => {
         await deleteLink('non-existent');
+    });
+
+    it('finds a link by its canonical link_uuid', async () => {
+        await saveLink({
+            link_id: 'link-uuid-1',
+            link_uuid: 'uuid-abc-123',
+            one_thing_id: 'thing-a',
+            link_type_id: 'type-parent',
+            other_thing_id: 'thing-b',
+            public: true,
+        });
+
+        const link = await getLinkByUuid('uuid-abc-123');
+        expect(link).toBeTruthy();
+        expect(link.link_id).toBe('link-uuid-1');
+    });
+
+    it('returns null for an unknown link_uuid', async () => {
+        expect(await getLinkByUuid('no-such-uuid')).toBeNull();
+    });
+
+    it('newLinkId mints a unique local link_id', () => {
+        const a = newLinkId();
+        const b = newLinkId();
+        expect(a).toMatch(/^link-/);
+        expect(a).not.toBe(b);
     });
 
     it('lists links for a thing', async () => {

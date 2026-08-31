@@ -374,7 +374,10 @@ class Everything
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
-            abort(404, 'Authorization required to access this resource');
+            // The row is missing either because it does not exist or because the
+            // auth() scope filtered it out (private, not owner). Keep the 404
+            // (never leak existence) but word it accurately for logged-in users.
+            abort(404, 'Object not found or you do not have access to it');
         }
 
         // Convert binary/resource values to strings (e.g. phash bytea from PostgreSQL)

@@ -19,6 +19,7 @@ const Search = () => import('@/components/Search.vue')
 /* Authenticated Component */
 
 const Object = () => import('@/components/Object.vue')
+const Identity = () => import('@/components/Identity.vue')
 
 const Tools = () => import('@/components/Tools.vue')
 
@@ -63,6 +64,14 @@ const routes = [
                 component: Object,
                 meta: {
                     title: `Object`
+                }
+            },
+            {
+                name: "identity",
+                path: "/identity",
+                component: Identity,
+                meta: {
+                    title: `Identity`
                 }
             },
             {
