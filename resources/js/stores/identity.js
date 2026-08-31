@@ -38,9 +38,27 @@ export const useIdentityStore = defineStore('identity', () => {
         await storage.set(STORAGE_KEY, JSON.stringify(file));
     }
 
-    function setUnlocked(opened) {
+    /**
+     * In offline (mobile/Electron) apps the identity IS the user session:
+     * establishing it also logs the app in as that person (so the whole UI —
+     * edit mode, profile, object creation — treats them as an owner). A real
+     * server account that already resolves to the same thing_id is left alone.
+     */
+    async function establishSession({ thingId, name }) {
+        const { useAuthStore } = await import('../stores/auth');
+        const authStore = useAuthStore();
+        if (authStore.user?.thing_id !== thingId) {
+            await authStore.login(
+                { id: thingId, thing_id: thingId, name, is_admin: false },
+                `identity-${thingId}`,
+            );
+        }
+    }
+
+    async function setUnlocked(opened) {
         identity.value = opened;
         unlocked.value = true;
+        await establishSession(opened);
     }
 
     /**

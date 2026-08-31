@@ -29,6 +29,36 @@
             </ul>
         </div>
 
+        <!-- Data import (needs an unlocked identity to determine ownership) -->
+        <div v-if="identityStore.unlocked && identityStore.identity" class="card mb-4 shadow-sm" data-testid="data-import-panel">
+            <div class="card-body">
+                <h5 class="card-title">Import my data</h5>
+                <p class="small text-muted">
+                    Import the export file from your web app (Search page → Export) into this device.
+                    Only objects owned by your identity are imported; everything else is skipped and reported.
+                </p>
+                <form @submit.prevent="importData">
+                    <div class="mb-3">
+                        <input type="file" class="form-control" accept="application/json,.json" @change="onDataFileChange" data-testid="data-file" />
+                    </div>
+                    <button type="submit" class="btn btn-primary" :disabled="dataImporting || !dataFile" data-testid="data-import-submit">
+                        {{ dataImporting ? 'Please wait…' : 'Import data' }}
+                    </button>
+                </form>
+                <div v-if="dataReport" class="mt-3">
+                    <div :class="['alert', dataReport.errors.length ? 'alert-warning' : 'alert-success']" class="mb-0" data-testid="data-import-report">
+                        <ul class="mb-0">
+                            <li>{{ dataReport.imported }} objects imported</li>
+                            <li>{{ dataReport.importedLinks }} links imported</li>
+                            <li>{{ dataReport.skippedExisting }} already present</li>
+                            <li>{{ dataReport.skippedNotYours }} not owned by you — skipped</li>
+                            <li v-for="(err, i) in dataReport.errors" :key="i" class="text-danger">{{ err }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div v-if="mnemonic" class="card mb-4 shadow-sm border-warning">
             <div class="card-body">
                 <h5 class="card-title text-warning">Backup phrase — write it down now</h5>
@@ -126,9 +156,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
+import { importExportData } from '../localDb/importData';
 
 const authStore = useAuthStore();
 const identityStore = useIdentityStore();
@@ -144,6 +175,9 @@ const unlocking = ref(false);
 const mnemonic = ref('');
 const message = ref('');
 const messageType = ref('success');
+const dataFile = ref(null);
+const dataImporting = ref(false);
+const dataReport = ref(null);
 
 const messageLines = computed(() => (message.value ? message.value.split('\n') : []));
 
@@ -226,9 +260,37 @@ async function unlock() {
     }
 }
 
+function onDataFileChange(event) {
+    dataFile.value = event.target.files?.[0] || null;
+}
+
+async function importData() {
+    setMessage('');
+    if (!dataFile.value) return;
+    dataImporting.value = true;
+    try {
+        const text = await dataFile.value.text();
+        const file = JSON.parse(text);
+        dataReport.value = await importExportData(file, identityStore.identity.thingId);
+        setMessage('Import finished. See the report below.');
+    } catch (error) {
+        setMessage(error.message, 'error');
+    } finally {
+        dataImporting.value = false;
+    }
+}
+
 function copyMnemonic() {
     navigator.clipboard?.writeText(mnemonic.value);
 }
+
+onMounted(async () => {
+    await identityStore.restore();
+    // A stored identity survives restarts — only the keys need re-unlocking.
+    if (identityStore.identityFile && !identityStore.unlocked) {
+        mode.value = 'unlock';
+    }
+});
 
 function downloadFile(file, filename) {
     const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
