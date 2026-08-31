@@ -52,7 +52,9 @@ export const useIdentityStore = defineStore('identity', () => {
             thingId, name, passphrase, createdBy,
         });
         await persistFile(file);
-        setUnlocked({ thingId, name, secretKey, publicKey, file });
+        // file.thing_id is authoritative (resolved from the key when no
+        // account thing_id was passed).
+        setUnlocked({ thingId: file.thing_id, name, secretKey, publicKey, file });
         return mnemonic;
     }
 

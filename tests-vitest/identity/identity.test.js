@@ -98,6 +98,12 @@ describe('identity — file roundtrip', () => {
             createIdentity({ thingId: THING_ID, name: NAME, passphrase: 'short' }),
         ).rejects.toThrow(/at least 8/);
     });
+
+    it('derives thing_id from the public key when no account thing_id is given', async () => {
+        const identity = await createIdentity({ name: NAME, passphrase: PASSPHRASE });
+        expect(identity.file.thing_id).toBe(thingIdFromPublicKey(identity.publicKey));
+        expect(identity.file.thing_id).toBeTruthy();
+    });
 });
 
 describe('identity — signing', () => {
