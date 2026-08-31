@@ -24,10 +24,12 @@
             >
                 <template #node="{ node }">
                     <div class="custom-node" :style="getNodeStyle(node)">
-                        <div class="node-image-area">
+                        <div class="node-image-area" :class="{ 'no-image': !nodeHasImage[node.id] }">
                             <Image
                                 :node-id="node.id"
                                 :alt="node.text"
+                                :hide-when-no-image="true"
+                                @has-image="onHasImage(node.id, $event)"
                             />
                         </div>
                         <div class="node-text">{{ node.text }}</div>
@@ -42,10 +44,10 @@
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
 import axios from 'axios'
-import { inject, ref, watch, onMounted } from 'vue'
+import { inject, reactive, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { objectName } from '../utils/localized.js'
+import { objectName, fieldText } from '../utils/localized.js'
 import Image from './Image.vue'
 
 const getThumbUrl = inject('getThumbUrl');
@@ -61,6 +63,13 @@ const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
 
+// nodeId → true once its thumbnail actually loaded (see Image `has-image`).
+// Drives hiding the empty thumbnail box for nodes without a real image.
+const nodeHasImage = reactive({})
+const onHasImage = (nodeId, has) => {
+    nodeHasImage[nodeId] = has
+}
+
 // How many levels of related objects the graph renders (refetched on change).
 const selectedDepth = ref(2)
 // The fetched root object carrying nested `links` (depth = selectedDepth).
@@ -73,6 +82,8 @@ const graphOptions = {
     defaultJunctionPoint: 'border',
     defaultNodeColor: '#4a6bff',
     defaultLineColor: '#99b3ff',
+    defaultNodeWidth: 150,
+    defaultNodeHeight: 100,
     layout: {
         layoutName: 'center'
     }
@@ -164,10 +175,12 @@ const buildGraphData = (object) => {
             if (!target || !target.thing_id) continue
             const isNew = addNode({
                 id: target.thing_id,
-                text: objectName(target) || link.name || t('Related'),
+                text: objectName(target) || link.link_name || t('Related'),
                 color: '#28a745',
                 borderColor: '#1e7e34',
                 fontColor: '#ffffff',
+                width: 150,
+                height: 100,
                 nodeShape: 1,
                 data: {
                     ...target,
@@ -178,7 +191,7 @@ const buildGraphData = (object) => {
                 id: link.link_id != null ? String(link.link_id) : `l-${parentId}-${target.thing_id}`,
                 from: parentId,
                 to: target.thing_id,
-                text: link.link_name || t('connected'),
+                text: fieldText(link.link_name, link.link_name_translations) || t('connected'),
                 color: '#28a745'
             })
             if (target.links && target.links.length) {
@@ -200,6 +213,9 @@ const renderGraph = async () => {
     if (!graphRef.value || !graphObject.value) return
     const graphData = buildGraphData(graphObject.value)
     if (graphData.nodes.length === 0) return
+    // Reset thumbnail state so nodes render without an image box until their
+    // thumbnail actually loads (each node re-emits `has-image` on mount).
+    for (const key of Object.keys(nodeHasImage)) delete nodeHasImage[key]
     await graphRef.value.setJsonData({
         rootId: graphObject.value.thing_id,
         nodes: graphData.nodes,
@@ -311,6 +327,10 @@ onMounted(async () => {
     overflow: hidden;
     background-color: #f0f0f0;
     margin-bottom: 5px;
+}
+
+.node-image-area.no-image {
+    display: none;
 }
 
 .node-text {
