@@ -3,7 +3,7 @@
 import Dexie from 'dexie';
 
 export const DB_NAME = 'factology_local';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /**
  * Define the local IndexedDB schema via Dexie.
@@ -76,20 +76,35 @@ const STORE_V1 = {
     `,
 };
 
+// v2: links gain a link_uuid index — the canonical, cross-instance link key
+// used by the sync layer (matching and dedup). link_id stays the local PK.
+const STORE_V2 = {
+    ...STORE_V1,
+    links: `
+        &link_id,
+        link_uuid,
+        one_thing_id,
+        link_type_id,
+        other_thing_id,
+        public,
+        [one_thing_id+link_type_id+other_thing_id],
+        _syncStatus,
+        _serverId
+    `,
+};
+
 export function createDatabase() {
     const db = new Dexie(DB_NAME);
 
     // Baseline schema.
     db.version(1).stores(STORE_V1);
 
-    // FUTURE MIGRATIONS — add new blocks here and bump DB_VERSION:
-    //
-    // db.version(2).stores({ ...STORE_V2 }).upgrade(async (tx) => {
-    //     // e.g. backfill a new column for all existing rows
-    //     await tx.table('objects').toCollection().modify((obj) => {
-    //         obj.newField = null;
-    //     });
-    // });
+    // v2: link_uuid index on links (see STORE_V2).
+    db.version(2).stores(STORE_V2).upgrade(async (tx) => {
+        // Nothing to migrate — the new index only needs re-created stores;
+        // existing rows keep their link_id PKs and are indexed on link_uuid
+        // as the value becomes available.
+    });
 
     return db;
 }
