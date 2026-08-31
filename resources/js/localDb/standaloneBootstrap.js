@@ -27,22 +27,31 @@ export async function bootstrapStandalone() {
     await seedDemoData();
 
     const { useAuthStore } = await import('../stores/auth');
+    const { useIdentityStore } = await import('../stores/identity');
 
     // Register the custom adapter
     axios.defaults.adapter = async (config) => {
         const authStore = useAuthStore();
+        const identityStore = useIdentityStore();
         await authStore.restoreAuth();
         if (authStore.token) {
             config.headers.Authorization = `Bearer ${authStore.token}`;
         }
+        await identityStore.restore();
 
         const url = config.url?.split('?')[0] || '';
         const method = config.method?.toLowerCase() || 'get';
         const data = config.data;
 
         // Mirror the server: a newly created object is owned by the current
-        // user, so pass their thing_id down to the local API handler.
-        const context = { userThingId: authStore.user?.thing_id || null };
+        // user, so pass their thing_id down to the local API handler. An
+        // unlocked identity takes precedence — in the offline app the identity
+        // IS the owner (fresh self-sovereign identities have no account).
+        const context = {
+            userThingId: identityStore.identity?.thingId
+                || authStore.user?.thing_id
+                || null,
+        };
 
         let result;
         if (url === '/user' || url === 'user') {

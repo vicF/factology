@@ -127,8 +127,11 @@ export async function createIdentity({ thingId, name, passphrase, createdBy }) {
         throw new Error(`Passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters.`);
     }
     const mnemonic = generateMnemonic();
-    const file = await buildIdentityFile({ thingId, name, mnemonic, passphrase, createdBy });
     const { secretKey, publicKey } = keygen(entropyFromMnemonic(mnemonic));
+    // No account bound (fresh self-sovereign identity) → derive the owner
+    // uuid from the public key, so the owner field is verifiable.
+    const resolvedThingId = thingId || thingIdFromPublicKey(publicKey);
+    const file = await buildIdentityFile({ thingId: resolvedThingId, name, mnemonic, passphrase, createdBy });
     return { mnemonic, secretKey, publicKey, file };
 }
 

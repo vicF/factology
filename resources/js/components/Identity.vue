@@ -59,12 +59,21 @@
         <!-- Create -->
         <div v-if="mode === 'create'" class="card shadow-sm" data-testid="create-panel">
             <div class="card-body">
-                <p class="small text-muted">
-                    Binds your current account ({{ authStore.user?.name || 'unknown' }},
-                    <code>{{ authStore.user?.thing_id || 'no thing_id' }}</code>) to a fresh keypair —
-                    your existing objects keep their owner.
+                <p v-if="authStore.user?.thing_id" class="small text-muted">
+                    Binds your current account ({{ authStore.user?.name }},
+                    <code>{{ authStore.user?.thing_id }}</code>) to a fresh keypair — your existing
+                    objects keep their owner.
+                </p>
+                <p v-else class="small text-muted">
+                    No account here — a fresh self-sovereign identity is created and its owner uuid is
+                    derived from your public key. Import this file into any other app of yours to use
+                    the same identity there.
                 </p>
                 <form @submit.prevent="create">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Name</label>
+                        <input type="text" class="form-control" v-model="name" data-testid="create-name" placeholder="Your name" />
+                    </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Passphrase (protects the file)</label>
                         <input type="password" class="form-control" v-model="passphrase" autocomplete="new-password" data-testid="create-passphrase" />
@@ -125,6 +134,7 @@ const authStore = useAuthStore();
 const identityStore = useIdentityStore();
 
 const mode = ref('create');
+const name = ref(authStore.user?.name || '');
 const passphrase = ref('');
 const passphrase2 = ref('');
 const selectedFile = ref(null);
@@ -160,7 +170,7 @@ async function create() {
     try {
         const createdMnemonic = await identityStore.createAndSave({
             thingId: authStore.user?.thing_id,
-            name: authStore.user?.name || 'Identity',
+            name: name.value || 'Identity',
             passphrase: passphrase.value,
             createdBy: 'web',
         });

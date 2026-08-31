@@ -114,6 +114,11 @@
                                         <IconAdd class="icon-sm me-2" />
                                         {{ $t('Register') }}
                                     </router-link></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><router-link class="dropdown-item" to="/identity" data-testid="identity-link-guest">
+                                        <IconKey class="icon-sm me-2" />
+                                        {{ $t('Identity') }}
+                                    </router-link></li>
                                 </template>
 
                                 <!-- User links -->
