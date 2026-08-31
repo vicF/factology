@@ -395,10 +395,6 @@ class GedcomImporter
             $this->importPersonEvent($eventNode, $thingId, $cleanName, 'EVEN', 'event');
         }
 
-        foreach (GedcomParser::findChildren($record, 'OBJE') as $objNode) {
-            $this->importMultimedia($objNode, $thingId, $cleanName);
-        }
-
         $this->imported++;
     }
 
@@ -559,7 +555,7 @@ class GedcomImporter
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
             if ($placeId !== null) {
-                $linkType = ($eventType === 'residence') ? UUID::INSIDE : UUID::LINK_TO_CLASS;
+                $linkType = UUID::INSIDE;
                 DB::table('links')->insert([
                     'link_uuid'     => (string) Str::uuid(),
                     'one_thing_id'  => $thingId,
@@ -731,7 +727,7 @@ class GedcomImporter
                 DB::table('links')->insert([
                     'link_uuid'     => (string) Str::uuid(),
                     'one_thing_id'  => $thingId,
-                    'link_type_id'  => UUID::LINK_TO_CLASS,
+                    'link_type_id'  => UUID::INSIDE,
                     'other_thing_id' => $placeId,
                 ]);
             }
@@ -805,6 +801,19 @@ class GedcomImporter
 
         if (isset($this->placeCache[$key])) {
             return $this->placeCache[$key];
+        }
+
+        // Check if a place with this name already exists in the database
+        // (any public thing with matching name, regardless of its specific class)
+        $existingPlace = DB::table('things')
+            ->where('name', trim($placeName))
+            ->where('type', '!=', 2) // not a class definition
+            ->where('public', true)
+            ->first();
+
+        if ($existingPlace) {
+            $this->placeCache[$key] = $existingPlace->thing_id;
+            return $existingPlace->thing_id;
         }
 
         $sourceExternalId = $this->externalId('place:' . $key);
@@ -933,75 +942,6 @@ class GedcomImporter
         $key = ($gedcomPersonId ?: 'person') . '-' . $gedcomTag;
         $counters[$key] = ($counters[$key] ?? 0) + 1;
         return $this->externalId($key . '-' . $counters[$key]);
-    }
-
-    // ── Multimedia (OBJE) import ──
-
-    private function importMultimedia(array $objNode, string $personId, string $personName): void
-    {
-        $fileNode = GedcomParser::findChild($objNode, 'FILE');
-        $titleNode = GedcomParser::findChild($objNode, 'TITL');
-        $formNode = $fileNode ? GedcomParser::findChild($fileNode, 'FORM') : null;
-
-        if ($fileNode === null) {
-            return;
-        }
-
-        $filePath = $fileNode['value'] ?? '';
-        $title = $titleNode ? trim($titleNode['value']) : basename($filePath);
-        $form = $formNode ? trim($formNode['value']) : null;
-
-        $isPhoto = in_array(mb_strtolower($form ?? ''), ['jpg', 'jpeg', 'gif', 'png', 'bmp', 'tiff', 'webp']);
-
-        if ($filePath === '') {
-            return;
-        }
-
-        $sourceExternalId = $this->externalId('obj:' . $personId . ':' . md5($filePath));
-        $existingThingId = $this->findExisting($sourceExternalId);
-
-        $mediaProperties = [
-            'file_path' => $filePath,
-            'file_format' => $form,
-        ];
-
-        $data = [
-            'name'        => $title,
-            'type'        => UUID::G_THING,
-            'description' => $filePath,
-            'owner'       => $this->ownerId,
-            'public'      => false,
-            'deleted'     => false,
-            'server_uuid' => $this->getServerUuid(),
-            'data'        => json_encode(['properties' => $mediaProperties]),
-        ];
-
-        if ($existingThingId) {
-            DB::table('things')->where('thing_id', $existingThingId)->update($data);
-            $this->updated++;
-            return;
-        }
-
-        $thingId = (string) Str::uuid();
-        $data['thing_id'] = $thingId;
-        DB::table('things')->insert($data);
-        $this->imported++;
-
-        DB::table('links')->insert([
-            'link_uuid'     => (string) Str::uuid(),
-            'one_thing_id'  => $thingId,
-            'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => $isPhoto ? UUID::PHOTO : UUID::FILE,
-        ]);
-
-        DB::table('links')->insert([
-            'link_uuid'     => (string) Str::uuid(),
-            'one_thing_id'  => $personId,
-            'link_type_id'  => UUID::PRESENT,
-            'other_thing_id' => $thingId,
-        ]);
-
-        $this->linkToSource($thingId, $sourceExternalId);
     }
 
     private static function cleanGedcomName(string $name): string
