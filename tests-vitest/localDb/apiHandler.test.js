@@ -159,6 +159,28 @@ describe('Local API search sorting + class filter (mirrors server ApiController:
         // Seeded bootstrap objects without a City class link are excluded
         expect(things.some(t => t.thing_id === UUID.EVERYTHING)).toBe(false);
     });
+
+    it('caps results at 100 like the server LIMIT 100', async () => {
+        const db = getDb();
+        const objs = [];
+        for (let i = 0; i < 105; i++) {
+            objs.push({
+                thing_id: `10000000-0000-4000-a000-${String(i).padStart(12, '0')}`,
+                name: `CapTest Object ${i}`,
+                type: UUID.G_THING,
+                public: 1,
+                deleted: 0,
+            });
+        }
+        await db.objects.bulkAdd(objs);
+
+        const res = await handleLocalApiCall('post', '/object', JSON.stringify({
+            search: 'CapTest',
+            type: [UUID.G_THING],
+        }));
+
+        expect(res.data.things).toHaveLength(100);
+    });
 });
 
 describe('Local API create/update mirrors server store()', () => {

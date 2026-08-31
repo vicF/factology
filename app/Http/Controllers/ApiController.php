@@ -16,6 +16,7 @@ use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -1216,18 +1217,14 @@ class ApiController extends BaseController
             $query->where(function ($query) use ($term) {
                 $query->where('name', 'ilike', $term)
                     ->orWhere('description', 'ilike', $term)
-                    // Match text inside the translation JSON columns too
-                    // (skip the reserved "lang" metadata key, which only holds a language code).
-                    ->orWhereExists(function ($sub) use ($term) {
-                        $sub->selectRaw('1')
-                            ->fromRaw('jsonb_each_text(COALESCE(things.name_translations, \'{}\'::jsonb)) as kv')
-                            ->whereRaw('kv.key <> \'lang\' AND kv.value ILIKE ?', [$term]);
-                    })
-                    ->orWhereExists(function ($sub) use ($term) {
-                        $sub->selectRaw('1')
-                            ->fromRaw('jsonb_each_text(COALESCE(things.description_translations, \'{}\'::jsonb)) as kv')
-                            ->whereRaw('kv.key <> \'lang\' AND kv.value ILIKE ?', [$term]);
-                    });
+                    // Translation search runs against generated columns holding
+                    // every translation value except the reserved "lang" key
+                    // (which only holds a language code) — see the
+                    // add_search_performance_indexes migration. A plain-column
+                    // ILIKE can use the pg_trgm GIN indexes, unlike the former
+                    // jsonb_each_text EXISTS subqueries (unindexable full scan).
+                    ->orWhere('name_search_text', 'ilike', $term)
+                    ->orWhere('description_search_text', 'ilike', $term);
             });
             // Sort source-language name/description matches above translation-only matches
             $query->orderByRaw('CASE WHEN name ILIKE ? OR description ILIKE ? THEN 0 ELSE 1 END', [$term, $term]);
@@ -1507,34 +1504,44 @@ class ApiController extends BaseController
      */
     public function searchOptions(): \Illuminate\Http\JsonResponse
     {
-        // Distinct owners with names and object counts.
-        $owners = DB::table('things as o')
-            ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
-            ->leftJoin('things as t', 'o.owner', '=', 't.thing_id')
-            ->where('o.deleted', 0)
-            ->whereNotNull('o.owner')
-            ->where($this->visibleObjectsScope('o'))
-            ->groupBy('o.owner', 't.name', 't.type')
-            ->orderByDesc(DB::raw('COUNT(*)'))
-            ->limit(100)
-            ->get();
+        // The owner/server lists are two GROUP BY scans over the whole things
+        // table (~100ms+ each at scale). They only change when objects are
+        // created/updated/deleted or visibility toggles, so a short per-user
+        // TTL is a cheap win; the filter dropdown tolerates slightly stale counts.
+        $cacheKey = 'search-options:' . (Auth::check() ? Auth::user()->thing_id : 'anon');
 
-        // Distinct server UUIDs with names and object counts
-        $servers = DB::table('things as o')
-            ->select('o.server_uuid as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
-            ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
-            ->where('o.deleted', 0)
-            ->whereNotNull('o.server_uuid')
-            ->where($this->visibleObjectsScope('o'))
-            ->groupBy('o.server_uuid', 't.name', 't.type')
-            ->orderByDesc(DB::raw('COUNT(*)'))
-            ->limit(100)
-            ->get();
+        $options = Cache::remember($cacheKey, 60, function () {
+            // Distinct owners with names and object counts.
+            $owners = DB::table('things as o')
+                ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+                ->leftJoin('things as t', 'o.owner', '=', 't.thing_id')
+                ->where('o.deleted', 0)
+                ->whereNotNull('o.owner')
+                ->where($this->visibleObjectsScope('o'))
+                ->groupBy('o.owner', 't.name', 't.type')
+                ->orderByDesc(DB::raw('COUNT(*)'))
+                ->limit(100)
+                ->get();
 
-        return response()->json([
-            'owners' => $owners,
-            'servers' => $servers,
-        ]);
+            // Distinct server UUIDs with names and object counts
+            $servers = DB::table('things as o')
+                ->select('o.server_uuid as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+                ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
+                ->where('o.deleted', 0)
+                ->whereNotNull('o.server_uuid')
+                ->where($this->visibleObjectsScope('o'))
+                ->groupBy('o.server_uuid', 't.name', 't.type')
+                ->orderByDesc(DB::raw('COUNT(*)'))
+                ->limit(100)
+                ->get();
+
+            return [
+                'owners' => $owners,
+                'servers' => $servers,
+            ];
+        });
+
+        return response()->json($options);
     }
 
     /**
