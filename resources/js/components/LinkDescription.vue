@@ -9,6 +9,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { i18n } from '../lang/i18n';
 import { fieldText, objectName } from '../utils/localized.js';
 
 const props = defineProps({
@@ -40,6 +41,7 @@ const props = defineProps({
 
 const cacheStore = useObjectCacheStore();
 const router = useRouter();
+const t = (key) => i18n.global.t(key);
 
 // The description is rendered as raw <a href="/object/{id}"> anchors via
 // v-html. A plain click would do a full-page navigation to /object/{id},
@@ -55,11 +57,22 @@ function onClick(event) {
     router.push({ name: 'object', params: { uid: match[1] } });
 }
 
-const resolveName = (id, fallback) => {
-    if (!id) return 'Unknown';
+const resolveName = (id, fallback, nameTranslations) => {
+    if (!id) return t('Unknown');
     const cached = cacheStore.getCachedObject(id);
-    if (cached) return objectName(cached) || 'Unknown';
-    return fallback || 'Unknown';
+    if (cached) return objectName(cached) || t('Unknown');
+    if (nameTranslations) {
+        return fieldText(fallback, nameTranslations) || fallback || t('Unknown');
+    }
+    return fallback || t('Unknown');
+};
+
+// Names from the API link payload may carry name_translations; resolve them.
+const resolveLinkName = (name, nameTranslations, fallback) => {
+    if (nameTranslations) {
+        return fieldText(name, nameTranslations) || fallback || name;
+    }
+    return fallback || name || t('Unknown');
 };
 
 const generateLinkDescription = (link, object) => {
@@ -80,10 +93,10 @@ const generateLinkDescription = (link, object) => {
     // non-common endpoint resolves instead of falling back to "Unknown".
     const oneName = objectIsOne
         ? resolveName(link.one_thing_id, objectName(object))
-        : resolveName(link.one_thing_id, link.target?.name ?? link.one_name);
+        : resolveName(link.one_thing_id, link.target?.name ?? link.one_name, link.one_name_translations);
 
     const otherName = objectIsOne
-        ? resolveName(link.other_thing_id, link.name)
+        ? resolveLinkName(link.name, link.name_translations, link.name)
         : resolveName(link.other_thing_id, objectName(object));
 
     // Prefer the payload's translated link-type name (link_type thing's

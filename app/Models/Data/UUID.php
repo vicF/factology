@@ -57,6 +57,7 @@ class UUID
     public const TRIP = 'e3cad1b0-74fa-44b2-9b2f-2adaf36baa14';
     public const FATHER = '29cafd84-0fc9-4295-afcc-d73b9613e39f';
     public const MOTHER = 'b7c887b7-cee4-452d-b491-bd552de79d70';
+    public const MARRIED_TO = 'eb8fbbab-1f92-42e6-b878-0519b9652ab6';
     public const PRESENT = '8811c270-4285-4534-bb2a-c4da1ba850e4';
     public const PRESENT_AS_ACTOR = '1e53a04c-15cf-49ba-9495-59d1d67500b6';
     public const EVENT = '0eed3b56-bdd6-47f0-9413-d9640a9dcafc';
@@ -74,6 +75,10 @@ class UUID
     public const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';
     public const RECENTLY_VIEWED = 'f0f0f0f0-0002-4000-a000-000000000002';
 
+    // ── Identity equivalence link types ──
+    public const DUPLICATE_OF = '0dc6915e-b92c-4834-b9a3-091273d0d334';
+    public const ALSO_KNOWN_AS = '0a1a2fe7-d4f7-4a85-8514-680cfd518bdb';
+
     // ── Localization system objects (Property/Language classes, languages) ──
     public const PROPERTY_CLASS = 'b1b1b1b1-0001-4000-8000-000000000001';
     public const LANGUAGE_CLASS = 'b1b1b1b1-0002-4000-8000-000000000001';
@@ -84,6 +89,10 @@ class UUID
     // ── Geo system objects (Coordinates property, linked to the Place class) ──
     public const PLACE_CLASS = 'dc006cda-047a-4862-acf7-e215355b6890';
     public const COORDINATES_PROPERTY = 'c1c1c1c1-0002-4000-8000-000000000001';
+
+    // ── GEDCOM import system objects ──
+    public const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
+    public const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';
 
     public static function contains(array $data,
                                     array $otherThings,

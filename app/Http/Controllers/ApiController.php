@@ -1218,25 +1218,27 @@ class ApiController extends BaseController
         if (@$requestBody['search']) {
             $term = '%' . $requestBody['search'] . '%';
             $query->where(function ($query) use ($term) {
-                $query->where('name', 'ilike', $term)
-                    ->orWhere('description', 'ilike', $term)
+                $query->where('things.name', 'ilike', $term)
+                    ->orWhere('things.description', 'ilike', $term)
                     // Translation search runs against generated columns holding
                     // every translation value except the reserved "lang" key
                     // (which only holds a language code) — see the
                     // add_search_performance_indexes migration. A plain-column
                     // ILIKE can use the pg_trgm GIN indexes, unlike the former
                     // jsonb_each_text EXISTS subqueries (unindexable full scan).
-                    ->orWhere('name_search_text', 'ilike', $term)
-                    ->orWhere('description_search_text', 'ilike', $term);
+                    ->orWhere('things.name_search_text', 'ilike', $term)
+                    ->orWhere('things.description_search_text', 'ilike', $term);
             });
             // Sort by relevance: source-language NAME matches first (the person
             // "Маша Фокина" must outrank a photo whose description merely
             // mentions "Маша"), then source description matches, then
             // translation-only matches. Within a tier the caller's sort_by
             // applies (start date for the timeline, name for pickers).
+            // Columns are table-qualified: the classes/favorites filters join
+            // `links`, which also has a `description` column.
             $query->orderByRaw('CASE
-                WHEN name ILIKE ? THEN 0
-                WHEN description ILIKE ? THEN 1
+                WHEN things.name ILIKE ? THEN 0
+                WHEN things.description ILIKE ? THEN 1
                 ELSE 2 END', [$term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
@@ -1359,6 +1361,8 @@ class ApiController extends BaseController
             $links = DB::table('links')
                 ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
                 ->addSelect('link_types.name_translations as link_name_translations')
+                ->addSelect('things.name_translations')
+                ->addSelect('one_side.name_translations as one_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {

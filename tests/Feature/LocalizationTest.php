@@ -211,6 +211,48 @@ class LocalizationTest extends TestCase
         $this->assertFalse($names->contains('остров'), 'The lang metadata key/value must not be searchable');
     }
 
+    public function testSearchMatchesCyrillicName(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $this->createObject($user, [
+            'name'              => 'Андрей Петров',
+            'name_translations' => ['lang' => 'ru'],
+        ]);
+
+        // Searching for a Cyrillic substring must find the object
+        $res = $this->actingAs($user, 'sanctum')->postJson('/api/v1/object', ['search' => 'Андрей']);
+        $res->assertStatus(200);
+        $names = collect($res->json('things'))->pluck('name');
+        $this->assertTrue($names->contains('Андрей Петров'), 'Cyrillic name search should match');
+    }
+
+    public function testSearchMatchesCyrillicWithClassFilter(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $thingId = uuid_create();
+        $this->createObject($user, [
+            'thing_id' => $thingId,
+            'name'     => 'Андрей Иванов',
+            'classes'  => [
+                [
+                    'one_thing_id'   => $thingId,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::HUMAN,
+                    'public'         => 1,
+                ],
+            ],
+        ]);
+
+        // Cyrillic search + class filter must find the object
+        $res = $this->actingAs($user, 'sanctum')->postJson('/api/v1/object', [
+            'search'  => 'Андрей',
+            'classes' => [UUID::HUMAN],
+        ]);
+        $res->assertStatus(200);
+        $names = collect($res->json('things'))->pluck('name');
+        $this->assertTrue($names->contains('Андрей Иванов'), 'Cyrillic name search with class filter should match');
+    }
+
     public function testBackwardCompatibleWithoutTranslations(): void
     {
         $user = $this->createTestUser()->getUser();

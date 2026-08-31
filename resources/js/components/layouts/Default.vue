@@ -136,6 +136,10 @@
                                         <IconKey class="icon-sm me-2" />
                                         {{ $t('Identity') }}
                                     </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/tools" data-testid="tools-link">
+                                        <IconTools class="icon-sm me-2" />
+                                        {{ $t('Tools') }}
+                                    </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
                                         <IconLogout class="icon-sm me-2" />
