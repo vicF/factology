@@ -4,7 +4,8 @@
     "version": "0.1.0",
     "description": "Browser (CodeceptJS) and mobile (Appium) E2E tests for Factology.",
     "scripts": {
-        "test:mobile": "codeceptjs run --config codecept.mobile.conf.js --steps --grep '@smoke'"
+        "test:mobile": "codeceptjs run --config codecept.mobile.conf.js --steps --grep '@smoke'",
+        "test:electron": "node electron/electron_smoke_test.js"
     },
     "devDependencies": {
         "appium": "^2.16.0",

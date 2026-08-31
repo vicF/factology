@@ -15,6 +15,12 @@ cd "$(dirname "$0")"
 SCRIPT_DIR="$(pwd)"
 BUILD_MODE="local"
 
+# Use D: drive for temp to avoid C: disk space issues
+export TMP=D:/tmp
+export TEMP=D:/tmp
+export APPDATA=D:/tmp/appdata-var
+mkdir -p D:/tmp D:/tmp/appdata-var
+
 # --- parse args ---------------------------------------------------------------
 for arg in "$@"; do
     case "$arg" in

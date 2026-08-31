@@ -1,12 +1,13 @@
 <!-- components/LinkDescription.vue -->
 <template>
-    <span class="link-description" :class="[sizeClass, customClass]">
+    <span class="link-description" :class="[sizeClass, customClass]" @click="onClick">
         <span v-html="generatedText"></span>
     </span>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { fieldText, objectName } from '../utils/localized.js';
 
@@ -38,6 +39,21 @@ const props = defineProps({
 });
 
 const cacheStore = useObjectCacheStore();
+const router = useRouter();
+
+// The description is rendered as raw <a href="/object/{id}"> anchors via
+// v-html. A plain click would do a full-page navigation to /object/{id},
+// which breaks on platforms using hash routing (Capacitor mobile, Electron
+// desktop) — the URL becomes an unreachable file:// or https:// path and the
+// screen goes blank. Intercept the click and navigate via the Vue router.
+function onClick(event) {
+    const anchor = event.target?.closest?.('a[href]');
+    if (!anchor) return;
+    const match = anchor.getAttribute('href')?.match(/^\/object\/([^/?#]+)/);
+    if (!match) return;
+    event.preventDefault();
+    router.push({ name: 'object', params: { uid: match[1] } });
+}
 
 const resolveName = (id, fallback) => {
     if (!id) return 'Unknown';
