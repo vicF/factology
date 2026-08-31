@@ -5,6 +5,8 @@
         "build": "vite build",
         "build:capacitor": "vite build --config vite.config.capacitor.js --mode capacitor",
         "build:android": "bash build-android.sh",
+        "build:electron": "bash build-electron.sh",
+        "run:electron": "bash run-electron.sh",
         "test:vitest": "vitest run --config vitest.config.js",
         "test:vitest-watch": "vitest --config vitest.config.js"
     },
@@ -28,6 +30,7 @@
         "vue-router": "^4.6.4"
     },
     "devDependencies": {
+        "@capacitor-community/electron": "^5.0.1",
         "@capacitor/android": "^8.0.1",
         "@capacitor/cli": "^8.0.1",
         "@capacitor/preferences": "^8.0.1",

@@ -35,8 +35,9 @@ dist-capacitor/
 /electron/
 .env.capacitor
 
-# Output of build-android.sh (keep .gitkeep)
+# Output of build-android.sh / build-electron.sh (keep .gitkeep)
 dist-android/
+dist-electron/
 
 # Node dependencies (nested toolchains, e.g. tests-js)
 node_modules/
