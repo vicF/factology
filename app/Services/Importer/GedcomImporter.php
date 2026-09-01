@@ -258,6 +258,11 @@ class GedcomImporter
         $surname = GedcomParser::childValue($nameNode, 'SURN');
         $marriedName = GedcomParser::childValue($nameNode, '_MARNM');
 
+        // If SURN tag is missing, extract surname from NAME value (between //)
+        if ($surname === null && preg_match('#/([^/]+)/#u', $rawName, $m)) {
+            $surname = trim($m[1]);
+        }
+
         $cleanName = self::cleanGedcomName($rawName);
         if ($givenName !== null && $surname !== null) {
             // Format: <given patronymic> <surname> (<birth surname>)
@@ -327,7 +332,8 @@ class GedcomImporter
         if ($surname !== null) {
             $properties['surname'] = $surname;
         }
-        if ($marriedName !== null) {
+        // Only store married_name for women when it differs from birth surname
+        if ($sex === 'F' && $marriedName !== null && $marriedName !== $surname) {
             $properties['married_name'] = $marriedName;
         }
         if ($this->sourceGuid !== null) {
