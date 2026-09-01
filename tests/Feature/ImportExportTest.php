@@ -37,6 +37,57 @@ class ImportExportTest extends TestCase
     }
 
     /** @test */
+    public function non_admin_exports_everything_they_can_see()
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+
+        // Public thing owned by someone else (visible) and a private foreign
+        // thing (must stay hidden).
+        $publicThing = uuid_create();
+        $hiddenThing = uuid_create();
+        $otherOwner = uuid_create();
+        DB::table('things')->insert([
+            ['thing_id' => $publicThing, 'name' => 'Public Thing', 'type' => UUID::G_THING, 'public' => true, 'owner' => $otherOwner, 'server_uuid' => $serverUuid],
+            ['thing_id' => $hiddenThing, 'name' => 'Hidden Thing', 'type' => UUID::G_THING, 'public' => false, 'owner' => $otherOwner, 'server_uuid' => $serverUuid],
+        ]);
+
+        // Link between the user's thing and the public thing (visible), and a
+        // link from the public thing into the hidden thing (not visible).
+        DB::table('links')->insert([
+            'link_uuid'      => uuid_create(),
+            'one_thing_id'   => $user->thing_id,
+            'link_type_id'   => UUID::PRESENT,
+            'other_thing_id' => $publicThing,
+            'public'         => true,
+        ]);
+        DB::table('links')->insert([
+            'link_uuid'      => uuid_create(),
+            'one_thing_id'   => $publicThing,
+            'link_type_id'   => UUID::PRESENT,
+            'other_thing_id' => $hiddenThing,
+            'public'         => true,
+        ]);
+
+        $response = $this->get(self::API_PREFIX . '/export');
+        $response->assertStatus(200);
+
+        // The export is a streamed response — run the stream callback to
+        // capture the produced JSON.
+        ob_start();
+        $response->baseResponse->sendContent();
+        $content = ob_get_clean();
+
+        $this->assertStringContainsString($publicThing, $content);
+        $this->assertStringContainsString($user->thing_id, $content);
+        $this->assertStringNotContainsString($hiddenThing, $content);
+    }
+
+    /** @test */
     public function admin_can_access_export()
     {
         $admin = $this->createAdminUser();

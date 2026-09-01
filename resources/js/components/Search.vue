@@ -7,24 +7,6 @@
                 </div>
             </div>
         </div>
-        <!-- Admin toolbar: Export / Import -->
-        <div v-if="authStore.user?.is_admin" class="row mb-2">
-            <div class="col-md-10 offset-md-1">
-                <div class="admin-toolbar d-flex gap-2 align-items-center">
-                    <button class="btn btn-outline-secondary btn-sm" @click="exportData" :disabled="exporting">
-                        {{ exporting ? $t('Exporting...') : $t('Export') }}
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" @click="showImportModal = true">
-                        {{ $t('Import') }}
-                    </button>
-                    <label class="small text-muted mb-0 ms-2">
-                        <input type="checkbox" v-model="includeDeleted" />
-                        {{ $t('Include deleted') }}
-                    </label>
-                </div>
-            </div>
-        </div>
-
         <div v-if="loaded && objects.length === 0" class="row">
             <div class="col text-center py-5">
                 <p class="text-muted">{{ $t('No results found') }}</p>
@@ -147,7 +129,6 @@
             </div>
         </div>
 
-        <ImportModal v-if="showImportModal" @close="showImportModal = false" />
         <ConfirmModal
             :show="showConfirmModal"
             :title="confirmTitle"
@@ -171,7 +152,6 @@ import { useAuthStore } from '../stores/auth';
 import { currentLocale } from '../utils/localized.js';
 import { FlexibleDate } from '../utils/flexibleDate.js';
 import Image from "./Image.vue";
-import ImportModal from "./ImportModal.vue";
 import ConfirmModal from './ConfirmModal.vue';
 import RelatedList from "./RelatedList.vue";
 import LinkDescription from "./LinkDescription.vue";
@@ -372,11 +352,6 @@ const handleToggleConfirm = () => {
     fn();
 };
 
-// Export/Import state
-const exporting = ref(false);
-const includeDeleted = ref(false);
-const showImportModal = ref(false);
-
 if (props.typeThing !== undefined && props.typeThing !== null) {
     searchStore.setTypeThing(props.typeThing === 'true' || props.typeThing === true);
 }
@@ -400,33 +375,6 @@ const truncateText = (text, maxLength) => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
-};
-
-const exportData = async () => {
-    exporting.value = true;
-    try {
-        const response = await axios.get('/export', {
-            params: { include_deleted: includeDeleted.value },
-            responseType: 'blob',
-        });
-
-        // Trigger browser download using raw blob (avoids double-encoding)
-        const blob = new Blob([response.data], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        a.download = `factology-export-${timestamp}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error('Export failed:', error);
-        alert('Export failed: ' + (error.response?.data?.message || error.message));
-    } finally {
-        exporting.value = false;
-    }
 };
 
 // Monotonic request sequence: only the latest search request may apply its

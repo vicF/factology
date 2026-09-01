@@ -7,6 +7,7 @@ use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ExportImportController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\TestDatabaseController;
+use App\Http\Controllers\ToolsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -112,6 +113,9 @@ Route::prefix('v1')->group(function () {
         // GEDCOM import (any authenticated user imports into their own tree)
         Route::post('/import/gedcom',         [ImportController::class, 'importGedcom']);
         Route::post('/import/find-duplicates', [ImportController::class, 'findDuplicates']);
+
+        // Database consistency audit (admin-only, enforced in the controller)
+        Route::post('/tools/consistency-check', [ToolsController::class, 'consistencyCheck']);
     });
 });
 
