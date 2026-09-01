@@ -838,6 +838,13 @@ class Everything
     }
 
     /**
+     * Delete a thing record by id.
+     *
+     * Bypasses the AuthScope (read-visibility) global scope: deleteById is
+     * always called after explicit authorization, and the read scope would
+     * otherwise silently match 0 rows for private objects the acting user does
+     * not "see" — turning a legitimate admin/owner delete into a no-op.
+     *
      * @param $id
      * @return bool|null
      * @throws \Exception
@@ -845,7 +852,7 @@ class Everything
     public static function deleteById($id): ?bool
     {
         @unlink(self::getThumbPathById($id, false));
-        return Thing::where('thing_id', $id)->delete();
+        return Thing::withoutGlobalScopes()->where('thing_id', $id)->delete();
     }
 
     public function setClass(array $classLink): bool

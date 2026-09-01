@@ -114,8 +114,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/import/gedcom',         [ImportController::class, 'importGedcom']);
         Route::post('/import/find-duplicates', [ImportController::class, 'findDuplicates']);
 
-        // Database consistency audit (admin-only, enforced in the controller)
+        // Database consistency audit (all authenticated users; scoped for non-admins)
         Route::post('/tools/consistency-check', [ToolsController::class, 'consistencyCheck']);
+        Route::post('/tools/consistency-delete', [ToolsController::class, 'deleteSelected']);
     });
 });
 

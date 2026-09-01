@@ -59,6 +59,22 @@ class DatabaseConsistencyTest extends TestCase
         return (new DatabaseConsistencyChecker())->check();
     }
 
+    /**
+     * Create a thing record for a user and assign it, so users.thing_id FK
+     * constraint is satisfied.
+     */
+    private function createUserThing(\App\Models\User $user): string
+    {
+        $thingId = uuid_create();
+        $this->insertThing($thingId, 'thing-' . $user->name, UUID::G_THING, [
+            'owner'   => $thingId,
+            'public'  => 0,
+        ]);
+        $user->thing_id = $thingId;
+        $user->save();
+        return $thingId;
+    }
+
     private function issueIds(string $check): array
     {
         return array_column($this->checkReport()['issues'][$check], 'thing_id');
@@ -228,12 +244,103 @@ class DatabaseConsistencyTest extends TestCase
     }
 
     /** @test */
-    public function non_admin_is_rejected_from_consistency_check()
+    public function non_admin_can_run_consistency_check_scoped_to_their_own_objects()
     {
         $user = $this->createTestUser()->getUser();
+        $this->createUserThing($user);
         Sanctum::actingAs($user, ['*']);
 
-        $this->postJson('/api/v1/tools/consistency-check')->assertForbidden();
+        // An orphan owned by the user — should be reported.
+        $mine = uuid_create();
+        $this->insertThing($mine, 'My orphan', UUID::G_THING, ['owner' => $user->thing_id, 'public' => 0]);
+        // Someone else's orphan — must stay hidden from this user.
+        $theirs = uuid_create();
+        $this->insertThing($theirs, 'Their orphan', UUID::G_THING, ['owner' => uuid_create(), 'public' => 0]);
+
+        $response = $this->postJson('/api/v1/tools/consistency-check')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $ids = array_column($response->json('result.issues.objects_without_classes'), 'thing_id');
+        $this->assertContains($mine, $ids);
+        $this->assertNotContains($theirs, $ids);
+    }
+
+    /** @test */
+    public function non_admin_can_delete_their_own_selected_objects()
+    {
+        $user = $this->createTestUser()->getUser();
+        $this->createUserThing($user);
+        Sanctum::actingAs($user, ['*']);
+
+        $mine = uuid_create();
+        $this->insertThing($mine, 'My orphan', UUID::G_THING, ['owner' => $user->thing_id]);
+
+        $this->postJson('/api/v1/tools/consistency-delete', ['ids' => [$mine]])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('deleted', 1);
+
+        $this->assertDatabaseMissing('things', ['thing_id' => $mine]);
+    }
+
+    /** @test */
+    public function non_admin_cannot_delete_objects_they_do_not_own()
+    {
+        $user = $this->createTestUser()->getUser();
+        $this->createUserThing($user);
+        Sanctum::actingAs($user, ['*']);
+
+        $theirs = uuid_create();
+        $this->insertThing($theirs, 'Their orphan', UUID::G_THING, ['owner' => uuid_create()]);
+
+        $this->postJson('/api/v1/tools/consistency-delete', ['ids' => [$theirs]])
+            ->assertOk()
+            ->assertJsonPath('deleted', 0);
+
+        $this->assertDatabaseHas('things', ['thing_id' => $theirs]);
+    }
+
+    /** @test */
+    public function admin_can_delete_any_selected_object()
+    {
+        $admin = $this->createTestUser()->getUser();
+        $admin->is_admin = true;
+        $admin->save();
+        Sanctum::actingAs($admin, ['*']);
+
+        // A private object owned by someone else — the delete must not be
+        // silently swallowed by the read-visibility scope (regression: an
+        // admin's hard delete used to no-op on private, non-owned objects).
+        $any = uuid_create();
+        $this->insertThing($any, "Someone else's", UUID::G_THING, ['owner' => uuid_create(), 'public' => 0]);
+
+        $this->postJson('/api/v1/tools/consistency-delete', ['ids' => [$any]])
+            ->assertOk()
+            ->assertJsonPath('deleted', 1)
+            ->assertJsonPath('failed', []);
+
+        $this->assertDatabaseMissing('things', ['thing_id' => $any]);
+    }
+
+    /** @test */
+    public function non_admin_can_delete_their_own_private_object()
+    {
+        $user = $this->createTestUser()->getUser();
+        $this->createUserThing($user);
+        Sanctum::actingAs($user, ['*']);
+
+        $mine = uuid_create();
+        $this->insertThing($mine, 'My private orphan', UUID::G_THING, [
+            'owner'   => $user->thing_id,
+            'public'  => 0,
+        ]);
+
+        $this->postJson('/api/v1/tools/consistency-delete', ['ids' => [$mine]])
+            ->assertOk()
+            ->assertJsonPath('deleted', 1);
+
+        $this->assertDatabaseMissing('things', ['thing_id' => $mine]);
     }
 
     /** @test */
