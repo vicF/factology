@@ -27,8 +27,8 @@
             <ImportModal v-if="showImportModal" @close="showImportModal = false" />
         </section>
 
-        <!-- ── Database Consistency Check (admin) ────────────────────── -->
-        <section v-if="isAdmin" class="card mb-4" data-testid="consistency-section">
+        <!-- ── Database Consistency Check (all registered users) ─────── -->
+        <section v-if="authStore.authenticated" class="card mb-4" data-testid="consistency-section">
             <div class="card-header">
                 <h5 class="mb-0">{{ $t('Database Consistency Check') }}</h5>
             </div>
@@ -37,15 +37,26 @@
                     {{ $t('Check for structural data problems: dangling links, self-references, objects without classes, classes outside the hierarchy, and link types not under the Link taxonomy.') }}
                 </p>
 
-                <button
-                    class="btn btn-primary mb-3"
-                    :disabled="checkingConsistency"
-                    @click="runConsistencyCheck"
-                    data-testid="run-consistency-check-btn"
-                >
-                    <span v-if="checkingConsistency" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    {{ checkingConsistency ? $t('Checking...') : $t('Run Consistency Check') }}
-                </button>
+                <div class="d-flex gap-2 mb-3 align-items-center">
+                    <button
+                        class="btn btn-primary"
+                        :disabled="checkingConsistency"
+                        @click="runConsistencyCheck"
+                        data-testid="run-consistency-check-btn"
+                    >
+                        <span v-if="checkingConsistency" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        {{ checkingConsistency ? $t('Checking...') : $t('Run Consistency Check') }}
+                    </button>
+                    <button
+                        class="btn btn-danger"
+                        :disabled="deleting || selectedIds.length === 0"
+                        @click="deleteSelected"
+                        data-testid="delete-selected-btn"
+                    >
+                        <span v-if="deleting" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        {{ deleting ? $t('Deleting...') : $t('Delete selected') }}
+                    </button>
+                </div>
 
                 <div v-if="consistencyError" class="alert alert-danger">{{ consistencyError }}</div>
 
@@ -76,6 +87,14 @@
                             <h6>{{ $t(checkLabel(check)) }} ({{ items.length }})</h6>
                             <ul class="list-group mb-3">
                                 <li v-for="(item, i) in items" :key="i" class="list-group-item small d-flex flex-wrap gap-1 align-items-baseline">
+                                    <input
+                                        v-if="deletableThingId(check, item)"
+                                        type="checkbox"
+                                        class="form-check-input me-1 align-self-center"
+                                        :value="deletableThingId(check, item)"
+                                        v-model="selectedIds"
+                                        :data-testid="`consistency-item-checkbox-${check}`"
+                                    />
                                     <template v-for="(part, pi) in issueParts(check, item)" :key="pi">
                                         <RouterLink
                                             v-if="part.thing_id"
@@ -202,16 +221,17 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import axios from 'axios';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { storageSync } from '../utils/storage';
 import ImportModal from "./ImportModal.vue";
 
 defineOptions({ name: 'Tools' });
 
+const { t } = useI18n();
 const authStore = useAuthStore();
-const isAdmin = computed(() => !!authStore.user?.is_admin);
 
 // ── Export / Import state ──
 const exporting = ref(false);
@@ -339,6 +359,8 @@ const loadCachedConsistency = () => {
 const checkingConsistency = ref(false);
 const consistencyError = ref('');
 const consistencyResult = ref(loadCachedConsistency());
+const deleting = ref(false);
+const selectedIds = ref([]);
 
 // Thing ids already opened from the report — shown struck-through so the user
 // can see at a glance which objects they've already visited.
@@ -418,6 +440,25 @@ const issueParts = (check, item) => {
     }
 };
 
+// Which object in an issue item is the "erroneous object" a user would delete.
+// Null means the item has nothing deletable (e.g. the dangling endpoint itself).
+const deletableThingId = (check, item) => {
+    switch (check) {
+        case 'links_to_missing_objects':
+            return item.missing.includes('one_thing_id') ? null : item.one_thing_id;
+        case 'self_referencing_links':
+            return item.one_thing_id;
+        case 'objects_without_classes':
+        case 'classes_without_parent':
+        case 'links_not_below_link_parent':
+            return item.thing_id;
+        case 'class_links_to_non_classes':
+            return item.one_thing_id;
+        default:
+            return null;
+    }
+};
+
 const runConsistencyCheck = async () => {
     checkingConsistency.value = true;
     consistencyError.value = '';
@@ -436,6 +477,39 @@ const runConsistencyCheck = async () => {
         consistencyError.value = serverMsg || `Request failed: ${err.message}. Check console (F12).`;
     } finally {
         checkingConsistency.value = false;
+    }
+};
+
+const deleteSelected = async () => {
+    if (selectedIds.value.length === 0) return;
+    if (!confirm(t('Delete the selected {count} object(s)?', { count: selectedIds.value.length }))) return;
+
+    deleting.value = true;
+    consistencyError.value = '';
+
+    try {
+        const response = await axios.post('/tools/consistency-delete', {
+            ids: selectedIds.value,
+        });
+        if (response.data.success) {
+            selectedIds.value = [];
+            if (response.data.failed?.length) {
+                consistencyError.value = t('Could not delete {count} object(s).', {
+                    count: response.data.failed.length,
+                });
+            }
+            // Deletion changes the graph (cascades links), so refresh the report
+            // and the cached copy to reflect what remains.
+            await runConsistencyCheck();
+        } else {
+            consistencyError.value = response.data.message || 'Delete failed';
+        }
+    } catch (err) {
+        console.error('Consistency delete error:', err);
+        const serverMsg = err.response?.data?.message || err.response?.data?.error?.message;
+        consistencyError.value = serverMsg || `Request failed: ${err.message}. Check console (F12).`;
+    } finally {
+        deleting.value = false;
     }
 };
 </script>

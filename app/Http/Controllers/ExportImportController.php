@@ -352,8 +352,11 @@ class ExportImportController extends BaseController
 
         // Bulk imports can leave structural issues behind (e.g. objects whose
         // class did not make it into the source export). Audit the database and
-        // attach the report so the caller can spot problems right away.
-        $result['consistency'] = (new DatabaseConsistencyChecker())->check();
+        // attach the report so the caller can spot problems right away. Non-admin
+        // users only see issues in their own imported data.
+        $result['consistency'] = (new DatabaseConsistencyChecker())->check(
+            $isAdmin ? null : $userThingId
+        );
 
         return response()->json([
             'success' => true,

@@ -33,6 +33,12 @@ class DatabaseConsistencyChecker
     /**
      * Run all consistency checks and return a report.
      *
+     * Pass $ownerThingId (the authenticated user's thing_id) to scope the audit
+     * to that user's own data — non-admin users must only ever see and act on
+     * objects they have rights for. Null means a DB-wide audit (admins, the
+     * artisan command, imports).
+     *
+     * @param string|null $ownerThingId scope the report to this owner's things
      * @return array{
      *     checked_at: string,
      *     clean: bool,
@@ -40,15 +46,15 @@ class DatabaseConsistencyChecker
      *     issues: array<string, array>,
      * }
      */
-    public function check(): array
+    public function check(?string $ownerThingId = null): array
     {
         $issues = [
-            'links_to_missing_objects'    => $this->linksToMissingObjects(),
-            'self_referencing_links'      => $this->selfReferencingLinks(),
-            'objects_without_classes'     => $this->objectsWithoutClasses(),
-            'classes_without_parent'      => $this->classesWithoutParent(),
-            'links_not_below_link_parent' => $this->linksNotBelowLinkParent(),
-            'class_links_to_non_classes'  => $this->classLinksToNonClasses(),
+            'links_to_missing_objects'    => $this->linksToMissingObjects($ownerThingId),
+            'self_referencing_links'      => $this->selfReferencingLinks($ownerThingId),
+            'objects_without_classes'     => $this->objectsWithoutClasses($ownerThingId),
+            'classes_without_parent'      => $this->classesWithoutParent($ownerThingId),
+            'links_not_below_link_parent' => $this->linksNotBelowLinkParent($ownerThingId),
+            'class_links_to_non_classes'  => $this->classLinksToNonClasses($ownerThingId),
         ];
 
         $summary = array_map('count', $issues);
@@ -66,12 +72,13 @@ class DatabaseConsistencyChecker
      *    a missing link type. Normally prevented by FK constraints, so this
      *    survives only hand-edited / legacy / sloppily imported databases.
      */
-    private function linksToMissingObjects(): array
+    private function linksToMissingObjects(?string $ownerThingId = null): array
     {
         return DB::table('links as l')
             ->leftJoin('things as one', 'one.thing_id', '=', 'l.one_thing_id')
             ->leftJoin('things as type', 'type.thing_id', '=', 'l.link_type_id')
             ->leftJoin('things as other', 'other.thing_id', '=', 'l.other_thing_id')
+            ->when($ownerThingId, fn ($q) => $q->whereIn('l.one_thing_id', $this->ownedThings($ownerThingId)))
             ->where('l.deleted', false)
             ->where(function ($q) {
                 $q->whereNull('one.thing_id')
@@ -115,9 +122,10 @@ class DatabaseConsistencyChecker
     /**
      * 2. Links where an object refers to itself (one_thing_id == other_thing_id).
      */
-    private function selfReferencingLinks(): array
+    private function selfReferencingLinks(?string $ownerThingId = null): array
     {
         return DB::table('links')
+            ->when($ownerThingId, fn ($q) => $q->whereIn('one_thing_id', $this->ownedThings($ownerThingId)))
             ->where('deleted', false)
             ->whereColumn('one_thing_id', 'other_thing_id')
             ->orderBy('link_id')
@@ -136,11 +144,12 @@ class DatabaseConsistencyChecker
      * 3. Concrete objects (things, servers, externals) that have no
      *    non-deleted LINK_TO_CLASS link.
      */
-    private function objectsWithoutClasses(): array
+    private function objectsWithoutClasses(?string $ownerThingId = null): array
     {
         return DB::table('things as t')
             ->whereIn('t.type', self::OBJECT_TYPES)
             ->where('t.deleted', false)
+            ->when($ownerThingId, fn ($q) => $q->where('t.owner', $ownerThingId))
             ->whereNotExists(function ($q) {
                 $q->select(DB::raw(1))
                     ->from('links as l')
@@ -164,11 +173,12 @@ class DatabaseConsistencyChecker
      *    are detached from the class hierarchy. The structural root "Everything"
      *    is type GENERAL, so it never matches here.
      */
-    private function classesWithoutParent(): array
+    private function classesWithoutParent(?string $ownerThingId = null): array
     {
         return DB::table('things as t')
             ->where('t.type', UUID::G_CLASS)
             ->where('t.deleted', false)
+            ->when($ownerThingId, fn ($q) => $q->where('t.owner', $ownerThingId))
             ->whereNotExists(function ($q) {
                 $q->select(DB::raw(1))
                     ->from('links as l')
@@ -195,7 +205,7 @@ class DatabaseConsistencyChecker
      * ancestors never include Link/System (e.g. it hangs under a class), is
      * reported.
      */
-    private function linksNotBelowLinkParent(): array
+    private function linksNotBelowLinkParent(?string $ownerThingId = null): array
     {
         // Load the whole hierarchy once: child thing_id => parent thing_ids.
         $parents = [];
@@ -212,6 +222,7 @@ class DatabaseConsistencyChecker
         $linkTypes = DB::table('things')
             ->where('type', UUID::G_LINK)
             ->where('deleted', false)
+            ->when($ownerThingId, fn ($q) => $q->where('owner', $ownerThingId))
             ->orderBy('name')
             ->get(['thing_id', 'name']);
 
@@ -247,11 +258,12 @@ class DatabaseConsistencyChecker
      *    usable class. Missing targets are already covered by the dangling-link
      *    check.
      */
-    private function classLinksToNonClasses(): array
+    private function classLinksToNonClasses(?string $ownerThingId = null): array
     {
         return DB::table('links as l')
             ->leftJoin('things as t', 'l.other_thing_id', '=', 't.thing_id')
             ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->when($ownerThingId, fn ($q) => $q->whereIn('l.one_thing_id', $this->ownedThings($ownerThingId)))
             ->where('l.deleted', false)
             ->where(function ($q) {
                 $q->where('t.deleted', true)
@@ -280,6 +292,15 @@ class DatabaseConsistencyChecker
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Subquery selecting the thing_ids owned by the given user's thing.
+     * Used to scope link checks to links originating from the user's objects.
+     */
+    private function ownedThings(?string $ownerThingId)
+    {
+        return DB::table('things')->where('owner', $ownerThingId)->select('thing_id');
     }
 
     /**
