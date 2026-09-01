@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportRequest;
+use App\Services\DatabaseConsistencyChecker;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
@@ -13,7 +14,9 @@ class ExportImportController extends BaseController
 {
     /**
      * Export things and links as JSON.
-     * Admins export everything; regular users export only their own objects.
+     * Admins export everything; regular users export everything they can see —
+     * their own objects plus public ones (and links whose both endpoints — and
+     * link type — are within that visible set).
      */
     public function export(Request $request)
     {
@@ -25,22 +28,29 @@ class ExportImportController extends BaseController
         $thingsQuery = DB::table('things');
         $linksQuery = DB::table('links');
 
-        // Non-admin users see only their own things
         if (!$isAdmin) {
-            $thingsQuery->where('owner', $userThingId);
+            // The set of thing_ids visible to this user: public or owned by them.
+            $visibleIds = DB::table('things')
+                ->where(function ($q) use ($userThingId) {
+                    $q->where('public', true)
+                        ->orWhere('owner', $userThingId);
+                })
+                ->select('thing_id');
+
+            $thingsQuery->where(function ($q) use ($userThingId) {
+                $q->where('public', true)
+                    ->orWhere('owner', $userThingId);
+            });
+
+            // Links are visible when both endpoints (and the link type) are.
+            $linksQuery->whereIn('one_thing_id', $visibleIds)
+                ->whereIn('other_thing_id', $visibleIds)
+                ->whereIn('link_type_id', $visibleIds);
         }
 
         if (!$includeDeleted) {
             $thingsQuery->where('deleted', false);
             $linksQuery->where('deleted', false);
-        }
-
-        // For non-admin, also scope links to the user's things
-        if (!$isAdmin) {
-            $linksQuery->where(function ($q) use ($userThingId) {
-                $q->where('one_thing_id', $userThingId)
-                  ->orWhere('other_thing_id', $userThingId);
-            });
         }
 
         $totalThings = $thingsQuery->count();
@@ -56,7 +66,7 @@ class ExportImportController extends BaseController
             echo '"server_uuid":' . json_encode($serverUuid) . ',';
             echo '"exported_by":' . json_encode(Auth::user()->thing_id) . ',';
             echo '"include_deleted":' . json_encode($includeDeleted) . ',';
-            echo '"export_scope":"' . ($isAdmin ? 'all' : 'own') . '",';
+            echo '"export_scope":"' . ($isAdmin ? 'all' : 'visible') . '",';
             echo '"stats":' . json_encode(['things' => $totalThings, 'links' => $totalLinks]) . ',';
 
             // ── Things ──────────────────────────────────────────────
@@ -339,6 +349,11 @@ class ExportImportController extends BaseController
                 'result'  => $result,
             ], 500);
         }
+
+        // Bulk imports can leave structural issues behind (e.g. objects whose
+        // class did not make it into the source export). Audit the database and
+        // attach the report so the caller can spot problems right away.
+        $result['consistency'] = (new DatabaseConsistencyChecker())->check();
 
         return response()->json([
             'success' => true,
