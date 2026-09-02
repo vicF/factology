@@ -48,3 +48,5 @@ database/Dumps/restore_mysql.cmd
 storage/logs/
 .workspace
 bash.exe.stackdump
+dist-pawlo/
+dist-pawlo-apk/pawlo-debug.apk
