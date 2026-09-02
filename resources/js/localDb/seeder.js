@@ -14,12 +14,15 @@ import {
     CLASSES,
     CLASS_LINKS,
 } from './seedData';
+import { SEED_TRANSLATIONS } from './seedTranslations';
 
 const makeObject = (t) => ({
     thing_id: t.thing_id,
     name: t.name,
     type: t.type,
     description: t.description || null,
+    name_translations: t.name_translations ?? SEED_TRANSLATIONS[t.thing_id] ?? null,
+    description_translations: t.description_translations ?? null,
     start: null,
     end: null,
     public: t.public ? 1 : 0,
@@ -49,6 +52,69 @@ const makeLink = (l) => ({
 // Sentinel class id — presence proves the class list has been seeded.
 const CITY_CLASS_ID = '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee';
 
+/**
+ * Normalize an already-seeded database: heal class-hierarchy edge duplicates
+ * and backfill missing name_translations on seed objects.
+ *
+ * These are safe to run on every boot (cheap scans on a small index).
+ */
+async function normalizeSeedData(db) {
+    // ── 1. Dedupe class-hierarchy (LINK_TO_PARENT) edges ────────────────
+    // Collapse duplicate rows for the same (one, type, other) triplet into
+    // one row, preferring the canonical link_uuid / SYNCED status.
+    //
+    // Only groups that involve a seed row (link_id `seed-…`) or a row without
+    // a link_uuid are touched — that is the exact corruption signature of the
+    // old import/sync (which could not dedupe seed rows because they lacked a
+    // link_uuid). Two rows that both carry link_uuids are left alone (they may
+    // be distinct synced records).
+    const allHierarchy = await db.links
+        .where('link_type_id')
+        .equals(UUID.LINK_TO_PARENT)
+        .toArray();
+
+    const groups = {};
+    for (const row of allHierarchy) {
+        const key = row.one_thing_id + '|' + row.other_thing_id;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    }
+
+    const toDelete = [];
+    for (const rows of Object.values(groups)) {
+        if (rows.length <= 1) continue;
+        const involvesSeed = rows.some(r => r.link_id?.startsWith('seed-') || !r.link_uuid);
+        if (!involvesSeed) continue;
+        // Pick keeper: prefer SYNCED (seed), else row with link_uuid, else first.
+        const keeper = rows.find(r => r._syncStatus === SYNC_STATUS.SYNCED)
+            || rows.find(r => r.link_uuid)
+            || rows[0];
+        // Adopt the best link_uuid (from the deleted row if keeper lacks one).
+        const bestUuid = rows.find(r => r.link_uuid)?.link_uuid ?? null;
+        if (bestUuid && !keeper.link_uuid) {
+            keeper.link_uuid = bestUuid;
+            await db.links.put(keeper);
+        }
+        for (const row of rows) {
+            if (row.link_id !== keeper.link_id) toDelete.push(row.link_id);
+        }
+    }
+    if (toDelete.length > 0) {
+        console.log('[Seeder] Removed', toDelete.length, 'duplicate class-hierarchy edges');
+        await db.links.bulkDelete(toDelete);
+    }
+
+    // ── 2. Backfill missing name_translations on seed objects ────────────
+    // Only fill when the field is null/empty — never overwrite user edits.
+    for (const [id, nt] of Object.entries(SEED_TRANSLATIONS)) {
+        const existing = await db.objects.get(id);
+        if (existing && !existing.name_translations) {
+            existing.name_translations = nt;
+            await db.objects.put(existing);
+        }
+    }
+}
+
 // Legacy pre-parity demo objects (from the old standalone seeder).
 const LEGACY_DEMO_IDS = [
     'a0000000-0000-0000-0000-000000000001',
@@ -77,6 +143,9 @@ async function removeLegacySeedData(db) {
  */
 export async function seedLocalDb() {
     const db = getDb();
+
+    // Always run normalization (heals existing installs on every boot).
+    await normalizeSeedData(db);
 
     const everything = await db.objects.get(UUID.EVERYTHING);
     const cityClass = await db.objects.get(CITY_CLASS_ID);
