@@ -1067,6 +1067,39 @@ class ApiTest extends TestCase
     }
 
     /**
+     * Search ranks an EXACT name match above prefix matches above substring
+     * matches above description-only matches — even when a lower tier has a
+     * newer start date (relevance must win over the date sort).
+     */
+    public function testSearchRanksExactNameBeforePrefixBeforeSubstring(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs, so use a unique per-run
+        // token so the search term only ever matches this run's objects.
+        $token = 'Zzpillow' . substr(uuid_create(), 0, 8);
+        $this->createTestObject($user, ['name' => $token, 'description' => 'the thing itself, undated']);
+        $this->createTestObject($user, ['name' => "$token photo.jpg", 'start' => '20240101']);       // prefix, newer
+        $this->createTestObject($user, ['name' => "Foo $token Bar", 'start' => '20250101']);         // substring, newest
+        $this->createTestObject($user, ['name' => 'Unrelated photo', 'description' => "mentions $token"]); // description only
+
+        $res = $this->postJson('/api/v1/object', ['search' => $token]);
+        $res->assertStatus(200);
+
+        $ours = collect($res->json('things'))
+            ->filter(fn ($t) => in_array($t['name'], [$token, "$token photo.jpg", "Foo $token Bar", 'Unrelated photo'], true))
+            ->pluck('name')
+            ->values()
+            ->all();
+        $this->assertSame(
+            [$token, "$token photo.jpg", "Foo $token Bar", 'Unrelated photo'],
+            $ours,
+            'Expected exact → prefix → substring → description-only order'
+        );
+    }
+
+    /**
      * Link descriptions: the detail endpoint exposes BOTH endpoint names for
      * every link (`one_name` = one_thing_id's name, `name` = other_thing_id's
      * name) regardless of direction, so the frontend can render incoming and

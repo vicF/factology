@@ -37,6 +37,7 @@ vi.mock('@/stores/objectHistory', () => ({
         getRecentSync: vi.fn(() => []),
         getSuggestions: vi.fn(() => []),
         recordSelection: vi.fn(),
+        getUsageRank: vi.fn(() => new Map()),
     })),
 }))
 

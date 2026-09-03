@@ -315,7 +315,15 @@ const selectedIds = computed(() => {
 const filteredObjects = computed(() => {
     let results = [];
     if (searchResults.value.length > 0) {
-        results = searchResults.value;
+        const term = searchText.value.trim().toLowerCase();
+        if (term.length >= 2) {
+            const usage = typeof historyStore.getUsageRank === 'function'
+                ? historyStore.getUsageRank(props.contextObjectType, props.contextLinkTypeId)
+                : new Map();
+            results = rankTypedSearch(searchResults.value, term, usage);
+        } else {
+            results = searchResults.value;
+        }
     } else if (!searchText.value.trim()) {
         // The initial list comes from loadSuggestions (persisted recent items
         // first, filled from other sources). It is a stable snapshot — do not
@@ -347,6 +355,48 @@ const showCategoryHeader = (obj, index) => {
     return categoryKey(obj) !== categoryKey(filteredObjects.value[index - 1]);
 };
 const categoryLabel = (obj) => fieldText(obj.category_name, obj.category_translations);
+
+// ── Typed-search ranking ───────────────────────────────────────
+// The server returns name/description substring matches ordered by date, which
+// buries the exact object under look-alike names ("Yellow Pillow" under
+// "Yellow Pillow 001.jpg"). For a picker we want the exact name first, then
+// prefix matches, and — among them — the user's frequently-used objects above
+// rare ones (usage comes from objectHistory, a personal browser signal the
+// server does not have). Original server order breaks ties, preserving its
+// relevance.
+const nameVariants = (obj) => {
+    const out = [];
+    if (obj?.name) out.push(String(obj.name).toLowerCase());
+    const tr = obj?.name_translations;
+    if (tr && typeof tr === 'object') {
+        for (const [key, value] of Object.entries(tr)) {
+            if (key !== 'lang' && typeof value === 'string' && value.trim()) {
+                out.push(value.toLowerCase());
+            }
+        }
+    }
+    return out;
+};
+
+const matchTier = (obj, term) => {
+    let tier = 2;
+    for (const n of nameVariants(obj)) {
+        if (n === term) return 0;
+        if (tier > 1 && n.startsWith(term)) tier = 1;
+    }
+    return tier;
+};
+
+const rankTypedSearch = (items, term, usage) => {
+    const scored = items.map((obj, index) => ({
+        obj,
+        index,
+        // Tier dominates (1000 apart); usage (≤ ~1.6) only rises within a tier.
+        value: matchTier(obj, term) * 1000 - (usage.get(obj.thing_id) || 0),
+    }));
+    scored.sort((a, b) => a.value - b.value || a.index - b.index);
+    return scored.map((s) => s.obj);
+};
 
 // ── Dropdown positioning ──────────────────────────────────────
 const calculateDropdownPosition = () => {

@@ -1363,7 +1363,9 @@ class ApiController extends BaseController
         }
 
         if (@$requestBody['search']) {
-            $term = '%' . $requestBody['search'] . '%';
+            $raw    = trim((string) $requestBody['search']);
+            $prefix = $raw . '%';
+            $term   = '%' . $raw . '%';
             $query->where(function ($query) use ($term) {
                 $query->where('things.name', 'ilike', $term)
                     ->orWhere('things.description', 'ilike', $term)
@@ -1376,17 +1378,20 @@ class ApiController extends BaseController
                     ->orWhere('things.name_search_text', 'ilike', $term)
                     ->orWhere('things.description_search_text', 'ilike', $term);
             });
-            // Sort by relevance: source-language NAME matches first (the person
-            // "Маша Фокина" must outrank a photo whose description merely
-            // mentions "Маша"), then source description matches, then
+            // Sort by relevance: an EXACT source-name match first (typing
+            // "Yellow Pillow" must surface the thing itself, not the many
+            // "Yellow Pillow 001.jpg" photos), then name-prefix, then any
+            // source-name substring, then source-description matches, then
             // translation-only matches. Within a tier the caller's sort_by
             // applies (start date for the timeline, name for pickers).
             // Columns are table-qualified: the classes/favorites filters join
             // `links`, which also has a `description` column.
             $query->orderByRaw('CASE
                 WHEN things.name ILIKE ? THEN 0
-                WHEN things.description ILIKE ? THEN 1
-                ELSE 2 END', [$term, $term]);
+                WHEN things.name ILIKE ? THEN 1
+                WHEN things.name ILIKE ? THEN 2
+                WHEN things.description ILIKE ? THEN 3
+                ELSE 4 END', [$raw, $prefix, $term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {

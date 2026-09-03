@@ -219,4 +219,33 @@ describe('objectHistory store', () => {
 
         expect(store.getRecentSync(THING_TYPE).map(o => o.thing_id)).toEqual(['picked', 'seed-1'])
     })
+
+    it('getUsageRank scores recency, frequency and link-type context', async () => {
+        const store = useObjectHistoryStore()
+        const cache = useObjectCacheStore()
+        cache.cacheObject('a', { thing_id: 'a', type: 3, name: 'A' }, 3)
+        cache.cacheObject('b', { thing_id: 'b', type: 3, name: 'B' }, 3)
+        cache.cacheObject('c', { thing_id: 'c', type: 3, name: 'C' }, 3)
+
+        // a and b used under the same link-type context; b twice. c used last
+        // (globally most recent, but never in that context).
+        await store.recordSelection('a', 3, 3, 'linktype-1')
+        await store.recordSelection('b', 3, 3, 'linktype-1')
+        await store.recordSelection('b', 3, 3, 'linktype-1')
+        await store.recordSelection('c', 3)
+
+        const all = store.getUsageRank()
+        expect(all.has('a')).toBe(true)
+        // c is the most recently picked, so it outranks a (which only had one
+        // earlier pick); b's extra frequency also outranks a.
+        expect(all.get('c')).toBeGreaterThan(all.get('a'))
+        expect(all.get('b')).toBeGreaterThan(all.get('a'))
+
+        // Scoped to the link-type context, the twice-picked b outranks the
+        // merely-most-recent c — the signal a picker needs ("who is always the
+        // author?") that plain recency would miss.
+        const ctx = store.getUsageRank(3, 'linktype-1')
+        expect(ctx.get('b')).toBeGreaterThan(ctx.get('c'))
+        expect(ctx.get('a')).toBeGreaterThan(0)
+    })
 })
