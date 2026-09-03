@@ -20,6 +20,7 @@ const Search = () => import('@/components/Search.vue')
 
 const Object = () => import('@/components/Object.vue')
 const Identity = () => import('@/components/Identity.vue')
+const WelcomeGate = () => import('@/components/WelcomeGate.vue')
 
 const Tools = () => import('@/components/Tools.vue')
 
@@ -71,7 +72,17 @@ const routes = [
                 path: "/identity",
                 component: Identity,
                 meta: {
-                    title: `Identity`
+                    title: `Identity`,
+                    isIdentityFlow: true
+                }
+            },
+            {
+                name: "welcome",
+                path: "/welcome",
+                component: WelcomeGate,
+                meta: {
+                    title: `Welcome`,
+                    isIdentityFlow: true
                 }
             },
             {
@@ -103,9 +114,46 @@ router.afterEach(() => {
     document.documentElement.style.overflow = 'auto';
 });
 
+// Identity gate — offline (standalone) builds only. Web/server mode keeps its
+// server-account flow untouched.
+const IS_STANDALONE = import.meta.env.VITE_TARGET === 'capacitor' && !import.meta.env.VITE_API_URL;
+
 // Navigation guard: show loading bar on route change
 router.beforeEach(async (to, from, next) => {
     document.body.classList.add('page-loading');
+
+    if (IS_STANDALONE) {
+        const { useIdentityStore } = await import('../stores/identity');
+        const identityStore = useIdentityStore();
+        await identityStore.restore();
+
+        // No identity stored yet:
+        //   - a deliberate guest (guestMode) goes straight in,
+        //   - identity-flow pages (/welcome, /identity) stay reachable,
+        //   - otherwise first run lands on the Welcome gate.
+        if (identityStore.items.length === 0) {
+            if (!identityStore.guestMode && !to.meta?.isIdentityFlow) {
+                return next({ name: 'welcome' });
+            }
+            return next();
+        }
+
+        // An identity is stored: keep the Welcome page out of reach and, when a
+        // passphrase-protected identity must be unlocked before the app is
+        // usable, park the user on the Identity manager (reopen = unlock).
+        if (to.name === 'welcome') {
+            return next({ name: 'dashboard' });
+        }
+        const primary = identityStore.primaryItem;
+        const primaryLocked = primary
+            && primary.requirePassphraseOnOpen
+            && !identityStore.unlockedSet.has(primary.thingId);
+        const needsUnlock = !identityStore.unlocked || primaryLocked;
+        if (needsUnlock && !to.meta?.isIdentityFlow) {
+            return next({ path: '/identity', query: { reopen: '1' } });
+        }
+    }
+
     if (to.name === 'register') {
         const { useAuthStore } = await import('../stores/auth');
         const authStore = useAuthStore();

@@ -43,15 +43,30 @@ export async function bootstrapStandalone() {
         const method = config.method?.toLowerCase() || 'get';
         const data = config.data;
 
-        // Mirror the server: a newly created object is owned by the current
-        // user, so pass their thing_id down to the local API handler. An
-        // unlocked identity takes precedence — in the offline app the identity
-        // IS the owner (fresh self-sovereign identities have no account).
+        // In the offline app the (unlocked) PRIMARY identity IS the session
+        // owner: new objects belong to it. `visibleOwners` feeds the owner
+        // visibility filter — null disables filtering (no identity stored yet).
         const context = {
-            userThingId: identityStore.identity?.thingId
-                || authStore.user?.thing_id
-                || null,
+            // Only an UNLOCKED identity may own new data offline. authStore's
+            // user is just the session mirror of that identity (set by
+            // identityStore.refreshSession), so we do not fall back to it.
+            userThingId: identityStore.primary?.thingId || null,
+            visibleOwners: identityStore.currentVisibleOwners(),
         };
+
+        // Guest (no unlocked identity) is read-only: creating/editing/deleting
+        // objects and links requires an identity so the new data has an owner.
+        const isObjectWrite = url.startsWith('/object') && ['post', 'put', 'delete'].includes(method)
+            && !/^\/object\/?$/.test(url); // bare POST /object is a search, not a write
+        const isLinkWrite = url.startsWith('/link') && ['post', 'put', 'delete'].includes(method);
+        if (!context.userThingId && (isObjectWrite || isLinkWrite)) {
+            throw {
+                response: {
+                    status: 403,
+                    data: { message: 'Offline data is read-only until you create or import an identity.' },
+                },
+            };
+        }
 
         let result;
         if (url === '/user' || url === 'user') {

@@ -636,7 +636,9 @@ const authenticated = computed(() => authStore?.authenticated || false);
 // explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
 // SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
 // may edit/delete such objects. A null/undefined owner is also unowned.
-const isSystemDefaultOwner = (uid) => !uid || uid === UUID.VICTOR_FOKIN || uid === UUID.SYSTEM_OWNER;
+// NOTE: UUID.VICTOR_FOKIN is an ordinary identity (never a system owner) and
+// therefore does NOT grant everyone edit rights.
+const isSystemDefaultOwner = (uid) => !uid || uid === UUID.SYSTEM_OWNER;
 
 // Whether the current user may edit this object's own fields. Admins may edit
 // any object (system-owned ones included); everyone else only their own.

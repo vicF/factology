@@ -160,6 +160,62 @@ export async function openIdentityFile(file, passphrase) {
     return { secretKey, publicKey, thingId: file.thing_id, name: file.name, file };
 }
 
+// ─── Auto-open token (device convenience) ────────────────────────────────
+//
+// When the user opts for "open freely on this device" (requirePassphraseOnOpen
+// = false) the app stores a token that lets it decrypt the identity file
+// WITHOUT re-asking the passphrase. The token is the raw file-decryption key
+// (PBKDF2 output) — the passphrase itself is never persisted. Storing it means
+// "trust this device": any attacker who can read device storage can already
+// read the plaintext Dexie data, so the token adds no new exposure. Turning
+// "require passphrase on open" ON deletes the token.
+
+/**
+ * Derive and export the file-decryption key so the file can later be opened
+ * without the passphrase (auto-open convenience on this device).
+ *
+ * @returns {Promise<{ version: number, key: string }>} base64url key token
+ */
+export async function buildAutoOpenToken(file, passphrase) {
+    const material = await crypto.subtle.importKey('raw', te.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: b64d(file.kdf.salt), iterations: file.kdf.iterations, hash: 'SHA-256' },
+        material,
+        { name: 'AES-GCM', length: 256 },
+        true, // extractable — required to persist the token
+        ['encrypt', 'decrypt'],
+    );
+    const raw = await crypto.subtle.exportKey('raw', key);
+    return { version: 1, key: b64e(new Uint8Array(raw)) };
+}
+
+/**
+ * Open an identity file using a stored auto-open token (no passphrase).
+ * @returns {Promise<{ secretKey, publicKey, thingId, name, file }>}
+ */
+export async function openIdentityFileWithToken(file, token) {
+    if (!token || !token.key) {
+        throw new Error('No auto-open token stored for this identity.');
+    }
+    let secretKeyBytes;
+    try {
+        const key = await crypto.subtle.importKey('raw', b64d(token.key), 'AES-GCM', false, ['decrypt']);
+        const plain = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: b64d(file.private_key.iv) },
+            key,
+            b64d(file.private_key.data),
+        );
+        secretKeyBytes = new Uint8Array(plain);
+    } catch {
+        throw new Error('Auto-open token does not match the identity file.');
+    }
+    const publicKey = getPublicKey(secretKeyBytes);
+    if (b64e(publicKey) !== file.public_key) {
+        throw new Error('Auto-open token does not match the identity file.');
+    }
+    return { secretKey: secretKeyBytes, publicKey, thingId: file.thing_id, name: file.name, file };
+}
+
 // ─── Signing ─────────────────────────────────────────────────────────────
 
 /** Sign raw bytes with the identity's secret key; returns base64url. */

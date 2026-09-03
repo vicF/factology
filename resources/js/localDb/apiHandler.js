@@ -30,6 +30,7 @@ import {
 import { saveLink, deleteLink, getLink, listLinksForThing } from './links';
 import { seedLocalDb } from './seeder';
 import { UUID } from '../constants/uuid';
+import { filterVisible, isRowVisible } from './visibility';
 
 /** Generate a unique id for locally-created links (crypto.randomUUID is
  *  available in the Android WebView and Node — avoids bundling the `uuid` npm
@@ -96,14 +97,14 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
 
     // ── /object (POST - search) ──────────────────────────────────────
     if (method === 'post' && parts.length === 0) {
-        return handleSearch(data);
+        return handleSearch(data, context);
     }
 
     // ── /object/{id} ─────────────────────────────────────────────────
     const id = parts[0];
 
     if (method === 'get') {
-        return handleGet(id, depth);
+        return handleGet(id, depth, context);
     }
 
     if (method === 'post') {
@@ -121,14 +122,20 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     throw new Error(`Unhandled local API: ${method} ${url}`);
 }
 
-async function handleSearch(body) {
+async function handleSearch(body, context = {}) {
     const params = typeof body === 'string' ? JSON.parse(body) : (body || {});
+
+    // Owners visible to this session (null = filter disabled). The offline
+    // adapter supplies this; UI never sees rows owned by a locked/unknown
+    // identity (see localDb/visibility.js).
+    const visibleOwners = context.visibleOwners ?? null;
 
     if (params.tree) {
         // Return class tree built from objects + parent-child links.
         // Mirrors the server (searchTree): classes AND link types that
         // descend from Everything via "is a parent of" links.
-        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
+        const all = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
+        const things = filterVisible(all, visibleOwners);
         const tree = await buildClassTree(things);
         return {
             data: { things: tree },
@@ -189,6 +196,10 @@ async function handleSearch(body) {
         return String(va).localeCompare(String(vb)) * sortDir;
     });
 
+    // Drop rows owned by identities that are locked/not active BEFORE the cap,
+    // so hidden rows never consume UI slots.
+    results = filterVisible(results, visibleOwners);
+
     // Cap at 100 like the server LIMIT 100 — the enrichment below is
     // per-object, so the cap must come first (it did in the server SQL too).
     const page = results.slice(0, 100);
@@ -216,7 +227,7 @@ async function handleSearch(body) {
         const relatedLinks = (linksByThing.get(obj.thing_id) || [])
             .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
         const links = depth > 0
-            ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
+            ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH, visibleOwners)
             : undefined;
         const classes = classesByThing.get(obj.thing_id) || [];
         thingsWithLinks.push({
@@ -321,9 +332,16 @@ async function listLinksForThings(thingIds) {
     return map;
 }
 
-async function handleGet(id, depth = 1) {
+async function handleGet(id, depth = 1, context = {}) {
     const obj = await getObject(id);
     if (!obj) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+
+    // A locked identity's own row must not be reachable even by direct
+    // deep-link — hide it like the server would (404).
+    const visibleOwners = context.visibleOwners ?? null;
+    if (!isRowVisible(obj, visibleOwners)) {
         throw { response: { status: 404, data: { message: 'Not found' } } };
     }
 
@@ -335,7 +353,7 @@ async function handleGet(id, depth = 1) {
     const relatedLinks = (await listLinksForThing(id))
         .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
     const links = depth > 0
-        ? await enrichNested(relatedLinks, id, depth, null, BREADTH_CAP, Infinity)
+        ? await enrichNested(relatedLinks, id, depth, null, BREADTH_CAP, Infinity, visibleOwners)
         : undefined;
 
     const classes = await resolveClassesInfo(id);
@@ -637,7 +655,7 @@ async function enrichLinks(links, currentThingId) {
  * (link_start desc, fallback target _updatedAt desc) → name, then cap to the
  * breadth limit. Mirrors the server's RelatedObjectsResolver ordering.
  */
-async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
+async function rankLinksForBreadth(rawLinks, currentThingId, breadth, visibleOwners = null) {
     if (!rawLinks || rawLinks.length === 0) return [];
     const enriched = await enrichLinks(rawLinks, currentThingId);
 
@@ -648,7 +666,14 @@ async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
         if (o) objById[o.thing_id] = o;
     }
 
-    enriched.sort((a, b) => {
+    // Do not surface a related link whose endpoint belongs to a locked/unknown
+    // identity — the target row is invisible, so the relation must not leak it.
+    const visible = enriched.filter((l) => {
+        const target = l.target?.thing_id ? objById[l.target.thing_id] : null;
+        return isRowVisible(target, visibleOwners);
+    });
+
+    visible.sort((a, b) => {
         const ta = objById[a.target?.thing_id];
         const tb = objById[b.target?.thing_id];
         const ra = richnessOf(ta);
@@ -668,7 +693,7 @@ async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
         return String(a.target?.name ?? '').localeCompare(String(b.target?.name ?? ''));
     });
 
-    return enriched.slice(0, breadth);
+    return visible.slice(0, breadth);
 }
 
 function richnessOf(obj) {
@@ -695,14 +720,14 @@ function richnessOf(obj) {
  *                                   e.g. GET /object/{id}; SEARCH_BREADTH for
  *                                   search results)
  */
-async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = null, breadth = BREADTH_CAP, topLevelLimit = null) {
+async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = null, breadth = BREADTH_CAP, topLevelLimit = null, visibleOwners = null) {
     const isTopLevel = visited === null;
     if (isTopLevel) {
         visited = new Set([currentThingId]);
     }
 
     const limit = topLevelLimit != null ? topLevelLimit : breadth;
-    const ranked = await rankLinksForBreadth(rawLinks, currentThingId, limit);
+    const ranked = await rankLinksForBreadth(rawLinks, currentThingId, limit, visibleOwners);
     if (remainingDepth <= 1 || ranked.length === 0) return ranked;
 
     // Children of this whole level, so deeper recursion dedupes against them.
@@ -728,7 +753,7 @@ async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = 
             // too (mirrors the server).
             const childLinks = (await listLinksForThing(tid))
                 .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
-            const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null);
+            const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null, visibleOwners);
             // Recursed links always carry `target.links` (possibly empty) —
             // mirrors the server, so the frontend can distinguish a resolved
             // but empty node from one that was never loaded.

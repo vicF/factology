@@ -68,6 +68,9 @@ export const BOOTSTRAP_THINGS = [
         description: 'System creator',
         type: UUID.GENERAL,
         public: false,
+        // Victor Fokin is an ordinary identity — the row represents that
+        // person and is owned by him, NOT by the system (SYSTEM_OWNER).
+        owner: UUID.VICTOR_FOKIN,
     },
     {
         thing_id: UUID.GROUP_READ_ACCESS,
