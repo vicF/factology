@@ -41,6 +41,7 @@ describe('ObjectField', () => {
             getRecentSync: vi.fn(() => []),
             getSuggestions: vi.fn(() => Promise.resolve([])),
             recordSelection: vi.fn(),
+            getUsageRank: vi.fn(() => new Map()),
         }
         useObjectHistoryStore.mockReturnValue(mockHistory)
     })
@@ -285,5 +286,35 @@ describe('ObjectField', () => {
         const wrapper = mount(ObjectField, { props: { modelValue: ['a', 'b'], multiple: true } })
         await wrapper.vm.clearSelection()
         expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([[]])
+    })
+
+    it('typed search puts an exact name match above prefix and substring matches', async () => {
+        axios.post.mockResolvedValue({
+            data: { things: [
+                { thing_id: 'photo', name: 'Yellow Pillow 001.jpg', type: THING_TYPE },
+                { thing_id: 'substr', name: 'A little yellow pillow on a chair', type: THING_TYPE },
+                { thing_id: 'exact', name: 'Yellow Pillow', type: THING_TYPE },
+            ]},
+        })
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        wrapper.vm.searchText = 'Yellow Pillow'
+        await wrapper.vm.debouncedSearch('Yellow Pillow')
+        await flushPromises()
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['exact', 'photo', 'substr'])
+    })
+
+    it('typed search boosts frequently-used objects within the same name tier', async () => {
+        axios.post.mockResolvedValue({
+            data: { things: [
+                { thing_id: 'rare', name: 'Yellow Pillow 2015.jpg', type: THING_TYPE },
+                { thing_id: 'used', name: 'Yellow Pillow 2020.jpg', type: THING_TYPE },
+            ]},
+        })
+        mockHistory.getUsageRank.mockReturnValue(new Map([['used', 0.5]]))
+        const wrapper = mount(ObjectField, { props: { modelValue: null } })
+        wrapper.vm.searchText = 'Yellow Pillow'
+        await wrapper.vm.debouncedSearch('Yellow Pillow')
+        await flushPromises()
+        expect(wrapper.vm.filteredObjects.map(o => o.thing_id)).toEqual(['used', 'rare'])
     })
 })

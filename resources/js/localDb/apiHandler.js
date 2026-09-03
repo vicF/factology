@@ -798,6 +798,7 @@ async function buildClassTree(classObjects) {
         return {
             id: thingId,
             name: obj.name,
+            name_translations: obj.name_translations ?? null,
             level,
             description: obj.description || null,
             type: obj.type,

@@ -259,6 +259,58 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         return objects;
     }
 
+    // ── Per-object usage score for ranking typed search results ──
+    // Returns a Map<uuid, number>; a higher number means the current user picks
+    // the object more often / more recently (optionally within a link-type
+    // context). Pickers re-rank the server's `/object` response with this so a
+    // frequently-used object surfaces above rare same-name matches. Synchronous:
+    // falls back to a sync storage read before hydration, mirroring getRecentSync.
+    function getUsageRank(contextType = null, linkTypeId = null) {
+        let recent = recentCache;
+        let freq = freqCache;
+        let contextArr = null;
+        let favs = favoritesCache;
+        if (!hydrated) {
+            const syncLoad = (suffix) => {
+                const raw = storageSync.get(historyKey(suffix)) ?? storageSync.get(`${STORAGE_PREFIX}:${suffix}`);
+                try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+            };
+            recent = syncLoad('recent') || [];
+            freq = syncLoad('freq') || {};
+            if (contextType !== null && linkTypeId !== null) {
+                const rawCtx = syncLoad('context');
+                contextArr = rawCtx?.[`${contextType}:${linkTypeId}`] || null;
+            }
+        } else if (contextType !== null && linkTypeId !== null) {
+            contextArr = contextCache[`${contextType}:${linkTypeId}`] || null;
+        }
+
+        const scores = new Map();
+        const bump = (uuid, amount) => {
+            if (!uuid) return;
+            scores.set(uuid, (scores.get(uuid) || 0) + amount);
+        };
+
+        // Recency: position-weighted, the most recent contributes ~0.4, fading fast.
+        recent.forEach((e, i) => bump(e.uuid, Math.max(0, 1 - i / 20) * 0.4));
+
+        // Global frequency: saturating so a handful of picks already ranks high.
+        for (const [uuid, count] of Object.entries(freq)) {
+            bump(uuid, Math.min(count, 25) / 25 * 0.5);
+        }
+
+        // Link-type context: only relevant when the picker knows which link type
+        // is being added (e.g. "Маша Фокина" is always the author of photos).
+        if (contextArr) {
+            contextArr.forEach((e, i) => bump(e.uuid, Math.max(0, 1 - i / 12) * 0.5));
+        }
+
+        // Favorites (DB-backed, cached once fetched this session): flat strong boost.
+        for (const uuid of favs) bump(uuid, 0.6);
+
+        return scores;
+    }
+
     // ── Get current user as a selectable object ──
     async function getCurrentUserObject() {
         const authStore = useAuthStore();
@@ -519,6 +571,7 @@ export const useObjectHistoryStore = defineStore('objectHistory', () => {
         preloadFromServer,
         getMostFrequent,
         getContextSuggestions,
+        getUsageRank,
         getCurrentUserObject,
         getGlobalSuggestions,
         getOtherObjects,

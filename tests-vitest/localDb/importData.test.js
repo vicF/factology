@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { importExportData } from '@/localDb/importData';
 import { clearAll, getDb, getObject, SYNC_STATUS } from '@/localDb/index';
 import { getLinkByUuid } from '@/localDb/links';
+import { seedLocalDb } from '@/localDb/seeder';
+import { UUID } from '@/constants/uuid';
 
 const MY_ID = 'me-0000-0000-0000-000000000001';
 
@@ -92,5 +94,53 @@ describe('LocalDB — importExportData (owner-integrity rules)', () => {
 
     it('rejects a non-export file', async () => {
         await expect(importExportData({ foo: 'bar' }, MY_ID)).rejects.toThrow(/Not a valid Factology export/);
+    });
+
+    it('does not duplicate class-hierarchy edges that exist as seed rows', async () => {
+        // Seed rows have no link_uuid, so a naive import of the same edge from
+        // a web export would insert a second row → every class appears twice in
+        // the class tree. The import must instead adopt the canonical link_uuid
+        // onto the existing seed row.
+        await seedLocalDb();
+        const db = getDb();
+
+        const seedLinks = await db.links
+            .where('link_type_id')
+            .equals(UUID.LINK_TO_PARENT)
+            .toArray();
+
+        // Simulate a server export file carrying the same edges with uuids.
+        const fileLinks = seedLinks.map((l, i) => ({
+            link_uuid: `11111111-2222-3333-4444-${String(i).padStart(12, '0')}`,
+            one_thing_id: l.one_thing_id,
+            link_type_id: l.link_type_id,
+            other_thing_id: l.other_thing_id,
+            public: true,
+        }));
+
+        const report = await importExportData(
+            exportFile([], fileLinks),
+            MY_ID,
+        );
+
+        // All edges already present locally → nothing inserted.
+        expect(report.importedLinks).toBe(0);
+
+        const after = await db.links
+            .where('link_type_id')
+            .equals(UUID.LINK_TO_PARENT)
+            .toArray();
+        expect(after.length).toBe(seedLinks.length);
+
+        // Existing seed rows adopted the canonical uuids (no dup rows).
+        const withUuid = after.filter(l => l.link_uuid);
+        expect(withUuid.length).toBe(seedLinks.length);
+
+        // Re-import is still a no-op (uuid dedupe kicks in now).
+        const report2 = await importExportData(
+            exportFile([], fileLinks),
+            MY_ID,
+        );
+        expect(report2.importedLinks).toBe(0);
     });
 });
