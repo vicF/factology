@@ -86,6 +86,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         ? Math.min(Math.max(parseInt(depthParam, 10) || 0, 0), DEPTH_CAP)
         : 1;
 
+    // Client error reports (from errorTracker.js) — silently ignore in local mode
+    if (pathPart === '/client-error' || pathPart === 'client-error') {
+        return { data: { success: true }, status: 200 };
+    }
+
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
@@ -793,6 +798,7 @@ async function buildClassTree(classObjects) {
         return {
             id: thingId,
             name: obj.name,
+            name_translations: obj.name_translations ?? null,
             level,
             description: obj.description || null,
             type: obj.type,

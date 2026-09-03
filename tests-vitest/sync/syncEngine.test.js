@@ -18,7 +18,7 @@ import {
     CHANGE_OP,
     getDb,
 } from '@/localDb/index';
-import { saveLink, getLink } from '@/localDb/links';
+import { saveLink, getLink, getLinkByUuid, listLinksForThing } from '@/localDb/links';
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -208,14 +208,15 @@ describe('SyncEngine — Pull', () => {
         expect(obj._syncStatus).toBe(SYNC_STATUS.CONFLICT);
     });
 
-    it('pulls links and applies them', async () => {
+    it('pulls links, matches by link_uuid and mints a local link_id', async () => {
         axios.post.mockResolvedValueOnce({
             data: {
                 changes: {
                     objects: [],
                     links: [
                         {
-                            link_id: 'svr-link-1',
+                            link_id: 'svr-link-999', // instance-specific — must NOT be trusted
+                            link_uuid: 'uuid-link-1',
                             one_thing_id: 'thing-a',
                             link_type_id: 'type-1',
                             other_thing_id: 'thing-b',
@@ -230,9 +231,100 @@ describe('SyncEngine — Pull', () => {
 
         await engine.pull(SERVER_ID);
 
-        const link = await getLink('svr-link-1');
+        const link = await getLinkByUuid('uuid-link-1');
         expect(link).toBeTruthy();
+        expect(link.link_id).not.toBe('svr-link-999'); // local PK is minted, not the server's
+        expect(link.link_id).toMatch(/^link-/);
         expect(link.one_thing_id).toBe('thing-a');
+        expect(link._syncStatus).toBe(SYNC_STATUS.SERVER_ONLY);
+        expect(link._serverRevision).toBe(1);
+    });
+
+    it('re-pull of a link matches by link_uuid — no duplicate, PK preserved', async () => {
+        // First pull creates the local record with a minted link_id.
+        axios.post.mockResolvedValueOnce({
+            data: {
+                changes: {
+                    objects: [],
+                    links: [{
+                        link_id: 'svr-link-1',
+                        link_uuid: 'uuid-link-2',
+                        one_thing_id: 'thing-a',
+                        link_type_id: 'type-1',
+                        other_thing_id: 'thing-b',
+                        public: true,
+                        _serverRevision: 1,
+                    }],
+                },
+                server_timestamp: 1000,
+            },
+        });
+        await engine.pull(SERVER_ID);
+
+        const first = await getLinkByUuid('uuid-link-2');
+        expect(first).toBeTruthy();
+
+        // Second pull — the server row now carries a different link_id
+        // (it was re-synced through another instance).
+        axios.post.mockResolvedValueOnce({
+            data: {
+                changes: {
+                    objects: [],
+                    links: [{
+                        link_id: 'svr-link-777',
+                        link_uuid: 'uuid-link-2',
+                        one_thing_id: 'thing-a',
+                        link_type_id: 'type-1',
+                        other_thing_id: 'thing-b',
+                        public: true,
+                        _serverRevision: 2,
+                    }],
+                },
+                server_timestamp: 2000,
+            },
+        });
+        await engine.pull(SERVER_ID);
+
+        const links = await listLinksForThing('thing-a');
+        expect(links.length).toBe(1); // still a single row
+        expect(links[0].link_id).toBe(first.link_id); // local PK preserved
+        expect(links[0]._serverRevision).toBe(2);
+    });
+
+    it('pulls a link deletion by link_uuid and removes the local record', async () => {
+        // Pre-existing SERVER_ONLY local record (synced earlier).
+        const db = getDb();
+        await db.links.put({
+            link_id: 'local-link-del',
+            link_uuid: 'uuid-del-1',
+            one_thing_id: 'thing-a',
+            link_type_id: 'type-1',
+            other_thing_id: 'thing-b',
+            public: true,
+            _syncStatus: SYNC_STATUS.SERVER_ONLY,
+            _localRevision: 0,
+            _serverRevision: 1,
+        });
+
+        axios.post.mockResolvedValueOnce({
+            data: {
+                changes: {
+                    objects: [],
+                    links: [{
+                        link_id: 'svr-link-del',
+                        link_uuid: 'uuid-del-1',
+                        _deleted: true,
+                        _serverRevision: 2,
+                    }],
+                },
+                server_timestamp: 2000,
+            },
+        });
+
+        await engine.pull(SERVER_ID);
+
+        expect(await getLinkByUuid('uuid-del-1')).toBeNull();
+        expect(await getLink('local-link-del')).toBeNull();
     });
 
     it('handles empty pull gracefully', async () => {

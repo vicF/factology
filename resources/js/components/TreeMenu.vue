@@ -206,14 +206,14 @@ const onCheckboxChange = () => {
     // Branch on the derived state, not event.target.checked: clicking a
     // semi (indeterminate) checkbox reports checked=true natively.
     if (nodeState.value === 'semi') {
-        store.checkSubtree(subtreeIds.value);
+        store.checkSubtree(subtreeIds.value, true);
     } else if (nodeState.value === 'checked') {
-        store.uncheckSubtree(subtreeIds.value);
+        store.uncheckSubtree(subtreeIds.value, true);
         // Drop now-empty parents (and their ancestors) that lost every
         // selected descendant, up to the tree root.
         store.pruneEmptyAncestors(objectsStore.rootNodes);
     } else {
-        store.checkSubtree(subtreeIds.value);
+        store.checkSubtree(subtreeIds.value, true);
     }
     emit('update-checked', store.checkedItems);
     eventBus.emit('trigger-search');

@@ -645,6 +645,9 @@ class ApiController extends BaseController
                 'errors'  => ['other_thing_id' => 'Cannot set a class/link-type of the other kind as the parent.'],
             ], 422);
         }
+        // Date-modified stamp for LWW conflict resolution; authoritative
+        // server-side value (never trust a client-supplied one).
+        $data['record_updated'] = now();
         if(!empty($data['link_id'])) {
             DB::table('links')
                 ->where('link_id', $data['link_id'])
@@ -672,7 +675,7 @@ class ApiController extends BaseController
                     if ($sameDirection && array_key_exists('description', $data)) {
                         DB::table('links')
                             ->where('link_id', $existing->link_id)
-                            ->update(['description' => $data['description']]);
+                            ->update(['description' => $data['description'], 'record_updated' => now()]);
                     }
                     $data['link_id'] = $existing->link_id;
                     return response()->json(

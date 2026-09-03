@@ -114,6 +114,11 @@
                                         <IconAdd class="icon-sm me-2" />
                                         {{ $t('Register') }}
                                     </router-link></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><router-link class="dropdown-item" to="/identity" data-testid="identity-link-guest">
+                                        <IconKey class="icon-sm me-2" />
+                                        {{ $t('Identity') }}
+                                    </router-link></li>
                                 </template>
 
                                 <!-- User links -->
@@ -126,6 +131,10 @@
                                     <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
                                         <IconUser class="icon-sm me-2" />
                                         {{ user.name }}
+                                    </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/identity" data-testid="identity-link">
+                                        <IconKey class="icon-sm me-2" />
+                                        {{ $t('Identity') }}
                                     </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
@@ -292,6 +301,8 @@ const selectedType = ref('')
 
 // Injected at build time by vite.config.capacitor.js — identifies which APK is running.
 const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
+// Dev-mode error toasts are gated behind this.
+const isDevelopment = import.meta.env.DEV
 
 // Debug: diagnostic button (always visible, outside dropdown)
 const showDiagnostic = ref(false)
@@ -299,11 +310,17 @@ const diagnosticInfo = ref('')
 const onDiagnostic = async () => {
   const auth = authStore
   let treeInfo = ''
+  let checkedInfo = ''
   try {
     const { useTreeState } = await import('@/composables/useTreeState')
     const ts = useTreeState()
     treeInfo = 'treeState: ' + JSON.stringify(ts._debugState())
   } catch (_) { treeInfo = 'treeState: (error)' }
+  try {
+    const { useSearchStore } = await import('@/stores/search')
+    const ss = useSearchStore()
+    checkedInfo = `checkedItems: ${ss.checkedItems.length} userInit: ${ss.checkedUserInitiated}`
+  } catch (_) { checkedInfo = 'searchStore: (error)' }
   const info = [
     `build: ${buildId}`,
     `route: ${route.path}`,
@@ -314,6 +331,7 @@ const onDiagnostic = async () => {
     `isMobile: ${window.innerWidth < 768}`,
     `currentScreen: ${currentScreen.value}`,
     treeInfo,
+    checkedInfo,
   ].join('\n')
   diagnosticInfo.value = info
   showDiagnostic.value = true
