@@ -392,6 +392,19 @@ export class SyncEngine {
         if (!existing && link.link_id) {
             existing = await getLink(link.link_id);
         }
+        // Endpoint-triplet fallback: a local seed row (no link_uuid) already
+        // represents the same edge. Adopt the server's canonical uuid onto it
+        // rather than inserting a duplicate row.
+        if (!existing && link.link_type_id) {
+            const db = (await import('../localDb/index')).getDb();
+            const triplet = await db.links
+                .where('[one_thing_id+link_type_id+other_thing_id]')
+                .equals([link.one_thing_id, link.link_type_id, link.other_thing_id])
+                .first();
+            if (triplet && !triplet.link_uuid) {
+                existing = triplet;
+            }
+        }
         const linkId = existing ? existing.link_id : newLinkId();
 
         if (link._deleted) {

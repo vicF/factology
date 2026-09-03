@@ -83,8 +83,27 @@ export async function importExportData(file, ownerThingId) {
         const otherOk = importedThingIds.has(link.other_thing_id) || !!(await db.objects.get(link.other_thing_id));
         if (!oneOk || !otherOk) continue;
 
-        if (link.link_uuid && (await db.links.where('link_uuid').equals(link.link_uuid).first())) {
-            continue; // already present (dedupe by canonical key)
+        // Dedupe by canonical link_uuid
+        if (link.link_uuid) {
+            const existing = await db.links.where('link_uuid').equals(link.link_uuid).first();
+            if (existing) continue;
+        }
+
+        // Also dedupe by endpoint triplet when the local row lacks a link_uuid
+        // (seed rows have no link_uuid, so a fresh import of the same edge
+        // would otherwise create a duplicate row).
+        if (link.link_type_id) {
+            const existing = await db.links
+                .where('[one_thing_id+link_type_id+other_thing_id]')
+                .equals([link.one_thing_id, link.link_type_id, link.other_thing_id])
+                .first();
+            if (existing && !existing.link_uuid) {
+                // Adopt the canonical link_uuid onto the existing row instead
+                // of inserting a new one.
+                existing.link_uuid = link.link_uuid ?? null;
+                await db.links.put(existing);
+                continue;
+            }
         }
 
         await db.links.put({
