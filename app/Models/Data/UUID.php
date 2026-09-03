@@ -108,6 +108,12 @@ class UUID
     public const CHRISTENING_CLASS = '2e3e8252-47c6-44e0-8804-6083ec506a92';
     public const ADDRESS_CLASS = '42a2e356-8ad1-406a-b78e-db13febf0415';
 
+    // ── Archive chain classes (ISAD-G): Archive → Fonds → Series → File ──
+    public const ARCHIVE_CLASS = 'c2c2c2c2-0001-4000-8000-000000000001';
+    public const FONDS_CLASS = 'c2c2c2c2-0002-4000-8000-000000000001';
+    public const SERIES_CLASS = 'c2c2c2c2-0003-4000-8000-000000000001';
+    public const FILE_CLASS = 'c2c2c2c2-0004-4000-8000-000000000001';
+
     public static function contains(array $data,
                                     array $otherThings,
                                     $linkType = self::LINK_TO_CLASS,

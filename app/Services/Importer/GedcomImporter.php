@@ -38,8 +38,9 @@ class GedcomImporter
     private ?string $sourceThingId = null;
     private ?string $sourceGuid = null;
     private array $existingSourceLinks = []; // source_external_id → thing_id (preloaded)
-    private array $pendingCitations = []; // ['citingExternalId' => ..., 'sourceRef' => '@S1@']
+    private array $pendingCitations = []; // ['citingExternalId' => ..., 'sourceRef' => '@S1@', ...]
     private array $urlOnlySources = []; // '@S1@' => ['urls' => [...]] sources that must not become objects
+    private array $archiveChainCache = []; // archival reference key → deepest chain thing_id
 
     /**
      * Map GEDCOM event tag → factology class UUID.
@@ -92,6 +93,7 @@ class GedcomImporter
         $this->existingSourceLinks = [];
         $this->pendingCitations = [];
         $this->urlOnlySources = [];
+        $this->archiveChainCache = [];
 
         $headMeta = GedcomParser::parseHeadMetadata($gedcomContent);
         $this->sourceGuid = $headMeta['dbguid'];
@@ -232,7 +234,9 @@ class GedcomImporter
      */
     private function linkToSource(string $thingId, string $sourceExternalId): void
     {
-        DB::table('links')->insert([
+        // Idempotent: a deduped thing (e.g. two SOUR @ids with the same title)
+        // may already be linked to this file's GEDCOM source thing.
+        DB::table('links')->insertOrIgnore([
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::IMPORTED_FROM,
@@ -770,12 +774,16 @@ class GedcomImporter
             return;
         }
 
+        $noteNode = GedcomParser::findChild($record, 'NOTE');
+        $note = $noteNode ? GedcomParser::getFullValue($noteNode) : null;
+
         $title = GedcomParser::childValue($record, 'TITL');
         $author = GedcomParser::childValue($record, 'AUTH');
         $publisher = GedcomParser::childValue($record, 'PUBL');
 
-        // Collect web URLs: WWW sub-records, and a TITL that is itself a URL
-        // (exports often put the bare URL in the title for online sources).
+        // Collect web URLs: WWW sub-records, a TITL that is itself a URL
+        // (exports often put the bare URL in the title for online sources),
+        // and links embedded in the NOTE (<a href="…">Ссылка (URL)</a>).
         $urls = [];
         foreach (GedcomParser::findChildren($record, 'WWW') as $www) {
             $url = trim((string) ($www['value'] ?? ''));
@@ -789,6 +797,9 @@ class GedcomImporter
                 $urls[] = $url;
             }
             $title = null; // the "title" was really the URL
+        }
+        foreach (self::extractHrefs($note ?? '') as $url) {
+            $urls[] = $url;
         }
 
         // A source only becomes an object when it carries bibliographic content
@@ -807,6 +818,8 @@ class GedcomImporter
             return;
         }
 
+        $sourceName = trim($title ?? '') !== '' ? trim($title) : 'Source';
+
         $description = '';
         if ($author) {
             $description .= 'Author: ' . $author . "\n";
@@ -814,30 +827,57 @@ class GedcomImporter
         if ($publisher) {
             $description .= 'Publisher: ' . $publisher . "\n";
         }
+        $noteText = trim($note ?? '');
+        if ($noteText !== '') {
+            // Keep the note only when it is not purely the link placeholder.
+            if (preg_match('/^<a[^>]*>.*<\/a>$/i', $noteText) !== 1) {
+                $description .= $noteText . "\n";
+            }
+        }
+        $description = trim($description) ?: null;
 
         $sourceExternalId = $this->externalId($gedcomId);
-        $existingThingId = $this->findExisting($sourceExternalId);
+
+        // Bibliographic sources are deduped by normalized title so the same
+        // book/record is one object across SOUR @ids and across import files.
+        $sourceKey = $titleMeaningful ? self::titleKey($title) : null;
+        $thingId = $sourceKey !== null
+            ? $this->findSourceByKey($sourceKey)
+            : null;
 
         $data = [
-            'name'        => trim($title ?? '') !== '' ? trim($title) : 'Source',
+            'name'        => $sourceName,
             'type'        => UUID::G_THING,
-            'description' => trim($description) ?: null,
+            'description' => $description,
             'owner'       => $this->ownerId,
             'public'      => false,
             'deleted'     => false,
             'server_uuid' => $this->getServerUuid(),
         ];
 
-        if ($existingThingId) {
-            DB::table('things')->where('thing_id', $existingThingId)->update($data);
+        if ($thingId === null) {
+            $existingByRef = $this->findExisting($sourceExternalId);
+            if ($existingByRef !== null) {
+                $thingId = $existingByRef;
+            }
+        }
+
+        if ($thingId !== null) {
+            DB::table('things')->where('thing_id', $thingId)->update($data);
             $this->updated++;
-            $this->attachSourceUrls($existingThingId, $urls);
+            $this->linkToSource($thingId, $sourceExternalId);
+            $this->existingSourceLinks[$sourceExternalId] = $thingId;
+            $this->attachSourceUrls($thingId, $urls);
+            $this->storeSourceKey($thingId, $sourceKey);
+            $this->attachArchivalLocation($thingId, $note ?? '', $sourceName);
             return;
         }
 
         $thingId = (string) Str::uuid();
         $data['thing_id'] = $thingId;
         DB::table('things')->insert($data);
+
+        $this->storeSourceKey($thingId, $sourceKey);
 
         // Class under the real Source class (EVIDENCE is a link type, not a
         // class — classing sources against it produced bogus relations).
@@ -851,6 +891,7 @@ class GedcomImporter
         $this->linkToSource($thingId, $sourceExternalId);
         $this->existingSourceLinks[$sourceExternalId] = $thingId;
         $this->attachSourceUrls($thingId, $urls);
+        $this->attachArchivalLocation($thingId, $note ?? '', $sourceName);
 
         $this->imported++;
     }
@@ -877,6 +918,257 @@ class GedcomImporter
     }
 
     /**
+     * Store a stable dedup key (normalized title) for a bibliographic source.
+     */
+    private function storeSourceKey(string $thingId, ?string $sourceKey): void
+    {
+        if ($sourceKey === null) {
+            return;
+        }
+        $row = DB::table('things')->where('thing_id', $thingId)->value('data');
+        $dataArr = $row !== null ? (is_string($row) ? json_decode($row, true) : (array) $row) : [];
+        $dataArr['properties'] = $dataArr['properties'] ?? [];
+        $dataArr['properties']['source_key'] = $sourceKey;
+        DB::table('things')->where('thing_id', $thingId)->update(['data' => json_encode($dataArr)]);
+    }
+
+    private function findSourceByKey(string $sourceKey): ?string
+    {
+        return DB::table('things')
+            ->where('owner', $this->ownerId)
+            ->where('type', UUID::G_THING)
+            ->whereRaw("cast(data as json)->'properties'->>'source_key' = ?", [$sourceKey])
+            ->value('thing_id');
+    }
+
+    private static function titleKey(?string $title): string
+    {
+        return self::normKey(trim($title ?? ''));
+    }
+
+    private static function normKey(string $text): string
+    {
+        $text = mb_strtolower(trim($text));
+        $text = preg_replace('/\s+/u', ' ', $text);
+        return trim($text);
+    }
+
+    /**
+     * Extract absolute http(s) URLs from <a href="…"> fragments.
+     */
+    private static function extractHrefs(string $text): array
+    {
+        if (!preg_match_all('#href\s*=\s*["\']([^"\']+)["\']#i', $text, $m)) {
+            return [];
+        }
+        $urls = [];
+        foreach ($m[1] as $u) {
+            $u = trim($u);
+            if (filter_var($u, FILTER_VALIDATE_URL)) {
+                $urls[] = $u;
+            }
+        }
+        return $urls;
+    }
+
+    // ── Archival locations ("Ф.179 оп.1 д.18" → Archive/Fonds/Series/File) ──
+
+    /**
+     * Attach a physical archival location to a source object when its own
+     * NOTE/TITLE is a clean archival reference. The source is linked via
+     * "is stored in" to the deepest archival unit found (the "дело"/file).
+     */
+    private function attachArchivalLocation(string $sourceThingId, string $note, string $title): void
+    {
+        // Archival references live in the source record's own NOTE (e.g.
+        // "Ф.179 оп.1 д.18"). Titles are prose and cause false positives, so
+        // only the note is inspected.
+        unset($title);
+        $ref = self::parseArchivalReference($note);
+        if ($ref === null) {
+            return;
+        }
+        $deepestId = $this->ensureArchiveChain($ref);
+        if ($deepestId !== null) {
+            $this->ensureLink($sourceThingId, UUID::LINK_TO_STORAGE, $deepestId);
+        }
+    }
+
+    /**
+     * Parse a clean archival reference like "Ф.179 оп.1 д.18" or
+     * "ГАВО. Фонд № 496. Опись № 4. Дело № 453". Returns null unless the
+     * whole string is (essentially) an archival reference — free-form prose
+     * with extra text is ignored to avoid garbage chain objects.
+     *
+     * @return array{archive: ?string, fonds: ?string, series: ?string, file: ?string}|null
+     */
+    public static function parseArchivalReference(?string $text): ?array
+    {
+        $t = trim((string) preg_replace('/\s+/u', ' ', (string) $text));
+        if ($t === '') {
+            return null;
+        }
+
+        if (!preg_match('/\b(?:фонд(?:ы|а)?|ф\.)\s*№?\s*([0-9A-Za-zА-Яа-яЁё][\wА-Яа-яЁё\-]*)/iu', $t, $mf)) {
+            return null;
+        }
+        $fonds = trim($mf[1], ".,;: \t");
+
+        $series = null;
+        if (preg_match('/\b(?:опись|оп\.?)\s*№?\s*([0-9][\w\-]*)/iu', $t, $ms)) {
+            $series = trim($ms[1], ".,;: \t");
+        }
+        $file = null;
+        if (preg_match('/\b(?:дело|ед\.?\s*хр\.?|д\.?)\s*№?\s*([0-9A-Za-zА-Яа-яЁё][\wА-Яа-яЁё\-]*)/iu', $t, $md)) {
+            $file = trim($md[1], ".,;: \t");
+        }
+
+        $fondsPos = mb_strpos($t, $mf[0]);
+        $prefix = trim(mb_substr($t, 0, $fondsPos));
+
+        $archive = null;
+        if ($prefix !== '') {
+            // The prefix may only be an archive label (letters/spaces/punct, no
+            // digits); otherwise the string is not a clean archival reference.
+            if (preg_match('/^\d/', $prefix) || preg_match('/[0-9]/u', $prefix)) {
+                return null;
+            }
+            if (preg_match('/\p{L}/u', $prefix) && mb_strlen($prefix) <= 80) {
+                $archive = trim($prefix, " \t.,;:()«»[]–—");
+            } else {
+                return null;
+            }
+        }
+
+        // Cleanliness: removing the parsed tokens (and the archive label, which
+        // was validated as letters/punctuation above) must leave no letters.
+        $leftover = $t;
+        foreach ([$mf[0], $series !== null ? $ms[0] : '', $file !== null ? $md[0] : ''] as $token) {
+            if ($token !== '') {
+                $leftover = str_replace($token, '', $leftover);
+            }
+        }
+        if ($archive !== null && $prefix !== '') {
+            $leftover = str_replace($prefix, '', $leftover);
+        }
+        if (preg_match('/\p{L}/u', $leftover)) {
+            return null;
+        }
+
+        return [
+            'archive' => $archive,
+            'fonds'   => $fonds,
+            'series'  => $series,
+            'file'    => $file,
+        ];
+    }
+
+    /**
+     * Find or create the Archive → Fonds → Series → File containment chain for
+     * a parsed archival reference. Returns the deepest unit's thing_id.
+     */
+    private function ensureArchiveChain(array $ref): ?string
+    {
+        $norm = function (?string $s): string {
+            return self::normKey((string) $s);
+        };
+
+        $chainKey = ($ref['archive'] !== null ? 'a|' . $norm($ref['archive']) . '|' : '')
+            . 'F|' . $norm($ref['fonds'])
+            . '|S|' . $norm($ref['series'])
+            . '|D|' . $norm($ref['file']);
+
+        if (isset($this->archiveChainCache[$chainKey])) {
+            return $this->archiveChainCache[$chainKey];
+        }
+
+        $parentId = null;
+        if ($ref['archive'] !== null && $ref['archive'] !== '') {
+            $parentId = $this->findOrCreateChainThing(
+                UUID::ARCHIVE_CLASS,
+                trim($ref['archive']),
+                $chainKey . '|L|archive'
+            );
+        }
+
+        $units = [];
+        if ($ref['fonds'] !== null) {
+            $units[] = [UUID::FONDS_CLASS, 'Ф.' . $ref['fonds'], $chainKey . '|L|fonds'];
+        }
+        if ($ref['series'] !== null) {
+            $units[] = [UUID::SERIES_CLASS, 'оп.' . $ref['series'], $chainKey . '|L|series'];
+        }
+        if ($ref['file'] !== null) {
+            $units[] = [UUID::FILE_CLASS, 'д.' . $ref['file'], $chainKey . '|L|file'];
+        }
+
+        $deepest = $parentId;
+        foreach ($units as [$classId, $label, $unitKey]) {
+            $thingId = $this->findOrCreateChainThing($classId, $label, $unitKey);
+            if ($parentId !== null) {
+                $this->ensureLink($thingId, UUID::INSIDE, $parentId);
+            }
+            $deepest = $thingId;
+            $parentId = $thingId;
+        }
+
+        $this->archiveChainCache[$chainKey] = $deepest;
+        return $deepest;
+    }
+
+    private function findOrCreateChainThing(string $classId, string $label, string $archKey): string
+    {
+        $existing = DB::table('things')
+            ->where('owner', $this->ownerId)
+            ->where('type', UUID::G_THING)
+            ->whereRaw("cast(data as json)->'properties'->>'arch_key' = ?", [$archKey])
+            ->value('thing_id');
+
+        if ($existing !== null) {
+            DB::table('things')->where('thing_id', $existing)
+                ->update(['name' => $label, 'deleted' => false]);
+            $this->ensureLink($existing, UUID::LINK_TO_CLASS, $classId);
+            return $existing;
+        }
+
+        $thingId = (string) Str::uuid();
+        DB::table('things')->insert([
+            'thing_id'    => $thingId,
+            'name'        => $label,
+            'type'        => UUID::G_THING,
+            'owner'       => $this->ownerId,
+            'public'      => false,
+            'deleted'     => false,
+            'server_uuid' => $this->getServerUuid(),
+            'data'        => json_encode(['properties' => ['arch_key' => $archKey]]),
+        ]);
+        $this->ensureLink($thingId, UUID::LINK_TO_CLASS, $classId);
+        $this->linkToSource($thingId, $this->externalId('arch:' . $archKey));
+
+        return $thingId;
+    }
+
+    private function ensureLink(string $oneId, string $linkTypeId, string $otherId, array $extra = []): void
+    {
+        $exists = DB::table('links')
+            ->where('one_thing_id', $oneId)
+            ->where('link_type_id', $linkTypeId)
+            ->where('other_thing_id', $otherId)
+            ->where('deleted', false)
+            ->first();
+        if ($exists) {
+            return;
+        }
+        $row = [
+            'link_uuid'     => (string) Str::uuid(),
+            'one_thing_id'  => $oneId,
+            'link_type_id'  => $linkTypeId,
+            'other_thing_id' => $otherId,
+        ];
+        DB::table('links')->insert(array_merge($row, $extra));
+    }
+
+    /**
      * Remember that a thing (event/person) cites a GEDCOM source. The actual
      * graph edge/URL is created later by wireCitations(), once all SOUR records
      * have been imported.
@@ -888,12 +1180,36 @@ class GedcomImporter
         }
         foreach (GedcomParser::findChildren($node, 'SOUR') as $sour) {
             $ref = trim((string) ($sour['value'] ?? ''));
-            if (preg_match('/^@.+@$/', $ref)) {
-                $this->pendingCitations[] = [
-                    'citingExternalId' => $citingExternalId,
-                    'sourceRef'        => $ref,
-                ];
+            if (!preg_match('/^@.+@$/', $ref)) {
+                continue;
             }
+            // Citation details live on the citation link: PAGE (page/folio or a
+            // direct URL), the quoted excerpt (DATA → TEXT) and a detected URL.
+            $page = GedcomParser::childValue($sour, 'PAGE');
+            $page = $page !== null ? trim($page) : null;
+
+            $text = null;
+            $dataNode = GedcomParser::findChild($sour, 'DATA');
+            if ($dataNode !== null) {
+                $textNode = GedcomParser::findChild($dataNode, 'TEXT');
+                if ($textNode !== null) {
+                    $full = GedcomParser::getFullValue($textNode);
+                    $text = trim($full) !== '' ? trim($full) : null;
+                }
+            }
+
+            $url = null;
+            if ($page !== null && filter_var($page, FILTER_VALIDATE_URL)) {
+                $url = $page; // the "page" of an online source is its URL
+            }
+
+            $this->pendingCitations[] = [
+                'citingExternalId' => $citingExternalId,
+                'sourceRef'        => $ref,
+                'page'             => $page,
+                'text'             => $text,
+                'url'              => $url,
+            ];
         }
     }
 
@@ -911,21 +1227,7 @@ class GedcomImporter
 
             $sourceThingId = $this->findExisting($this->externalId($citation['sourceRef']));
             if ($sourceThingId !== null) {
-                $exists = DB::table('links')
-                    ->where('one_thing_id', $sourceThingId)
-                    ->where('link_type_id', UUID::EVIDENCE)
-                    ->where('other_thing_id', $citingThingId)
-                    ->where('deleted', false)
-                    ->exists();
-                if ($exists) {
-                    continue;
-                }
-                DB::table('links')->insert([
-                    'link_uuid'      => (string) Str::uuid(),
-                    'one_thing_id'   => $sourceThingId,
-                    'link_type_id'   => UUID::EVIDENCE,
-                    'other_thing_id' => $citingThingId,
-                ]);
+                $this->createEvidenceLink($sourceThingId, $citingThingId, $citation);
                 continue;
             }
 
@@ -936,8 +1238,52 @@ class GedcomImporter
         }
     }
 
-    // ── Place management ──
+    /**
+     * Create (or refresh) a citation edge source → EVIDENCE → citing object,
+     * carrying PAGE / quoted text / URL as data + a readable description.
+     */
+    private function createEvidenceLink(string $sourceThingId, string $citingThingId, array $citation): void
+    {
+        $description = null;
+        if (!empty($citation['page']) && !filter_var($citation['page'], FILTER_VALIDATE_URL)) {
+            $description = $citation['page'];
+        } elseif (!empty($citation['url'])) {
+            $description = $citation['url'];
+        }
 
+        $props = [];
+        foreach (['page', 'text', 'url'] as $key) {
+            if (!empty($citation[$key])) {
+                $props[$key] = $citation[$key];
+            }
+        }
+
+        $fields = [
+            'description' => $description,
+            'data'        => $props !== [] ? json_encode($props, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+        ];
+
+        $existing = DB::table('links')
+            ->where('one_thing_id', $sourceThingId)
+            ->where('link_type_id', UUID::EVIDENCE)
+            ->where('other_thing_id', $citingThingId)
+            ->where('deleted', false)
+            ->first();
+
+        if ($existing) {
+            DB::table('links')->where('link_id', $existing->link_id)->update($fields);
+            return;
+        }
+
+        DB::table('links')->insert(array_merge([
+            'link_uuid'     => (string) Str::uuid(),
+            'one_thing_id'  => $sourceThingId,
+            'link_type_id'  => UUID::EVIDENCE,
+            'other_thing_id' => $citingThingId,
+        ], $fields));
+    }
+
+    // ── Place management ──
     private function findOrCreatePlace(string $placeName, ?array $placeNode): ?string
     {
         $key = mb_strtolower(trim($placeName));
