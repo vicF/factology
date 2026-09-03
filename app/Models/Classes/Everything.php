@@ -1198,17 +1198,19 @@ class Everything
             if (empty($link['url'])) {
                 continue; // Just an empty form
             }
+            // Only url is ever written — client side-flags (e.g. a "create
+            // object" checkbox) must never leak into the external_links row.
+            $url = trim((string) $link['url']);
             if (empty($link['id'])) {
-                $link['id'] = Str::uuid();
-                $link['thing_id'] = $this->thing_id;
-                DB::table('external_links')->insert(
-                    $link);
+                DB::table('external_links')->insert([
+                    'id'       => Str::uuid(),
+                    'thing_id' => $this->thing_id,
+                    'url'      => $url,
+                ]);
             } else {
-                DB::table('external_links')->where('id', $link['id'])->update(
-                    $link);
+                DB::table('external_links')->where('id', $link['id'])->update(['url' => $url]);
                 unset($oldLinks[$link['id']]);
             }
-
         }
         if (!empty($oldLinks)) {
             DB::table('external_links')->whereIn('id', array_keys($oldLinks))->delete();

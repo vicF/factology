@@ -94,6 +94,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('/object/{id}/visibility', [ApiController::class, 'toggleVisibility']);
         Route::patch('/object/{id}/confirm',    [ApiController::class, 'confirmPlanned']);
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
+        Route::post('/object/{id}/media-from-url', [ApiController::class, 'createMediaFromUrl']);
         Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
         Route::put('/link/{id}',              [ApiController::class, 'storeLink']);     // update
         Route::delete('/link/{id}',           [ApiController::class, 'deleteLink']);

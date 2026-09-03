@@ -2,6 +2,7 @@
 
 namespace App\Services\Importer;
 
+use App\Services\MediaLink\UrlMediaClassifier;
 use Fokin\Facts\Data\FlexibleDate;
 use Fokin\Facts\Data\UUID;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,8 @@ class GedcomImporter
     private ?string $sourceThingId = null;
     private ?string $sourceGuid = null;
     private array $existingSourceLinks = []; // source_external_id → thing_id (preloaded)
+    private array $pendingCitations = []; // ['citingExternalId' => ..., 'sourceRef' => '@S1@']
+    private array $urlOnlySources = []; // '@S1@' => ['urls' => [...]] sources that must not become objects
 
     public function __construct(
         string $ownerId,
@@ -66,6 +69,8 @@ class GedcomImporter
         $this->sourceThingId = null;
         $this->sourceGuid = null;
         $this->existingSourceLinks = [];
+        $this->pendingCitations = [];
+        $this->urlOnlySources = [];
 
         $headMeta = GedcomParser::parseHeadMetadata($gedcomContent);
         $this->sourceGuid = $headMeta['dbguid'];
@@ -95,6 +100,10 @@ class GedcomImporter
                     $this->importSource($record);
                 }
             }
+
+            // Sources run last, so citations collected during person/event/family
+            // import are only resolvable now that every source thing exists.
+            $this->wireCitations();
         });
 
         return [
@@ -255,6 +264,9 @@ class GedcomImporter
         $sourceExternalId = $this->externalId($gedcomId);
         $existingThingId = $this->findExisting($sourceExternalId);
 
+        // Person-level citations (SOUR @S#@ directly under the INDI record).
+        $this->collectCitations($record, $sourceExternalId);
+
         $birthNode = GedcomParser::findChild($record, 'BIRT');
         $deathNode = GedcomParser::findChild($record, 'DEAT');
 
@@ -346,6 +358,7 @@ class GedcomImporter
         ]);
 
         $this->linkToSource($thingId, $sourceExternalId);
+        $this->existingSourceLinks[$sourceExternalId] = $thingId;
 
         if ($birthNode) {
             $this->importPersonEvent($birthNode, $thingId, $cleanName, 'BIRT', 'birth');
@@ -393,6 +406,9 @@ class GedcomImporter
 
         $eventExternalId = $this->findEventExternalId($personId, $eventNode, $gedcomTag);
         $existingThingId = $this->findExisting($eventExternalId);
+
+        // Event-level citations (SOUR @S#@ under BIRT/DEAT/OCCU/RESI/...).
+        $this->collectCitations($eventNode, $eventExternalId);
 
         $start = null;
         $end = null;
@@ -479,6 +495,7 @@ class GedcomImporter
         ]);
 
         $this->linkToSource($thingId, $eventExternalId);
+        $this->existingSourceLinks[$eventExternalId] = $thingId;
 
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
@@ -557,6 +574,9 @@ class GedcomImporter
 
         $eventExternalId = $this->externalId($familyGedcomId . '-marriage');
         $existingThingId = $this->findExisting($eventExternalId);
+
+        // Marriage-event citations.
+        $this->collectCitations($marrNode, $eventExternalId);
 
         $start = null;
         $end = null;
@@ -638,6 +658,7 @@ class GedcomImporter
         }
 
         $this->linkToSource($thingId, $eventExternalId);
+        $this->existingSourceLinks[$eventExternalId] = $thingId;
 
         if ($placeName !== null) {
             $placeId = $this->findOrCreatePlace($placeName, $placeNode);
@@ -661,9 +682,42 @@ class GedcomImporter
             return;
         }
 
-        $title = GedcomParser::childValue($record, 'TITL') ?? 'Source';
+        $title = GedcomParser::childValue($record, 'TITL');
         $author = GedcomParser::childValue($record, 'AUTH');
         $publisher = GedcomParser::childValue($record, 'PUBL');
+
+        // Collect web URLs: WWW sub-records, and a TITL that is itself a URL
+        // (exports often put the bare URL in the title for online sources).
+        $urls = [];
+        foreach (GedcomParser::findChildren($record, 'WWW') as $www) {
+            $url = trim((string) ($www['value'] ?? ''));
+            if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+                $urls[] = $url;
+            }
+        }
+        if (UrlMediaClassifier::looksLikeUrl($title)) {
+            $url = trim($title);
+            if (filter_var($url, FILTER_VALIDATE_URL)) {
+                $urls[] = $url;
+            }
+            $title = null; // the "title" was really the URL
+        }
+
+        // A source only becomes an object when it carries bibliographic content
+        // (author/publisher or a meaningful non-URL title). A bare URL source
+        // creates no object — its URL is attached to the citing objects instead.
+        $hasBibliographic = ($author !== null && trim($author) !== '')
+            || ($publisher !== null && trim($publisher) !== '');
+        $titleMeaningful = $title !== null
+            && trim($title) !== ''
+            && !UrlMediaClassifier::looksLikeUrl($title);
+
+        if (!$hasBibliographic && !$titleMeaningful) {
+            if ($urls !== []) {
+                $this->urlOnlySources[$gedcomId] = ['urls' => $urls];
+            }
+            return;
+        }
 
         $description = '';
         if ($author) {
@@ -677,7 +731,7 @@ class GedcomImporter
         $existingThingId = $this->findExisting($sourceExternalId);
 
         $data = [
-            'name'        => $title,
+            'name'        => trim($title ?? '') !== '' ? trim($title) : 'Source',
             'type'        => UUID::G_THING,
             'description' => trim($description) ?: null,
             'owner'       => $this->ownerId,
@@ -689,6 +743,7 @@ class GedcomImporter
         if ($existingThingId) {
             DB::table('things')->where('thing_id', $existingThingId)->update($data);
             $this->updated++;
+            $this->attachSourceUrls($existingThingId, $urls);
             return;
         }
 
@@ -696,16 +751,101 @@ class GedcomImporter
         $data['thing_id'] = $thingId;
         DB::table('things')->insert($data);
 
+        // Class under the real Source class (EVIDENCE is a link type, not a
+        // class — classing sources against it produced bogus relations).
         DB::table('links')->insert([
             'link_uuid'     => (string) Str::uuid(),
             'one_thing_id'  => $thingId,
             'link_type_id'  => UUID::LINK_TO_CLASS,
-            'other_thing_id' => UUID::EVIDENCE,
+            'other_thing_id' => UUID::SOURCE_CLASS,
         ]);
 
         $this->linkToSource($thingId, $sourceExternalId);
+        $this->existingSourceLinks[$sourceExternalId] = $thingId;
+        $this->attachSourceUrls($thingId, $urls);
 
         $this->imported++;
+    }
+
+    /**
+     * Store web URLs as external links on a source object (idempotent).
+     */
+    private function attachSourceUrls(string $thingId, array $urls): void
+    {
+        foreach (array_unique($urls) as $url) {
+            $exists = DB::table('external_links')
+                ->where('thing_id', $thingId)
+                ->where('url', $url)
+                ->exists();
+            if ($exists) {
+                continue;
+            }
+            DB::table('external_links')->insert([
+                'id'       => (string) Str::uuid(),
+                'thing_id' => $thingId,
+                'url'      => $url,
+            ]);
+        }
+    }
+
+    /**
+     * Remember that a thing (event/person) cites a GEDCOM source. The actual
+     * graph edge/URL is created later by wireCitations(), once all SOUR records
+     * have been imported.
+     */
+    private function collectCitations(?array $node, string $citingExternalId): void
+    {
+        if ($node === null) {
+            return;
+        }
+        foreach (GedcomParser::findChildren($node, 'SOUR') as $sour) {
+            $ref = trim((string) ($sour['value'] ?? ''));
+            if (preg_match('/^@.+@$/', $ref)) {
+                $this->pendingCitations[] = [
+                    'citingExternalId' => $citingExternalId,
+                    'sourceRef'        => $ref,
+                ];
+            }
+        }
+    }
+
+    /**
+     * Create citation edges (source → EVIDENCE → citing object) and attach URLs
+     * of URL-only sources to the objects that cite them.
+     */
+    private function wireCitations(): void
+    {
+        foreach ($this->pendingCitations as $citation) {
+            $citingThingId = $this->findExisting($citation['citingExternalId']);
+            if ($citingThingId === null) {
+                continue;
+            }
+
+            $sourceThingId = $this->findExisting($this->externalId($citation['sourceRef']));
+            if ($sourceThingId !== null) {
+                $exists = DB::table('links')
+                    ->where('one_thing_id', $sourceThingId)
+                    ->where('link_type_id', UUID::EVIDENCE)
+                    ->where('other_thing_id', $citingThingId)
+                    ->where('deleted', false)
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
+                DB::table('links')->insert([
+                    'link_uuid'      => (string) Str::uuid(),
+                    'one_thing_id'   => $sourceThingId,
+                    'link_type_id'   => UUID::EVIDENCE,
+                    'other_thing_id' => $citingThingId,
+                ]);
+                continue;
+            }
+
+            $urlOnly = $this->urlOnlySources[$citation['sourceRef']] ?? null;
+            if ($urlOnly !== null) {
+                $this->attachSourceUrls($citingThingId, $urlOnly['urls']);
+            }
+        }
     }
 
     // ── Place management ──

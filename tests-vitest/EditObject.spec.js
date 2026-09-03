@@ -469,6 +469,49 @@ describe('EditObject', () => {
         }])
     })
 
+    it('fills the Parent field with the real superclass when a class also has subclasses', async () => {
+        // Regression: a class that has BOTH a parent (superclass) and children
+        // (subclasses) used to show one of its children in the Parent field.
+        // Hierarchy edges store one_thing_id = parent/superclass and
+        // other_thing_id = child/subclass (see ApiController::classProperties).
+        // The API union puts the "object as one endpoint" arm first, so the
+        // subclass edge (Disaster → Child) is listed before the parent edge
+        // (Parent → Disaster) — the parent reader must still pick the latter.
+        const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb'
+        const classObject = {
+            thing_id: EDIT_ID,
+            name: 'Disaster',
+            type: 2,
+            links: [
+                {
+                    link_id: 'child-edge',
+                    link_type_id: LINK_TO_PARENT,
+                    one_thing_id: EDIT_ID,
+                    other_thing_id: 'child-class-id',
+                    name: 'Child class',
+                    one_name: 'Disaster',
+                    description: 'Subclass of Disaster',
+                },
+                {
+                    link_id: 'parent-edge',
+                    link_type_id: LINK_TO_PARENT,
+                    one_thing_id: 'parent-class-id',
+                    other_thing_id: EDIT_ID,
+                    name: 'Disaster',
+                    one_name: 'Parent class',
+                    description: '',
+                },
+            ],
+        }
+        await mountEditObject({ params: { type: 2 }, object: classObject, initialLinkedObjects: classObject.links })
+        await flushPromises()
+
+        // The real parent is the superclass endpoint of the edge where the
+        // current object is the child — never one of its own subclasses.
+        expect(wrapper.vm.parentLinkData.other_thing_id).toBe('parent-class-id')
+        expect(wrapper.vm.parentLinkData.link_id).toBe('parent-edge')
+    })
+
     it('enables Swap once a linked object is created into the empty slot', async () => {
         await mountEditObject({ object: OBJECT })
 
