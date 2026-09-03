@@ -53,6 +53,9 @@ class UUID
     public const INSIDE = '922cca80-a0ba-4a5e-8344-769f083f0e72';
     public const VICTOR_FOKIN = '0ac1b13b-acbf-4246-bed4-8f0c2a8b2546';
     public const EVIDENCE = '4eff773a-6bbd-410f-a668-681b41d69051';
+    public const MEDIA_DEPICTS = 'b4d2a9c2-0001-4c1a-8000-000000000001';
+    public const SOURCE_CLASS = 'e1d4c1d1-0002-4c1a-8000-000000000001';
+    public const ARTICLE_CLASS = 'e1d4c1d1-0002-4c1a-8000-000000000002';
     public const HUMAN = '4c8ee41a-9912-4dff-8b44-7779a66e4fcf';
     public const TRIP = 'e3cad1b0-74fa-44b2-9b2f-2adaf36baa14';
     public const FATHER = '29cafd84-0fc9-4295-afcc-d73b9613e39f';

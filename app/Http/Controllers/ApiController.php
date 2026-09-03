@@ -6,6 +6,8 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\MediaLink\MediaTitleResolver;
+use App\Services\MediaLink\UrlMediaClassifier;
 use App\Services\RelatedObjectsResolver;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
@@ -795,6 +797,151 @@ class ApiController extends BaseController
         }
         Everything::deleteById($id);
         return response()->json(['success' => true]);
+    }
+
+    /** Object classes a pasted link may be promoted into. */
+    private const PROMOTE_CLASSES = [
+        'video'   => ['class' => UUID::VIDEO, 'kind' => 'video',   'label' => ['en' => 'Video', 'ru' => 'Видео']],
+        'image'   => ['class' => UUID::PHOTO, 'kind' => 'image',   'label' => ['en' => 'Image', 'ru' => 'Изображение']],
+        'audio'   => ['class' => UUID::AUDIO, 'kind' => 'audio',   'label' => ['en' => 'Audio', 'ru' => 'Аудио']],
+        'article' => ['class' => UUID::ARTICLE_CLASS, 'kind' => 'article', 'label' => ['en' => 'Article', 'ru' => 'Статья']],
+    ];
+
+    /**
+     * Promote an external link into a dedicated media object.
+     *
+     * Given an object (e.g. a regatta event) and a pasted URL (YouTube/VK
+     * video, image, audio, article), this creates a new Thing of the matching
+     * class, stores the URL as an external link ON the new object, and links
+     * the edited object → new object with the "has media depicting" link type.
+     * One object per video; extra copy URLs are later added directly on the
+     * media object.
+     *
+     * The class may be given explicitly (manual override for URLs that are not
+     * auto-classifiable); otherwise it is inferred server-side. The name may
+     * also be given explicitly; otherwise a real title is fetched (YouTube/
+     * Vimeo oEmbed → OpenGraph) with a placeholder fallback.
+     *
+     * POST /api/v1/object/{id}/media-from-url
+     */
+    public function createMediaFromUrl(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'url'   => ['required', 'url', 'max:2048'],
+            'class' => ['nullable', 'string', Rule::in(array_keys(self::PROMOTE_CLASSES))],
+            'name'  => ['nullable', 'string', 'max:191'],
+        ]);
+        $url = trim($validated['url']);
+
+        if (!empty($validated['class'])) {
+            $classified = self::PROMOTE_CLASSES[$validated['class']];
+        } else {
+            $classified = UrlMediaClassifier::classify($url);
+            if ($classified === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This link does not look like a video, image or audio file. Choose the object type manually.',
+                ], 422);
+            }
+        }
+
+        $user = Auth::user();
+
+        $parent = DB::table('things')->where('thing_id', $id)->first();
+        if (!$parent) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+        // Same rights as delete: admins may act on any object, everyone else only their own.
+        if (!$user->is_admin && (string) $parent->owner !== (string) $user->thing_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to modify this record',
+            ], 403);
+        }
+
+        // An explicitly typed name wins; otherwise resolve the real title
+        // before the transaction (the fetch must never hold a DB lock). Raw
+        // file URLs (direct .jpg/.mp3 links) have no title page; tests and
+        // offline sandboxes skip the network call entirely.
+        $requestName = isset($validated['name']) ? trim($validated['name']) : '';
+        if ($requestName !== '') {
+            $name = $requestName;
+        } else {
+            $pathExtension = strtolower((string) pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+            $title = $pathExtension === '' && app()->environment() !== 'testing'
+                ? (new MediaTitleResolver())->resolve($url)
+                : null;
+            $name = $this->promoteObjectName($url, $classified, $title);
+        }
+
+        $mediaId = (string) Str::uuid();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+        $public = (bool) $parent->public;
+
+        DB::transaction(function () use ($mediaId, $id, $url, $classified, $name, $user, $serverUuid, $public) {
+            DB::table('things')->insert([
+                'thing_id'    => $mediaId,
+                'name'        => $name,
+                'type'        => UUID::G_THING,
+                'owner'       => $user->thing_id,
+                'public'      => $public,
+                'deleted'     => false,
+                'server_uuid' => $serverUuid,
+            ]);
+
+            DB::table('links')->insert([
+                'link_uuid'      => (string) Str::uuid(),
+                'one_thing_id'   => $mediaId,
+                'link_type_id'   => UUID::LINK_TO_CLASS,
+                'other_thing_id' => $classified['class'],
+                'public'         => $public,
+            ]);
+
+            DB::table('external_links')->insert([
+                'id'       => (string) Str::uuid(),
+                'thing_id' => $mediaId,
+                'url'      => $url,
+            ]);
+
+            DB::table('links')->insert([
+                'link_uuid'      => (string) Str::uuid(),
+                'one_thing_id'   => $id,
+                'link_type_id'   => UUID::MEDIA_DEPICTS,
+                'other_thing_id' => $mediaId,
+                'public'         => $public,
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'media'   => [
+                'thing_id' => $mediaId,
+                'name'     => $name,
+                'class_id' => $classified['class'],
+                'url'      => $url,
+            ],
+        ]);
+    }
+
+    /**
+     * Build a name for a promoted object: the fetched title when available,
+     * otherwise a descriptive fallback derived from the URL.
+     */
+    private function promoteObjectName(string $url, array $classified, ?string $title): string
+    {
+        if ($title !== null && trim($title) !== '') {
+            return trim($title);
+        }
+        $kindEn = $classified['label']['en']; // Video / Image / Audio / Article
+        if ($classified['kind'] === 'image') {
+            $filename = basename((string) parse_url($url, PHP_URL_PATH));
+            if ($filename !== '' && preg_match('/\.(?:jpe?g|png|gif|webp|bmp|heic)$/i', $filename)) {
+                return 'Image: ' . pathinfo($filename, PATHINFO_FILENAME);
+            }
+        }
+        $provider = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $provider = preg_replace('/^www\./', '', $provider) ?? $provider;
+        return ucfirst($provider) . ' ' . strtolower($kindEn) . ' — ' . now()->format('Y-m-d');
     }
 
     /**

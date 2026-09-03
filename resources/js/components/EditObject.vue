@@ -453,17 +453,55 @@
                             <div v-if="externalLinks.length" class="mb-1">
                                 <label class="form-label mb-0">{{ $t('External Links') }}</label>
                             </div>
-                            <div v-for="(el, idx) in externalLinks" :key="el._key" class="d-flex gap-2 mb-2">
-                                <input
-                                    :ref="(node) => setExternalLinkRef(el._key, node)"
-                                    type="url"
-                                    class="form-control"
-                                    v-model="el.url"
-                                    :placeholder="$t('https://example.com/...')"
-                                />
-                                <button type="button" class="btn btn-outline-danger" @click="removeExternalLink(idx)">
-                                    {{ $t('Remove') }}
-                                </button>
+                            <div v-for="(el, idx) in externalLinks" :key="el._key" class="mb-2">
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <input
+                                        :ref="(node) => setExternalLinkRef(el._key, node)"
+                                        type="url"
+                                        class="form-control"
+                                        style="flex: 1 1 260px;"
+                                        v-model="el.url"
+                                        :placeholder="$t('https://example.com/...')"
+                                    />
+                                    <button type="button" class="btn btn-outline-danger" @click="removeExternalLink(idx)">
+                                        {{ $t('Remove') }}
+                                    </button>
+                                </div>
+                                <!-- Promote a pasted link into a dedicated object (media/article). -->
+                                <div v-if="isEditMode" class="d-flex gap-2 align-items-center flex-wrap mt-1 ps-2">
+                                    <label
+                                        class="form-check d-inline-flex gap-1 align-items-center mb-0"
+                                        :title="$t('Creates a Video/Image/Audio/Article object that holds this link, and links it to this object')"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input mt-0"
+                                            v-model="el.want"
+                                            @change="onPromoteToggle(el)"
+                                        />
+                                        <span class="small">{{ $t('Create an object for this link') }}</span>
+                                    </label>
+                                    <template v-if="el.want">
+                                        <input
+                                            v-model="el.objName"
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            style="max-width: 260px;"
+                                            :placeholder="$t('Object name')"
+                                        />
+                                        <select
+                                            v-model="el.objClass"
+                                            class="form-select form-select-sm"
+                                            style="width: auto;"
+                                        >
+                                            <option value="" disabled>{{ $t('Type') }}</option>
+                                            <option value="video">{{ $t('Video') }}</option>
+                                            <option value="image">{{ $t('Image') }}</option>
+                                            <option value="audio">{{ $t('Audio') }}</option>
+                                            <option value="article">{{ $t('Article') }}</option>
+                                        </select>
+                                    </template>
+                                </div>
                             </div>
                             <small v-if="externalLinks.length" class="form-text text-muted d-block mb-3">
                                 {{ $t('External links point to URLs instead of other objects.') }}
@@ -1373,10 +1411,18 @@ const initializeData = () => {
             return;
         }
 
+        // Canonical hierarchy direction (see ApiController::classProperties and
+        // searchTree): one_thing_id = parent/superclass, other_thing_id =
+        // child/subclass. A LINK_TO_PARENT edge is this object's own parent only
+        // when the object is the child endpoint (other_thing_id) — or when other
+        // is still empty because a new class is being created (TreeMenu pre-sets
+        // one_thing_id = the intended parent). Edges where this object is
+        // one_thing_id merely name its own subclasses, never its parent.
         if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && item.link_type_id === LINK_TO_PARENT) {
-            const parentId = linkItem.one_thing_id || linkItem.other_thing_id;
-            if (parentId) {
-                parentLinkData.value.other_thing_id = parentId;
+            const isOwnParentEdge = linkItem.other_thing_id === formData.value.thing_id
+                || (!linkItem.other_thing_id && !!linkItem.one_thing_id);
+            if (isOwnParentEdge) {
+                parentLinkData.value.other_thing_id = linkItem.one_thing_id;
                 parentLinkData.value.link_id = linkItem.link_id;
                 parentLinkData.value.description = linkItem.description;
             }
@@ -1409,15 +1455,14 @@ const initializeData = () => {
             }
         }
         if ((formData.value.type === CLASS_TYPE || formData.value.type === LINK_TYPE) && props.object.links) {
-            const parentLinkFromLinks = props.object.links.find(link => link.link_type_id === LINK_TO_PARENT);
+            // This object's own parent is the LINK_TO_PARENT edge where it is
+            // the child endpoint (other_thing_id); parent = one_thing_id. Edges
+            // where it is one_thing_id list its subclasses, not its parent.
+            const parentLinkFromLinks = props.object.links.find(
+                link => link.link_type_id === LINK_TO_PARENT && link.other_thing_id === props.object.thing_id
+            );
             if (parentLinkFromLinks) {
-                let parentId;
-                if (parentLinkFromLinks.one_thing_id === props.object.thing_id) {
-                    parentId = parentLinkFromLinks.other_thing_id;
-                } else {
-                    parentId = parentLinkFromLinks.one_thing_id;
-                }
-                parentLinkData.value.other_thing_id = parentId;
+                parentLinkData.value.other_thing_id = parentLinkFromLinks.one_thing_id;
                 parentLinkData.value.link_id = parentLinkFromLinks.link_id;
                 parentLinkData.value.description = parentLinkFromLinks.description || '';
                 console.log('[EditObject] parentLinkData updated from existing links:', JSON.parse(JSON.stringify(parentLinkData.value)));
@@ -1430,6 +1475,9 @@ const initializeData = () => {
                 id: el.id || null,
                 _key: el.id || uuidv4(), // stable frontend-only key for v-for
                 url: el.url || '',
+                want: false,
+                objName: '',
+                objClass: '',
             }));
         }
     }
@@ -1521,12 +1569,53 @@ const setExternalLinkRef = (key, node) => {
     else delete externalLinkInputs.value[key];
 };
 
+// Video hosts whose links are recognizably media (mirrors the server-side
+// UrlMediaClassifier). Non-video URLs must carry an image/audio extension.
+const MEDIA_VIDEO_HOSTS = ['youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com', 'vkvideo.ru'];
+const MEDIA_IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|heic)$/i;
+const MEDIA_AUDIO_EXT = /\.(mp3|wav|ogg|m4a|flac)$/i;
+
+// Auto-detect the object type of a pasted link, or '' when it is not a
+// recognisable video/image/audio URL. Scheme-less input is treated as https://.
+const autoKind = (url) => {
+    const value = (url || '').trim();
+    if (!value) return '';
+    let parsed;
+    try {
+        parsed = new URL(value);
+    } catch {
+        try {
+            parsed = new URL('https://' + value);
+        } catch {
+            return '';
+        }
+    }
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    if (MEDIA_VIDEO_HOSTS.includes(host)) return 'video';
+    if (host === 'vk.com' && /\/video|\/clip/i.test(parsed.pathname)) return 'video';
+    if (MEDIA_IMAGE_EXT.test(parsed.pathname)) return 'image';
+    if (MEDIA_AUDIO_EXT.test(parsed.pathname)) return 'audio';
+    return '';
+};
+
+// When the user ticks "create an object", pre-select the detected type so the
+// manual override is only needed for links the classifier cannot recognize.
+const onPromoteToggle = (el) => {
+    if (el.want && !el.objClass) {
+        const kind = autoKind(el.url);
+        if (kind) el.objClass = kind;
+    }
+};
+
 const addExternalLink = async () => {
     const key = uuidv4();
     externalLinks.value.push({
         id: null, // stays null for new rows so the backend inserts instead of updating
         _key: key, // stable frontend-only key for v-for
         url: '',
+        want: false,
+        objName: '',
+        objClass: '',
     });
     await nextTick();
     externalLinkInputs.value[key]?.focus();
@@ -1578,6 +1667,34 @@ const submitForm = async () => {
             return out;
         };
         sanitizeGeoProperties();
+
+        // Promote external links the user flagged with "create a media object":
+        // each becomes a dedicated Video/Image/Audio object holding the URL as
+        // its own external link and linked back to this object. Done before the
+        // regular save so the URL row is not also saved on the current object.
+        const wantPromoted = externalLinks.value.filter(el => el.want && (el.url || '').trim());
+        for (const el of wantPromoted) {
+            try {
+                const mediaRes = await axios.post(`/object/${formData.value.thing_id}/media-from-url`, {
+                    url: el.url.trim(),
+                    class: el.objClass || undefined,
+                    name: (el.objName || '').trim() || undefined,
+                });
+                if (!mediaRes.data?.success) {
+                    throw new Error(mediaRes.data?.message || t('Failed to create media object from link'));
+                }
+                const idx = externalLinks.value.indexOf(el);
+                if (idx !== -1) externalLinks.value.splice(idx, 1);
+            } catch (err) {
+                console.error('Media promotion error:', err.response || err);
+                const resp = err.response?.data || {};
+                errorMessage.value = resp.message || err.message || t('Failed to create media object from link');
+                errorDetails.value = resp.errors || '';
+                showError.value = true;
+                isSubmitting = false;
+                return;
+            }
+        }
 
         const linksToAdd = regularLinks.value
             .filter(item => item.other_thing_id?.trim() && !item.link_id)
