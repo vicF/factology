@@ -146,6 +146,10 @@
                                         {{ $t('Logout') }}
                                     </a></li>
                                 </template>
+                                <li><router-link class="dropdown-item" to="/logs" data-testid="logs-link">
+                                    <i class="bi bi-journal-text icon-sm me-2"></i>
+                                    {{ $t('Logs') }}
+                                </router-link></li>
                                 <li><hr class="dropdown-divider" /></li>
                                 <li class="dropdown-header text-muted small" style="font-size: 10px; padding: 4px 12px;">
                                     build {{ buildId }} <span style="cursor:pointer" @click.stop="onBuildIdTap">⚠️</span>

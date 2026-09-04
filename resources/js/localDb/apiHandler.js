@@ -31,6 +31,13 @@ import { saveLink, deleteLink, getLink, listLinksForThing } from './links';
 import { seedLocalDb } from './seeder';
 import { UUID } from '../constants/uuid';
 import { filterVisible, isRowVisible } from './visibility';
+import {
+    localConsistencyCheck,
+    localConsistencyDelete,
+    localExportJson,
+    localImportJson,
+    localFindDuplicates,
+} from './localTools';
 
 /** Generate a unique id for locally-created links (crypto.randomUUID is
  *  available in the Android WebView and Node — avoids bundling the `uuid` npm
@@ -95,6 +102,25 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
+    // ── Server-mirror Tools endpoints, implemented locally for the offline
+    //    app (same response shapes as the Laravel controllers — see
+    //    localTools.js). Handled before the /object-only guard below.
+    const localTool = await handleLocalTool(method, parts, queryPart, data, context);
+    if (localTool !== undefined) {
+        return localTool;
+    }
+
+    // The local mirror only knows /object (and /user, /link, /client-error,
+    // handled before reaching here). A write to any other path is a
+    // server-only endpoint (e.g. /import/gedcom, /search/options); sending it
+    // into handleCreate below would "create" a junk object whose id is the
+    // path segment (thing_id 'import', 'tools', …) and silently report
+    // success. Reject it with a clean, visible message instead.
+    const isObjectPath = pathPart === API_PREFIX || pathPart.startsWith(API_PREFIX + '/');
+    if (['post', 'put', 'patch', 'delete'].includes(method) && !isObjectPath) {
+        throw offlineError(501, `Not available in the offline app: ${method.toUpperCase()} ${pathPart}`);
+    }
+
     // ── /object (POST - search) ──────────────────────────────────────
     if (method === 'post' && parts.length === 0) {
         return handleSearch(data, context);
@@ -120,6 +146,103 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     }
 
     throw new Error(`Unhandled local API: ${method} ${url}`);
+}
+
+/**
+ * Shape an error like an axios failure so UI catch handlers surface `message`.
+ */
+function offlineError(status, message) {
+    const err = new Error(message);
+    err.response = { status, data: { message, code: 'offline_unavailable' } };
+    return err;
+}
+
+/**
+ * Tools-page endpoints implemented locally (see localTools.js). Returns the
+ * axios-shaped success object, or undefined when the path is not one of ours
+ * (then the normal /object dispatch / guard applies).
+ */
+async function handleLocalTool(method, parts, queryPart, data, context = {}) {
+    const first = parts[0];
+
+    // GET /export?include_deleted=… → JSON backup string (Tools downloads it).
+    if (method === 'get' && first === 'export') {
+        const includeDeleted = queryPart
+            ? new URLSearchParams(queryPart).get('include_deleted') === 'true'
+            : false;
+        const text = await localExportJson({
+            includeDeleted,
+            visibleOwners: context.visibleOwners ?? null,
+            exportedBy: context.userThingId ?? null,
+        });
+        return { data: text, status: 200 };
+    }
+
+    // POST /import → JSON backup restore (ImportModal). The file arrives as
+    // FormData from the modal.
+    if (method === 'post' && first === 'import' && parts.length === 1) {
+        const result = await readImportRequest(data);
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /import/gedcom → not ported to the offline app yet (see plan).
+    if (method === 'post' && first === 'import' && parts[1] === 'gedcom') {
+        throw offlineError(501, 'GEDCOM import is not available in the offline app yet — it will arrive in a future update.');
+    }
+
+    // POST /import/find-duplicates → DuplicatePersonMatcher mirror.
+    if (method === 'post' && first === 'import' && parts[1] === 'find-duplicates') {
+        const result = await localFindDuplicates(context.visibleOwners ?? null);
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /tools/consistency-check → DatabaseConsistencyChecker mirror.
+    if (method === 'post' && first === 'tools' && parts[1] === 'consistency-check') {
+        const result = await localConsistencyCheck();
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /tools/consistency-delete → ToolsController::deleteSelected mirror.
+    if (method === 'post' && first === 'tools' && parts[1] === 'consistency-delete') {
+        const body = typeof data === 'string' ? JSON.parse(data) : (data || {});
+        const res = await localConsistencyDelete(body.ids, context.visibleOwners ?? null);
+        return { data: { success: true, deleted: res.deleted, failed: res.failed }, status: 200 };
+    }
+
+    return undefined;
+}
+
+/**
+ * Unwrap the /import request body (FormData file upload from ImportModal, or a
+ * raw JSON string/object in tests) and run the local import.
+ */
+async function readImportRequest(data) {
+    let payload;
+    let conflictMode = 'latest_wins';
+
+    const reject = () => offlineError(422, 'Invalid import data. Expected JSON with "data" key containing "things" and/or "links".');
+
+    if (data && typeof data === 'object' && typeof data.get === 'function') {
+        conflictMode = String(data.get('conflict_mode') || 'latest_wins');
+        const file = data.get('file');
+        if (!file) throw offlineError(422, 'No file provided for import.');
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed?.data) throw reject();
+        payload = parsed.data;
+    } else if (typeof data === 'string') {
+        const parsed = JSON.parse(data);
+        payload = parsed?.data ?? parsed;
+        conflictMode = parsed?.conflict_mode || conflictMode;
+    } else {
+        payload = data?.data ?? data;
+        conflictMode = data?.conflict_mode || conflictMode;
+    }
+
+    if (!payload || typeof payload !== 'object') throw reject();
+    if (!Array.isArray(payload.things) && !Array.isArray(payload.links)) throw reject();
+
+    return localImportJson(payload, conflictMode);
 }
 
 async function handleSearch(body, context = {}) {
