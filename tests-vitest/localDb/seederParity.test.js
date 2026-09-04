@@ -41,7 +41,10 @@ describe('Seeder parity with web DatabaseSeeder', () => {
             const obj = things.find(o => o.thing_id === c.thing_id);
             expect(obj, `class "${c.name}" (${c.thing_id})`).toBeTruthy();
             expect(obj.name).toBe(c.name);
-            expect(obj.type).toBe(UUID.G_CLASS);
+            // The seed array declares the intended type; classes are G_CLASS,
+            // and rows moved to the Link taxonomy (e.g. "is a part of") are
+            // G_LINK — both stay visible for the offline tree.
+            expect(obj.type).toBe(c.type);
         }
     });
 

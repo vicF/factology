@@ -413,7 +413,7 @@ class ApiController extends BaseController
              * Type identifier
              * @example 3
              */
-            'type' => ['required', 'integer', 'min:1', 'max:6'],
+            'type' => ['required', 'integer', 'min:1', 'max:7'],
 
             /**
              * Class relationship data (optional)
@@ -1582,6 +1582,7 @@ class ApiController extends BaseController
         $rootId = UUID::EVERYTHING;
         $linkTypeParent = UUID::LINK_TO_PARENT;
         $classType = UUID::G_CLASS;
+        $modelType = UUID::G_MODEL;
         $linkType = UUID::G_LINK;
         $systemId = UUID::SYSTEM;
         $isAuthenticated = Auth::check();
@@ -1589,8 +1590,8 @@ class ApiController extends BaseController
         // Only filter by public if user is not authenticated
         $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
-        // Sort siblings so classes come first, then link types, and "System" last
-        $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type = ? THEN 0 ELSE 1 END';
+        // Sort siblings so classes and models come first, then link types, and "System" last
+        $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type IN (?, ?) THEN 0 ELSE 1 END';
 
         $rawSql = "
     WITH RECURSIVE descendants (name, level, id, parent_id, description, type, public, name_translations) AS (
@@ -1620,7 +1621,7 @@ class ApiController extends BaseController
         FROM descendants d
         JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ? AND l.deleted IS NOT TRUE
         JOIN things c ON l.other_thing_id = c.thing_id
-        WHERE (c.type = ? OR c.type = ?) AND c.deleted IS NOT TRUE AND d.level < 10 $publicCondition
+        WHERE c.type IN (?, ?, ?) AND c.deleted IS NOT TRUE AND d.level < 10 $publicCondition
     )
     SELECT * FROM descendants
     ORDER BY level, $sortPriority, name;
@@ -1630,9 +1631,11 @@ class ApiController extends BaseController
             $rootId,
             $linkTypeParent,
             $classType,
+            $modelType,
             $linkType,
             $systemId,
             $classType,
+            $modelType,
         ]);
 
         // Remove duplicate nodes, keep the one with the smallest level
@@ -1696,7 +1699,7 @@ class ApiController extends BaseController
                 $join->on('things.thing_id', 'links.one_thing_id')
                     ->whereRaw('links.link_type_id = ?', UUID::LINK_TO_PARENT);
             })
-            ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
+            ->whereIn('type', [UUID::G_CLASS, UUID::G_MODEL, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
             ->orderByRaw('type = ?, type = ? DESC', [UUID::GENERAL, UUID::G_CLASS])->get())->keyBy('thing_id')->toArray();
 
         foreach ($data as $id => $node) {

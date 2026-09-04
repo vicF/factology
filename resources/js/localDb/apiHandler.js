@@ -126,9 +126,9 @@ async function handleSearch(body) {
     let results;
     if (params.tree) {
         // Return class tree built from objects + parent-child links.
-        // Mirrors the server (searchTree): classes AND link types that
+        // Mirrors the server (searchTree): classes, models AND link types that
         // descend from Everything via "is a parent of" links.
-        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
+        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_MODEL, UUID.G_LINK], includeDeleted: false });
         const tree = await buildClassTree(things);
         return {
             data: { things: tree },

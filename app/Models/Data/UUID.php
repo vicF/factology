@@ -16,6 +16,7 @@ class UUID
     public const G_LINK = 4;
     public const G_THING = 3;
     public const G_CLASS = 2;
+    public const G_MODEL = 7;
     public const G_EXTERNAL = 5;
     public const G_SERVER = 6;
     public const G_SERVER_CLASS = 'f8c9f7a6-99ed-4156-81ff-991e8008f377';

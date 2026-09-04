@@ -11,6 +11,7 @@ export const UUID = {
     G_LINK: 4,
     G_EXTERNAL: 5,
     G_SERVER: 6,
+    G_MODEL: 7,
 
     // ── System class UUIDs ──
     G_SERVER_CLASS: 'f8c9f7a6-99ed-4156-81ff-991e8008f377',
