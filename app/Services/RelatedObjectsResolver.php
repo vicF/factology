@@ -264,6 +264,8 @@ class RelatedObjectsResolver
                 't.name',
                 't.name_translations',
                 't.type',
+                't.start',
+                't.end',
                 't.public',
                 't.description',
                 't.data',
@@ -383,6 +385,8 @@ class RelatedObjectsResolver
             'name'              => $row->name ?? null,
             'name_translations' => $nameTranslations,
             'type'              => $row->type !== null ? (int) $row->type : null,
+            'start'             => $row->start !== null ? (string) $row->start : null,
+            'end'               => $row->end !== null ? (string) $row->end : null,
             'classes'           => $class, // multi-class: array of {thing_id, name}
             'class'             => $class[0] ?? null, // primary class (backward compat)
             'public'            => $row->public !== null ? (bool) $row->public : null,

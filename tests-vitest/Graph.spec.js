@@ -108,4 +108,5 @@ describe('Graph', () => {
         const line = data.lines.find((l) => l.id === 'l2')
         expect(line.text).toBe('connected')
     })
+
 })

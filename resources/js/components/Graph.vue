@@ -48,6 +48,7 @@ import { inject, reactive, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
+import { applyAgeBias } from '../utils/graphAgeBias.js'
 import Image from './Image.vue'
 
 const getThumbUrl = inject('getThumbUrl');
@@ -75,7 +76,9 @@ const selectedDepth = ref(2)
 // The fetched root object carrying nested `links` (depth = selectedDepth).
 const graphObject = ref(null)
 
-// Updated options to force rectangular shapes
+// The graph uses relation-graph's own automatic "center" layout (the original
+// look, arranged from the real links). After it runs we nudge the result so
+// older objects end up higher (see applyAgeBias).
 const graphOptions = {
     debug: false,
     defaultNodeShape: 1, // 1 = Rectangle (fixes the oval issue)
@@ -144,29 +147,6 @@ const buildGraphData = (object) => {
         data: object
     })
 
-    // Класс объекта
-    if (object.class && object.class.thing_id) {
-        if (addNode({
-            id: object.class.thing_id,
-            text: objectName(object.class) || t('Class'),
-            color: '#6c757d',
-            borderColor: '#495057',
-            fontColor: '#ffffff',
-            width: 130,
-            height: 90,
-            nodeShape: 1,
-            data: object.class
-        })) {
-            lines.push({
-                id: `class-${object.thing_id}-${object.class.thing_id}`,
-                from: object.class.thing_id,
-                to: object.thing_id,
-                text: t('is'),
-                color: '#6c757d'
-            })
-        }
-    }
-
     // Связанные объекты — рекурсивно до глубины загруженных данных
     const walk = (parentId, links) => {
         if (!Array.isArray(links)) return
@@ -191,6 +171,7 @@ const buildGraphData = (object) => {
                 id: link.link_id != null ? String(link.link_id) : `l-${parentId}-${target.thing_id}`,
                 from: parentId,
                 to: target.thing_id,
+                linkType: link.link_type_id ?? null,
                 text: fieldText(link.link_name, link.link_name_translations) || t('connected'),
                 color: '#28a745'
             })
@@ -216,11 +197,43 @@ const renderGraph = async () => {
     // Reset thumbnail state so nodes render without an image box until their
     // thumbnail actually loads (each node re-emits `has-image` on mount).
     for (const key of Object.keys(nodeHasImage)) delete nodeHasImage[key]
+
+    // Pass 1: relation-graph auto-lays the graph out ("center"), arranged from
+    // the actual links, so connected objects are drawn together.
+    graphOptions.layout.layoutName = 'center'
     await graphRef.value.setJsonData({
         rootId: graphObject.value.thing_id,
         nodes: graphData.nodes,
         lines: graphData.lines
     })
+
+    const instance = graphRef.value && typeof graphRef.value.getInstance === 'function'
+        ? graphRef.value.getInstance()
+        : null
+    if (instance && typeof instance.getNodes === 'function') {
+        // Pass 2: keep the automatic arrangement but nudge it so older objects
+        // sit higher (and parents sit above their children), then re-render the
+        // nudged positions as a fixed layout.
+        const positions = {}
+        instance.getNodes().forEach((n) => { positions[n.id] = { x: n.x, y: n.y } })
+        const fixed = graphData.nodes.map((n) => {
+            const p = positions[n.id] || {}
+            return { ...n, x: p.x ?? 0, y: p.y ?? 0 }
+        })
+        applyAgeBias(fixed, graphData.lines)
+
+        graphOptions.layout.layoutName = 'fixed'
+        await graphRef.value.setJsonData({
+            rootId: graphObject.value.thing_id,
+            nodes: fixed,
+            lines: graphData.lines
+        })
+        // "fixed" disables the library's own zoom-to-fit, so fit explicitly.
+        setTimeout(() => {
+            if (typeof instance.moveToCenter === 'function') instance.moveToCenter()
+            if (typeof instance.zoomToFit === 'function') instance.zoomToFit()
+        }, 80)
+    }
 }
 
 const showGraph = async () => {
