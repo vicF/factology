@@ -5,7 +5,8 @@ export const OBJECT_TYPES = {
     THING:    3,
     LINK:     4,
     EXTERNAL: 5,
-    SERVER:   6
+    SERVER:   6,
+    MODEL:    7
 };
 
 // Optional: named exports if you prefer
@@ -14,6 +15,7 @@ export const THING_TYPE    = 3;
 export const LINK_TYPE     = 4;
 export const EXTERNAL_TYPE = 5;
 export const SERVER_TYPE   = 6;
+export const MODEL_TYPE    = 7;
 
 export const LINK_TO_PARENT = '361c19af-c011-4051-9329-49c75d1ca0fb';
 export const LINK_TO_CLASS = 'c217c185-742f-4a9f-8e69-acea2b4f5aea';
@@ -28,5 +30,6 @@ export const TYPE_NAMES = {
     [THING_TYPE]:    'Thing',
     [LINK_TYPE]:     'Link',
     [EXTERNAL_TYPE]: 'External',
-    [SERVER_TYPE]:   'Server'
+    [SERVER_TYPE]:   'Server',
+    [MODEL_TYPE]:    'Model'
 };

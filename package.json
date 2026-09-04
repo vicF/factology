@@ -9,6 +9,9 @@
         "test:vitest-watch": "vitest --config vitest.config.js"
     },
     "dependencies": {
+        "@noble/ed25519": "^3.2.0",
+        "@scure/base": "^2.3.0",
+        "@scure/bip39": "^2.3.0",
         "axios": "^1.18.0",
         "bootstrap": "^5.3.8",
         "bootstrap-icons": "^1.13.1",

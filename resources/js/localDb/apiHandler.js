@@ -85,6 +85,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         ? Math.min(Math.max(parseInt(depthParam, 10) || 0, 0), DEPTH_CAP)
         : 1;
 
+    // Client error reports (from errorTracker.js) — silently ignore in local mode
+    if (pathPart === '/client-error' || pathPart === 'client-error') {
+        return { data: { success: true }, status: 200 };
+    }
+
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
@@ -121,9 +126,9 @@ async function handleSearch(body) {
     let results;
     if (params.tree) {
         // Return class tree built from objects + parent-child links.
-        // Mirrors the server (searchTree): classes AND link types that
+        // Mirrors the server (searchTree): classes, models AND link types that
         // descend from Everything via "is a parent of" links.
-        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
+        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_MODEL, UUID.G_LINK], includeDeleted: false });
         const tree = await buildClassTree(things);
         return {
             data: { things: tree },
@@ -709,6 +714,7 @@ async function buildClassTree(classObjects) {
         return {
             id: thingId,
             name: obj.name,
+            name_translations: obj.name_translations ?? null,
             level,
             description: obj.description || null,
             type: obj.type,

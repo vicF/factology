@@ -5,9 +5,10 @@
 // every class, and every class-hierarchy link declared in seedData.js.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
+import { getDb, clearAll, SYNC_STATUS } from '@/localDb/index';
 import { seedLocalDb } from '@/localDb/seeder';
 import { UUID } from '@/constants/uuid';
+import { SEED_TRANSLATIONS } from '@/localDb/seedTranslations';
 import {
     BOOTSTRAP_THINGS,
     BOOTSTRAP_LINKS,
@@ -40,7 +41,10 @@ describe('Seeder parity with web DatabaseSeeder', () => {
             const obj = things.find(o => o.thing_id === c.thing_id);
             expect(obj, `class "${c.name}" (${c.thing_id})`).toBeTruthy();
             expect(obj.name).toBe(c.name);
-            expect(obj.type).toBe(UUID.G_CLASS);
+            // The seed array declares the intended type; classes are G_CLASS,
+            // and rows moved to the Link taxonomy (e.g. "is a part of") are
+            // G_LINK — both stay visible for the offline tree.
+            expect(obj.type).toBe(c.type);
         }
     });
 
@@ -165,5 +169,87 @@ describe('Seeder parity with web DatabaseSeeder', () => {
             seen.set(t.thing_id, t.name);
         }
         expect(seen.size).toBe(BOOTSTRAP_THINGS.length + CLASSES.length);
+    });
+
+    it('seeds name_translations for bootstrap things and classes', async () => {
+        await seedLocalDb();
+        const db = getDb();
+
+        const character = await db.objects.get('f48ef10a-40f6-4190-bfae-2834e9781ad1');
+        expect(character.name_translations).toEqual(SEED_TRANSLATIONS['f48ef10a-40f6-4190-bfae-2834e9781ad1']);
+        expect(character.name_translations.ru).toBe('Персонаж');
+
+        const everything = await db.objects.get(UUID.EVERYTHING);
+        expect(everything.name_translations.ru).toBe('Всё');
+    });
+
+    it('backfills missing name_translations on a DB seeded before translations existed', async () => {
+        // Simulate an older install: objects exist but carry no translations.
+        const db = getDb();
+        await seedLocalDb();
+
+        // Strip translations, as a pre-translation install would have them.
+        const all = await db.objects.toArray();
+        await db.objects.bulkPut(all.map(o => {
+            o.name_translations = null;
+            return o;
+        }));
+
+        await seedLocalDb();
+
+        const character = await db.objects.get('f48ef10a-40f6-4190-bfae-2834e9781ad1');
+        expect(character.name_translations.ru).toBe('Персонаж');
+    });
+
+    it('does not overwrite user-edited name_translations', async () => {
+        const db = getDb();
+        await seedLocalDb();
+        const id = 'f48ef10a-40f6-4190-bfae-2834e9781ad1';
+        const obj = await db.objects.get(id);
+        obj.name_translations = { lang: 'en', ru: 'Мой персонаж' };
+        await db.objects.put(obj);
+
+        await seedLocalDb();
+
+        const after = await db.objects.get(id);
+        expect(after.name_translations.ru).toBe('Мой персонаж');
+    });
+
+    it('dedupes duplicate class-hierarchy edges (heals buggy-import DBs)', async () => {
+        const db = getDb();
+        await seedLocalDb();
+
+        // Corrupt the DB like the old import did: one parallel row per seed edge,
+        // carrying a link_uuid (the seed rows have none).
+        const seedRows = await db.links
+            .where('link_type_id')
+            .equals(UUID.LINK_TO_PARENT)
+            .toArray();
+        for (let i = 0; i < seedRows.length; i++) {
+            const s = seedRows[i];
+            await db.links.put({
+                link_id: `corrupt-${i}`,
+                one_thing_id: s.one_thing_id,
+                link_type_id: UUID.LINK_TO_PARENT,
+                other_thing_id: s.other_thing_id,
+                link_uuid: `22222222-3333-4444-5555-${String(i).padStart(12, '0')}`,
+                public: 1,
+                _syncStatus: SYNC_STATUS.LOCAL_ONLY,
+            });
+        }
+
+        await seedLocalDb();
+
+        // Back to one row per edge.
+        const after = await db.links
+            .where('link_type_id')
+            .equals(UUID.LINK_TO_PARENT)
+            .toArray();
+        expect(after.length).toBe(seedRows.length);
+
+        // The kept rows now carry the canonical link_uuid adopted from the dup.
+        for (const row of after) {
+            expect(row.link_uuid).toBeTruthy();
+        }
     });
 });

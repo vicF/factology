@@ -31,7 +31,7 @@ const props = defineProps({
     alt: { type: String, default: '' },
     width: { type: String, default: '100%' },
     alternativeUuids: { type: Array, default: () => [] },
-    type: { type: Number, default: null },
+    type: { type: [Number, String], default: null },
     showTypeLabel: { type: Boolean, default: true },
     sideBar: { type: String, default: null }
 })

@@ -104,6 +104,19 @@ describe('Local API class tree (mirrors server searchTree)', () => {
         expect(names).not.toContain('Married to');
         expect(names).not.toContain('meanwhile');
     });
+
+    it('includes name_translations on tree nodes (RU class names work)', async () => {
+        const res = await handleLocalApiCall('post', '/object', JSON.stringify({ tree: true }));
+        const tree = res.data.things;
+
+        // Everything → Something → Event
+        const something = tree[0].nodes.find(n => n.id === UUID.SOMETHING);
+        expect(something.name_translations).toBeTruthy();
+        const event = something.nodes.find(n => n.id === UUID.EVENT);
+        expect(event).toBeTruthy();
+        expect(event.name_translations).toBeTruthy();
+        expect(event.name_translations.ru).toBe('Событие');
+    });
 });
 
 describe('Local API search sorting + class filter (mirrors server ApiController::search)', () => {
