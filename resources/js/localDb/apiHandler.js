@@ -38,6 +38,8 @@ import {
     localImportJson,
     localFindDuplicates,
 } from './localTools';
+import { importGedcom } from '../gedcom/gedcomImporter';
+import { createDexieStore } from '../gedcom/dexieStore';
 
 /** Generate a unique id for locally-created links (crypto.randomUUID is
  *  available in the Android WebView and Node — avoids bundling the `uuid` npm
@@ -185,9 +187,23 @@ async function handleLocalTool(method, parts, queryPart, data, context = {}) {
         return { data: { success: true, result }, status: 200 };
     }
 
-    // POST /import/gedcom → not ported to the offline app yet (see plan).
+    // POST /import/gedcom → client-side GEDCOM parser + importer, same mapping
+    // as the redesigned server importer (see gedcom/gedcomImporter.js).
     if (method === 'post' && first === 'import' && parts[1] === 'gedcom') {
-        throw offlineError(501, 'GEDCOM import is not available in the offline app yet — it will arrive in a future update.');
+        if (!context.userThingId) {
+            throw offlineError(403, 'Offline data is read-only until you create or import an identity.');
+        }
+        const fileData = (data && typeof data.get === 'function') ? data.get('file') : null;
+        if (!fileData) throw offlineError(422, 'No file provided for import.');
+        const content = await fileData.text();
+        if (!content.trim()) throw offlineError(422, 'Empty or unreadable file');
+
+        const result = await importGedcom({
+            content,
+            ownerId: context.userThingId,
+            store: createDexieStore(),
+        });
+        return { data: { success: true, result }, status: 200 };
     }
 
     // POST /import/find-duplicates → DuplicatePersonMatcher mirror.
