@@ -1,51 +1,83 @@
 <template>
-    <div>
-        <!-- Multilevel control: how many levels of related objects to show -->
-        <div class="graph-levels mb-1 d-flex align-items-center gap-2">
-            <span class="small text-muted">{{ t('Levels') }}</span>
-            <div class="btn-group btn-group-sm" role="group" aria-label="Graph levels">
+    <div class="graph-wrap" style="height:calc(100vh - 56px);">
+        <!-- Floating panel over the graph. The head (Levels 1-4) is always
+             visible; the Group controls unfold/collapse below it. -->
+        <div class="graph-hud" :class="{ 'is-mini': !hudOpen }">
+            <div class="graph-hud-head">
+                <span class="graph-hud-label">{{ t('Levels') }}</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Graph levels">
+                    <button
+                        v-for="lvl in [1, 2, 3, 4]"
+                        :key="lvl"
+                        type="button"
+                        class="btn"
+                        :class="selectedDepth === lvl ? 'btn-primary' : 'btn-outline-secondary'"
+                        @click="selectedDepth = lvl"
+                    >{{ lvl }}</button>
+                </div>
                 <button
-                    v-for="lvl in [1, 2, 3, 4]"
-                    :key="lvl"
                     type="button"
-                    class="btn"
-                    :class="selectedDepth === lvl ? 'btn-primary' : 'btn-outline-secondary'"
-                    @click="selectedDepth = lvl"
-                >{{ lvl }}</button>
+                    class="graph-hud-toggle"
+                    :title="hudOpen ? t('Hide') : t('Group')"
+                    :aria-label="hudOpen ? t('Hide') : t('Group')"
+                    @click="hudOpen = !hudOpen"
+                >
+                    <svg v-if="!hudOpen" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 6h9v2H4zM4 11h5v2H4zM4 16h11v2H4z" />
+                        <circle cx="17" cy="7" r="2.4" />
+                        <circle cx="14" cy="12" r="2.4" />
+                        <circle cx="19" cy="17" r="2.4" />
+                    </svg>
+                    <span v-else>×</span>
+                </button>
             </div>
-            <span class="small text-muted ms-2">{{ t('Click a node to open it') }}</span>
+
+            <div v-if="hudOpen" class="graph-hud-body">
+                <div class="graph-hud-group">
+                    <div class="graph-hud-line">
+                        <span class="graph-hud-label">{{ t('Group') }}:</span>
+                        <label class="graph-hud-check">
+                            <input v-model="groupCfg.byType" type="checkbox">
+                            <span>{{ t('by link type') }}</span>
+                        </label>
+                        <label class="graph-hud-check">
+                            <input v-model="groupCfg.byClass" type="checkbox">
+                            <span>{{ t('by class') }}</span>
+                        </label>
+                    </div>
+                    <div class="graph-hud-steppers">
+                        <span class="graph-hud-stepper">
+                            {{ t('fold when a type has more than') }}
+                            <span class="graph-hud-num">
+                                <button type="button" @click="bump('typeAbove', -1)" aria-label="−">−</button>
+                                <b>{{ groupCfg.typeAbove }}</b>
+                                <button type="button" @click="bump('typeAbove', 1)" aria-label="+">+</button>
+                            </span>
+                        </span>
+                        <span class="graph-hud-stepper">
+                            {{ t('a class more than') }}
+                            <span class="graph-hud-num">
+                                <button type="button" @click="bump('classAbove', -1)" aria-label="−">−</button>
+                                <b>{{ groupCfg.classAbove }}</b>
+                                <button type="button" @click="bump('classAbove', 1)" aria-label="+">+</button>
+                            </span>
+                        </span>
+                        <span class="graph-hud-stepper">
+                            {{ t('only when total links exceed') }}
+                            <span class="graph-hud-num">
+                                <button type="button" @click="bump('clutter', -1)" aria-label="−">−</button>
+                                <b>{{ groupCfg.clutter }}</b>
+                                <button type="button" @click="bump('clutter', 1)" aria-label="+">+</button>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="graph-hud-hint">{{ t('Click a node to open it') }}</div>
+            </div>
         </div>
-        <!-- Grouping: pack many same-type / same-class links into folders -->
-        <div class="graph-grouping mb-1 d-flex align-items-center gap-3 flex-wrap small">
-            <span class="text-muted">{{ t('Group') }}:</span>
-            <label class="mb-0 d-flex align-items-center gap-1">
-                <input v-model="groupCfg.byType" type="checkbox" class="form-check-input mt-0">
-                <span>{{ t('by link type') }}</span>
-            </label>
-            <label class="mb-0 d-flex align-items-center gap-1">
-                <input v-model="groupCfg.byClass" type="checkbox" class="form-check-input mt-0">
-                <span>{{ t('by class') }}</span>
-            </label>
-            <span class="text-muted d-inline-flex align-items-center gap-1">
-                {{ t('fold when a type has more than') }}
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('typeAbove', -1)">−</button>
-                <span class="badge bg-secondary">{{ groupCfg.typeAbove }}</span>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('typeAbove', 1)">+</button>
-            </span>
-            <span class="text-muted d-inline-flex align-items-center gap-1">
-                {{ t('a class more than') }}
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('classAbove', -1)">−</button>
-                <span class="badge bg-secondary">{{ groupCfg.classAbove }}</span>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('classAbove', 1)">+</button>
-            </span>
-            <span class="text-muted d-inline-flex align-items-center gap-1">
-                {{ t('only when total links exceed') }}
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('clutter', -1)">−</button>
-                <span class="badge bg-secondary">{{ groupCfg.clutter }}</span>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('clutter', 1)">+</button>
-            </span>
-        </div>
-        <div style="height:calc(100vh - 132px);">
+
+        <div class="graph-canvas">
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
@@ -137,6 +169,9 @@ const treeRoot = ref(null)
 const collapsed = ref(new Set())
 // Ids of group folders that are currently unfolded (folders start collapsed).
 const expandedGroups = ref(new Set())
+// Whether the Group section of the floating panel is open. The Levels head is
+// always visible; the panel starts collapsed so the graph is unobstructed.
+const hudOpen = ref(false)
 // Grouping settings (fold many same-type / same-class children into folders).
 const groupCfg = reactive({
     byType: true,
@@ -673,5 +708,199 @@ onMounted(async () => {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Floating Levels/Group HUD panel (reference-demo style, hideable)    */
+/* ------------------------------------------------------------------ */
+.graph-wrap {
+    position: relative;
+}
+
+.graph-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* Floating panel: Levels head always shown; Group body folds away when mini */
+.graph-hud {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 30;
+    width: auto;
+    max-width: min(340px, calc(100% - 24px));
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    border-radius: 12px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #3d3f45;
+    box-sizing: border-box;
+}
+
+.graph-hud.is-mini {
+    padding: 6px 10px;
+}
+
+.graph-hud.is-mini .graph-hud-head {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.graph-hud-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.graph-hud-head .btn-group .btn {
+    font-size: 12px;
+    line-height: 1.2;
+    padding: 2px 8px;
+}
+
+/* Toggle: gear icon when the Group section is closed, × when open */
+.graph-hud-toggle {
+    margin-left: auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ced4da;
+    background: #fff;
+    border-radius: 50%;
+    color: #4a6bff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.graph-hud-toggle:hover {
+    background: #4a6bff;
+    border-color: #4a6bff;
+    color: #fff;
+}
+
+.graph-hud-toggle svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.graph-hud-toggle svg circle {
+    fill: #fff;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.graph-hud-label {
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: #7b828c;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.graph-hud-body {
+    padding-top: 8px;
+}
+
+.graph-hud-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 0;
+}
+
+.graph-hud-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+}
+
+.graph-hud-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    font-size: 12px;
+    color: #3d3f45;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.graph-hud-check input[type='checkbox'] {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: #4a6bff;
+    cursor: pointer;
+}
+
+.graph-hud-steppers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 8px;
+}
+
+.graph-hud-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #7b828c;
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.graph-hud-num {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.graph-hud-num button {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    line-height: 1;
+    font-size: 13px;
+    border: 1px solid #ced4da;
+    background: #fff;
+    border-radius: 50%;
+    color: #3d3f45;
+    cursor: pointer;
+}
+
+.graph-hud-num button:hover {
+    background: #4a6bff;
+    border-color: #4a6bff;
+    color: #fff;
+}
+
+.graph-hud-num b {
+    min-width: 24px;
+    text-align: center;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #3d3f45;
+}
+
+.graph-hud-hint {
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.14);
+    color: #8a919a;
+    font-size: 11.5px;
 }
 </style>
