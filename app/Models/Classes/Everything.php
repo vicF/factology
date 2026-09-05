@@ -814,13 +814,11 @@ class Everything
         /** @noinspection MkdirRaceConditionInspection */
         @mkdir(dirname($target), 0775, true);
         if (@$file) {
-            $image = new \claviska\SimpleImage();
-            @unlink($target);
-            $image->fromFile($file)
-                //->maxColors(8, false)
-                ->autoOrient()
-                ->resize(100)
-                ->toFile($target, 'image/jpeg', 20);
+            try {
+                \App\Services\ThumbStore::put($this->thing_id, $file, 'small');
+            } catch (\Throwable $e) {
+                Log::warning('Could not encode thumb for ' . $this->thing_id . ': ' . $e->getMessage());
+            }
         }
         if (!is_file($target)) {
             if (!empty($this->getClassId())) {
