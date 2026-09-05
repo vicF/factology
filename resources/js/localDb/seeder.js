@@ -26,7 +26,9 @@ const makeObject = (t) => ({
     start: null,
     end: null,
     public: t.public ? 1 : 0,
-    owner: t.owner ?? UUID.VICTOR_FOKIN,
+    // System seed rows belong to SYSTEM_OWNER (shared), never to an ordinary
+    // user. UUID.VICTOR_FOKIN is a real identity, not a system owner.
+    owner: t.owner ?? UUID.SYSTEM_OWNER,
     data: null,
     _syncStatus: SYNC_STATUS.SYNCED,
     _localRevision: 0,
@@ -52,13 +54,44 @@ const makeLink = (l) => ({
 // Sentinel class id — presence proves the class list has been seeded.
 const CITY_CLASS_ID = '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee';
 
+// Known seed/system thing ids. The Victor Fokin person row is excluded — he is
+// an ordinary identity, not a system owner, so his row keeps its own owner.
+const SYSTEM_SEED_IDS = new Set(
+    [...BOOTSTRAP_THINGS.map(t => t.thing_id), ...CLASSES.map(c => c.thing_id)]
+        .filter(id => id !== UUID.VICTOR_FOKIN),
+);
+
 /**
- * Normalize an already-seeded database: heal class-hierarchy edge duplicates
- * and backfill missing name_translations on seed objects.
+ * Heal installs seeded before the owner-semantics fix: rows for known
+ * system/seed things that were defaulted to UUID.VICTOR_FOKIN (the old seed
+ * default) — or never got an owner — are re-owned to UUID.SYSTEM_OWNER so they
+ * are genuinely shared and never hidden behind an identity lock.
+ */
+async function normalizeSystemOwners(db) {
+    const updates = [];
+    for (const id of SYSTEM_SEED_IDS) {
+        const row = await db.objects.get(id);
+        if (row && (row.owner === UUID.VICTOR_FOKIN || row.owner == null)) {
+            row.owner = UUID.SYSTEM_OWNER;
+            updates.push(row);
+        }
+    }
+    if (updates.length > 0) {
+        console.log('[Seeder] Re-owned', updates.length, 'system rows to SYSTEM_OWNER');
+        await db.objects.bulkPut(updates);
+    }
+}
+
+/**
+ * Normalize an already-seeded database: heal class-hierarchy edge duplicates,
+ * re-own system rows correctly, and backfill missing name_translations on seed
+ * objects.
  *
  * These are safe to run on every boot (cheap scans on a small index).
  */
 async function normalizeSeedData(db) {
+    await normalizeSystemOwners(db);
+
     // ── 1. Dedupe class-hierarchy (LINK_TO_PARENT) edges ────────────────
     // Collapse duplicate rows for the same (one, type, other) triplet into
     // one row, preferring the canonical link_uuid / SYNCED status.

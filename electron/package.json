@@ -1,0 +1,19 @@
+{
+    "name": "factology-desktop",
+    "version": "1.0.0",
+    "description": "Factology - Desktop application",
+    "author": "Victor Fokin",
+    "license": "MIT",
+    "main": "src/main.js",
+    "scripts": {
+        "electron:start": "electron .",
+        "electron:pack": "electron-builder build --dir -c ./electron-builder.config.json",
+        "electron:make": "electron-builder build -c ./electron-builder.config.json"
+    },
+    "devDependencies": {
+        "electron": "^43.4.1",
+        "electron-builder": "^26.15.3"
+    },
+    "keywords": [],
+    "type": "commonjs"
+}

@@ -30,6 +30,16 @@ import {
 import { saveLink, deleteLink, getLink, listLinksForThing } from './links';
 import { seedLocalDb } from './seeder';
 import { UUID } from '../constants/uuid';
+import { filterVisible, isRowVisible } from './visibility';
+import {
+    localConsistencyCheck,
+    localConsistencyDelete,
+    localExportJson,
+    localImportJson,
+    localFindDuplicates,
+} from './localTools';
+import { importGedcom } from '../gedcom/gedcomImporter';
+import { createDexieStore } from '../gedcom/dexieStore';
 
 /** Generate a unique id for locally-created links (crypto.randomUUID is
  *  available in the Android WebView and Node — avoids bundling the `uuid` npm
@@ -40,6 +50,9 @@ function newLinkId() {
 
 /** Base path to strip from URLs */
 const API_PREFIX = '/object';
+
+/** True in the standalone offline build (mirrors utils/objectImages). */
+const OFFLINE_ONLY = import.meta.env.VITE_TARGET === 'capacitor' && !import.meta.env.VITE_API_URL;
 
 // Multilevel related-object limits (mirror App\Services\RelatedObjectsResolver).
 const DEPTH_CAP = 6;
@@ -94,16 +107,48 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     const normalizedUrl = pathPart.replace(API_PREFIX, '').replace(/^\/+/, '');
     const parts = normalizedUrl.split('/').filter(Boolean);
 
+    // ── Server-mirror Tools endpoints, implemented locally for the offline
+    //    app (same response shapes as the Laravel controllers — see
+    //    localTools.js). Handled before the /object-only guard below.
+    const localTool = await handleLocalTool(method, parts, queryPart, data, context);
+    if (localTool !== undefined) {
+        return localTool;
+    }
+
+    // The local mirror only knows /object (and /user, /link, /client-error,
+    // handled before reaching here). A write to any other path is a
+    // server-only endpoint (e.g. /import/gedcom, /search/options); sending it
+    // into handleCreate below would "create" a junk object whose id is the
+    // path segment (thing_id 'import', 'tools', …) and silently report
+    // success. Reject it with a clean, visible message instead.
+    const isObjectPath = pathPart === API_PREFIX || pathPart.startsWith(API_PREFIX + '/');
+    if (['post', 'put', 'patch', 'delete'].includes(method) && !isObjectPath) {
+        throw offlineError(501, `Not available in the offline app: ${method.toUpperCase()} ${pathPart}`);
+    }
+
     // ── /object (POST - search) ──────────────────────────────────────
     if (method === 'post' && parts.length === 0) {
-        return handleSearch(data);
+        return handleSearch(data, context);
     }
 
     // ── /object/{id} ─────────────────────────────────────────────────
     const id = parts[0];
 
+    // /object/{id}/thumb — per-object image file on the device (offline
+    // standalone only; the UI layer usually talks to deviceImages directly).
+    if (OFFLINE_ONLY && id && parts[1] === 'thumb') {
+        return handleDeviceThumb(method, id, data);
+    }
+
+    // Everything else must be exactly /object/{id} — never let an extra
+    // segment (e.g. a server-mode thumb request) silently fall through to
+    // handleUpdate/handleGet with the wrong payload.
+    if (parts.length !== 1) {
+        throw new Error(`Unhandled local API: ${method} ${url}`);
+    }
+
     if (method === 'get') {
-        return handleGet(id, depth);
+        return handleGet(id, depth, context);
     }
 
     if (method === 'post') {
@@ -121,14 +166,173 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     throw new Error(`Unhandled local API: ${method} ${url}`);
 }
 
-async function handleSearch(body) {
+/**
+ * Shape an error like an axios failure so UI catch handlers surface `message`.
+ */
+function offlineError(status, message) {
+    const err = new Error(message);
+    err.response = { status, data: { message, code: 'offline_unavailable' } };
+    return err;
+}
+
+/**
+ * Tools-page endpoints implemented locally (see localTools.js). Returns the
+ * axios-shaped success object, or undefined when the path is not one of ours
+ * (then the normal /object dispatch / guard applies).
+ */
+async function handleLocalTool(method, parts, queryPart, data, context = {}) {
+    const first = parts[0];
+
+    // GET /export?include_deleted=… → JSON backup string (Tools downloads it).
+    if (method === 'get' && first === 'export') {
+        const includeDeleted = queryPart
+            ? new URLSearchParams(queryPart).get('include_deleted') === 'true'
+            : false;
+        const text = await localExportJson({
+            includeDeleted,
+            visibleOwners: context.visibleOwners ?? null,
+            exportedBy: context.userThingId ?? null,
+        });
+        return { data: text, status: 200 };
+    }
+
+    // POST /import → JSON backup restore (ImportModal). The file arrives as
+    // FormData from the modal.
+    if (method === 'post' && first === 'import' && parts.length === 1) {
+        const result = await readImportRequest(data);
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /import/gedcom → client-side GEDCOM parser + importer, same mapping
+    // as the redesigned server importer (see gedcom/gedcomImporter.js).
+    if (method === 'post' && first === 'import' && parts[1] === 'gedcom') {
+        if (!context.userThingId) {
+            throw offlineError(403, 'Offline data is read-only until you create or import an identity.');
+        }
+        const fileData = (data && typeof data.get === 'function') ? data.get('file') : null;
+        if (!fileData) throw offlineError(422, 'No file provided for import.');
+        const content = await fileData.text();
+        if (!content.trim()) throw offlineError(422, 'Empty or unreadable file');
+
+        const result = await importGedcom({
+            content,
+            ownerId: context.userThingId,
+            store: createDexieStore(),
+        });
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /import/find-duplicates → DuplicatePersonMatcher mirror.
+    if (method === 'post' && first === 'import' && parts[1] === 'find-duplicates') {
+        const result = await localFindDuplicates(context.visibleOwners ?? null);
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /tools/consistency-check → DatabaseConsistencyChecker mirror.
+    if (method === 'post' && first === 'tools' && parts[1] === 'consistency-check') {
+        const result = await localConsistencyCheck();
+        return { data: { success: true, result }, status: 200 };
+    }
+
+    // POST /tools/consistency-delete → ToolsController::deleteSelected mirror.
+    if (method === 'post' && first === 'tools' && parts[1] === 'consistency-delete') {
+        const body = typeof data === 'string' ? JSON.parse(data) : (data || {});
+        const res = await localConsistencyDelete(body.ids, context.visibleOwners ?? null);
+        return { data: { success: true, deleted: res.deleted, failed: res.failed }, status: 200 };
+    }
+
+    return undefined;
+}
+
+/**
+ * Unwrap the /import request body (FormData file upload from ImportModal, or a
+ * raw JSON string/object in tests) and run the local import.
+ */
+async function readImportRequest(data) {
+    let payload;
+    let conflictMode = 'latest_wins';
+
+    const reject = () => offlineError(422, 'Invalid import data. Expected JSON with "data" key containing "things" and/or "links".');
+
+    if (data && typeof data === 'object' && typeof data.get === 'function') {
+        conflictMode = String(data.get('conflict_mode') || 'latest_wins');
+        const file = data.get('file');
+        if (!file) throw offlineError(422, 'No file provided for import.');
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed?.data) throw reject();
+        payload = parsed.data;
+    } else if (typeof data === 'string') {
+        const parsed = JSON.parse(data);
+        payload = parsed?.data ?? parsed;
+        conflictMode = parsed?.conflict_mode || conflictMode;
+    } else {
+        payload = data?.data ?? data;
+        conflictMode = data?.conflict_mode || conflictMode;
+    }
+
+    if (!payload || typeof payload !== 'object') throw reject();
+    if (!Array.isArray(payload.things) && !Array.isArray(payload.links)) throw reject();
+
+    return localImportJson(payload, conflictMode);
+}
+
+/**
+ * Offline thumbnails: GET /object/{id}/thumb → existence check,
+ * PUT /object/{id}/thumb → write the picked file, DELETE → remove it.
+ */
+async function handleDeviceThumb(method, thingId, body) {
+    const device = await import('../media/deviceImages');
+
+    if (method === 'get') {
+        const custom = await device.hasDeviceThumb(thingId);
+        return {
+            data: {
+                success: true,
+                thing_id: thingId,
+                custom,
+                thumb: `/thumbs/${thingId.charAt(0)}/${thingId.charAt(1)}/${thingId}.jpg`,
+            },
+            status: 200,
+        };
+    }
+
+    if (method === 'put') {
+        const raw = typeof body === 'string' ? JSON.parse(body) : (body || {});
+        const form = raw instanceof FormData ? raw : null;
+        const file = form ? form.get('file') : null;
+        if (!file) {
+            throw new Error('Offline image upload requires a file (URL import is handled in the UI).');
+        }
+        await device.writeDeviceThumb(thingId, file);
+        return {
+            data: { success: true, thumb: `/thumbs/${thingId.charAt(0)}/${thingId.charAt(1)}/${thingId}.jpg` },
+            status: 200,
+        };
+    }
+
+    if (method === 'delete') {
+        await device.removeDeviceThumb(thingId);
+        return { data: { success: true }, status: 200 };
+    }
+
+    throw new Error(`Unhandled local thumb API: ${method} /object/${thingId}/thumb`);
+}
+
+async function handleSearch(body, context = {}) {
     const params = typeof body === 'string' ? JSON.parse(body) : (body || {});
+
+    // Owners visible to this session (null = filter disabled). The offline
+    // adapter supplies this; UI never sees rows owned by a locked/unknown
+    // identity (see localDb/visibility.js).
+    const visibleOwners = context.visibleOwners ?? null;
 
     if (params.tree) {
         // Return class tree built from objects + parent-child links.
-        // Mirrors the server (searchTree): classes AND link types that
+        // Mirrors the server (searchTree): classes, models AND link types that
         // descend from Everything via "is a parent of" links.
-        const things = await listObjects({ type: [UUID.G_CLASS, UUID.G_LINK], includeDeleted: false });
+        const all = await listObjects({ type: [UUID.G_CLASS, UUID.G_MODEL, UUID.G_LINK], includeDeleted: false });
+        const things = filterVisible(all, visibleOwners);
         const tree = await buildClassTree(things);
         return {
             data: { things: tree },
@@ -189,6 +393,10 @@ async function handleSearch(body) {
         return String(va).localeCompare(String(vb)) * sortDir;
     });
 
+    // Drop rows owned by identities that are locked/not active BEFORE the cap,
+    // so hidden rows never consume UI slots.
+    results = filterVisible(results, visibleOwners);
+
     // Cap at 100 like the server LIMIT 100 — the enrichment below is
     // per-object, so the cap must come first (it did in the server SQL too).
     const page = results.slice(0, 100);
@@ -216,7 +424,7 @@ async function handleSearch(body) {
         const relatedLinks = (linksByThing.get(obj.thing_id) || [])
             .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
         const links = depth > 0
-            ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH)
+            ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH, visibleOwners)
             : undefined;
         const classes = classesByThing.get(obj.thing_id) || [];
         thingsWithLinks.push({
@@ -321,9 +529,16 @@ async function listLinksForThings(thingIds) {
     return map;
 }
 
-async function handleGet(id, depth = 1) {
+async function handleGet(id, depth = 1, context = {}) {
     const obj = await getObject(id);
     if (!obj) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+
+    // A locked identity's own row must not be reachable even by direct
+    // deep-link — hide it like the server would (404).
+    const visibleOwners = context.visibleOwners ?? null;
+    if (!isRowVisible(obj, visibleOwners)) {
         throw { response: { status: 404, data: { message: 'Not found' } } };
     }
 
@@ -335,7 +550,7 @@ async function handleGet(id, depth = 1) {
     const relatedLinks = (await listLinksForThing(id))
         .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
     const links = depth > 0
-        ? await enrichNested(relatedLinks, id, depth, null, BREADTH_CAP, Infinity)
+        ? await enrichNested(relatedLinks, id, depth, null, BREADTH_CAP, Infinity, visibleOwners)
         : undefined;
 
     const classes = await resolveClassesInfo(id);
@@ -637,7 +852,7 @@ async function enrichLinks(links, currentThingId) {
  * (link_start desc, fallback target _updatedAt desc) → name, then cap to the
  * breadth limit. Mirrors the server's RelatedObjectsResolver ordering.
  */
-async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
+async function rankLinksForBreadth(rawLinks, currentThingId, breadth, visibleOwners = null) {
     if (!rawLinks || rawLinks.length === 0) return [];
     const enriched = await enrichLinks(rawLinks, currentThingId);
 
@@ -648,7 +863,14 @@ async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
         if (o) objById[o.thing_id] = o;
     }
 
-    enriched.sort((a, b) => {
+    // Do not surface a related link whose endpoint belongs to a locked/unknown
+    // identity — the target row is invisible, so the relation must not leak it.
+    const visible = enriched.filter((l) => {
+        const target = l.target?.thing_id ? objById[l.target.thing_id] : null;
+        return isRowVisible(target, visibleOwners);
+    });
+
+    visible.sort((a, b) => {
         const ta = objById[a.target?.thing_id];
         const tb = objById[b.target?.thing_id];
         const ra = richnessOf(ta);
@@ -668,7 +890,7 @@ async function rankLinksForBreadth(rawLinks, currentThingId, breadth) {
         return String(a.target?.name ?? '').localeCompare(String(b.target?.name ?? ''));
     });
 
-    return enriched.slice(0, breadth);
+    return visible.slice(0, breadth);
 }
 
 function richnessOf(obj) {
@@ -695,14 +917,14 @@ function richnessOf(obj) {
  *                                   e.g. GET /object/{id}; SEARCH_BREADTH for
  *                                   search results)
  */
-async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = null, breadth = BREADTH_CAP, topLevelLimit = null) {
+async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = null, breadth = BREADTH_CAP, topLevelLimit = null, visibleOwners = null) {
     const isTopLevel = visited === null;
     if (isTopLevel) {
         visited = new Set([currentThingId]);
     }
 
     const limit = topLevelLimit != null ? topLevelLimit : breadth;
-    const ranked = await rankLinksForBreadth(rawLinks, currentThingId, limit);
+    const ranked = await rankLinksForBreadth(rawLinks, currentThingId, limit, visibleOwners);
     if (remainingDepth <= 1 || ranked.length === 0) return ranked;
 
     // Children of this whole level, so deeper recursion dedupes against them.
@@ -728,7 +950,7 @@ async function enrichNested(rawLinks, currentThingId, remainingDepth, visited = 
             // too (mirrors the server).
             const childLinks = (await listLinksForThing(tid))
                 .filter(l => l.link_type_id !== UUID.LINK_TO_CLASS);
-            const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null);
+            const nested = await enrichNested(childLinks, tid, remainingDepth - 1, nextVisited, breadth, null, visibleOwners);
             // Recursed links always carry `target.links` (possibly empty) —
             // mirrors the server, so the frontend can distinguish a resolved
             // but empty node from one that was never loaded.

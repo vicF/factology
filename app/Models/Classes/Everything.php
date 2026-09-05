@@ -696,7 +696,7 @@ class Everything
         }
         if (!isset($this->type)) {
             $errors[] = 'Empty type';
-        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
+        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_MODEL, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
             $errors[] = 'Unknown type: ' . $this->type;
         }
         if (count($errors) === 0) {
@@ -814,13 +814,11 @@ class Everything
         /** @noinspection MkdirRaceConditionInspection */
         @mkdir(dirname($target), 0775, true);
         if (@$file) {
-            $image = new \claviska\SimpleImage();
-            @unlink($target);
-            $image->fromFile($file)
-                //->maxColors(8, false)
-                ->autoOrient()
-                ->resize(100)
-                ->toFile($target, 'image/jpeg', 20);
+            try {
+                \App\Services\ThumbStore::put($this->thing_id, $file, 'small');
+            } catch (\Throwable $e) {
+                Log::warning('Could not encode thumb for ' . $this->thing_id . ': ' . $e->getMessage());
+            }
         }
         if (!is_file($target)) {
             if (!empty($this->getClassId())) {

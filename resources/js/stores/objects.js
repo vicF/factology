@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import {CLASS_TYPE, LINK_TYPE, EVENT} from "../constants.js"
+import {CLASS_TYPE, MODEL_TYPE, LINK_TYPE, EVENT} from "../constants.js"
 import { eventBus } from "../eventBus.js"
 import { useSearchStore, checkedRestorePromise } from './search'
 import { collectSubtreeIds } from '../utils/classTree'
@@ -35,7 +35,7 @@ export const useObjectsStore = defineStore('objects', {
                 const response = await axios.post('/object', JSON.stringify({
                     tree: true,
                     search: this.searchText,
-                    type: [CLASS_TYPE, LINK_TYPE]
+                    type: [CLASS_TYPE, MODEL_TYPE, LINK_TYPE]
                 }))
                 this.validationErrors = {}
                 console.log('response', response.data.things)

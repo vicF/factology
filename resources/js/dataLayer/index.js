@@ -281,6 +281,15 @@ export async function deleteObject(thingId, opts = {}) {
         _updatedAt: Date.now(),
     });
 
+    // Offline standalone: an object's image is a file in the device folder —
+    // remove it so deleting an object does not leave orphan image files behind.
+    if (import.meta.env.VITE_TARGET === 'capacitor' && !import.meta.env.VITE_API_URL) {
+        try {
+            const { removeDeviceThumb } = await import('../media/deviceImages');
+            await removeDeviceThumb(thingId);
+        } catch (e) { /* not fatal */ }
+    }
+
     const servers = opts.syncToServers?.length
         ? opts.syncToServers
         : await getObjectServers(thingId);

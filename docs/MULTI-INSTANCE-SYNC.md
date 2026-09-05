@@ -58,6 +58,14 @@ Extend `ExportImportController` with encrypted mode: AES-GCM envelope + per-file
 - **Already owned by the importing identity locally, but the file claims a different owner** → **error**: ignore the object, record and report the mismatch. The file is either tampered with or from an untrusted source.
 - Files are **signed by the object's owner** (Ed25519 over the payload). The receiver verifies the signature against the owner's public key (`identity_keys`, own identity file, or a friend's exchanged key) before applying. Unsigned/mismatched files are rejected with a per-object report.
 
+### 1.8 Offline device identity behavior (multi-identity, lock, guest) — implemented
+- A device stores a **registry of identity files**; any subset can be **unlocked simultaneously**. Visibility offline = rows owned by any currently-unlocked identity **plus** shared rows — the `public` flag does **not** grant cross-identity visibility in offline mode (unlocking another identity on the same device is how sharing works today; access groups §1.4 arrive later).
+- **`SYSTEM_OWNER` is the only shared/system owner.** `UUID.VICTOR_FOKIN` is an ordinary identity, never a system owner; seed/system rows are owned by `SYSTEM_OWNER` (re-owned each boot for older installs).
+- A per-device **primary** identity owns newly created objects; a **guest** (no identity unlocked) is read-only over shared data.
+- **Lock = app-level hide**: in-memory keys are cleared and the locked identity's rows stop being served (read filter by owner at the API boundary). Dexie content stays plaintext. Reopen behavior is per-identity: `requirePassphraseOnOpen` OFF (default, convenience) stores a device **auto-open token** (the file-decryption key — never the passphrase); ON keeps no token and asks for the passphrase on open.
+- Upgrade/migration: pre-identity rows (`local-user-thing` / no owner) are **adopted to the first identity** on its first unlock so nothing disappears.
+- **Merging two identities is deferred** (owner reassignment + re-signing) — explicitly out of scope. File + registry content encryption at rest is likewise deferred.
+
 **Phases (each independently shippable):** 0 = sync endpoints → 1 = identity → 2 = private relay → 3 = global import/publish → 4 = friends/sharing → 5 = encrypted files/P2P.
 
 ---
@@ -128,3 +136,32 @@ Route::middleware('auth:sanctum')->group(function () {
 - **Share depth policy**: default for "object + direct links"; cap to avoid leaking deep private graphs.
 - **Retention/moderation**: relay-blob TTL; moderation for the public/global channel; GDPR treatment of key fingerprints.
 - **Server-mediated recovery**: offer as opt-in alongside self-custody + social recovery, or exclude entirely to honor data minimization?
+
+---
+
+## Offline import & schema parity (GEDCOM)
+
+**Schema parity is a standing rule**: the local Dexie stores mirror the server
+tables 1:1. `objects` ↔ `things`, `links` ↔ `links`; with `localDb` **v3** the
+`external_links` store (`&id, thing_id, url` + sync columns) mirrors the
+server's `external_links` table (id uuid PK, thing_id, url) so source/URL links
+are first-class offline rows with the same shape on both sides.
+
+**GEDCOM import runs in the client** (`resources/js/gedcom/gedcomParser.js` +
+`gedcomImporter.js`), mirroring the redesigned server importer on
+`feature/gedcom` (dev2): GEDCOM source thing keyed by a 16-hex `sha256` file
+key, event-specific classes under Event, INSIDE event→place, Address under
+Place, existing-place reuse, PRESENT links carrying event dates, bibliographic
+vs URL-only SOUR records (URLs land in `external_links`), and EVIDENCE
+citation edges. Imported rows are owned by the unlocked identity (`public:
+false`) and carry `IMPORTED_FROM` links with a `data.source_external_id`
+pin (`<fileKey>/<localId>`) that makes re-imports idempotent (update instead of
+duplicate).
+
+Offline the Tools page's POST `/import/gedcom` is served locally by
+`apiHandler.handleLocalTool` and returns the same `{imported, updated, skipped,
+errors, details, source_thing_id}` result the web panel renders. Because the
+parser output is the standard `{things, links}` export shape, the **web/server
+path is a later slice**: a browser can parse with the same module and POST the
+records to the existing JSON `/import` endpoint (mapping `externalLinks` rows
+to the server `external_links` table), retiring the PHP `GedcomImporter`.

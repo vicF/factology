@@ -62,10 +62,22 @@ import {
     trackError,
     reportToServer,
     shouldIgnoreError as trackerShouldIgnore,
+    onError as trackerOnError,
 } from './utils/errorTracker.js';
 
 installVueErrorHandler(app);
 installGlobalHandlers();
+
+// ── In-app error log (visible on /logs, copyable) ────────────────────────
+// Packaged Electron/Android builds have no DevTools, so capture console /
+// window / promise errors into a persistent buffer and mirror the errors that
+// errorTracker tracks (Vue render errors, axios failures) into the same log.
+import { installAppLog, addLogEntry } from './utils/appLog.js';
+installAppLog();
+trackerOnError((error, context = {}) => {
+    const origin = context.vueComponent ? `vue:${context.vueComponent}` : (context.type || 'tracker');
+    addLogEntry('error', error, { origin, stack: error?.stack, meta: { type: context.type } });
+});
 
 // ── Standalone mode bootstrap ────────────────────────────────────────
 // In standalone (capacitor) mode, axios calls are intercepted by a custom
