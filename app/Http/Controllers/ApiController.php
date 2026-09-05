@@ -71,6 +71,24 @@ class ApiController extends BaseController
     }
 
     /**
+     * Full related-object graph for the Graph tab: the displayed node set of
+     * GET /object/{id}?depth=N plus EVERY link between any two displayed
+     * objects (cross-links the nested view prunes).
+     *
+     * @param string  $id
+     * @param Request $request query `depth` (1..cap), default 2
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function graph($id, Request $request)
+    {
+        $depth = (int) $request->query('depth', 2);
+        $depth = min(max($depth, 1), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+        $graph = (new RelatedObjectsResolver)->forGraph($id, $depth, RelatedObjectsResolver::BREADTH_CAP);
+
+        return response()->json(['data' => $graph, 'success' => true]);
+    }
+
+    /**
      * Properties suggested for a class: things P linked to the class via a
      * PROPERTY_APPLIES_TO link ("is a property of class"), plus properties
      * linked to any ancestor class whose own `inherited` flag (data.inherited,

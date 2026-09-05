@@ -67,6 +67,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/object',       [ApiController::class, 'list']);
         Route::post('/object',      [ApiController::class, 'search']);
         Route::get('/object/{id}',  [ApiController::class, 'get']);
+        Route::get('/object/{id}/graph', [ApiController::class, 'graph']);
         Route::get('/properties',   [ApiController::class, 'properties']);
         Route::get('/geocode',      [ApiController::class, 'geocode']);
         Route::get('/class/{id}/properties', [ApiController::class, 'classProperties']);

@@ -127,9 +127,11 @@ const onThumbError = (id) => {
 
 // How many levels of related objects the graph renders (refetched on change).
 const selectedDepth = ref(2)
-// The fetched root object carrying nested `links` (depth = selectedDepth).
+// The fetched full graph {root_id, nodes:[], edges:[]} (depth = selectedDepth).
 const graphObject = ref(null)
-// Root of the loaded related-object tree (used to flatten the visible graph).
+// Every link between the displayed objects (drawn in addition to the tree).
+const graphEdges = ref([])
+// Root of the loaded spanning tree (used to flatten the visible graph).
 const treeRoot = ref(null)
 // Ids of nodes whose loaded subtree is currently collapsed.
 const collapsed = ref(new Set())
@@ -207,34 +209,64 @@ const glyphSvg = (node) => {
 }
 
 /**
- * Recursively turn the fetched (nested) object into an internal tree. `children`
- * carries the loaded related subtree; each child remembers the link that leads
- * to it so lines can be labelled.
+ * Build a spanning tree over the full displayed graph (BFS from the root), so
+ * each displayed object hangs off one "parent". Every other link of the graph
+ * (`graphEdges`) is still drawn later as a cross-link between any two visible
+ * nodes.
  */
-const buildTree = (thing) => {
-    const links = Array.isArray(thing?.links) ? thing.links : []
-    const children = links
-        .filter((link) => link?.target?.thing_id)
-        .map((link) => ({
-            ...buildTree(link.target),
-            _inLink: link,
-        }))
-    const cls = classOf(thing)
-    return {
-        id: thing.thing_id,
-        thing,
-        text: objectName(thing) || localizedClassName(cls) || t('Unnamed'),
-        clsId: cls?.thing_id || cls?.id || null,
-        clsName: localizedClassName(cls),
-        clsColor: colorForClassId(cls?.thing_id || cls?.id || null),
-        children,
+const buildTreeFromGraph = (rootId, nodesById, edges) => {
+    const adj = new Map()
+    const addAdj = (id, other, edge) => {
+        if (!adj.has(id)) adj.set(id, [])
+        adj.get(id).push({ other, edge })
     }
+    for (const edge of edges || []) {
+        if (!nodesById.has(edge.one_thing_id) || !nodesById.has(edge.other_thing_id)) continue
+        addAdj(edge.one_thing_id, edge.other_thing_id, edge)
+        addAdj(edge.other_thing_id, edge.one_thing_id, edge)
+    }
+
+    const makeNode = (meta, inLink) => {
+        const cls = classOf(meta)
+        const clsThing = cls || {}
+        const node = {
+            id: meta.thing_id,
+            thing: meta,
+            text: objectName(meta) || localizedClassName(cls) || t('Unnamed'),
+            clsId: clsThing.thing_id || clsThing.id || null,
+            clsName: localizedClassName(cls),
+            clsColor: colorForClassId(clsThing.thing_id || clsThing.id || null),
+            children: [],
+        }
+        if (inLink) node._inLink = inLink
+        return node
+    }
+
+    const rootMeta = nodesById.get(rootId)
+    if (!rootMeta) return null
+    const root = makeNode(rootMeta)
+    const seen = new Set([rootId])
+    const queue = [root]
+    while (queue.length) {
+        const cur = queue.shift()
+        for (const { other, edge } of adj.get(cur.id) || []) {
+            if (seen.has(other)) continue
+            seen.add(other)
+            const meta = nodesById.get(other)
+            if (!meta) continue
+            const child = makeNode(meta, edge)
+            cur.children.push(child)
+            queue.push(child)
+        }
+    }
+    return root
 }
 
-const linkLabel = (treeNode) => {
-    const link = treeNode._inLink
-    if (!link) return null
-    return fieldText(link.link_name, link.link_name_translations) || null
+const linkLabel = (node) => {
+    if (!node) return null
+    const edge = node._inLink || node // a tree node wraps its edge; raw edges pass through
+    if (!edge) return null
+    return fieldText(edge.link_name, edge.link_name_translations) || null
 }
 
 const isCollapsed = (id) => collapsed.value.has(id)
@@ -273,8 +305,11 @@ const baseJsonNode = (id, text, data) => ({
     data,
 })
 
-/** Flatten the visible part of the loaded tree into JsonNodes + labelled lines. */
-const buildGraphJson = (root) => {
+/**
+ * Flatten the visible part of the loaded tree into JsonNodes + labelled lines,
+ * then add every remaining link of the full graph between visible nodes.
+ */
+const buildGraphJson = (root, allEdges = []) => {
     const nodes = []
     const lines = []
     const addLine = (from, to, text, groupKey) => {
@@ -336,10 +371,32 @@ const buildGraphJson = (root) => {
     }
 
     visit(root)
+
+    // Every cross-link between two visible displayed objects that the spanning
+    // tree did not already draw.
+    const visible = new Set(nodes.map((n) => n.id))
+    const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+    const drawn = new Set(lines.map((l) => pairKey(l.from, l.to)))
+    for (const edge of allEdges || []) {
+        const a = edge.one_thing_id
+        const b = edge.other_thing_id
+        if (!a || !b || a === b) continue
+        if (!visible.has(a) || !visible.has(b)) continue
+        const key = pairKey(a, b)
+        if (drawn.has(key)) continue
+        drawn.add(key)
+        lines.push({
+            id: `x:${edge.link_id || key}`,
+            from: a,
+            to: b,
+            text: linkLabel(edge) || t('connected'),
+            color: '#8fa2d0',
+        })
+    }
     return { nodes, lines }
 }
 
-const isRootId = (id) => !!graphObject.value && id === graphObject.value.thing_id
+const isRootId = (id) => !!graphObject.value && id === graphObject.value.root_id
 const isFolderNode = (node) => !!(node && node.data && node.data._folder)
 const ringStyle = (node) => {
     if (node.data && node.data._folder) {
@@ -349,17 +406,17 @@ const ringStyle = (node) => {
     return { borderColor: color }
 }
 
-const fetchObject = async (uid, depth) => {
-    const { data } = await axios.get(`/object/${uid}?depth=${depth}`)
+const fetchGraph = async (uid, depth) => {
+    const { data } = await axios.get(`/object/${uid}/graph?depth=${depth}`)
     return data?.data ?? null
 }
 
 const renderGraph = async () => {
     if (!graphRef.value || !treeRoot.value) return
-    const { nodes, lines } = buildGraphJson(treeRoot.value)
+    const { nodes, lines } = buildGraphJson(treeRoot.value, graphEdges.value)
     if (nodes.length === 0) return
     await graphRef.value.setJsonData({
-        rootId: graphObject.value.thing_id,
+        rootId: graphObject.value.root_id,
         nodes,
         lines,
     })
@@ -367,8 +424,12 @@ const renderGraph = async () => {
 
 const showGraph = async () => {
     if (!props.object) return
-    graphObject.value = await fetchObject(props.object.thing_id, selectedDepth.value)
-    treeRoot.value = graphObject.value ? buildTree(graphObject.value) : null
+    graphObject.value = await fetchGraph(props.object.thing_id, selectedDepth.value)
+    const nodesById = new Map((graphObject.value?.nodes || []).map((n) => [n.thing_id, n]))
+    graphEdges.value = graphObject.value?.edges || []
+    treeRoot.value = graphObject.value
+        ? buildTreeFromGraph(graphObject.value.root_id, nodesById, graphEdges.value)
+        : null
     collapsed.value = new Set()
     expandedGroups.value = new Set()
     await renderGraph()
