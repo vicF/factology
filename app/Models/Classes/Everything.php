@@ -696,7 +696,7 @@ class Everything
         }
         if (!isset($this->type)) {
             $errors[] = 'Empty type';
-        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
+        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_MODEL, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
             $errors[] = 'Unknown type: ' . $this->type;
         }
         if (count($errors) === 0) {
