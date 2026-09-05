@@ -225,7 +225,6 @@ export const CLASSES = [
     // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
     { thing_id: UUID.BIRTH_CLASS,       name: 'Birth',          description: 'Birth of a person',                                                                      type: UUID.G_CLASS, public: true },
     { thing_id: UUID.DEATH_CLASS,       name: 'Death',          description: 'Death of a person',                                                                      type: UUID.G_CLASS, public: true },
-    { thing_id: UUID.RESIDENCE_CLASS,   name: 'Residence In',   description: 'Living in a place',                                                                      type: UUID.G_CLASS, public: true },
     { thing_id: UUID.OCCUPATION_CLASS,  name: 'Occupation',     description: 'Occupation / work',                                                                      type: UUID.G_CLASS, public: true },
     { thing_id: UUID.MARRIAGE_CLASS,    name: 'Marriage',       description: 'Marriage',                                                                               type: UUID.G_CLASS, public: true },
     { thing_id: UUID.BURIAL_CLASS,      name: 'Burial',         description: 'Burial',                                                                                 type: UUID.G_CLASS, public: true },
@@ -329,9 +328,10 @@ export const CLASS_LINKS = [
     { one: UUID.SYSTEM, other: UUID.G_SERVER_CLASS,              description: 'Server is subclass of System' },
     { one: UUID.SYSTEM, other: '298496fb-142b-4fc7-a844-7cb3fe9f9100', description: 'System event is subclass of System' },
     // Event → GEDCOM event subclasses
+    // (Residence already exists under Event with id a70ae070 from the dev1
+    // taxonomy cleanup — reused by the GEDCOM importer via RESIDENCE_CLASS.)
     { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.BIRTH_CLASS,       description: 'Birth is subclass of Event' },
     { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.DEATH_CLASS,       description: 'Death is subclass of Event' },
-    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.RESIDENCE_CLASS,   description: 'Residence In is subclass of Event' },
     { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.OCCUPATION_CLASS,  description: 'Occupation is subclass of Event' },
     { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.MARRIAGE_CLASS,    description: 'Marriage is subclass of Event' },
     { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.BURIAL_CLASS,      description: 'Burial is subclass of Event' },

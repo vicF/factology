@@ -91,7 +91,7 @@ export const SEED_TRANSLATIONS = {
     // GEDCOM importer taxonomy (mirror dev2 migrations)
     'a565fc22-6dae-4b7a-bd9e-30df8bc8acca': {"ru":"Рождение","lang":"en"},
     '6ea018a1-d71c-4655-89b9-9f469b979847': {"ru":"Смерть","lang":"en"},
-    'a70ae070-0c52-4a89-84a0-5c76f76e5aa7': {"ru":"Проживание в","lang":"en"},
+    // Residence (a70ae070) already exists above from the dev1 taxonomy.
     '7fae11dc-3411-4652-9712-18729bf1e3a7': {"ru":"Работа","lang":"en"},
     'f5fe8e87-da33-4a40-ad7f-1b62b4e62299': {"ru":"Брак","lang":"en"},
     '02a3040c-c9fd-48b7-9f1c-57ef66002aa6': {"ru":"Похороны","lang":"en"},
