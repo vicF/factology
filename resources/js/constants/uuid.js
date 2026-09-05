@@ -101,6 +101,10 @@ export const UUID = {
     GEDCOM_CLASS:      '10b04205-aecb-406d-befc-c6362f7ac9fb',
     IMPORTED_FROM:     '7e58df61-3f99-4a82-9f0d-555a56abfb69',
 
+    // ── Geo system objects (Coordinates property, linked to the Place class) ──
+    PLACE_CLASS:         'dc006cda-047a-4862-acf7-e215355b6890',
+    COORDINATES_PROPERTY: 'c1c1c1c1-0002-4000-8000-000000000001',
+
     // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
     // ids mirror database/migrations/2026_08_31_000001_gedcom_event_classes.php
     BIRTH_CLASS:       'a565fc22-6dae-4b7a-bd9e-30df8bc8acca',
