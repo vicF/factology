@@ -50,10 +50,11 @@ const person = (id, extra = {}) => ({
     links: [],
     ...extra,
 })
-const linkTo = (id, target, link_name = null) => ({
+const linkTo = (id, target, link_name = null, link_type_id = 't-generic') => ({
     link_id: `${id}-l`,
     link_name,
     link_name_translations: null,
+    link_type_id,
     target,
 })
 
@@ -156,5 +157,45 @@ describe('Graph', () => {
 
         wrapper.vm.openObject({ id: 'child', text: 'child', data: {} })
         expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'object', params: { uid: 'child' } })
+    })
+
+    it('packs many same-type links into a collapsed folder node', async () => {
+        axios.get.mockResolvedValueOnce({ data: { data: person('root', {
+            links: Array.from({ length: 9 }, (_, i) =>
+                linkTo(`ev${i}`, person(`ev${i}`), 'participates in', 'EV')),
+        }) } })
+
+        mountGraph()
+        await flushPromises()
+
+        const data = mocks.setJsonData.mock.calls[0][0]
+        const ids = data.nodes.map((n) => n.id)
+        expect(ids.some((id) => id.startsWith('grp:'))).toBe(true)
+        expect(ids).not.toContain('ev0') // items are packed by default
+        const folder = data.nodes.find((n) => n.id.startsWith('grp:'))
+        expect(folder.data._folder).toBe(true)
+        expect(folder.data._collapsed).toBe(true)
+        expect(folder.data._count).toBe(9)
+    })
+
+    it('unfolds a packed folder revealing its items', async () => {
+        axios.get.mockResolvedValueOnce({ data: { data: person('root', {
+            links: Array.from({ length: 9 }, (_, i) =>
+                linkTo(`ev${i}`, person(`ev${i}`), 'participates in', 'EV')),
+        }) } })
+
+        const wrapper = mountGraph()
+        await flushPromises()
+
+        let data = mocks.setJsonData.mock.calls[0][0]
+        const folder = data.nodes.find((n) => n.id.startsWith('grp:'))
+
+        wrapper.vm.toggleNode(folder)
+        await flushPromises()
+
+        data = mocks.setJsonData.mock.calls.at(-1)[0]
+        expect(data.nodes.map((n) => n.id)).toContain('ev0')
+        const openFolder = data.nodes.find((n) => n.id.startsWith('grp:'))
+        expect(openFolder.data._collapsed).toBe(false)
     })
 })

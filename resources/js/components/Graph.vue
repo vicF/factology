@@ -15,10 +15,41 @@
             </div>
             <span class="small text-muted ms-2">{{ t('Click a node to open it') }}</span>
         </div>
-        <div style="height:calc(100vh - 95px);">
+        <!-- Grouping: pack many same-type / same-class links into folders -->
+        <div class="graph-grouping mb-1 d-flex align-items-center gap-3 flex-wrap small">
+            <span class="text-muted">{{ t('Group') }}:</span>
+            <label class="mb-0 d-flex align-items-center gap-1">
+                <input v-model="groupCfg.byType" type="checkbox" class="form-check-input mt-0">
+                <span>{{ t('by link type') }}</span>
+            </label>
+            <label class="mb-0 d-flex align-items-center gap-1">
+                <input v-model="groupCfg.byClass" type="checkbox" class="form-check-input mt-0">
+                <span>{{ t('by class') }}</span>
+            </label>
+            <span class="text-muted d-inline-flex align-items-center gap-1">
+                {{ t('fold when a type has more than') }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('typeAbove', -1)">−</button>
+                <span class="badge bg-secondary">{{ groupCfg.typeAbove }}</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('typeAbove', 1)">+</button>
+            </span>
+            <span class="text-muted d-inline-flex align-items-center gap-1">
+                {{ t('a class more than') }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('classAbove', -1)">−</button>
+                <span class="badge bg-secondary">{{ groupCfg.classAbove }}</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('classAbove', 1)">+</button>
+            </span>
+            <span class="text-muted d-inline-flex align-items-center gap-1">
+                {{ t('only when total links exceed') }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('clutter', -1)">−</button>
+                <span class="badge bg-secondary">{{ groupCfg.clutter }}</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="bump('clutter', 1)">+</button>
+            </span>
+        </div>
+        <div style="height:calc(100vh - 132px);">
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
+                :on-line-click="onLineClick"
             >
                 <template #node="{ node }">
                     <div
@@ -29,7 +60,7 @@
                     >
                         <div class="rg-ring" :style="ringStyle(node)">
                             <span class="rg-glyph" v-html="glyphSvg(node)"></span>
-                            <div v-if="!thumbFailed[node.id]" class="rg-media">
+                            <div v-if="!thumbFailed[node.id] && !(node.data && node.data._folder)" class="rg-media">
                                 <img
                                     :src="thumbUrl(node.id)"
                                     :alt="node.text"
@@ -60,6 +91,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
 import { UUID } from '../constants/uuid.js'
+import { foldChildren } from '../utils/graphFold.js'
 
 const getThumbUrl = inject('getThumbUrl')
 
@@ -89,6 +121,21 @@ const graphObject = ref(null)
 const treeRoot = ref(null)
 // Ids of nodes whose loaded subtree is currently collapsed.
 const collapsed = ref(new Set())
+// Ids of group folders that are currently unfolded (folders start collapsed).
+const expandedGroups = ref(new Set())
+// Grouping settings (fold many same-type / same-class children into folders).
+const groupCfg = reactive({
+    byType: true,
+    byClass: true,
+    typeAbove: 4,    // pack a type bucket when it has MORE than this many children
+    classAbove: 4,   // same for same-class buckets
+    clutter: 8,      // pack only when the object has MORE than this many children total
+})
+const bump = (key, delta) => {
+    const min = 1
+    const max = key === 'clutter' ? 100 : 30
+    groupCfg[key] = Math.max(min, Math.min(max, (groupCfg[key] || min) + delta))
+}
 
 // Per-class colors (stable hash of the class id).
 const CLASS_COLORS = [
@@ -127,6 +174,11 @@ const localizedClassName = (cls) => (cls
 const glyphSvg = (node) => {
     const data = node.data || {}
     const color = data._clsColor || '#4a6bff'
+    if (data._folder) {
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" width="42" height="42">
+             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`
+    }
     const clsId = data._clsId
     let icon = 'default'
     if (clsId === UUID.HUMAN) icon = 'person'
@@ -174,45 +226,89 @@ const linkLabel = (treeNode) => {
 }
 
 const isCollapsed = (id) => collapsed.value.has(id)
+const isFolderOpen = (key) => expandedGroups.value.has(key)
+
+/** Buckets of one object's children: real children or foldable folders. */
+const entriesOf = (treeNode) => {
+    const children = treeNode.children || []
+    if (!groupCfg.byType && !groupCfg.byClass) {
+        return children.map((child) => ({ type: 'child', child }))
+    }
+    return foldChildren(children, {
+        ownerId: treeNode.id,
+        byType: groupCfg.byType,
+        byClass: groupCfg.byClass,
+        typeAbove: groupCfg.typeAbove,
+        classAbove: groupCfg.classAbove,
+        clutter: groupCfg.clutter,
+        excludeClass: [UUID.HUMAN],
+        typeOf: (c) => c?._inLink?.link_type_id ?? null,
+        classOf: (c) => (c?.clsId && c.clsId !== UUID.HUMAN) ? c.clsId : null,
+        typeLabel: (c) => linkLabel(c) || '',
+        classLabel: (c) => c?.clsName || '',
+    })
+}
+
+const baseJsonNode = (id, text, data) => ({
+    id,
+    text,
+    nodeShape: 1,
+    width: 120,
+    height: 160,
+    styleClass: 'rg-ghost',
+    disableDefaultClickEffect: true,
+    color: 'transparent',
+    data,
+})
 
 /** Flatten the visible part of the loaded tree into JsonNodes + labelled lines. */
 const buildGraphJson = (root) => {
     const nodes = []
     const lines = []
+    const addLine = (from, to, text, groupKey) => {
+        const line = { id: `${from}→${to}`, from, to, text: text ?? '', color: '#a7b1d6' }
+        if (groupKey) line.groupKey = groupKey
+        lines.push(line)
+    }
 
     const visit = (treeNode) => {
         const nodeId = treeNode.id
         const { thing, _inLink: _link, children: _kids } = treeNode
         const { links: _links, ...thingData } = thing || {}
         const isCollapsedNode = isCollapsed(nodeId)
-        nodes.push({
-            id: nodeId,
-            text: treeNode.text,
-            nodeShape: 1,
-            width: 120,
-            height: 160,
-            styleClass: 'rg-ghost',
-            disableDefaultClickEffect: true,
-            color: 'transparent',
-            data: {
-                ...thingData,
-                _clsId: treeNode.clsId,
-                _clsName: treeNode.clsName,
-                _clsColor: treeNode.clsColor,
-                _hasChildren: (treeNode.children || []).length > 0,
-                _collapsed: isCollapsedNode,
-            },
-        })
+        nodes.push(baseJsonNode(nodeId, treeNode.text, {
+            ...thingData,
+            _clsId: treeNode.clsId,
+            _clsName: treeNode.clsName,
+            _clsColor: treeNode.clsColor,
+            _hasChildren: (treeNode.children || []).length > 0,
+            _collapsed: isCollapsedNode,
+        }))
         if (isCollapsedNode) return
-        for (const child of treeNode.children) {
-            lines.push({
-                id: `${nodeId}→${child.id}`,
-                from: nodeId,
-                to: child.id,
-                text: linkLabel(child) || t('connected'),
-                color: '#a7b1d6',
-            })
-            visit(child)
+        for (const entry of entriesOf(treeNode)) {
+            if (entry.type === 'child') {
+                addLine(nodeId, entry.child.id, linkLabel(entry.child) || t('connected'))
+                visit(entry.child)
+                continue
+            }
+            // A folder node that packs many same-type / same-class children.
+            const open = isFolderOpen(entry.key)
+            const folderLabel = entry.label || (entry.kind === 'type' ? t('Related') : t('Objects'))
+            nodes.push(baseJsonNode(entry.key, `${folderLabel} · ${entry.items.length}`, {
+                _folder: true,
+                _groupKey: entry.key,
+                _clsColor: '#6c757d',
+                _clsName: folderLabel,
+                _hasChildren: true,
+                _collapsed: !open,
+                _count: entry.items.length,
+            }))
+            addLine(nodeId, entry.key, '', entry.key)
+            if (!open) continue
+            for (const item of entry.items) {
+                addLine(entry.key, item.id, '', entry.key)
+                visit(item)
+            }
         }
     }
 
@@ -222,6 +318,9 @@ const buildGraphJson = (root) => {
 
 const isRootId = (id) => !!graphObject.value && id === graphObject.value.thing_id
 const ringStyle = (node) => {
+    if (node.data && node.data._folder) {
+        return { borderColor: '#6c757d', background: '#f4f5f8' }
+    }
     const color = (node.data && node.data._clsColor) || '#4a6bff'
     return { borderColor: color }
 }
@@ -247,12 +346,29 @@ const showGraph = async () => {
     graphObject.value = await fetchObject(props.object.thing_id, selectedDepth.value)
     treeRoot.value = graphObject.value ? buildTree(graphObject.value) : null
     collapsed.value = new Set()
+    expandedGroups.value = new Set()
     await renderGraph()
 }
 
-/** Toggle the loaded subtree of a node (shown via the +/- button). */
+/** Flip whether a group folder (packed same-type/same-class links) is open. */
+const toggleGroup = (groupKey) => {
+    if (!groupKey) return
+    const next = new Set(expandedGroups.value)
+    if (next.has(groupKey)) next.delete(groupKey)
+    else next.add(groupKey)
+    expandedGroups.value = next
+    renderGraph()
+}
+
+/** Toggle a real node's loaded subtree or a group folder (the +/- button). */
 const toggleNode = (node) => {
-    if (!node || !node.data || !node.data._hasChildren) return
+    const data = node && node.data
+    if (!data) return
+    if (data._folder && data._groupKey) {
+        toggleGroup(data._groupKey)
+        return
+    }
+    if (!data._hasChildren) return
     const id = node.id
     const next = new Set(collapsed.value)
     if (next.has(id)) next.delete(id)
@@ -269,14 +385,23 @@ const onNodeDown = (e) => {
     nodeDown.value = e ? { x: e.clientX, y: e.clientY } : null
 }
 
-/** Clicking a node circle opens that object — unless the node was dragged. */
+/** Clicking a node: folders unfold/fold, object nodes open — unless dragged. */
 const onNodeClickLocal = (node, e) => {
     const down = nodeDown.value
     nodeDown.value = null
     if (down && e && (Math.abs(e.clientX - down.x) > 5 || Math.abs(e.clientY - down.y) > 5)) {
         return // pointer moved: that was a drag, not a click
     }
+    if (node && node.data && node.data._folder) {
+        toggleNode(node)
+        return
+    }
     openObject(node)
+}
+
+/** Clicking a line that belongs to a group folds/unfolds that group. */
+const onLineClick = (line) => {
+    if (line && line.groupKey) toggleGroup(line.groupKey)
 }
 
 /** Clicking a node circle opens that object (client-side route change). */
@@ -305,6 +430,11 @@ watch(() => props.object, async () => {
 watch(selectedDepth, async () => {
     await showGraph()
 })
+
+watch(groupCfg, () => {
+    expandedGroups.value = new Set()
+    if (treeRoot.value) renderGraph()
+}, { deep: true })
 
 onMounted(async () => {
     if (props.object) {
