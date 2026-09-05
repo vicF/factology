@@ -136,3 +136,32 @@ Route::middleware('auth:sanctum')->group(function () {
 - **Share depth policy**: default for "object + direct links"; cap to avoid leaking deep private graphs.
 - **Retention/moderation**: relay-blob TTL; moderation for the public/global channel; GDPR treatment of key fingerprints.
 - **Server-mediated recovery**: offer as opt-in alongside self-custody + social recovery, or exclude entirely to honor data minimization?
+
+---
+
+## Offline import & schema parity (GEDCOM)
+
+**Schema parity is a standing rule**: the local Dexie stores mirror the server
+tables 1:1. `objects` ↔ `things`, `links` ↔ `links`; with `localDb` **v3** the
+`external_links` store (`&id, thing_id, url` + sync columns) mirrors the
+server's `external_links` table (id uuid PK, thing_id, url) so source/URL links
+are first-class offline rows with the same shape on both sides.
+
+**GEDCOM import runs in the client** (`resources/js/gedcom/gedcomParser.js` +
+`gedcomImporter.js`), mirroring the redesigned server importer on
+`feature/gedcom` (dev2): GEDCOM source thing keyed by a 16-hex `sha256` file
+key, event-specific classes under Event, INSIDE event→place, Address under
+Place, existing-place reuse, PRESENT links carrying event dates, bibliographic
+vs URL-only SOUR records (URLs land in `external_links`), and EVIDENCE
+citation edges. Imported rows are owned by the unlocked identity (`public:
+false`) and carry `IMPORTED_FROM` links with a `data.source_external_id`
+pin (`<fileKey>/<localId>`) that makes re-imports idempotent (update instead of
+duplicate).
+
+Offline the Tools page's POST `/import/gedcom` is served locally by
+`apiHandler.handleLocalTool` and returns the same `{imported, updated, skipped,
+errors, details, source_thing_id}` result the web panel renders. Because the
+parser output is the standard `{things, links}` export shape, the **web/server
+path is a later slice**: a browser can parse with the same module and POST the
+records to the existing JSON `/import` endpoint (mapping `externalLinks` rows
+to the server `external_links` table), retiring the PHP `GedcomImporter`.
