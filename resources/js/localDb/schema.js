@@ -3,7 +3,7 @@
 import Dexie from 'dexie';
 
 export const DB_NAME = 'factology_local';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 /**
  * Define the local IndexedDB schema via Dexie.
@@ -93,6 +93,20 @@ const STORE_V2 = {
     `,
 };
 
+// v3: `external_links` store — mirrors the server's external_links table
+// (id uuid PK, thing_id, url) plus the usual sync columns, so offline
+// source/URL links are first-class rows with schema parity.
+const STORE_V3 = {
+    ...STORE_V2,
+    external_links: `
+        &id,
+        thing_id,
+        url,
+        _syncStatus,
+        _serverId
+    `,
+};
+
 export function createDatabase() {
     const db = new Dexie(DB_NAME);
 
@@ -105,6 +119,9 @@ export function createDatabase() {
         // existing rows keep their link_id PKs and are indexed on link_uuid
         // as the value becomes available.
     });
+
+    // v3: external_links store (see STORE_V3). No data migration required.
+    db.version(3).stores(STORE_V3);
 
     return db;
 }
