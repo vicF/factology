@@ -92,6 +92,20 @@ if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
     export ANDROID_SDK_ROOT="$ANDROID_HOME"
 fi
 
+# --- 6.5 stable debug signing ----------------------------------------------------
+# The generated android/ project's debug buildType has no explicit signing
+# config, so Gradle falls back to the default keystore at
+# ~/.android/debug.keystore — which would be created fresh (random key) on every
+# CI run, making each alpha un-installable over the previous one. Copy the
+# committed debug keystore into that default location so every CI/local build
+# shares one signature and alpha updates install cleanly.
+# (Debug-only key; password/alias are the well-known Android defaults.)
+if [ -f "$SCRIPT_DIR/android-debug.keystore" ]; then
+    mkdir -p "$HOME/.android"
+    cp -f "$SCRIPT_DIR/android-debug.keystore" "$HOME/.android/debug.keystore"
+    echo "==> debug keystore installed at \$HOME/.android/debug.keystore"
+fi
+
 (cd android && ./gradlew assembleDebug)
 echo "==> Gradle assembleDebug complete"
 
