@@ -54,28 +54,40 @@
                 <template #node="{ node }">
                     <div
                         class="rg-node"
-                        :class="{ 'is-root': isRootId(node.id) }"
+                        :class="{
+                            'is-root': isRootId(node.id),
+                            'is-folder': isFolderNode(node),
+                        }"
                         @mousedown="onNodeDown"
                         @click.stop="onNodeClickLocal(node, $event)"
                     >
-                        <div class="rg-ring" :style="ringStyle(node)">
-                            <span class="rg-glyph" v-html="glyphSvg(node)"></span>
-                            <div v-if="!thumbFailed[node.id] && !(node.data && node.data._folder)" class="rg-media">
-                                <img
-                                    :src="thumbUrl(node.id)"
-                                    :alt="node.text"
-                                    draggable="false"
-                                    @error="onThumbError(node.id)"
-                                />
+                        <template v-if="isFolderNode(node)">
+                            <!-- A group of many same-type/same-class links is just
+                                 a small +/− circle; the relation name sits on the link. -->
+                            <div class="rg-folder" :class="{ 'is-open': !node.data._collapsed }">
+                                {{ node.data._collapsed ? '+' : '−' }}
                             </div>
-                            <button
-                                v-if="node.data && node.data._hasChildren"
-                                class="rg-expander"
-                                :title="node.data._collapsed ? t('Expand') : t('Collapse')"
-                                @click.stop="toggleNode(node)"
-                            >{{ node.data._collapsed ? '+' : '−' }}</button>
-                        </div>
-                        <div class="rg-name" :title="node.text">{{ node.text }}</div>
+                        </template>
+                        <template v-else>
+                            <div class="rg-ring" :style="ringStyle(node)">
+                                <span class="rg-glyph" v-html="glyphSvg(node)"></span>
+                                <div v-if="!thumbFailed[node.id]" class="rg-media">
+                                    <img
+                                        :src="thumbUrl(node.id)"
+                                        :alt="node.text"
+                                        draggable="false"
+                                        @error="onThumbError(node.id)"
+                                    />
+                                </div>
+                                <button
+                                    v-if="node.data && node.data._hasChildren"
+                                    class="rg-expander"
+                                    :title="node.data._collapsed ? t('Expand') : t('Collapse')"
+                                    @click.stop="toggleNode(node)"
+                                >{{ node.data._collapsed ? '+' : '−' }}</button>
+                            </div>
+                            <div class="rg-name" :title="node.text">{{ node.text }}</div>
+                        </template>
                     </div>
                 </template>
             </RelationGraph>
@@ -291,19 +303,30 @@ const buildGraphJson = (root) => {
                 visit(entry.child)
                 continue
             }
-            // A folder node that packs many same-type / same-class children.
+            // A folder is a small +/− circle; the relation/class name is shown
+            // on the link itself so the node stays tiny and distinct.
             const open = isFolderOpen(entry.key)
             const folderLabel = entry.label || (entry.kind === 'type' ? t('Related') : t('Objects'))
-            nodes.push(baseJsonNode(entry.key, `${folderLabel} · ${entry.items.length}`, {
-                _folder: true,
-                _groupKey: entry.key,
-                _clsColor: '#6c757d',
-                _clsName: folderLabel,
-                _hasChildren: true,
-                _collapsed: !open,
-                _count: entry.items.length,
-            }))
-            addLine(nodeId, entry.key, '', entry.key)
+            nodes.push({
+                id: entry.key,
+                text: '',
+                nodeShape: 1,
+                width: 44,
+                height: 44,
+                styleClass: 'rg-ghost',
+                disableDefaultClickEffect: true,
+                color: 'transparent',
+                data: {
+                    _folder: true,
+                    _groupKey: entry.key,
+                    _clsColor: '#6c757d',
+                    _clsName: folderLabel,
+                    _hasChildren: true,
+                    _collapsed: !open,
+                    _count: entry.items.length,
+                },
+            })
+            addLine(nodeId, entry.key, `${folderLabel} · ${entry.items.length}`, entry.key)
             if (!open) continue
             for (const item of entry.items) {
                 addLine(entry.key, item.id, '', entry.key)
@@ -317,6 +340,7 @@ const buildGraphJson = (root) => {
 }
 
 const isRootId = (id) => !!graphObject.value && id === graphObject.value.thing_id
+const isFolderNode = (node) => !!(node && node.data && node.data._folder)
 const ringStyle = (node) => {
     if (node.data && node.data._folder) {
         return { borderColor: '#6c757d', background: '#f4f5f8' }
@@ -471,6 +495,42 @@ onMounted(async () => {
     box-sizing: border-box;
     cursor: pointer;
     background: transparent;
+}
+
+/* Grouping folders are a small standalone +/− circle, clearly not an object. */
+.rg-node.is-folder {
+    width: 46px;
+    height: 46px;
+    justify-content: center;
+}
+
+.rg-folder {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    background: #6c757d;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box;
+    transition: transform 0.15s ease, background 0.15s ease;
+    padding-bottom: 2px;
+}
+
+.rg-folder:hover {
+    transform: scale(1.12);
+}
+
+.rg-folder.is-open {
+    background: #4a6bff;
 }
 
 .rg-ring {

@@ -176,6 +176,10 @@ describe('Graph', () => {
         expect(folder.data._folder).toBe(true)
         expect(folder.data._collapsed).toBe(true)
         expect(folder.data._count).toBe(9)
+        expect(folder.width).toBe(44) // small +/− circle, not an object node
+        // the relation name moved onto the linking line
+        const folderLine = data.lines.find((l) => l.to === folder.id)
+        expect(folderLine.text).toBe('participates in · 9')
     })
 
     it('unfolds a packed folder revealing its items', async () => {
