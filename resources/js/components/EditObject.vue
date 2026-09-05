@@ -23,6 +23,17 @@
                                 {{ $t('You are editing an object that belongs to {owner}.', { owner: (object.owner_name || $t('another user')) }) }}
                             </div>
 
+                            <!-- Image / icon (existing objects only — a fresh object
+                                 gets its UUID registered on first save) -->
+                            <ObjectImageEditor
+                                v-if="isEditMode"
+                                :thing-id="formData.thing_id"
+                                class="mb-1"
+                            />
+                            <div v-else class="small text-muted mb-3">
+                                <i class="bi bi-image me-1"></i>{{ $t('You can add an image after saving the object.') }}
+                            </div>
+
                             <!-- Classes (multi-class) for Thing type (type 3) -->
                             <div class="mb-3" v-if="formData.type === 3">
                                 <label class="form-label d-block">{{ $t('Classes') }}</label>
@@ -549,6 +560,7 @@ import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TO_RELATED, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
 import { eventBus } from "../eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
+import ObjectImageEditor from "./ObjectImageEditor.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { useAuthStore } from '@/stores/auth';

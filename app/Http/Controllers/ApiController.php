@@ -7,6 +7,7 @@ use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
 use App\Services\RelatedObjectsResolver;
+use App\Services\ThumbStore;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
 use Fokin\Facts\Data\Era;
@@ -773,6 +774,164 @@ class ApiController extends BaseController
                 'filesStored' => $stored,
                 'success'     => true
             ]);
+    }
+
+    /**
+     * Set an object's image/icon.
+     *
+     * Accepts either a multipart `file` upload or a JSON `{ "url": ... }` to
+     * import from the web. `size` picks the storage profile: small (default,
+     * the historic ~1 KB icon profile), medium or original — see ThumbStore.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeThumb(Request $request, $id)
+    {
+        Log::info('storeThumb request', [
+            'id'           => $id,
+            'content_type' => $request->header('Content-Type'),
+            'has_file'     => $request->hasFile('file'),
+            'file_size'    => $request->hasFile('file') ? $request->file('file')->getSize() : null,
+            'file_name'    => $request->hasFile('file') ? $request->file('file')->getClientOriginalName() : null,
+            'file_error'   => $request->hasFile('file') ? $request->file('file')->getError() : null,
+            'input_keys'   => array_keys($request->all()),
+            'url'          => $request->input('url'),
+            'size'         => $request->input('size'),
+        ]);
+
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to edit this object\'s image',
+            ], 403);
+        }
+
+        $size = (string) $request->input('size', 'small');
+        if (!ThumbStore::isValidSize($size)) {
+            throw ValidationException::withMessages(['size' => 'The size must be one of: small, medium, original.']);
+        }
+
+        // An UploadedFile temp is removed by Laravel after the request;
+        // a URL download lands in our own temp file that we must clean up.
+        $downloadedTemp = null;
+        try {
+            if ($request->hasFile('file')) {
+                $request->validate([
+                    'file' => ['required', 'image', 'mimes:jpeg,jpg,png,gif,webp,bmp', 'max:25000'],
+                ]);
+                $sourcePath = $request->file('file')->getRealPath();
+            } elseif ($request->filled('url')) {
+                $url = trim((string) $request->input('url'));
+                if (!preg_match('#^https?://#i', $url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                    throw ValidationException::withMessages(['url' => 'The url must be a valid http(s) address.']);
+                }
+                $response = Http::timeout(20)->get($url);
+                if ($response->failed()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Could not download the image from the given URL.',
+                    ], 422);
+                }
+                $contentType = strtolower((string) $response->header('Content-Type', ''));
+                if ($contentType !== '' && strpos($contentType, 'image/') !== 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The URL does not point to an image.',
+                    ], 422);
+                }
+                $contentLength = (int) $response->header('Content-Length', 0);
+                if ($contentLength && $contentLength > ThumbStore::MAX_SOURCE_BYTES) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The remote image is too large.',
+                    ], 422);
+                }
+                $body = $response->body();
+                if (strlen($body) > ThumbStore::MAX_SOURCE_BYTES) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The remote image is too large.',
+                    ], 422);
+                }
+                $downloadedTemp = tempnam(sys_get_temp_dir(), 'factology_thumb_');
+                if ($downloadedTemp === false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Could not create a temporary file for the download.',
+                    ], 500);
+                }
+                file_put_contents($downloadedTemp, $body);
+                $sourcePath = $downloadedTemp;
+            } else {
+                throw ValidationException::withMessages(['file' => 'Provide either a file or a url.']);
+            }
+
+            if (!is_file($sourcePath)) {
+                throw new \RuntimeException('The image could not be read.');
+            }
+            $result = ThumbStore::put($id, $sourcePath, $size);
+
+            return response()->json(['success' => true] + $result);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } finally {
+            if ($downloadedTemp && is_file($downloadedTemp)) {
+                @unlink($downloadedTemp);
+            }
+        }
+    }
+
+    /**
+     * Remove an object's custom image/icon, restoring the class/parent icon
+     * fallback so the thumb URL keeps resolving.
+     *
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function removeThumb($id)
+    {
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to edit this object\'s image',
+            ], 403);
+        }
+
+        $hadThumb = ThumbStore::remove($id);
+
+        return response()->json([
+            'success'    => true,
+            'thing_id'   => $id,
+            'had_thumb'  => (bool) $hadThumb,
+            'thumb'      => ThumbStore::webPath($id),
+        ]);
+    }
+
+    /**
+     * Report whether an object currently has a real custom image (vs the
+     * class/parent icon fallback the web server symlinks into its slot).
+     *
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function thumbStatus($id)
+    {
+        $path = ThumbStore::localPath($id);
+        $custom = is_file($path) && !is_link($path);
+
+        return response()->json([
+            'success'  => true,
+            'thing_id' => $id,
+            'custom'   => $custom,
+            'thumb'    => ThumbStore::webPath($id),
+        ]);
     }
 
     /**

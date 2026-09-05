@@ -275,6 +275,7 @@ import SearchFilterPanel from "../SearchFilterPanel.vue"
 import { setLanguage } from '../../lang/i18n.js'
 
 import { eventBus } from '../../eventBus.js'
+import { thumbUrl, thumbRevision } from '../../utils/objectImages'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import { useObjectsStore } from '../../stores/objects'
@@ -282,10 +283,19 @@ import { useUiStore } from '../../stores/ui'
 import { onError } from '../../utils/errorTracker.js'
 import axios from 'axios'
 
-// Provide getThumbUrl function for child components
+// Provide getThumbUrl function for child components. Resolution accounts for
+// the runtime: web → same-origin /thumbs/…; remote Capacitor → API server
+// origin; offline builds → Electron's local static route or Capacitor's
+// convertFileSrc (device folder). A cache-buster (?v=revision) is appended so
+// an image replaced for the same UUID re-fetches immediately — reading
+// thumbRevision (a reactive ref) inside the provided function makes every
+// consumer's computed image URL reactive to image changes.
+provide('thumbRevision', thumbRevision);
 const getThumbUrl = (thing_id) => {
-    if (!thing_id) return '';
-    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
+    const url = thumbUrl(thing_id);
+    if (!url) return '';
+    const rev = thumbRevision.value;
+    return rev ? `${url}${url.includes('?') ? '&' : '?'}v=${rev}` : url;
 };
 provide('getThumbUrl', getThumbUrl);
 

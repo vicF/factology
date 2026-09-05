@@ -103,6 +103,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/suggest/links',         [ApiController::class, 'suggestLinks']);
         Route::get('/suggest/lists',          [ApiController::class, 'suggestLists']);
         Route::post('/object/{id}/favorite',  [ApiController::class, 'toggleFavorite']);
+        Route::get('/object/{id}/thumb',      [ApiController::class, 'thumbStatus']);
+        // PHP only parses multipart/form-data into $_FILES for POST, so file
+        // uploads must be POST (JSON url imports may use either verb).
+        Route::match(['post', 'put'], '/object/{id}/thumb', [ApiController::class, 'storeThumb']);
+        Route::delete('/object/{id}/thumb',   [ApiController::class, 'removeThumb']);
 
         // Export/Import (admin-only, enforced in controller)
         Route::get('/export',                 [ExportImportController::class, 'export']);

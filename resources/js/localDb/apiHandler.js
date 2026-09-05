@@ -40,6 +40,9 @@ function newLinkId() {
 /** Base path to strip from URLs */
 const API_PREFIX = '/object';
 
+/** True in the standalone offline build (mirrors utils/objectImages). */
+const OFFLINE_ONLY = import.meta.env.VITE_TARGET === 'capacitor' && !import.meta.env.VITE_API_URL;
+
 // Multilevel related-object limits (mirror App\Services\RelatedObjectsResolver).
 const DEPTH_CAP = 6;
 const SEARCH_BREADTH = 5;
@@ -101,6 +104,19 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     // ── /object/{id} ─────────────────────────────────────────────────
     const id = parts[0];
 
+    // /object/{id}/thumb — per-object image file on the device (offline
+    // standalone only; the UI layer usually talks to deviceImages directly).
+    if (OFFLINE_ONLY && id && parts[1] === 'thumb') {
+        return handleDeviceThumb(method, id, data);
+    }
+
+    // Everything else must be exactly /object/{id} — never let an extra
+    // segment (e.g. a server-mode thumb request) silently fall through to
+    // handleUpdate/handleGet with the wrong payload.
+    if (parts.length !== 1) {
+        throw new Error(`Unhandled local API: ${method} ${url}`);
+    }
+
     if (method === 'get') {
         return handleGet(id, depth);
     }
@@ -118,6 +134,48 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
     }
 
     throw new Error(`Unhandled local API: ${method} ${url}`);
+}
+
+/**
+ * Offline thumbnails: GET /object/{id}/thumb → existence check,
+ * PUT /object/{id}/thumb → write the picked file, DELETE → remove it.
+ */
+async function handleDeviceThumb(method, thingId, body) {
+    const device = await import('../media/deviceImages');
+
+    if (method === 'get') {
+        const custom = await device.hasDeviceThumb(thingId);
+        return {
+            data: {
+                success: true,
+                thing_id: thingId,
+                custom,
+                thumb: `/thumbs/${thingId.charAt(0)}/${thingId.charAt(1)}/${thingId}.jpg`,
+            },
+            status: 200,
+        };
+    }
+
+    if (method === 'put') {
+        const raw = typeof body === 'string' ? JSON.parse(body) : (body || {});
+        const form = raw instanceof FormData ? raw : null;
+        const file = form ? form.get('file') : null;
+        if (!file) {
+            throw new Error('Offline image upload requires a file (URL import is handled in the UI).');
+        }
+        await device.writeDeviceThumb(thingId, file);
+        return {
+            data: { success: true, thumb: `/thumbs/${thingId.charAt(0)}/${thingId.charAt(1)}/${thingId}.jpg` },
+            status: 200,
+        };
+    }
+
+    if (method === 'delete') {
+        await device.removeDeviceThumb(thingId);
+        return { data: { success: true }, status: 200 };
+    }
+
+    throw new Error(`Unhandled local thumb API: ${method} /object/${thingId}/thumb`);
 }
 
 async function handleSearch(body) {

@@ -26,6 +26,15 @@ export async function bootstrapStandalone() {
     // Seed demo data on first run
     await seedDemoData();
 
+    // Resolve the on-device images folder so thumb URLs are stable from the
+    // first render (offline native builds).
+    try {
+        const { initDeviceThumbs } = await import('../media/deviceImages');
+        await initDeviceThumbs();
+    } catch (e) {
+        // web/browser fallback — no device folder available
+    }
+
     const { useAuthStore } = await import('../stores/auth');
     const { useIdentityStore } = await import('../stores/identity');
 
