@@ -13,27 +13,38 @@
                     @click="selectedDepth = lvl"
                 >{{ lvl }}</button>
             </div>
-            <span class="small text-muted ms-2">{{ t('Click a node to expand it') }}</span>
+            <span class="small text-muted ms-2">{{ t('Click a node to open it') }}</span>
         </div>
         <div style="height:calc(100vh - 95px);">
             <RelationGraph
                 ref="graphRef"
                 :options="graphOptions"
-                :on-node-click="onNodeClick"
-                :on-line-click="onLineClick"
             >
                 <template #node="{ node }">
-                    <div class="custom-node" :style="getNodeStyle(node)">
-                        <div class="node-image-area" :class="{ 'no-image': !nodeHasImage[node.id] }">
-                            <Image
-                                :node-id="node.id"
-                                :alt="node.text"
-                                :hide-when-no-image="true"
-                                @has-image="onHasImage(node.id, $event)"
-                            />
+                    <div
+                        class="rg-node"
+                        :class="{ 'is-root': isRootId(node.id) }"
+                        @mousedown="onNodeDown"
+                        @click.stop="onNodeClickLocal(node, $event)"
+                    >
+                        <div class="rg-ring" :style="ringStyle(node)">
+                            <span class="rg-glyph" v-html="glyphSvg(node)"></span>
+                            <div v-if="!thumbFailed[node.id]" class="rg-media">
+                                <img
+                                    :src="thumbUrl(node.id)"
+                                    :alt="node.text"
+                                    draggable="false"
+                                    @error="onThumbError(node.id)"
+                                />
+                            </div>
+                            <button
+                                v-if="node.data && node.data._hasChildren"
+                                class="rg-expander"
+                                :title="node.data._collapsed ? t('Expand') : t('Collapse')"
+                                @click.stop="toggleNode(node)"
+                            >{{ node.data._collapsed ? '+' : '−' }}</button>
                         </div>
-                        <div class="node-text">{{ node.text }}</div>
-                        <div v-if="node.data && node.data._hasChildren" class="node-expand-hint">+</div>
+                        <div class="rg-name" :title="node.text">{{ node.text }}</div>
                     </div>
                 </template>
             </RelationGraph>
@@ -48,10 +59,9 @@ import { inject, reactive, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
-import { applyAgeBias } from '../utils/graphAgeBias.js'
-import Image from './Image.vue'
+import { UUID } from '../constants/uuid.js'
 
-const getThumbUrl = inject('getThumbUrl');
+const getThumbUrl = inject('getThumbUrl')
 
 const props = defineProps({
     object: {
@@ -64,125 +74,156 @@ const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
 
-// nodeId → true once its thumbnail actually loaded (see Image `has-image`).
-// Drives hiding the empty thumbnail box for nodes without a real image.
-const nodeHasImage = reactive({})
-const onHasImage = (nodeId, has) => {
-    nodeHasImage[nodeId] = has
+// nodeId → true once its thumbnail failed to load, so the class icon stays.
+const thumbFailed = reactive({})
+const thumbUrl = (id) => getThumbUrl ? getThumbUrl(id) : ''
+const onThumbError = (id) => {
+    thumbFailed[id] = true
 }
 
 // How many levels of related objects the graph renders (refetched on change).
 const selectedDepth = ref(2)
 // The fetched root object carrying nested `links` (depth = selectedDepth).
 const graphObject = ref(null)
+// Root of the loaded related-object tree (used to flatten the visible graph).
+const treeRoot = ref(null)
+// Ids of nodes whose loaded subtree is currently collapsed.
+const collapsed = ref(new Set())
 
-// The graph uses relation-graph's own automatic "center" layout (the original
-// look, arranged from the real links). After it runs we nudge the result so
-// older objects end up higher (see applyAgeBias).
+// Per-class colors (stable hash of the class id).
+const CLASS_COLORS = [
+    '#4a6bff', '#28a745', '#e0a800', '#d9534f', '#6f42c1',
+    '#20c997', '#fd7e14', '#17a2b8', '#e83e8c', '#6c757d',
+    '#7c6f56', '#54b4d4', '#a6742c', '#7a8c8f', '#3d7ea6',
+]
+const colorForClassId = (id) => {
+    if (!id) return '#4a6bff'
+    let h = 0
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+    return CLASS_COLORS[h % CLASS_COLORS.length]
+}
+
+// relation-graph auto layout. The default node wrapper is made invisible via
+// the `rg-ghost` styleClass below, so only our own circle + label are drawn.
 const graphOptions = {
     debug: false,
-    defaultNodeShape: 1, // 1 = Rectangle (fixes the oval issue)
     defaultJunctionPoint: 'border',
-    defaultNodeColor: '#4a6bff',
-    defaultLineColor: '#99b3ff',
-    defaultNodeWidth: 150,
-    defaultNodeHeight: 100,
+    defaultLineColor: '#a7b1d6',
+    defaultLineWidth: 1,
+    defaultShowLineLabel: true,
+    zoomToFitWhenRefresh: true,
+    moveToCenterWhenRefresh: true,
     layout: {
         layoutName: 'center'
     }
 }
 
-const onLineClick = (lineObject, $event) => {
-    console.log('onLineClick:', lineObject)
-}
+const classOf = (thing) => thing?.class || thing?.classes?.[0] || null
+const localizedClassName = (cls) => (cls
+    ? (cls.name_translations ? fieldText(cls.name, cls.name_translations) : cls.name)
+    : '')
 
-const getNodeStyle = (node) => {
-    return {
-        background: node.color || '#4a6bff',
-        border: `2px solid ${node.borderColor || '#1e3b8a'}`,
-        color: node.fontColor || '#ffffff',
-        padding: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
-        boxSizing: 'border-box',
-        cursor: 'pointer',
-        borderRadius: '4px', // Slightly rounded corners for the rectangle
-        transition: 'transform 0.2s, box-shadow 0.2s'
+/** Small SVG icon shown inside a node circle while no photo is available. */
+const glyphSvg = (node) => {
+    const data = node.data || {}
+    const color = data._clsColor || '#4a6bff'
+    const clsId = data._clsId
+    let icon = 'default'
+    if (clsId === UUID.HUMAN) icon = 'person'
+    else if (clsId === UUID.PHOTO || clsId === UUID.VIDEO) icon = 'media'
+    else if (clsId === UUID.MUSIC_BAND) icon = 'music'
+    const paths = {
+        person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4.2 4.4-6.5 8-6.5s6.8 2.3 8 6.5"/>',
+        media: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9.5" cy="11" r="2.2"/><path d="M21 15l-4.5-4.5L8 19"/>',
+        music: '<path d="M9 18V6l10-2v11.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
+        default: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="9.5" r="2.6"/><path d="M5.6 19.2c1-3.6 3.6-5.6 6.4-5.6s5.4 2 6.4 5.6"/>',
     }
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" width="42" height="42">${paths[icon]}</svg>`
 }
 
 /**
- * Build {nodes, lines} from a (possibly nested) object. Walk related links
- * recursively via each link's `target.links`, deduping node ids so a thing
- * reachable via several paths appears once.
+ * Recursively turn the fetched (nested) object into an internal tree. `children`
+ * carries the loaded related subtree; each child remembers the link that leads
+ * to it so lines can be labelled.
  */
-const buildGraphData = (object) => {
-    if (!object) return { nodes: [], lines: [] }
+const buildTree = (thing) => {
+    const links = Array.isArray(thing?.links) ? thing.links : []
+    const children = links
+        .filter((link) => link?.target?.thing_id)
+        .map((link) => ({
+            ...buildTree(link.target),
+            _inLink: link,
+        }))
+    const cls = classOf(thing)
+    return {
+        id: thing.thing_id,
+        thing,
+        text: objectName(thing) || localizedClassName(cls) || t('Unnamed'),
+        clsId: cls?.thing_id || cls?.id || null,
+        clsName: localizedClassName(cls),
+        clsColor: colorForClassId(cls?.thing_id || cls?.id || null),
+        children,
+    }
+}
 
+const linkLabel = (treeNode) => {
+    const link = treeNode._inLink
+    if (!link) return null
+    return fieldText(link.link_name, link.link_name_translations) || null
+}
+
+const isCollapsed = (id) => collapsed.value.has(id)
+
+/** Flatten the visible part of the loaded tree into JsonNodes + labelled lines. */
+const buildGraphJson = (root) => {
     const nodes = []
     const lines = []
-    const nodeIds = new Set()
 
-    const addNode = (node) => {
-        if (nodeIds.has(node.id)) return false
-        nodeIds.add(node.id)
-        nodes.push(node)
-        return true
-    }
-
-    // Главный узел
-    addNode({
-        id: object.thing_id,
-        text: objectName(object) || t('Unnamed'),
-        color: '#4a6bff',
-        borderColor: '#1e3b8a',
-        fontColor: '#ffffff',
-        width: 150,
-        height: 100,
-        nodeShape: 1,
-        data: object
-    })
-
-    // Связанные объекты — рекурсивно до глубины загруженных данных
-    const walk = (parentId, links) => {
-        if (!Array.isArray(links)) return
-        for (const link of links) {
-            const target = link.target
-            if (!target || !target.thing_id) continue
-            const isNew = addNode({
-                id: target.thing_id,
-                text: objectName(target) || link.link_name || t('Related'),
-                color: '#28a745',
-                borderColor: '#1e7e34',
-                fontColor: '#ffffff',
-                width: 150,
-                height: 100,
-                nodeShape: 1,
-                data: {
-                    ...target,
-                    _hasChildren: !!(target.links && target.links.length)
-                }
-            })
+    const visit = (treeNode) => {
+        const nodeId = treeNode.id
+        const { thing, _inLink: _link, children: _kids } = treeNode
+        const { links: _links, ...thingData } = thing || {}
+        const isCollapsedNode = isCollapsed(nodeId)
+        nodes.push({
+            id: nodeId,
+            text: treeNode.text,
+            nodeShape: 1,
+            width: 120,
+            height: 160,
+            styleClass: 'rg-ghost',
+            disableDefaultClickEffect: true,
+            color: 'transparent',
+            data: {
+                ...thingData,
+                _clsId: treeNode.clsId,
+                _clsName: treeNode.clsName,
+                _clsColor: treeNode.clsColor,
+                _hasChildren: (treeNode.children || []).length > 0,
+                _collapsed: isCollapsedNode,
+            },
+        })
+        if (isCollapsedNode) return
+        for (const child of treeNode.children) {
             lines.push({
-                id: link.link_id != null ? String(link.link_id) : `l-${parentId}-${target.thing_id}`,
-                from: parentId,
-                to: target.thing_id,
-                linkType: link.link_type_id ?? null,
-                text: fieldText(link.link_name, link.link_name_translations) || t('connected'),
-                color: '#28a745'
+                id: `${nodeId}→${child.id}`,
+                from: nodeId,
+                to: child.id,
+                text: linkLabel(child) || t('connected'),
+                color: '#a7b1d6',
             })
-            if (target.links && target.links.length) {
-                walk(target.thing_id, target.links)
-            }
+            visit(child)
         }
     }
-    walk(object.thing_id, object.links)
 
+    visit(root)
     return { nodes, lines }
+}
+
+const isRootId = (id) => !!graphObject.value && id === graphObject.value.thing_id
+const ringStyle = (node) => {
+    const color = (node.data && node.data._clsColor) || '#4a6bff'
+    return { borderColor: color }
 }
 
 const fetchObject = async (uid, depth) => {
@@ -191,100 +232,62 @@ const fetchObject = async (uid, depth) => {
 }
 
 const renderGraph = async () => {
-    if (!graphRef.value || !graphObject.value) return
-    const graphData = buildGraphData(graphObject.value)
-    if (graphData.nodes.length === 0) return
-    // Reset thumbnail state so nodes render without an image box until their
-    // thumbnail actually loads (each node re-emits `has-image` on mount).
-    for (const key of Object.keys(nodeHasImage)) delete nodeHasImage[key]
-
-    // Pass 1: relation-graph auto-lays the graph out ("center"), arranged from
-    // the actual links, so connected objects are drawn together.
-    graphOptions.layout.layoutName = 'center'
+    if (!graphRef.value || !treeRoot.value) return
+    const { nodes, lines } = buildGraphJson(treeRoot.value)
+    if (nodes.length === 0) return
     await graphRef.value.setJsonData({
         rootId: graphObject.value.thing_id,
-        nodes: graphData.nodes,
-        lines: graphData.lines
+        nodes,
+        lines,
     })
-
-    const instance = graphRef.value && typeof graphRef.value.getInstance === 'function'
-        ? graphRef.value.getInstance()
-        : null
-    if (instance && typeof instance.getNodes === 'function') {
-        // Pass 2: keep the automatic arrangement but nudge it so older objects
-        // sit higher (and parents sit above their children), then re-render the
-        // nudged positions as a fixed layout.
-        const positions = {}
-        instance.getNodes().forEach((n) => { positions[n.id] = { x: n.x, y: n.y } })
-        const fixed = graphData.nodes.map((n) => {
-            const p = positions[n.id] || {}
-            return { ...n, x: p.x ?? 0, y: p.y ?? 0 }
-        })
-        applyAgeBias(fixed, graphData.lines)
-
-        graphOptions.layout.layoutName = 'fixed'
-        await graphRef.value.setJsonData({
-            rootId: graphObject.value.thing_id,
-            nodes: fixed,
-            lines: graphData.lines
-        })
-        // "fixed" disables the library's own zoom-to-fit, so fit explicitly.
-        setTimeout(() => {
-            if (typeof instance.moveToCenter === 'function') instance.moveToCenter()
-            if (typeof instance.zoomToFit === 'function') instance.zoomToFit()
-        }, 80)
-    }
 }
 
 const showGraph = async () => {
     if (!props.object) return
     graphObject.value = await fetchObject(props.object.thing_id, selectedDepth.value)
+    treeRoot.value = graphObject.value ? buildTree(graphObject.value) : null
+    collapsed.value = new Set()
     await renderGraph()
 }
 
-/** Find the link whose target equals nodeId and attach the deeper branch. */
-const attachBranch = (node, nodeId, branch) => {
-    if (!node || !Array.isArray(node.links)) return false
-    for (const link of node.links) {
-        if (link.target && link.target.thing_id === nodeId) {
-            link.target.links = branch.links || []
-            return true
-        }
-        if (link.target && link.target.links && attachBranch(link.target, nodeId, branch)) {
-            return true
-        }
-    }
-    return false
+/** Toggle the loaded subtree of a node (shown via the +/- button). */
+const toggleNode = (node) => {
+    if (!node || !node.data || !node.data._hasChildren) return
+    const id = node.id
+    const next = new Set(collapsed.value)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    collapsed.value = next
+    renderGraph()
 }
 
-/**
- * Node click: unfold a node that still has unloaded related objects in place;
- * navigate when the node is already expanded, is a leaf, or is the root/class.
- */
-const onNodeClick = async (node, event) => {
-    const nodeData = node.data || {}
-    if (nodeData.type === 'link_type') return
+// Pointer position when the press started, to tell a real click apart from a
+// node drag (relation-graph lets nodes be dragged around; releasing after a
+// drag must not open the object).
+const nodeDown = ref(null)
+const onNodeDown = (e) => {
+    nodeDown.value = e ? { x: e.clientX, y: e.clientY } : null
+}
 
-    const isRoot = graphObject.value && node.id === graphObject.value.thing_id
-    if (!isRoot && nodeData.type === 3 && !nodeData._hasChildren) {
-        try {
-            const branch = await fetchObject(node.id, 1)
-            if (branch && branch.links && branch.links.length) {
-                if (attachBranch(graphObject.value, node.id, branch)) {
-                    await renderGraph()
-                    return
-                }
-            }
-        } catch (error) {
-            console.error('Graph.vue - failed to expand node:', error)
-        }
+/** Clicking a node circle opens that object — unless the node was dragged. */
+const onNodeClickLocal = (node, e) => {
+    const down = nodeDown.value
+    nodeDown.value = null
+    if (down && e && (Math.abs(e.clientX - down.x) > 5 || Math.abs(e.clientY - down.y) > 5)) {
+        return // pointer moved: that was a drag, not a click
     }
+    openObject(node)
+}
 
+/** Clicking a node circle opens that object (client-side route change). */
+const openObject = (node) => {
     router.push({ name: 'object', params: { uid: node.id } })
 }
 
 defineExpose({
     updateData: showGraph,
+    openObject,
+    toggleNode,
     refreshView: () => {
         if (graphRef.value) {
             const instance = graphRef.value.getInstance()
@@ -310,64 +313,114 @@ onMounted(async () => {
 })
 </script>
 
+<style>
+/* Hide relation-graph's own node wrapper (it would draw a second ellipse
+   behind our custom circle + label). Only our slot content stays visible. */
+.relation-graph .rel-node.rg-ghost {
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    border-radius: 0 !important;
+}
+.relation-graph .rel-node.rg-ghost.rel-node-checked,
+.relation-graph .rel-node.rg-ghost.rel-node-flashing {
+    box-shadow: none !important;
+    outline: none !important;
+}
+</style>
+
 <style scoped>
-.custom-node {
-    position: relative;
+.rg-node {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    justify-content: flex-start;
+    width: 120px;
+    height: 160px;
     box-sizing: border-box;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    padding: 8px;
+    background: transparent;
 }
 
-.custom-node:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 10;
+.rg-ring {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 3px solid #4a6bff;
+    box-sizing: border-box;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
 }
 
-.node-image-area {
-    width: 60px;
-    height: 45px;
-    border: 2px solid white;
-    border-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-    background-color: #f0f0f0;
-    margin-bottom: 5px;
+.rg-ring:hover {
+    transform: scale(1.06);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
-.node-image-area.no-image {
-    display: none;
+.rg-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
-.node-text {
-    font-size: 12px;
-    font-weight: bold;
-    text-align: center;
-    word-break: break-word;
-    max-width: 100%;
-    padding: 0 2px;
-    color: inherit;
-}
-
-.node-expand-hint {
+.rg-media {
     position: absolute;
-    top: 2px;
-    right: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: 8px;
-    width: 16px;
-    height: 16px;
-    line-height: 14px;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.rg-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.rg-expander {
+    position: absolute;
+    right: -8px;
+    bottom: -8px;
+    width: 22px;
+    height: 22px;
+    line-height: 20px;
+    font-size: 16px;
+    font-weight: 700;
     text-align: center;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    cursor: pointer;
+    color: #fff;
+    background: #4a6bff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.rg-name {
+    margin-top: 7px;
+    max-width: 118px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    color: #333;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 </style>
