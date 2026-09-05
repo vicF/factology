@@ -322,6 +322,7 @@ export async function clearAll() {
     await db.objects.clear();
     await db.links.clear();
     await db.media.clear();
+    await db.external_links?.clear();
     await db.pendingChanges.clear();
     await db.syncMetadata.clear();
 }

@@ -86,6 +86,49 @@ export const BOOTSTRAP_THINGS = [
         type: UUID.G_LINK,
         public: true,
     },
+    // GEDCOM importer link types (mirror dev2 migrations/seed taxonomy)
+    {
+        thing_id: UUID.IMPORTED_FROM,
+        name: 'imported from',
+        description: 'Объект был импортирован из внешнего источника данных',
+        type: UUID.G_LINK,
+        public: true,
+    },
+    {
+        thing_id: UUID.PRESENT,
+        name: 'participates in',
+        description: 'Person participates in an event (участвует в)',
+        type: UUID.G_LINK,
+        public: true,
+    },
+    {
+        thing_id: UUID.INSIDE,
+        name: 'inside',
+        description: 'Object is inside / located within a place',
+        type: UUID.G_LINK,
+        public: true,
+    },
+    {
+        thing_id: UUID.EVIDENCE,
+        name: 'is evidenced by',
+        description: 'Statement/object is evidenced by a source (подтверждается источником)',
+        type: UUID.G_LINK,
+        public: true,
+    },
+    {
+        thing_id: UUID.FATHER,
+        name: 'father',
+        description: 'is father of',
+        type: UUID.G_LINK,
+        public: true,
+    },
+    {
+        thing_id: UUID.MOTHER,
+        name: 'mother',
+        description: 'is mother of',
+        type: UUID.G_LINK,
+        public: true,
+    },
 ];
 
 // ── Bootstrap links (top-level class hierarchy edges) ─────────────────
@@ -95,6 +138,13 @@ export const BOOTSTRAP_LINKS = [
     { one: UUID.EVERYTHING, other: UUID.SYSTEM,         description: '"System" is subclass of "Everything"' },
     { one: UUID.LINK,       other: UUID.LINK_TO_PARENT, description: '"Superclass" is subclass of "Link"' },
     { one: UUID.LINK,       other: UUID.LINK_TO_CLASS,  description: '"Class of" is subclass of "Link"' },
+    // GEDCOM importer link types live under the Link root (mirror dev2).
+    { one: UUID.LINK,       other: UUID.IMPORTED_FROM,  description: '"Imported from" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.PRESENT,        description: '"Participates in" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.INSIDE,         description: '"Inside" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.EVIDENCE,       description: '"Is evidenced by" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.FATHER,         description: '"Father" is subclass of "Link"' },
+    { one: UUID.LINK,       other: UUID.MOTHER,         description: '"Mother" is subclass of "Link"' },
 ];
 
 // ── Classes (public G_CLASS things) — mirrors DatabaseSeeder.php ──────
@@ -172,6 +222,17 @@ export const CLASSES = [
     { thing_id: 'd6320bf5-ca8b-4e50-ad5c-873216d9fcf0', name: 'Yacht',                    description: 'Яхта',                                                                                                                               type: UUID.G_CLASS, public: true },
     { thing_id: 'dbb3866e-e5a8-4186-b6e3-a273a42b1809', name: 'Flat',                 description: 'Квартира, офис',                                                                                                                       type: UUID.G_CLASS, public: true },
     { thing_id: '1fdf78e0-aa61-4e52-bbed-4ce157da78ab', name: 'Sports section',         description: '',                                                                                                                                   type: UUID.G_CLASS, public: true },
+    // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
+    { thing_id: UUID.BIRTH_CLASS,       name: 'Birth',          description: 'Birth of a person',                                                                      type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.DEATH_CLASS,       name: 'Death',          description: 'Death of a person',                                                                      type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.RESIDENCE_CLASS,   name: 'Residence In',   description: 'Living in a place',                                                                      type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.OCCUPATION_CLASS,  name: 'Occupation',     description: 'Occupation / work',                                                                      type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.MARRIAGE_CLASS,    name: 'Marriage',       description: 'Marriage',                                                                               type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.BURIAL_CLASS,      name: 'Burial',         description: 'Burial',                                                                                 type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.EDUCATION_CLASS,   name: 'Education',      description: 'Education',                                                                              type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.CHRISTENING_CLASS, name: 'Christening',    description: 'Christening / baptism',                                                                  type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.ADDRESS_CLASS,     name: 'Address',        description: 'Postal / street address',                                                                type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.GEDCOM_CLASS,      name: 'GEDCOM',         description: 'A GEDCOM genealogy file or other external data source',                                  type: UUID.G_CLASS, public: true },
 ];
 
 // ── Class hierarchy links (LINK_TO_PARENT edges) — mirrors DatabaseSeeder.php ──
@@ -267,4 +328,17 @@ export const CLASS_LINKS = [
     { one: UUID.SYSTEM, other: UUID.BELONGS_TO_USER_GROUP,      description: 'Belongs to user group is subclass of System' },
     { one: UUID.SYSTEM, other: UUID.G_SERVER_CLASS,              description: 'Server is subclass of System' },
     { one: UUID.SYSTEM, other: '298496fb-142b-4fc7-a844-7cb3fe9f9100', description: 'System event is subclass of System' },
+    // Event → GEDCOM event subclasses
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.BIRTH_CLASS,       description: 'Birth is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.DEATH_CLASS,       description: 'Death is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.RESIDENCE_CLASS,   description: 'Residence In is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.OCCUPATION_CLASS,  description: 'Occupation is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.MARRIAGE_CLASS,    description: 'Marriage is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.BURIAL_CLASS,      description: 'Burial is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.EDUCATION_CLASS,   description: 'Education is subclass of Event' },
+    { one: '0eed3b56-bdd6-47f0-9413-d9640a9dcafc', other: UUID.CHRISTENING_CLASS, description: 'Christening is subclass of Event' },
+    // Place → Address
+    { one: 'dc006cda-047a-4862-acf7-e215355b6890', other: UUID.ADDRESS_CLASS,     description: 'Address is subclass of Place' },
+    // System → GEDCOM (external data source class)
+    { one: UUID.SYSTEM, other: UUID.GEDCOM_CLASS, description: 'GEDCOM is subclass of System' },
 ];

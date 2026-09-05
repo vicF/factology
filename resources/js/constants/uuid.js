@@ -101,4 +101,20 @@ export const UUID = {
     // ── GEDCOM import system objects ──
     GEDCOM_CLASS:      '10b04205-aecb-406d-befc-c6362f7ac9fb',
     IMPORTED_FROM:     '7e58df61-3f99-4a82-9f0d-555a56abfb69',
+
+    // ── Geo system objects (Coordinates property, linked to the Place class) ──
+    PLACE_CLASS:         'dc006cda-047a-4862-acf7-e215355b6890',
+    COORDINATES_PROPERTY: 'c1c1c1c1-0002-4000-8000-000000000001',
+
+    // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
+    // ids mirror database/migrations/2026_08_31_000001_gedcom_event_classes.php
+    BIRTH_CLASS:       'a565fc22-6dae-4b7a-bd9e-30df8bc8acca',
+    DEATH_CLASS:       '6ea018a1-d71c-4655-89b9-9f469b979847',
+    RESIDENCE_CLASS:   'a70ae070-0c52-4a89-84a0-5c76f76e5aa7',
+    OCCUPATION_CLASS:  '7fae11dc-3411-4652-9712-18729bf1e3a7',
+    MARRIAGE_CLASS:    'f5fe8e87-da33-4a40-ad7f-1b62b4e62299',
+    BURIAL_CLASS:      '02a3040c-c9fd-48b7-9f1c-57ef66002aa6',
+    EDUCATION_CLASS:   '5092247b-8fff-475f-b90c-22b29bf59532',
+    CHRISTENING_CLASS: '2e3e8252-47c6-44e0-8804-6083ec506a92',
+    ADDRESS_CLASS:     '42a2e356-8ad1-406a-b78e-db13febf0415',
 };
