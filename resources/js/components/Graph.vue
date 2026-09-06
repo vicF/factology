@@ -504,8 +504,12 @@ const renderGraph = async () => {
     const plan = planGraphUpdate(lastRender.nodeSigs, nodes, lastRender.lines, lines)
 
     for (const id of plan.removedNodeIds) inst.removeNodeById(id)
+    // Data-changed nodes are removed AND re-created below — their RGNode data
+    // (folder +/− state, children flags) lives on the library object, so we
+    // replace the object itself to refresh its rendered state.
+    const reAddIds = new Set([...plan.changedNodeIds, ...plan.addNodes.map((n) => n.id)])
     for (const id of plan.changedNodeIds) inst.removeNodeById(id)
-    if (plan.addNodes.length) inst.addNodes(plan.addNodes)
+    if (reAddIds.size) inst.addNodes(nodes.filter((n) => reAddIds.has(n.id)))
 
     // The root changed (navigated to another object / deeper level): point the
     // graph at the new root node before laying out.
@@ -515,7 +519,6 @@ const renderGraph = async () => {
     // Re-created nodes start at (0,0) → restore their previous canvas position
     // so the layout animation glides from where they were instead of swooping
     // in from the centre.
-    const reAddIds = new Set([...plan.changedNodeIds, ...plan.addNodes.map((n) => n.id)])
     for (const id of reAddIds) {
         const pos = lastRender.pos.get(id)
         if (!pos) continue
