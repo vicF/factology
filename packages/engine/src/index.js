@@ -6,3 +6,8 @@
 
 export const ENGINE_NAME = '@factology/engine';
 export const ENGINE_VERSION = '0.1.0';
+
+// ── Constants (moved from resources/js/constants) ──
+export * from './constants/uuid.js';
+export * from './constants/eras.js';
+export * from './constants/syncStatus.js';

@@ -1,27 +1,5 @@
-// resources/js/constants/syncStatus.js
+// Transitional re-export shim — sync-status constants now live in the engine
+// package (packages/engine/src/constants/syncStatus.js). Kept until all app
+// imports move to @factology/engine (P1-S6), then this file is deleted.
 
-/**
- * Sync status of a local record.
- *
- *  SYNCED      – record matches server state
- *  LOCAL       – pending local changes that need to be pushed
- *  CONFLICT    – both local and server versions changed since last sync
- *  SERVER_ONLY – pulled from server, not modified locally
- *  LOCAL_ONLY  – created locally, never pushed to any server
- */
-export const SYNC_STATUS = {
-  SYNCED:      'synced',
-  LOCAL:       'local',
-  CONFLICT:    'conflict',
-  SERVER_ONLY: 'server_only',
-  LOCAL_ONLY:  'local_only',
-};
-
-/**
- * Change operations tracked in the pendingChanges queue.
- */
-export const CHANGE_OP = {
-  INSERT: 'insert',
-  UPDATE: 'update',
-  DELETE: 'delete',
-};
+export * from '@factology/engine/constants/syncStatus.js';
