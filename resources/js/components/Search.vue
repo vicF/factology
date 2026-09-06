@@ -22,14 +22,19 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
-                                <div v-if="groupLabels[thingIndex]" class="date-group-header" :class="{ 'future-divider': typeof groupLabels[thingIndex] === 'object' }">
-                                    <span class="date-group-line"></span>
-                                    <span class="date-group-label">
-                                        <template v-if="typeof groupLabels[thingIndex] === 'string'">{{ groupLabels[thingIndex] }}</template>
-                                        <template v-else-if="groupLabels[thingIndex].dateLabel">{{ $t('dates.future_in', { date: groupLabels[thingIndex].dateLabel }) }}</template>
-                                        <template v-else>{{ groupLabels[thingIndex].future ? $t('dates.future') : $t('dates.past') }}</template>
+                                <div v-if="dateDividers[thingIndex]" class="date-group-header" :class="{ 'future-divider': dateDividers[thingIndex].future }">
+                                    <span v-if="dateDividers[thingIndex].bucket" class="date-group-date">
+                                        📅 {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                     </span>
                                     <span class="date-group-line"></span>
+                                    <template v-if="dateDividers[thingIndex].center">
+                                        <span class="date-group-label">
+                                            <template v-if="dateDividers[thingIndex].center.kind === 'month'">{{ dateDividers[thingIndex].center.label }}</template>
+                                            <template v-else-if="dateDividers[thingIndex].center.kind === 'future_in'">{{ $t('dates.future_in', { date: dateDividers[thingIndex].center.label }) }}</template>
+                                            <template v-else>{{ $t('dates.past') }}</template>
+                                        </span>
+                                        <span class="date-group-line"></span>
+                                    </template>
                                 </div>
                                 <div class="result-content">
                                     <!-- LEFT: icon only -->
@@ -70,9 +75,10 @@
                                         >
                                             
         <span v-if="thing.start || thing.end" class="inline-date" style="margin-right: 8px;">
-
-                                                📅
-                                                {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
+                                                <template v-if="!dateDividersActive">
+                                                    📅
+                                                    {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
+                                                </template>
                                                 <span v-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
                                                 <span
                                                     v-if="isPlanned(thing)"
@@ -121,7 +127,7 @@
 
                                 <!-- A group boundary already draws its own labeled
                                      separator line — don't stack a plain one on it. -->
-                                <div v-if="thingIndex < objects.length - 1 && !groupLabels[thingIndex + 1]" class="result-separator"></div>
+                                <div v-if="thingIndex < objects.length - 1 && !dateDividers[thingIndex + 1]" class="result-separator"></div>
                             </div>
                         </div>
                     </div>
@@ -151,6 +157,7 @@ import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
 import { currentLocale } from '../utils/localized.js';
 import { FlexibleDate } from '../utils/flexibleDate.js';
+import { dateBucket } from '../utils/dateGroupings.js';
 import Image from "./Image.vue";
 import ConfirmModal from './ConfirmModal.vue';
 import RelatedList from "./RelatedList.vue";
@@ -237,23 +244,16 @@ const expandTarget = async (link) => {
 const filterKeys = ['sort', 'order', 'visibility', 'date_from', 'date_to', 'owner', 'server'];
 
 // ── Date-group delimiters (only meaningful when sorting by start date) ──────
-function dateGroupKey(start) {
-    if (!start) return null;
-    // Decode via the canonical components so huge years (variable-length year
-    // in the digit string) group under their real year, not its first 4 digits.
-    const c = FlexibleDate.componentsFromCanonical(String(start));
-    if (!c) return null;
-    if (FlexibleDate.precisionFromValue(String(start)) === 'year') return 'y' + c.y;
-    return 'm' + c.y + '-' + String(c.m).padStart(2, '0');
-}
-
-function dateGroupLabel(key) {
-    if (!key) return null;
-    if (key[0] === 'y') {
-        const y = Number(key.slice(1));
+// Each divider line carries the date of the first object in its group on the
+// left — so the per-object date row can be dropped — and, on the first divider
+// of a month, the month/year label centered. See utils/dateGroupings.js.
+function dateGroupMonthLabel(coarseKey) {
+    if (!coarseKey) return null;
+    if (coarseKey[0] === 'y') {
+        const y = Number(coarseKey.slice(1));
         return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
     }
-    const m = key.match(/^m(-?\d+)-(\d{2})$/);
+    const m = coarseKey.match(/^m(-?\d+)-(\d{2})$/);
     if (!m) return null;
     const year = parseInt(m[1], 10);
     const locale = currentLocale();
@@ -262,47 +262,56 @@ function dateGroupLabel(key) {
     return year < 0 ? label + ' ' + t('dates.bc') : label;
 }
 
-// Header label aligned with each result row (null = no header before it).
-// Returns a string (month/year label) or an object { future: boolean }
-// (past divider) or { future: true, dateLabel: string } (every future
-// date group, renders as "planned in <dateLabel>"), or null for no header.
-const groupLabels = computed(() => {
-    const labels = new Array(objects.value.length).fill(null);
-    if (searchStore.sortBy !== 'start') return labels;
-    let prevKey = null;
-    let prevFuture = null;
+// Per-row divider descriptor (null = no divider before this row). Dividers
+// appear at every date-group boundary; the centered month/year label only on
+// the first divider of each month. Future groups and the past/future seam
+// keep their "planned in <date>"/"Past" labels (moved to the center slot).
+const dateDividers = computed(() => {
+    const dividers = new Array(objects.value.length).fill(null);
+    if (searchStore.sortBy !== 'start') return dividers;
+    let lastBucket = null;
+    let lastCoarse = null;
+    let lastFuture = null;
     objects.value.forEach((thing, i) => {
         const future = isFutureDate(thing);
+        const bucket = dateBucket(thing.start);
         // Boundary between the future and past sections — place the divider at
         // the start of the second section, whichever sort direction is active.
-        if (prevFuture !== null && future !== prevFuture) {
-            if (future) {
-                // Entering future section (ASC): merge with date label
-                const key = dateGroupKey(thing.start);
-                labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
-                prevKey = key;
-            } else {
-                // Entering past section (DESC): show divider
-                labels[i] = { future: false };
-                prevKey = null;
-            }
-            prevFuture = future;
+        if (lastFuture !== null && future !== lastFuture) {
+            dividers[i] = {
+                future,
+                bucket,
+                center: future
+                    ? { kind: 'future_in', label: dateGroupMonthLabel(bucket ? bucket.coarse : null) }
+                    : { kind: 'past' },
+            };
+            lastFuture = future;
+            lastBucket = bucket ? bucket.key : null;
+            lastCoarse = bucket ? bucket.coarse : null;
             return;
         }
-        prevFuture = future;
-        const key = dateGroupKey(thing.start);
-        if (key !== prevKey) {
-            if (future) {
-                // Every future date group: show "planned in <date>"
-                labels[i] = { future: true, dateLabel: dateGroupLabel(key) };
-            } else {
-                labels[i] = dateGroupLabel(key);
-            }
-            prevKey = key;
+        lastFuture = future;
+        if (!bucket) return;
+        const newBucket = bucket.key !== lastBucket;
+        const firstOfMonth = bucket.coarse !== lastCoarse;
+        if (!newBucket && !firstOfMonth) return;
+        let center = null;
+        if (future) {
+            // Every future date group: show "planned in <date>"
+            center = { kind: 'future_in', label: dateGroupMonthLabel(bucket.coarse) };
+        } else if (firstOfMonth) {
+            center = { kind: 'month', label: dateGroupMonthLabel(bucket.coarse) };
         }
+        dividers[i] = { future, bucket, center };
+        lastBucket = bucket.key;
+        lastCoarse = bucket.coarse;
     });
-    return labels;
+    return dividers;
 });
+
+// When date-sorted, each object's date lives on its group divider, so the
+// cards stop repeating it.
+const dateDividersActive = computed(() => searchStore.sortBy === 'start');
 
 // ─── Quick visibility toggle state ─────────────────────────────────
 let quickMode = false;
@@ -521,6 +530,15 @@ onUnmounted(() => {
 
 .date-group-label {
     white-space: nowrap;
+}
+
+/* The object date sits at the start of the divider line (not uppercased or
+   letter-spaced like the centered month label). */
+.date-group-date {
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .future-divider {

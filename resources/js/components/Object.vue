@@ -211,6 +211,18 @@
                                     class="result-item object-link-item"
                                     @mouseenter="hoveredLink = linkIndex"
                                     @mouseleave="hoveredLink = null">
+                                    <!-- Date-group divider: the related object's date lives
+                                         here, so the per-link date row below is omitted. -->
+                                    <div v-if="linkDateDividers[linkIndex]" class="date-group-header">
+                                        <span class="date-group-date">
+                                            📅 {{ $flexibleDateFormatShort(link.start, link.end, link.start_meta, link.end_meta) }}
+                                        </span>
+                                        <span class="date-group-line"></span>
+                                        <template v-if="linkDateDividers[linkIndex].center">
+                                            <span class="date-group-label">{{ linkDateDividers[linkIndex].center.label }}</span>
+                                            <span class="date-group-line"></span>
+                                        </template>
+                                    </div>
                                     <div class="result-content">
                                         <div class="result-icon-section">
                                             <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="icon-link">
@@ -234,16 +246,8 @@
                                                 </div>
                                             </div>
 
-                                            <div v-if="link.start || link.end || link.description" class="result-description">
-                                                <span v-if="link.start || link.end" class="inline-date" style="margin-right: 8px;">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="link.start">{{ $dateFromDb(link.start) }}</template>
-                                                        <template v-if="link.start && link.end"> → </template>
-                                                        <template v-if="link.end">{{ $dateFromDb(link.end) }}</template>
-                                                    </span>
-                                                </span>
-                                                <span v-if="link.description">{{ $truncateText(link.description, 300) }}</span>
+                                            <div v-if="link.description" class="result-description">
+                                                <span>{{ $truncateText(link.description, 300) }}</span>
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
@@ -426,6 +430,7 @@ import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { fieldText, currentLocale } from '../utils/localized';
+import { dateBucket } from '../utils/dateGroupings';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import LinkDescription from './LinkDescription.vue';
@@ -937,6 +942,46 @@ const handleLinkedObjectCreated = async () => {
     await getObject();
 };
 
+// ─── Date-group dividers for the related-links list ─────────────────────────
+// Same pattern as the main search results: the related object's date sits on a
+// one-line divider (first divider of a month also centers the month/year), so
+// the per-link date rows can be dropped. See utils/dateGroupings.js.
+function relatedMonthLabel(coarseKey) {
+    if (!coarseKey) return null;
+    if (coarseKey[0] === 'y') {
+        const y = Number(coarseKey.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = coarseKey.match(/^m(-?\d+)-(\d{2})$/);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const label = new Intl.DateTimeFormat(currentLocale(), { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
+}
+
+const linkDateDividers = computed(() => {
+    const links = object.value?.links;
+    if (!Array.isArray(links)) return [];
+    const dividers = new Array(links.length).fill(null);
+    let lastBucket = null;
+    let lastCoarse = null;
+    links.forEach((link, i) => {
+        const bucket = dateBucket(link.start);
+        if (!bucket) return;
+        const newBucket = bucket.key !== lastBucket;
+        const firstOfMonth = bucket.coarse !== lastCoarse;
+        if (!newBucket && !firstOfMonth) return;
+        dividers[i] = {
+            bucket,
+            center: firstOfMonth ? { label: relatedMonthLabel(bucket.coarse) } : null,
+        };
+        lastBucket = bucket.key;
+        lastCoarse = bucket.coarse;
+    });
+    return dividers;
+});
+
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
     return object.value.links.map(link => ({
@@ -1390,5 +1435,34 @@ button.more-links {
 .object-link-item .result-links-section {
     width: 260px;
     max-width: 260px;
+}
+.object-link-item .date-group-header {
+    margin-bottom: 6px;
+}
+
+/* Date-group divider lines (same pattern as the search results list). */
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+.date-group-label {
+    white-space: nowrap;
+}
+.date-group-date {
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
 }
 </style>

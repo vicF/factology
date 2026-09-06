@@ -127,9 +127,15 @@ async function createWindow() {
     // Load the Capacitor-built SPA from the local HTTP server
     await mainWindow.loadURL(`${serverUrl}/`);
 
-    // Debug: forward renderer console + load status to the terminal
-    mainWindow.webContents.on('console-message', (event) => {
-        console.log(`[renderer:${event.level}] ${event.message}`);
+    // Debug: forward renderer console + load status to the terminal. The
+    // 'console-message' event changed shape across Electron versions (older:
+    // positional (event, level, message, line, sourceId); newer: level/message
+    // live on the event object) — read whichever form this Electron uses.
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        const hasFields = event && typeof event === 'object' && 'message' in event;
+        const lvl = hasFields ? event.level : level;
+        const msg = hasFields ? event.message : message;
+        console.log(`[renderer:${lvl}] ${msg}`);
     });
     mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
         console.error(`[renderer] did-fail-load ${code} ${desc} ${url}`);
