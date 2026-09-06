@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { importExportData } from '@/localDb/importData';
+import { onImportProgress } from '@/utils/importProgress';
 import { clearAll, getDb, getObject, SYNC_STATUS } from '@/localDb/index';
 import { getLinkByUuid } from '@/localDb/links';
 import { seedLocalDb } from '@/localDb/seeder';
@@ -142,5 +143,32 @@ describe('LocalDB — importExportData (owner-integrity rules)', () => {
             MY_ID,
         );
         expect(report2.importedLinks).toBe(0);
+    });
+
+    it('posts things and links progress while importing', async () => {
+        const events = [];
+        const unsubscribe = onImportProgress(info => events.push(info));
+        try {
+            await importExportData(exportFile([
+                { thing_id: 'a', name: 'A', type: 3, owner: MY_ID, public: 1 },
+                { thing_id: 'b', name: 'B', type: 3, owner: MY_ID, public: 1 },
+            ], [
+                { link_uuid: 'link-u-progress', one_thing_id: 'a', link_type_id: 't1', other_thing_id: 'b', public: true },
+            ]), MY_ID);
+        } finally {
+            unsubscribe();
+        }
+
+        expect(events.length).toBeGreaterThan(0);
+        const thingsEvents = events.filter(e => e.phase === 'things');
+        const linksEvents = events.filter(e => e.phase === 'links');
+        expect(thingsEvents.length).toBeGreaterThan(0);
+        expect(linksEvents.length).toBeGreaterThan(0);
+        const thingsEnd = thingsEvents[thingsEvents.length - 1];
+        const linksEnd = linksEvents[linksEvents.length - 1];
+        expect(thingsEnd.done).toBe(thingsEnd.total);
+        expect(thingsEnd.percent).toBe(100);
+        expect(linksEnd.done).toBe(linksEnd.total);
+        expect(linksEnd.percent).toBe(100);
     });
 });
