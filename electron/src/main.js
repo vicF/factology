@@ -66,12 +66,40 @@ function startStaticServer() {
             });
         });
 
-        // Listen on an ephemeral port (0) — avoids conflicts
-        server.listen(0, '127.0.0.1', () => {
-            serverUrl = `http://127.0.0.1:${server.address().port}`;
-            console.log(`[main] Serving SPA at ${serverUrl}`);
-            resolve(server);
-        });
+        // Serve on a FIXED port so the web origin (http://127.0.0.1:<port>) stays
+        // the same between launches. Chromium keeps localStorage AND IndexedDB
+        // per origin, so an ephemeral port made every session start on a brand
+        // new origin — the identity registry and local data "disappeared" and
+        // the app landed back on the Welcome gate each time. FACTOLOGY_PORT
+        // overrides; if the port is taken we walk a small list before falling
+        // back to an ephemeral one (logged, last resort).
+        const preferred = [
+            ...(process.env.FACTOLOGY_PORT ? [Number(process.env.FACTOLOGY_PORT)] : []),
+            47321, 47322, 47323,
+        ];
+        let attempt = 0;
+        const listen = () => {
+            const port = attempt < preferred.length ? preferred[attempt] : 0;
+            server.once('error', (err) => {
+                if (err.code === 'EADDRINUSE' && attempt < preferred.length) {
+                    attempt++;
+                    listen();
+                    return;
+                }
+                console.error(`[main] failed to listen on ${port}:`, err);
+                resolve(server);
+            });
+            server.listen(port, '127.0.0.1', () => {
+                serverUrl = `http://127.0.0.1:${server.address().port}`;
+                if (server.address().port !== preferred[0]) {
+                    console.log(`[main] WARNING: using ${serverUrl} (requested ${preferred[0]} busy) — data will NOT persist between sessions on this run`);
+                } else {
+                    console.log(`[main] Serving SPA at ${serverUrl}`);
+                }
+                resolve(server);
+            });
+        };
+        listen();
     });
 }
 
