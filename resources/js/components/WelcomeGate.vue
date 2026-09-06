@@ -2,24 +2,23 @@
     <div class="container py-5" style="max-width: 620px">
         <div class="card shadow-sm">
             <div class="card-body p-4 text-center">
-                <h1 class="mb-2">Welcome to Factology</h1>
+                <h1 class="mb-2">{{ $t('Welcome to Factology') }}</h1>
                 <p class="text-muted mb-4">
-                    Everything you store here is kept on this device. An <b>identity</b> is what makes
-                    data yours — the same identity can be used on all your apps via an identity file.
+                    {{ $t('Everything you store here is kept on this device. An identity is what makes data yours — the same identity can be used on all your apps via an identity file.') }}
                 </p>
 
                 <div class="d-grid gap-2 col-8 mx-auto mb-4">
                     <button class="btn btn-primary btn-lg" data-testid="welcome-create" @click="goToIdentity">
-                        Create a new identity
+                        {{ $t('Create a new identity') }}
                     </button>
                     <button class="btn btn-outline-primary btn-lg" data-testid="welcome-import" @click="goToIdentity">
-                        Import an existing identity
+                        {{ $t('Import an existing identity') }}
                     </button>
                 </div>
 
                 <div class="small">
                     <a href="#" @click.prevent="continueAsGuest" data-testid="welcome-guest">
-                        Continue as guest — browse shared data without an identity
+                        {{ $t('Continue as guest — browse shared data without an identity') }}
                     </a>
                 </div>
             </div>
