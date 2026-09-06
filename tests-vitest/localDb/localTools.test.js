@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { getDb, clearAll } from '@/localDb/index';
 import { seedLocalDb } from '@/localDb/seeder';
 import { UUID } from '@/constants/uuid';
+import { onImportProgress } from '@/utils/importProgress';
 import {
     localConsistencyCheck,
     localConsistencyDelete,
@@ -129,6 +130,81 @@ describe('export / import round-trip', () => {
 
         expect(result.skipped.things).toBe(1);
         expect((await getDb().objects.get(id)).name).toBe('Keep me');
+    });
+
+    it('import overwrites existing links by uuid', async () => {
+        const id = crypto.randomUUID();
+        const id2 = crypto.randomUUID();
+        const classId = UUID.EVERYTHING;
+        await getDb().objects.put({ thing_id: id, name: 'A', type: UUID.G_THING, owner: OWNER, deleted: 0 });
+        await getDb().objects.put({ thing_id: id2, name: 'B', type: UUID.G_THING, owner: OWNER, deleted: 0 });
+        await getDb().links.put({
+            link_id: 'link-existing',
+            link_uuid: 'uuid-a',
+            one_thing_id: id,
+            link_type_id: UUID.LINK_TO_CLASS,
+            other_thing_id: classId,
+            deleted: 0,
+        });
+
+        const result = await localImportJson({
+            things: [],
+            links: [{
+                link_uuid: 'uuid-a',
+                one_thing_id: id,
+                link_type_id: UUID.LINK_TO_CLASS,
+                other_thing_id: classId,
+                deleted: 0,
+            }],
+        }, 'overwrite');
+
+        expect(result.imported.links).toBe(1);
+        const link = await getDb().links.get('link-existing');
+        expect(link.link_uuid).toBe('uuid-a');
+    });
+});
+
+describe('import progress events', () => {
+    it('posts things and links progress through the whole import', async () => {
+        const events = [];
+        const unsubscribe = onImportProgress(info => events.push(info));
+
+        const idA = crypto.randomUUID();
+        const idB = crypto.randomUUID();
+        try {
+            await localImportJson({
+                things: [
+                    { thing_id: idA, name: 'New A', type: UUID.G_THING, owner: OWNER, deleted: 0 },
+                    { thing_id: idB, name: 'New B', type: UUID.G_THING, owner: OWNER, deleted: 0 },
+                ],
+                links: [{
+                    one_thing_id: idA,
+                    link_type_id: UUID.LINK_TO_CLASS,
+                    other_thing_id: UUID.EVERYTHING,
+                    deleted: 0,
+                }],
+            });
+        } finally {
+            unsubscribe();
+        }
+
+        expect(events.length).toBeGreaterThan(0);
+        const thingsEvents = events.filter(e => e.phase === 'things');
+        const linksEvents = events.filter(e => e.phase === 'links');
+        expect(thingsEvents.length).toBeGreaterThan(0);
+        expect(linksEvents.length).toBeGreaterThan(0);
+
+        // Each phase ends with a done === total event.
+        const thingsEnd = thingsEvents[thingsEvents.length - 1];
+        const linksEnd = linksEvents[linksEvents.length - 1];
+        expect(thingsEnd.done).toBe(thingsEnd.total);
+        expect(linksEnd.done).toBe(linksEnd.total);
+        expect(thingsEnd.percent).toBe(100);
+        expect(linksEnd.percent).toBe(100);
+        // Progress within each phase is monotonic.
+        for (const ev of thingsEvents) {
+            expect(ev.done).toBeLessThanOrEqual(ev.total);
+        }
     });
 });
 
