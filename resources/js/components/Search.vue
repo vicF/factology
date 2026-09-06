@@ -22,7 +22,7 @@
                                 :key="`${thing.thing_id}-${thingIndex}`"
                                 class="result-item"
                             >
-                                <div v-if="dateDividers[thingIndex]" class="date-group-header" :class="{ 'future-divider': dateDividers[thingIndex].future }">
+                                <div v-if="dateDividers[thingIndex]" class="date-group-header" :class="{ 'future-divider': dateDividers[thingIndex].future, 'past-divider': dateDividers[thingIndex].center?.kind === 'past' }">
                                     <span v-if="dateDividers[thingIndex].bucket" class="date-group-date">
                                         📅 {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                     </span>
@@ -263,9 +263,10 @@ function dateGroupMonthLabel(coarseKey) {
 }
 
 // Per-row divider descriptor (null = no divider before this row). Dividers
-// appear at every date-group boundary; the centered month/year label only on
-// the first divider of each month. Future groups and the past/future seam
-// keep their "planned in <date>"/"Past" labels (moved to the center slot).
+// appear at every date-group boundary. The centered label — "<Month Year>"
+// for past groups, "planned in <Month Year>" for future ones — appears only
+// on the first divider of each month, so a month is announced once above all
+// of its events. The past/future seam divider instead centers a bold "Past".
 const dateDividers = computed(() => {
     const dividers = new Array(objects.value.length).fill(null);
     if (searchStore.sortBy !== 'start') return dividers;
@@ -296,11 +297,13 @@ const dateDividers = computed(() => {
         const firstOfMonth = bucket.coarse !== lastCoarse;
         if (!newBucket && !firstOfMonth) return;
         let center = null;
-        if (future) {
-            // Every future date group: show "planned in <date>"
-            center = { kind: 'future_in', label: dateGroupMonthLabel(bucket.coarse) };
-        } else if (firstOfMonth) {
-            center = { kind: 'month', label: dateGroupMonthLabel(bucket.coarse) };
+        if (firstOfMonth) {
+            // Only the first divider of a month gets the centered label, so a
+            // month reads once ("planned in <Month Year>" for future months,
+            // "<Month Year>" for past ones) above all its events.
+            center = future
+                ? { kind: 'future_in', label: dateGroupMonthLabel(bucket.coarse) }
+                : { kind: 'month', label: dateGroupMonthLabel(bucket.coarse) };
         }
         dividers[i] = { future, bucket, center };
         lastBucket = bucket.key;
@@ -511,11 +514,27 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Tighter vertical rhythm for the date-sorted timeline than the generic
+   list (kept local to this page, not the shared app.css rule). */
+.result-item {
+    padding: 0.5rem 0;
+}
+
+/* Image.vue centers its contents inside the 48px wrapper, so when the
+   thumbnail also carries a right icon bar (48px img + 6px gap + 18px bar)
+   the picture overflows 12px to the LEFT of the row. Pin the picture to the
+   wrapper's start so it lines up with the date dividers at the list edge;
+   the icon bar then sits in the gutter before the text column. */
+.result-icon-section .image-wrapper {
+    justify-content: flex-start;
+    gap: 0 !important; /* Image.vue inlines gap: 6px; only !important beats it */
+}
+
 .date-group-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 14px 0 8px;
+    margin: 6px 0 3px;
     color: #6c757d;
     font-size: 0.72rem;
     letter-spacing: 1px;
@@ -542,7 +561,7 @@ onUnmounted(() => {
 }
 
 .future-divider {
-    margin: 20px 0 10px;
+    margin: 10px 0 5px;
 }
 .future-divider .date-group-label {
     color: #0d6efd;
@@ -551,6 +570,18 @@ onUnmounted(() => {
 .future-divider .date-group-line {
     background: #0d6efd;
     opacity: 0.4;
+}
+
+/* The past/future seam must read at least as strongly as the "planned"
+   dividers above it — bold dark label plus a distinct, solid line. */
+.past-divider .date-group-label {
+    color: #212529;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+}
+.past-divider .date-group-line {
+    background: #495057;
+    height: 2px;
 }
 .ongoing-badge {
     display: inline-block;
