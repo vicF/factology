@@ -74,13 +74,14 @@
                             <div class="progress mt-3" style="height: 8px;">
                                 <div
                                     class="progress-bar progress-bar-striped"
-                                    :class="{ 'progress-bar-animated': overallPercent <= 0 || overallPercent >= 100 }"
+                                    :class="{ 'progress-bar-animated': overallPercent <= 0 }"
                                     :style="overallPercent > 0 ? { width: overallPercent + '%' } : { width: '100%' }"
                                     role="progressbar"
                                 ></div>
                             </div>
                             <div v-if="overallPercent > 0" class="d-flex justify-content-between small text-muted mt-1">
-                                <span>{{ $t(importPhase === 'links' ? 'Links' : 'Things') }} {{ importPhase === 'links' ? prog.links.done : prog.things.done }} / {{ importPhase === 'links' ? prog.links.total : prog.things.total }}</span>
+                                <span v-if="overallPercent < 100">{{ $t(importPhase === 'links' ? 'Links' : 'Things') }} {{ importPhase === 'links' ? prog.links.done : prog.things.done }} / {{ importPhase === 'links' ? prog.links.total : prog.things.total }}</span>
+                                <span v-else>{{ $t('Import finished. See the report below.') }}</span>
                                 <span class="fw-semibold">{{ overallPercent }}%</span>
                             </div>
                         </div>
