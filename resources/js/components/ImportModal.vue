@@ -71,8 +71,18 @@
                             <p class="text-muted small mb-0">
                                 {{ $t('This may take several minutes for large files. Please do not close this window.') }}
                             </p>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                            <div class="progress mt-3" style="height: 8px;">
+                                <div
+                                    class="progress-bar progress-bar-striped"
+                                    :class="{ 'progress-bar-animated': overallPercent <= 0 }"
+                                    :style="overallPercent > 0 ? { width: overallPercent + '%' } : { width: '100%' }"
+                                    role="progressbar"
+                                ></div>
+                            </div>
+                            <div v-if="overallPercent > 0" class="d-flex justify-content-between small text-muted mt-1">
+                                <span v-if="overallPercent < 100">{{ $t(importPhase === 'links' ? 'Links' : 'Things') }} {{ importPhase === 'links' ? prog.links.done : prog.things.done }} / {{ importPhase === 'links' ? prog.links.total : prog.things.total }}</span>
+                                <span v-else>{{ $t('Import finished. See the report below.') }}</span>
+                                <span class="fw-semibold">{{ overallPercent }}%</span>
                             </div>
                         </div>
                     </div>
@@ -98,8 +108,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import axios from 'axios';
+import { onImportProgress } from '../utils/importProgress';
 
 const emit = defineEmits(['close']);
 
@@ -109,6 +120,16 @@ const importing = ref(false);
 const importResult = ref(null);
 const error = ref('');
 const fileInfo = ref({ things: '...', links: '...' });
+
+// Live progress (offline imports post events through utils/importProgress.js).
+const prog = ref({ things: { done: 0, total: 0 }, links: { done: 0, total: 0 } });
+const importPhase = ref('things');
+const overallPercent = computed(() => {
+    const { things, links } = prog.value;
+    const total = things.total + links.total;
+    if (!total) return 0;
+    return Math.round(((things.done + links.done) / total) * 100);
+});
 
 const onFileChange = async (event) => {
     const file = event.target.files[0] || null;
@@ -151,8 +172,18 @@ const importData = async () => {
 
     importing.value = true;
     error.value = '';
+    prog.value = { things: { done: 0, total: 0 }, links: { done: 0, total: 0 } };
 
+    let unsubscribe = null;
     try {
+        unsubscribe = onImportProgress((info) => {
+            const side = info.phase === 'links' ? 'links' : 'things';
+            importPhase.value = side;
+            const cur = prog.value[side];
+            cur.done = info.done;
+            cur.total = info.total;
+        });
+
         const formData = new FormData();
         formData.append('file', selectedFile.value);
         formData.append('conflict_mode', conflictMode.value);
@@ -180,6 +211,10 @@ const importData = async () => {
             error.value = 'Import failed (unknown cause). Check console (F12).';
         }
     } finally {
+        if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+        }
         importing.value = false;
     }
 };

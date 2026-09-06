@@ -68,9 +68,20 @@
                         <input type="file" class="form-control" accept="application/json,.json" @change="onDataFileChange" data-testid="data-file" />
                     </div>
                     <button type="submit" class="btn btn-primary" :disabled="dataImporting || !dataFile" data-testid="data-import-submit">
-                        {{ dataImporting ? 'Please wait…' : 'Import data' }}
+                        {{ dataImporting ? (dataImportPct > 0 ? `Importing… ${dataImportPct}%` : 'Please wait…') : 'Import data' }}
                     </button>
                 </form>
+                <div v-if="dataImporting" class="mt-3">
+                    <div class="progress" style="height: 8px;">
+                        <div
+                            class="progress-bar progress-bar-striped"
+                            :class="{ 'progress-bar-animated': dataImportPct <= 0 || dataImportPct >= 100 }"
+                            :style="dataImportPct > 0 ? { width: dataImportPct + '%' } : { width: '100%' }"
+                            role="progressbar"
+                        ></div>
+                    </div>
+                    <div v-if="dataImportPct > 0" class="small text-muted mt-1 text-end">{{ dataImportPct }}%</div>
+                </div>
                 <div v-if="dataReport" class="mt-3">
                     <div :class="['alert', dataReport.errors.length ? 'alert-warning' : 'alert-success']" class="mb-0" data-testid="data-import-report">
                         <ul class="mb-0">
@@ -235,6 +246,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
 import { importExportData } from '../localDb/importData';
+import { onImportProgress } from '../utils/importProgress';
 
 const route = useRoute();
 const router = useRouter();
@@ -257,6 +269,13 @@ const messageType = ref('success');
 const dataFile = ref(null);
 const dataImporting = ref(false);
 const dataReport = ref(null);
+const dataProg = ref({ things: { done: 0, total: 0 }, links: { done: 0, total: 0 } });
+const dataImportPct = computed(() => {
+    const { things, links } = dataProg.value;
+    const total = things.total + links.total;
+    if (!total) return 0;
+    return Math.round(((things.done + links.done) / total) * 100);
+});
 const importIdentityId = ref(null);
 const unlockTarget = ref(null);
 const removeTarget = ref(null);
@@ -417,7 +436,16 @@ async function importData() {
     const targetId = importIdentityId.value || identityStore.primary?.thingId;
     if (!targetId) return;
     dataImporting.value = true;
+    dataProg.value = { things: { done: 0, total: 0 }, links: { done: 0, total: 0 } };
+
+    let unsubscribe = null;
     try {
+        unsubscribe = onImportProgress((info) => {
+            const side = info.phase === 'links' ? 'links' : 'things';
+            const cur = dataProg.value[side];
+            cur.done = info.done;
+            cur.total = info.total;
+        });
         const text = await dataFile.value.text();
         const file = JSON.parse(text);
         dataReport.value = await importExportData(file, targetId);
@@ -425,6 +453,10 @@ async function importData() {
     } catch (error) {
         setMessage(error.message, 'error');
     } finally {
+        if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+        }
         dataImporting.value = false;
     }
 }

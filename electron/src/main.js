@@ -66,12 +66,40 @@ function startStaticServer() {
             });
         });
 
-        // Listen on an ephemeral port (0) — avoids conflicts
-        server.listen(0, '127.0.0.1', () => {
-            serverUrl = `http://127.0.0.1:${server.address().port}`;
-            console.log(`[main] Serving SPA at ${serverUrl}`);
-            resolve(server);
-        });
+        // Serve on a FIXED port so the web origin (http://127.0.0.1:<port>) stays
+        // the same between launches. Chromium keeps localStorage AND IndexedDB
+        // per origin, so an ephemeral port made every session start on a brand
+        // new origin — the identity registry and local data "disappeared" and
+        // the app landed back on the Welcome gate each time. FACTOLOGY_PORT
+        // overrides; if the port is taken we walk a small list before falling
+        // back to an ephemeral one (logged, last resort).
+        const preferred = [
+            ...(process.env.FACTOLOGY_PORT ? [Number(process.env.FACTOLOGY_PORT)] : []),
+            47321, 47322, 47323,
+        ];
+        let attempt = 0;
+        const listen = () => {
+            const port = attempt < preferred.length ? preferred[attempt] : 0;
+            server.once('error', (err) => {
+                if (err.code === 'EADDRINUSE' && attempt < preferred.length) {
+                    attempt++;
+                    listen();
+                    return;
+                }
+                console.error(`[main] failed to listen on ${port}:`, err);
+                resolve(server);
+            });
+            server.listen(port, '127.0.0.1', () => {
+                serverUrl = `http://127.0.0.1:${server.address().port}`;
+                if (server.address().port !== preferred[0]) {
+                    console.log(`[main] WARNING: using ${serverUrl} (requested ${preferred[0]} busy) — data will NOT persist between sessions on this run`);
+                } else {
+                    console.log(`[main] Serving SPA at ${serverUrl}`);
+                }
+                resolve(server);
+            });
+        };
+        listen();
     });
 }
 
@@ -96,12 +124,29 @@ async function createWindow() {
         mainWindow.show();
     });
 
+    // Reliable DevTools shortcut inside the window (the global F12 hotkey can
+    // be stolen by the OS / other apps; this cannot).
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        const ctrlShiftI = input.control && input.shift && input.key.toLowerCase() === 'i';
+        if (input.key === 'F12' || ctrlShiftI) {
+            event.preventDefault();
+            mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
+    });
+
     // Load the Capacitor-built SPA from the local HTTP server
     await mainWindow.loadURL(`${serverUrl}/`);
 
-    // Debug: forward renderer console + load status to the terminal
-    mainWindow.webContents.on('console-message', (event) => {
-        console.log(`[renderer:${event.level}] ${event.message}`);
+    // Debug: forward renderer console + load status to the terminal. The
+    // 'console-message' event changed shape across Electron versions (older:
+    // positional (event, level, message, line, sourceId); newer: level/message
+    // live on the event object) — read whichever form this Electron uses.
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        const hasFields = event && typeof event === 'object' && 'message' in event;
+        const lvl = hasFields ? event.level : level;
+        const msg = hasFields ? event.message : message;
+        console.log(`[renderer:${lvl}] ${msg}`);
     });
     mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
         console.error(`[renderer] did-fail-load ${code} ${desc} ${url}`);
