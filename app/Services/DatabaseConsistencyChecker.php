@@ -24,6 +24,14 @@ class DatabaseConsistencyChecker
     private const OBJECT_TYPES = [UUID::G_THING, UUID::G_EXTERNAL, UUID::G_SERVER];
 
     /**
+     * Thing types that may serve as the "class" of a concrete object (the
+     * target of a LINK_TO_CLASS link): a class proper, or a model hanging
+     * under it. Models are leaves of the class tree, so objects may belong
+     * to a model that in turn belongs to a class.
+     */
+    private const CLASS_TARGET_TYPES = [UUID::G_CLASS, UUID::G_MODEL];
+
+    /**
      * The link taxonomy lives under the "Link" node; system-internal link types
      * (read access, user-group membership, …) hang under "System" instead.
      * "Link" itself is the taxonomy root and is exempt.
@@ -251,12 +259,13 @@ class DatabaseConsistencyChecker
     }
 
     /**
-     * 6. LINK_TO_CLASS must point to a class (type G_CLASS), never to another
-     *    object. Events or persons linked to a place used as their "class" is a
-     *    classic mistake (the place is a G_THING instance, not a class).
-     *    Targets that are soft-deleted are reported too — a dead class is not a
-     *    usable class. Missing targets are already covered by the dangling-link
-     *    check.
+     * 6. LINK_TO_CLASS must point to a class (type G_CLASS) or to a model
+     *    (type G_MODEL — a class-tree leaf under a class), never to another
+     *    concrete object. Events or persons linked to a place used as their
+     *    "class" is a classic mistake (the place is a G_THING instance, not a
+     *    class). Targets that are soft-deleted are reported too — a dead
+     *    class/model is not a usable class. Missing targets are already
+     *    covered by the dangling-link check.
      */
     private function classLinksToNonClasses(?string $ownerThingId = null): array
     {
@@ -267,7 +276,7 @@ class DatabaseConsistencyChecker
             ->where('l.deleted', false)
             ->where(function ($q) {
                 $q->where('t.deleted', true)
-                    ->orWhere('t.type', '!=', UUID::G_CLASS);
+                    ->orWhereNotIn('t.type', self::CLASS_TARGET_TYPES);
             })
             ->select(
                 'l.link_id',

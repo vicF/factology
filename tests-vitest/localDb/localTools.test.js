@@ -59,6 +59,23 @@ describe('consistency check', () => {
         const report = await localConsistencyCheck();
         expect(report.issues.classes_without_parent.some(i => i.thing_id === id)).toBe(true);
     });
+
+    it('accepts a model as the class of an object', async () => {
+        const model = crypto.randomUUID();
+        const object = crypto.randomUUID();
+        await getDb().objects.put({ thing_id: model, name: 'Opel Zafira B', type: UUID.G_MODEL, owner: OWNER, deleted: 0 });
+        await getDb().objects.put({ thing_id: object, name: 'Our Opel', type: UUID.G_THING, owner: OWNER, deleted: 0 });
+        await getDb().links.put({
+            link_id: `link-${crypto.randomUUID()}`,
+            one_thing_id: object,
+            link_type_id: UUID.LINK_TO_CLASS,
+            other_thing_id: model,
+            deleted: 0,
+        });
+
+        const report = await localConsistencyCheck();
+        expect(report.issues.class_links_to_non_classes.some(i => i.other_thing_id === model)).toBe(false);
+    });
 });
 
 describe('consistency delete', () => {

@@ -21,6 +21,10 @@ import { UUID } from '../constants/uuid';
 import { postImportProgress } from '../utils/importProgress';
 
 const OBJECT_TYPES = [UUID.G_THING, UUID.G_EXTERNAL, UUID.G_SERVER];
+// Types that may act as the "class" of an object: a class proper, or a model
+// (a class-tree leaf under a class) — objects may belong to a model that in
+// turn belongs to a class. Mirrors CLASS_TARGET_TYPES in the server checker.
+const CLASS_TARGET_TYPES = [UUID.G_CLASS, UUID.G_MODEL];
 const LINK_TYPE_ROOTS = [UUID.LINK, UUID.SYSTEM];
 const NOT_VISIBLE_OWNER = null; // owner column null = legacy row, treated as own
 
@@ -164,7 +168,7 @@ export async function localConsistencyCheck(ownerThingId = null) {
             && (ownerThingId == null || liveThing.get(l.one_thing_id)?.owner === ownerThingId))
         .map(l => {
             const target = liveThing.get(l.other_thing_id);
-            if (!target || target.deleted || target.type !== UUID.G_CLASS) {
+            if (!target || target.deleted || !CLASS_TARGET_TYPES.includes(target.type)) {
                 const wasDeleted = target && target.deleted;
                 return {
                     link_id: l.link_id,

@@ -198,6 +198,36 @@ class DatabaseConsistencyTest extends TestCase
     }
 
     /** @test */
+    public function accepts_models_as_class_targets()
+    {
+        // Models (G_MODEL) are class-tree leaves under a class; an object may
+        // point its "class" link at a model rather than at a class proper.
+        $model = uuid_create();
+        $thing = uuid_create();
+        $this->insertThing($model, 'Opel Zafira B', UUID::G_MODEL);
+        $this->insertThing($thing, 'Our Opel', UUID::G_THING);
+        $this->insertLink($thing, UUID::LINK_TO_CLASS, $model);
+
+        $issues = $this->checkReport()['issues']['class_links_to_non_classes'];
+        $targets = array_column($issues, 'other_thing_id');
+        $this->assertNotContains($model, $targets);
+    }
+
+    /** @test */
+    public function flags_class_links_pointing_to_deleted_models()
+    {
+        $deletedModel = uuid_create();
+        $thing = uuid_create();
+        $this->insertThing($deletedModel, 'Gone model', UUID::G_MODEL, ['deleted' => 1]);
+        $this->insertThing($thing, 'An object', UUID::G_THING);
+        $this->insertLink($thing, UUID::LINK_TO_CLASS, $deletedModel);
+
+        $issues = $this->checkReport()['issues']['class_links_to_non_classes'];
+        $this->assertCount(1, $issues);
+        $this->assertSame('target class is deleted', $issues[0]['problem']);
+    }
+
+    /** @test */
     public function reports_a_link_type_under_a_class_as_misplaced()
     {
         $parentClass = uuid_create();
