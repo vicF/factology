@@ -1,18 +1,23 @@
 // resources/js/utils/networkMonitor.js
+//
+// Engine-bound module (moves to packages/engine with the data layer): keep it
+// free of any Vue import. State is exposed as plain `{ value }` objects — the
+// same shape Vue refs use, so engine consumers (dataLayer, SyncEngine) that
+// read `.value` are unchanged. The app layer wraps these in its own reactivity
+// if any UI needs to react to connectivity changes.
 
-import { ref } from 'vue';
 import { eventBus } from '../eventBus';
 
 /**
  * Reactive network monitor.
  *
  * Detects online/offline state changes and exposes them
- * as a reactive ref. Listens to browser `online`/`offline`
+ * via a {value} object. Listens to browser `online`/`offline`
  * events and also pings the API server periodically.
  */
 export function createNetworkMonitor(healthCheckUrl = '/api/v1/object?limit=1') {
-    const isOnline = ref(navigator.onLine);
-    const isServerReachable = ref(false);
+    const isOnline = { value: navigator.onLine };
+    const isServerReachable = { value: false };
     let checkInterval = null;
     let listenersAttached = false;
 

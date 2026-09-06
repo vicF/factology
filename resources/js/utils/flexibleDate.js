@@ -7,7 +7,19 @@
 
 import { dateToDb } from '@/utils/dateUtils'
 import { Era } from '@/constants/eras'
-import { currentLocale } from '@/utils/localized'
+
+// Engine-bound module: the UI-facing formatters must not reach into the app's
+// vue-i18n. The app registers a locale provider at bootstrap
+// (setFlexibleDateLocaleProvider), so this file stays free of app imports.
+let _localeProvider = null
+
+export function setFlexibleDateLocaleProvider(provider) {
+    _localeProvider = provider
+}
+
+function currentLocale() {
+    return _localeProvider ? _localeProvider() : 'en'
+}
 
 export const QUALIFIER_EXACT = 'exact'
 export const QUALIFIER_APPROX = 'approx'

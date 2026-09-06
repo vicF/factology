@@ -163,6 +163,9 @@ app.config.globalProperties.$resolveLocalized = localized.resolveLocalized;
 app.config.globalProperties.$hasOtherTranslations = localized.hasOtherTranslations;
 app.config.globalProperties.$getClassesList = localized.getClassesList;
 
+// Engine seam: flexible-date formatters (Vue-free) learn the active UI locale.
+flexibleDate.setFlexibleDateLocaleProvider(() => localized.currentLocale());
+
 (async () => {
     const authStore = useAuthStore();
     await authStore.checkAuth();
