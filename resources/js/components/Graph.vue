@@ -130,12 +130,13 @@
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
 import axios from 'axios'
-import { inject, reactive, ref, watch, onMounted } from 'vue'
+import { inject, nextTick, reactive, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
 import { UUID } from '../constants/uuid.js'
 import { foldChildren } from '../utils/graphFold.js'
+import { nodeSignature, planGraphUpdate } from '../utils/graphDiff.js'
 
 const getThumbUrl = inject('getThumbUrl')
 
@@ -446,29 +447,122 @@ const fetchGraph = async (uid, depth) => {
     return data?.data ?? null
 }
 
+// ---------------------------------------------------------------------------
+// Rendering. The first paint (and any full reload) uses setJsonData. Toggles
+// afterwards mutate the graph incrementally (add/remove only what changed),
+// because relation-graph's setJsonData fades the whole canvas out and back
+// in — which reads as "the graph disappears for a moment".
+// ---------------------------------------------------------------------------
+
+const lastRender = {
+    rootId: null,          // root node id the lib currently shows
+    nodeSigs: new Map(),   // id → nodeSignature of what the lib currently shows
+    lines: new Map(),      // id → {from, to}
+    pos: new Map(),        // id → {x, y} last known positions (canvas coords)
+}
+
+// Serialize graph updates so two quick toggles can't race each other.
+let renderChain = Promise.resolve()
+const queueRender = (fn) => {
+    renderChain = renderChain.then(fn).catch((err) => console.error('graph render failed:', err))
+    return renderChain
+}
+
+const instanceOf = () => {
+    const g = graphRef.value
+    return g && typeof g.getInstance === 'function' ? g.getInstance() : null
+}
+
+const supportsIncremental = (inst) => !!inst
+    && typeof inst.addNodes === 'function'
+    && typeof inst.addLines === 'function'
+    && typeof inst.removeNodeById === 'function'
+    && typeof inst.removeLineById === 'function'
+    && typeof inst.doLayout === 'function'
+    && typeof inst.getNodes === 'function'
+    && typeof inst.setNodePosition === 'function'
+    && typeof inst.getNodeById === 'function'
+    && typeof inst.setRootNodeId === 'function'
+
 const renderGraph = async () => {
     if (!graphRef.value || !treeRoot.value) return
     const { nodes, lines } = buildGraphJson(treeRoot.value, graphEdges.value)
     if (nodes.length === 0) return
-    await graphRef.value.setJsonData({
-        rootId: graphObject.value.root_id,
-        nodes,
-        lines,
-    })
+    const rootId = graphObject.value?.root_id
+
+    const inst = instanceOf()
+    if (!supportsIncremental(inst) || lastRender.nodeSigs.size === 0) {
+        // Full (re)build — first paint of a fresh Graph component.
+        await graphRef.value.setJsonData({ rootId, nodes, lines })
+        lastRender.rootId = rootId
+        lastRender.nodeSigs = new Map(nodes.map((n) => [n.id, nodeSignature(n)]))
+        lastRender.lines = new Map(lines.map((l) => [l.id, { from: l.from, to: l.to }]))
+        lastRender.pos = new Map()
+        return
+    }
+
+    const plan = planGraphUpdate(lastRender.nodeSigs, nodes, lastRender.lines, lines)
+
+    for (const id of plan.removedNodeIds) inst.removeNodeById(id)
+    for (const id of plan.changedNodeIds) inst.removeNodeById(id)
+    if (plan.addNodes.length) inst.addNodes(plan.addNodes)
+
+    // The root changed (navigated to another object / deeper level): point the
+    // graph at the new root node before laying out.
+    const rootChanged = lastRender.rootId != null && lastRender.rootId !== rootId
+    if (rootChanged) inst.setRootNodeId(rootId)
+
+    // Re-created nodes start at (0,0) → restore their previous canvas position
+    // so the layout animation glides from where they were instead of swooping
+    // in from the centre.
+    const reAddIds = new Set([...plan.changedNodeIds, ...plan.addNodes.map((n) => n.id)])
+    for (const id of reAddIds) {
+        const pos = lastRender.pos.get(id)
+        if (!pos) continue
+        const nd = inst.getNodeById(id)
+        if (nd) inst.setNodePosition(nd, pos.x, pos.y)
+    }
+
+    for (const id of plan.removeLineIds) inst.removeLineById(id)
+    if (plan.addLines.length) inst.addLines(plan.addLines)
+
+    await nextTick()
+    await inst.doLayout()
+
+    const pos = new Map()
+    for (const nd of inst.getNodes()) {
+        if (nd && nd.id != null && Number.isFinite(nd.x) && Number.isFinite(nd.y)) {
+            pos.set(nd.id, { x: nd.x, y: nd.y })
+        }
+    }
+    lastRender.pos = pos
+    await inst.playShowEffect()
+
+    lastRender.rootId = rootId
+    lastRender.nodeSigs = new Map(nodes.map((n) => [n.id, nodeSignature(n)]))
+    lastRender.lines = new Map(lines.map((l) => [l.id, { from: l.from, to: l.to }]))
 }
 
-const showGraph = async () => {
-    if (!props.object) return
-    graphObject.value = await fetchGraph(props.object.thing_id, selectedDepth.value)
-    const nodesById = new Map((graphObject.value?.nodes || []).map((n) => [n.thing_id, n]))
-    graphEdges.value = graphObject.value?.edges || []
-    treeRoot.value = graphObject.value
-        ? buildTreeFromGraph(graphObject.value.root_id, nodesById, graphEdges.value)
-        : null
+const showGraph = () => queueRender(async () => {
+    // Read the target at execution time: updateData() is called by Object.vue
+    // just before it re-renders props.object, so reading props inside the
+    // queued task (which runs after that render) gives the current object.
+    const uid = props.object?.thing_id
+    const depth = selectedDepth.value
+    if (!uid) return
+    const data = await fetchGraph(uid, depth)
+    if (uid !== props.object?.thing_id || depth !== selectedDepth.value) return // superseded
+    graphObject.value = data
+    const nodesById = new Map((data?.nodes || []).map((n) => [n.thing_id, n]))
+    graphEdges.value = data?.edges || []
+    treeRoot.value = data ? buildTreeFromGraph(data.root_id, nodesById, graphEdges.value) : null
     collapsed.value = new Set()
     expandedGroups.value = new Set()
+    // Keep the previous paint's bookkeeping: when this Graph stays mounted
+    // we diff from the old graph to the new one (add/remove nodes) instead
+    // of tearing everything down.
     await renderGraph()
-}
+})
 
 /** Flip whether a group folder (packed same-type/same-class links) is open. */
 const toggleGroup = (groupKey) => {
@@ -477,7 +571,7 @@ const toggleGroup = (groupKey) => {
     if (next.has(groupKey)) next.delete(groupKey)
     else next.add(groupKey)
     expandedGroups.value = next
-    renderGraph()
+    queueRender(renderGraph)
 }
 
 /** Toggle a real node's loaded subtree or a group folder (the +/- button). */
@@ -494,7 +588,7 @@ const toggleNode = (node) => {
     if (next.has(id)) next.delete(id)
     else next.add(id)
     collapsed.value = next
-    renderGraph()
+    queueRender(renderGraph)
 }
 
 // Pointer position when the press started, to tell a real click apart from a
@@ -543,17 +637,17 @@ defineExpose({
     }
 })
 
-watch(() => props.object, async () => {
-    await showGraph()
-})
-
+// NOTE: object changes are NOT watched here — Object.vue calls updateData()
+// (via defineExpose) when the displayed object changes, so a mounted Graph can
+// diff to the next object's graph rather than remount. A fresh Graph paints
+// itself in onMounted below.
 watch(selectedDepth, async () => {
     await showGraph()
 })
 
 watch(groupCfg, () => {
     expandedGroups.value = new Set()
-    if (treeRoot.value) renderGraph()
+    if (treeRoot.value) queueRender(renderGraph)
 }, { deep: true })
 
 onMounted(async () => {

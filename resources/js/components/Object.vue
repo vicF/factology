@@ -756,14 +756,13 @@ const getLinkTargetName = (link) => {
 
 const getObject = async () => {
     try {
-        loaded.value = false;
-        serverError.value = false;
         loadPropertyDefinitions(); // names for the Details-tab property rows (cached)
         // depth=2 attaches a `target` to each direct link AND pre-fills the
         // related items of those targets, so the right-column panel can show
         // a compact summary of each link's related objects immediately.
         const response = await axios.get(`/object/${route.params.uid}?depth=2`);
         object.value = response.data.data;
+        serverError.value = false;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
         }
@@ -973,9 +972,10 @@ onMounted(() => {
 
 watch(() => route.params.uid, (newUid, oldUid) => {
     if (newUid && newUid !== oldUid) {
-        object.value = null;
-        loaded.value = false;
-        serverError.value = false;
+        // Keep the current view (header/tabs/graph) mounted while the next
+        // object loads — swap its content in place instead of flashing a
+        // full-page spinner. Failure branches (not-found/error) replace the
+        // view only when the request actually fails.
         getObject();
     }
 });
@@ -1010,16 +1010,12 @@ watch(activeTab, (newTab) => {
 }, { immediate: true });
 
 watch(() => object.value, (newObject) => {
+    // updateData diffs the mounted graph to the new object (add/remove nodes).
+    // While the graph tab is hidden, its container has no size — the activeTab
+    // watcher calls refreshView() when the tab is next shown to re-fit it.
     if (graphInitialized.value && graphComponentRef.value && newObject) {
         graphComponentRef.value.updateData(newObject);
-        if (activeTab.value === 'graph') {
-            setTimeout(() => {
-                if (graphComponentRef.value) graphComponentRef.value.refreshView();
-            }, 200);
-        }
     }
-    // updateData (showMap) already fetches and re-renders; refreshView is only
-    // needed when the tab becomes visible (handled in the activeTab watcher).
     if (mapInitialized.value && mapComponentRef.value && newObject) {
         mapComponentRef.value.updateData(newObject);
     }
