@@ -16,6 +16,7 @@
 import { getDb } from './index';
 import { SYNC_STATUS } from '../constants/syncStatus';
 import { newLinkId } from './links';
+import { postImportProgress } from '../utils/importProgress';
 
 const CHUNK = 500;
 const TRIPLET = (l) => `${l.one_thing_id}|${l.link_type_id}|${l.other_thing_id}`;
@@ -63,6 +64,19 @@ export async function importExportData(file, ownerThingId) {
         throw new Error('Not a valid Factology export file.');
     }
 
+    // Throttled progress emitter (~0.25% steps per phase) → importProgress bus.
+    const progress = (() => {
+        const step = {};
+        return (phase, done, total) => {
+            if (!total) return;
+            const bucket = Math.floor((done / total) * 400);
+            if (done === total || bucket !== step[phase]) {
+                step[phase] = bucket;
+                postImportProgress({ phase, done, total, percent: Math.round((done / total) * 100) });
+            }
+        };
+    })();
+
     const importedThingIds = new Set();
 
     // ── Things ────────────────────────────────────────────────────────────
@@ -79,7 +93,10 @@ export async function importExportData(file, ownerThingId) {
     }
 
     const thingWrites = [];
+    let thingsDone = 0;
     for (const thing of thingRows) {
+        thingsDone++;
+        progress('things', thingsDone, thingRows.length);
         if (!thing?.thing_id) {
             report.errors.push('Thing row missing thing_id, skipped.');
             continue;
@@ -110,6 +127,7 @@ export async function importExportData(file, ownerThingId) {
         importedThingIds.add(thing.thing_id);
     }
     await chunkedPut(db.objects, thingWrites);
+    progress('things', thingRows.length, thingRows.length);
 
     // ── Links ─────────────────────────────────────────────────────────────
     // Import only links whose endpoints are present (imported or already local);
@@ -143,7 +161,10 @@ export async function importExportData(file, ownerThingId) {
     }
 
     const linkWrites = [];
+    let linksDone = 0;
     for (const link of linkRows) {
+        linksDone++;
+        progress('links', linksDone, linkRows.length);
         if (!link?.one_thing_id || !link?.other_thing_id) continue;
 
         // Dedupe by canonical link_uuid.
@@ -177,6 +198,7 @@ export async function importExportData(file, ownerThingId) {
         report.importedLinks++;
     }
     await chunkedPut(db.links, linkWrites);
+    progress('links', linkRows.length, linkRows.length);
 
     return report;
 }
