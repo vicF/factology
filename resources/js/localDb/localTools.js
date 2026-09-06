@@ -282,7 +282,39 @@ export async function localExportJson({ includeDeleted = false, visibleOwners = 
         return copy;
     };
 
-    const payload = {
+    // Throttled progress emitter (~0.25% steps per phase) → importProgress bus.
+    const progress = (() => {
+        const step = {};
+        return (phase, done, total) => {
+            if (!total) return;
+            const bucket = Math.floor((done / total) * 400);
+            if (done === total || bucket !== step[phase]) {
+                step[phase] = bucket;
+                postImportProgress({ phase, done, total, percent: Math.round((done / total) * 100) });
+            }
+        };
+    })();
+
+    // Serialize each table chunk by chunk (cleaning + JSON-encoding in bounded
+    // slices) so huge exports don't block on one giant JSON.stringify and can
+    // report progress. Parts are comma-joined item strings without brackets.
+    const serialize = (rows, phase) => {
+        const parts = [];
+        let done = 0;
+        const CHUNK = 3000;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+            const slice = rows.slice(i, i + CHUNK);
+            parts.push(JSON.stringify(slice.map(clean)).slice(1, -1));
+            done += slice.length;
+            progress(phase, done, rows.length);
+        }
+        return `[${parts.join(',')}]`;
+    };
+
+    const thingsText = serialize(visibleThings, 'things');
+    const linksText = serialize(visibleLinks, 'links');
+
+    const head = JSON.stringify({
         version: 1,
         exported_at: new Date().toISOString(),
         server_uuid: null,
@@ -290,13 +322,9 @@ export async function localExportJson({ includeDeleted = false, visibleOwners = 
         include_deleted: includeDeleted,
         export_scope: ownerSet == null ? 'all' : 'visible',
         stats: { things: visibleThings.length, links: visibleLinks.length },
-        data: {
-            things: visibleThings.map(clean),
-            links: visibleLinks.map(clean),
-        },
-    };
+    });
 
-    return JSON.stringify(payload);
+    return head.slice(0, -1) + `,"data":{"things":${thingsText},"links":${linksText}}}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
