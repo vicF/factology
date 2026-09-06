@@ -31,6 +31,7 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, 'resources/js'),
             '~': path.resolve(__dirname, 'resources'),
+            '@factology/engine': path.resolve(__dirname, 'packages/engine/src'),
         },
     },
     // Don't copy the Laravel public directory (huge thumbs, PHP files) into the build

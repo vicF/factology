@@ -1,0 +1,25 @@
+{
+    "name": "@factology/engine",
+    "version": "0.1.0",
+    "description": "Universal data engine for Factology apps: universal object/links data layer, identity wallet, sync client, import/export codec, class registry.",
+    "type": "module",
+    "main": "./src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    },
+    "files": [
+        "src"
+    ],
+    "keywords": [
+        "factology",
+        "entity",
+        "graph",
+        "dexie",
+        "offline-first"
+    ],
+    "license": "PolyForm-Noncommercial-1.0.0",
+    "dependencies": {},
+    "engines": {
+        "node": ">=22"
+    }
+}

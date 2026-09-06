@@ -12,6 +12,7 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, './resources/js'),
             '@icons': path.resolve(__dirname, './resources/js/components/icons'),
+            '@factology/engine': path.resolve(__dirname, './packages/engine/src'),
         }
     },
     // Keep the heavy dirs out of the watcher — with hundreds of thousands of
