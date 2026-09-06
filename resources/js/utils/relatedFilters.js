@@ -36,13 +36,15 @@ export function nodeClassIds(node) {
 /**
  * Whether one link row passes the active filters (inclusion semantics — the
  * checked ids are exactly what is shown):
- *  - link types: when `linkTypeIds` is provided (non-null) the link's type
- *    must be one of them (an empty array = no link type is allowed);
- *  - classes: when `classIds` is provided (non-null) the link's target must
- *    belong to one of those classes (an empty array = no object class is
- *    allowed).
- * Passing `null`/`undefined` for a dimension means "no restriction" — used
- * before the filter panel has published its first (all-checked) selection.
+ *  - link types: when `linkTypeIds` is a non-empty list the link's type must
+ *    be one of them;
+ *  - classes: when `classIds` is a non-empty list the link's target must
+ *    belong to one of those classes.
+ * An EMPTY list means "no restriction" for that dimension — otherwise checking
+ * only a relation-type group (e.g. "Родственные отношения") while no class is
+ * checked would blank the whole view, even though the group's objects clearly
+ * should be shown. `null`/`undefined` also means "no restriction" (used before
+ * the filter panel has published its first selection).
  *
  * @param {object} link  link row with `link_type_id` and (usually) `target`
  * @param {string[]|null} classIds
@@ -51,10 +53,10 @@ export function nodeClassIds(node) {
  */
 export function linkPassesFilter(link, classIds, linkTypeIds) {
     if (!link) return false;
-    if (linkTypeIds != null && !linkTypeIds.includes(link.link_type_id)) {
+    if (linkTypeIds != null && linkTypeIds.length && !linkTypeIds.includes(link.link_type_id)) {
         return false;
     }
-    if (classIds != null) {
+    if (classIds != null && classIds.length) {
         const ids = nodeClassIds(link.target);
         if (!ids.some((id) => classIds.includes(id))) return false;
     }

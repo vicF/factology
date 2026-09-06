@@ -122,6 +122,40 @@ describe('Graph incremental depth switch', () => {
         fullData.setJsonDataCalls = []
     })
 
+    it('rebuilds cleanly when navigating to a different root object', async () => {
+        const A = p('objA', 'A')
+        const B = p('objB', 'B')
+        const X = p('objX', 'X')
+        const Y = p('objY', 'Y')
+        axios.get
+            .mockResolvedValueOnce(payload('objA', [A, B, X], [
+                edge('objA', 'objB', 'related'),
+                edge('objA', 'objX', 'related'),
+                edge('objB', 'objX', 'related'),
+            ]))
+            .mockResolvedValueOnce(payload('objB', [B, A, Y], [
+                edge('objB', 'objA', 'related'),
+                edge('objB', 'objY', 'related'),
+                edge('objA', 'objY', 'related'),
+            ]))
+
+        const wrapper = mountGraph({ thing_id: 'objA' })
+        await flushPromises()
+        expect(fullData.setJsonDataCalls).toHaveLength(1)
+
+        await wrapper.setProps({ object: { thing_id: 'objB' } })
+        await wrapper.vm.updateData()
+        await flushPromises()
+
+        // Root changed → full rebuild (never a half-morphed incremental graph).
+        expect(fullData.setJsonDataCalls).toHaveLength(2)
+        expect(fullData.setJsonDataCalls[1].rootId).toBe('objB')
+        const inst = fullData.instance
+        expect(inst.nodes.size).toBe(3)
+        for (const id of ['objB', 'objA', 'objY']) expect(inst.nodes.has(id)).toBe(true)
+        expect(inst.nodes.has('objX')).toBe(false)
+    })
+
     it('keeps every direct link when lowering depth 2 → 1', async () => {
         axios.get
             .mockResolvedValueOnce(payload(WED, [

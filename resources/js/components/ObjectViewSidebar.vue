@@ -56,7 +56,7 @@
                 :key="root.id"
                 :node="root"
                 :depth="0"
-                :checked-ids="checkedIds"
+                :checked-ids="viewStore.checkedIds"
                 @change="onToggle"
             />
         </div>
@@ -114,18 +114,13 @@ const availableIds = computed(() => [
     ...stats.value.linkTypeCounts.keys(),
 ]);
 
-// Full set of checked ids (kept here because it includes category/ancestor ids
-// that have no objects of their own; only the effective subset is published to
-// the store as selectedClasses/selectedLinkTypes).
-const checkedIds = ref([]);
-// Ids already offered in a previous neighborhood (depth/uid). Newly appearing
-// classes/link types default to checked; ids the user unchecks stay unchecked
-// even when they remain available at a deeper level.
-const seenIds = ref(new Set());
-
-// Everything currently offered is checked → nothing is hidden by the filter.
+// Full set of checked ids and the ids already offered in a previous
+// neighborhood live in the objectView store, so the user's checked/unchecked
+// tree survives moving between object pages (the sidebar stays mounted) and
+// even a sidebar remount. Newly appearing classes/link types default to
+// checked; ids the user unchecks stay unchecked everywhere.
 const allChecked = computed(() =>
-    availableIds.value.every((id) => checkedIds.value.includes(id))
+    availableIds.value.every((id) => viewStore.checkedIds.includes(id))
 );
 
 let requestSeq = 0;
@@ -159,42 +154,42 @@ async function loadNeighborhood() {
 // class (resp. a link type) in this neighborhood restrict anything.
 function pushFilters() {
     viewStore.setFilters(
-        checkedIds.value.filter((id) => stats.value.classCounts.has(id)),
-        checkedIds.value.filter((id) => stats.value.linkTypeCounts.has(id))
+        viewStore.checkedIds.filter((id) => stats.value.classCounts.has(id)),
+        viewStore.checkedIds.filter((id) => stats.value.linkTypeCounts.has(id))
     );
 }
 
 // Check every offered class/link type (the default view and the "Show all"
-// action). Removed ids stay removed on later depth changes.
+// action). Removed ids stay removed on later depth/object changes.
 function acceptNewAvailable() {
-    const seen = seenIds.value;
+    const seen = viewStore.seenIds;
     const newly = availableIds.value.filter((id) => !seen.has(id));
     if (!newly.length) return;
     for (const id of newly) seen.add(id);
-    checkedIds.value = [...new Set([...checkedIds.value, ...newly])];
+    viewStore.checkedIds = [...new Set([...viewStore.checkedIds, ...newly])];
 }
 
 function checkAll() {
-    for (const id of availableIds.value) seenIds.value.add(id);
-    checkedIds.value = [...availableIds.value];
+    for (const id of availableIds.value) viewStore.seenIds.add(id);
+    viewStore.checkedIds = [...availableIds.value];
     pushFilters();
 }
 
 function onToggle(node) {
     const subtreeIds = [node.id, ...collectSubtreeIds(node.nodes || [])];
-    const state = nodeSelectionState(node.id, node.nodes || [], checkedIds.value);
+    const state = nodeSelectionState(node.id, node.nodes || [], viewStore.checkedIds);
     if (state === 'semi') {
         // Clicking an indeterminate node selects the whole subtree (like the
         // search tree).
-        checkedIds.value = [...new Set([...checkedIds.value, ...subtreeIds])];
+        viewStore.checkedIds = [...new Set([...viewStore.checkedIds, ...subtreeIds])];
     } else if (state === 'checked') {
         const remove = new Set(subtreeIds);
-        checkedIds.value = checkedIds.value.filter((id) => !remove.has(id));
+        viewStore.checkedIds = viewStore.checkedIds.filter((id) => !remove.has(id));
         // Drop category ids whose last selected descendant was just removed,
         // mirroring the search tree's ancestor pruning.
-        checkedIds.value = pruneEmptyNodes(topLevelTaxonomyNodes(objectsStore.rootNodes), checkedIds.value);
+        viewStore.checkedIds = pruneEmptyNodes(topLevelTaxonomyNodes(objectsStore.rootNodes), viewStore.checkedIds);
     } else {
-        checkedIds.value = [...new Set([...checkedIds.value, ...subtreeIds])];
+        viewStore.checkedIds = [...new Set([...viewStore.checkedIds, ...subtreeIds])];
     }
     pushFilters();
 }
@@ -236,8 +231,8 @@ function onDetailsChanged() {
 
 watch(uid, (value) => {
     viewStore.setUid(value);
-    checkedIds.value = [];
-    seenIds.value = new Set();
+    // Note: do NOT clear checkedIds/seenIds here — the checked/unchecked tree
+    // is a user preference that must survive object-to-object navigation.
     loadNeighborhood();
 }, { immediate: true });
 

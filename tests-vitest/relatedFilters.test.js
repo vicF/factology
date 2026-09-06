@@ -93,10 +93,14 @@ describe('linkPassesFilter', () => {
         const multi = { link_type_id: 'x', target: { classes: [{ thing_id: 'p' }, { thing_id: 'q' }] } }
         expect(linkPassesFilter(multi, ['q'], null)).toBe(true)
     })
-    it('an empty allowed set hides everything (inclusion semantics)', () => {
-        expect(linkPassesFilter(humanLink, [], null)).toBe(false)
-        expect(linkPassesFilter(humanLink, null, [])).toBe(false)
-        expect(filterLinks(ROOT.links, [], [])).toHaveLength(0)
+    it('an empty allowed list means "no restriction" for that dimension', () => {
+        // Checking only a relation-type group (classes left empty) must still
+        // show the objects it connects — not blank the whole view.
+        expect(linkPassesFilter(humanLink, [], null)).toBe(true)
+        expect(linkPassesFilter(humanLink, null, [])).toBe(true)
+        expect(linkPassesFilter(humanLink, [], ['lt-perform'])).toBe(false)
+        expect(linkPassesFilter(bandLink, [], ['lt-perform'])).toBe(true)
+        expect(filterLinks(ROOT.links, [], [])).toHaveLength(ROOT.links.length)
     })
 })
 

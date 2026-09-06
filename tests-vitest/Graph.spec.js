@@ -164,6 +164,26 @@ describe('Graph', () => {
         expect(openFolder.data._collapsed).toBe(false)
     })
 
+    it('never shows GEDCOM "imported from" provenance in the graph', async () => {
+        const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69'
+        const drevo = { thing_id: 'drevo', name: 'Древо Жизни', name_translations: { lang: 'en' }, type: 3, class: null, classes: [] }
+        axios.get.mockResolvedValueOnce(graphPayload('root', [
+            person('root'),
+            person('father'),
+            drevo,
+        ], [
+            edge('root', 'father', 'father'),
+            edge('root', 'drevo', 'imported from', IMPORTED_FROM),
+        ]))
+
+        mountGraph()
+        await flushPromises()
+
+        const data = mocks.setJsonData.mock.calls[0][0]
+        expect(data.nodes.map((n) => n.id)).not.toContain('drevo')
+        expect(data.lines.some((l) => l.from === 'drevo' || l.to === 'drevo')).toBe(false)
+    })
+
     it('opens the clicked node object through the router', async () => {
         axios.get.mockResolvedValueOnce(graphPayload('root', [
             person('root'),

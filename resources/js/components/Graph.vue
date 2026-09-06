@@ -228,25 +228,29 @@ const graphOptions = {
 // its child only if the link type is checked AND the child object belongs to a
 // checked class; extra cross-links only need a checked link type (both their
 // endpoints are already visible objects).
+// GEDCOM import provenance is never a real relation: every imported object
+// carries an "imported from" link to the source tree ("Древо Жизни", class
+// GEDCOM). Keep that noise out of the graph entirely.
 const graphFilterIds = () => (viewStore.filtersReady
     ? { classIds: viewStore.selectedClasses, linkTypeIds: viewStore.selectedLinkTypes }
     : null)
 
 const edgeShownForChild = (edge, childMeta) => {
+    if (edge && edge.link_type_id === UUID.IMPORTED_FROM) return false
+    const childClasses = nodeClassIds(childMeta)
+    if (childClasses.includes(UUID.GEDCOM_CLASS)) return false
     const f = graphFilterIds()
     if (!f) return true
-    if (f.linkTypeIds != null && !f.linkTypeIds.includes(edge.link_type_id)) return false
-    if (f.classIds != null) {
-        const ids = nodeClassIds(childMeta)
-        if (!ids.some((id) => f.classIds.includes(id))) return false
-    }
+    if (f.linkTypeIds.length && !f.linkTypeIds.includes(edge.link_type_id)) return false
+    if (f.classIds.length && !childClasses.some((id) => f.classIds.includes(id))) return false
     return true
 }
 
 const edgeShownForCross = (edge) => {
+    if (edge && edge.link_type_id === UUID.IMPORTED_FROM) return false
     const f = graphFilterIds()
     if (!f) return true
-    return f.linkTypeIds == null || f.linkTypeIds.includes(edge.link_type_id)
+    return f.linkTypeIds.length === 0 || f.linkTypeIds.includes(edge.link_type_id)
 }
 
 const classOf = (thing) => thing?.class || thing?.classes?.[0] || null
@@ -518,7 +522,6 @@ const supportsIncremental = (inst) => !!inst
     && typeof inst.getNodes === 'function'
     && typeof inst.setNodePosition === 'function'
     && typeof inst.getNodeById === 'function'
-    && typeof inst.setRootNodeId === 'function'
 
 const renderGraph = async () => {
     if (!graphRef.value || !graphObject.value) return
@@ -534,8 +537,13 @@ const renderGraph = async () => {
     const rootId = go.root_id
 
     const inst = instanceOf()
-    if (!supportsIncremental(inst) || lastRender.nodeSigs.size === 0) {
-        // Full (re)build — first paint of a fresh Graph component.
+    // The graph can be morphed in place only while the SAME root object stays
+    // in view (folder toggles, +/−, depth/filter changes). Moving to a different
+    // root (node click / object navigation) rebuilds cleanly — incremental
+    // diffs across two unrelated spanning trees left stale nodes/lines behind.
+    const rootChanged = lastRender.rootId != null && lastRender.rootId !== rootId
+    if (!supportsIncremental(inst) || lastRender.nodeSigs.size === 0 || rootChanged) {
+        // Full (re)build — fresh Graph mount or a new root object.
         await graphRef.value.setJsonData({ rootId, nodes, lines })
         lastRender.rootId = rootId
         lastRender.nodeSigs = new Map(nodes.map((n) => [n.id, nodeSignature(n)]))
@@ -553,11 +561,6 @@ const renderGraph = async () => {
     const reAddIds = new Set([...plan.changedNodeIds, ...plan.addNodes.map((n) => n.id)])
     for (const id of plan.changedNodeIds) inst.removeNodeById(id)
     if (reAddIds.size) inst.addNodes(nodes.filter((n) => reAddIds.has(n.id)))
-
-    // The root changed (navigated to another object / deeper level): point the
-    // graph at the new root node before laying out.
-    const rootChanged = lastRender.rootId != null && lastRender.rootId !== rootId
-    if (rootChanged) inst.setRootNodeId(rootId)
 
     // Re-created nodes start at (0,0) → restore their previous canvas position
     // so the layout animation glides from where they were instead of swooping

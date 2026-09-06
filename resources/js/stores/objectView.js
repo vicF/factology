@@ -26,10 +26,22 @@ export const useObjectViewStore = defineStore('objectView', () => {
     const selectedLinkTypes = ref([]);
     const filtersReady = ref(false);
 
+    // User's checked/unchecked state of the related-objects tree. Lives here
+    // (not in the sidebar) so it survives moving between object pages — a
+    // class/link type the user unchecks stays unchecked on the next object.
+    const checkedIds = ref([]);
+    const seenIds = ref(new Set());
+
     function setUid(value) {
         if (uid.value !== value) {
             uid.value = value ?? null;
-            clearFilters();
+            // Keep the user's tree selections (checkedIds/seenIds). Only drop
+            // the *published* filter until the new object's neighborhood has
+            // been re-collected, so object A's restrictions never hide object
+            // B's rows in the meantime.
+            selectedClasses.value = [];
+            selectedLinkTypes.value = [];
+            filtersReady.value = false;
         }
     }
 
@@ -57,6 +69,8 @@ export const useObjectViewStore = defineStore('objectView', () => {
         selectedClasses,
         selectedLinkTypes,
         filtersReady,
+        checkedIds,
+        seenIds,
         setUid,
         setDepth,
         setFilters,
