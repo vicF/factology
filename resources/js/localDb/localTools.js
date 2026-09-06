@@ -18,6 +18,7 @@ import { getDb, SYNC_STATUS } from './index';
 import { newLinkId } from './links';
 import { isRowVisible } from './visibility';
 import { UUID } from '../constants/uuid';
+import { postImportProgress } from '../utils/importProgress';
 
 const OBJECT_TYPES = [UUID.G_THING, UUID.G_EXTERNAL, UUID.G_SERVER];
 const LINK_TYPE_ROOTS = [UUID.LINK, UUID.SYSTEM];
@@ -310,6 +311,16 @@ async function bulkPut(table, rows, onChunk) {
     }
 }
 
+/** Fetch rows matching many keys on an index, in bounded anyOf batches. */
+async function bulkAnyOf(table, index, keys) {
+    const out = [];
+    for (let i = 0; i < keys.length; i += 1000) {
+        const slice = keys.slice(i, i + 1000);
+        if (slice.length) out.push(...(await table.where(index).anyOf(slice).toArray()));
+    }
+    return out;
+}
+
 /**
  * @param {object} input { things?: [], links?: [] }
  * @param {string} conflictMode latest_wins | keep_existing | overwrite
@@ -333,6 +344,19 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
     const rawThings = hasThings ? input.things : [];
     const rawLinks = hasLinks ? input.links : [];
 
+    // Throttled progress emitter (~0.25% steps per phase).
+    const progress = (() => {
+        const step = {};
+        return (phase, done, total) => {
+            if (!total) return;
+            const bucket = Math.floor((done / total) * 400);
+            if (done === total || bucket !== step[phase]) {
+                step[phase] = bucket;
+                postImportProgress({ phase, done, total, percent: Math.round((done / total) * 100) });
+            }
+        };
+    })();
+
     // ── Things ─────────────────────────────────────────────────────
     const existingById = new Map();
     const wantedIds = rawThings.map(t => t.thing_id).filter(Boolean);
@@ -345,9 +369,12 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
     }
 
     const toWrite = [];
+    let thingsDone = 0;
     for (const thing of rawThings) {
         if (!thing?.thing_id) {
             result.errors.push('Thing missing thing_id, skipping');
+            thingsDone++;
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         const id = thing.thing_id;
@@ -356,15 +383,21 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
         if (!existing) {
             if (thing.deleted) {
                 result.skipped.things++;
+                thingsDone++;
+                progress('things', thingsDone, rawThings.length);
                 continue;
             }
             toWrite.push({ ...thing, ...localSyncFields() });
             result.imported.things++;
+            thingsDone++;
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
 
         if (conflictMode === 'keep_existing') {
             result.skipped.things++;
+            thingsDone++;
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         if (conflictMode === 'latest_wins') {
@@ -372,6 +405,8 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             const tEx = existing.record_updated;
             if (tIm && tEx && (tEx >= tIm)) {
                 result.skipped.things++;
+                thingsDone++;
+                progress('things', thingsDone, rawThings.length);
                 continue;
             }
         }
@@ -379,38 +414,57 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             existingById.set(id, { ...existing, deleted: 1 });
             toWrite.push({ ...existing, ...thing, deleted: 1, ...localSyncFields() });
             result.deleted.things++;
+            thingsDone++;
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         toWrite.push({ ...existing, ...thing, ...localSyncFields() });
         result.imported.things++;
+        thingsDone++;
+        progress('things', thingsDone, rawThings.length);
     }
     await bulkPut(db.objects, toWrite);
+    progress('things', rawThings.length, rawThings.length);
 
     // ── Links ──────────────────────────────────────────────────────
-    const allIds = new Set([...(await db.objects.toArray()).map(t => t.thing_id)]);
+    // Prefetch every possibly-matching existing link ONCE (by link_uuid and by
+    // endpoint triplet) instead of querying the DB twice per row — with
+    // hundreds of thousands of links that's the difference between minutes
+    // and seconds. Semantics are unchanged from the per-row version below.
+    const allIds = new Set(await db.objects.toCollection().keys());
+    const uuidMap = new Map();
+    const uuidKeys = rawLinks.map(l => (l && l.link_uuid) ? l.link_uuid : null).filter(Boolean);
+    for (const row of await bulkAnyOf(db.links, 'link_uuid', uuidKeys)) {
+        if (row.link_uuid) uuidMap.set(row.link_uuid, row);
+    }
+    const tripletMap = new Map();
+    const tripletOf = (l) => `${l.one_thing_id}|${l.link_type_id}|${l.other_thing_id}`;
+    const tripletKeys = rawLinks
+        .filter(l => l && l.one_thing_id && l.other_thing_id && l.link_type_id)
+        .map(tripletOf);
+    for (const row of await bulkAnyOf(db.links, '[one_thing_id+link_type_id+other_thing_id]', tripletKeys)) {
+        tripletMap.set(`${row.one_thing_id}|${row.link_type_id}|${row.other_thing_id}`, row);
+    }
+
     const linkWrites = [];
+    let linksDone = 0;
+    const progressLink = () => progress('links', ++linksDone, rawLinks.length);
     for (const link of rawLinks) {
         if (!link?.one_thing_id || !link?.other_thing_id || !link?.link_type_id) {
             result.skipped.links++;
+            progressLink();
             continue;
         }
 
         // Existing match: by canonical link_uuid, else by endpoint triplet.
-        let matched = null;
-        if (link.link_uuid) {
-            matched = await db.links.where('link_uuid').equals(link.link_uuid).first() || null;
-        }
-        if (!matched) {
-            matched = await db.links
-                .where('[one_thing_id+link_type_id+other_thing_id]')
-                .equals([link.one_thing_id, link.link_type_id, link.other_thing_id])
-                .first() || null;
-        }
+        const matched = (link.link_uuid ? (uuidMap.get(link.link_uuid) || null) : null)
+            || tripletMap.get(tripletOf(link)) || null;
 
         if (matched) {
             if (link.deleted) {
                 linkWrites.push({ ...matched, deleted: 1, ...localSyncFields() });
                 result.deleted.links++;
+                progressLink();
                 continue;
             }
             if (conflictMode === 'overwrite') {
@@ -419,15 +473,18 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             } else {
                 result.skipped.links++;
             }
+            progressLink();
             continue;
         }
 
         if (link.deleted) {
             result.skipped.links++;
+            progressLink();
             continue;
         }
         if (!allIds.has(link.one_thing_id) || !allIds.has(link.other_thing_id)) {
             result.skipped.links++;
+            progressLink();
             continue;
         }
 
@@ -438,8 +495,10 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             ...localSyncFields(),
         });
         result.imported.links++;
+        progressLink();
     }
     await bulkPut(db.links, linkWrites);
+    progress('links', rawLinks.length, rawLinks.length);
 
     return result;
 }
