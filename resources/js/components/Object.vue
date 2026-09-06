@@ -66,6 +66,12 @@
                             </div>
                         </div>
 
+                        <!-- Warning when editing/deleting another user's object -->
+                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
+                            <i class="bi bi-person-exclamation me-1"></i>
+                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
+                        </div>
+
                         <!-- Tabs -->
                         <ul class="nav nav-tabs justify-content-end mb-3">
                             <li class="nav-item">
@@ -127,8 +133,8 @@
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
                                                 <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
-                                                    <span v-if="!confirmedDate && isPlanned" class="planned-badge">
-                                                        {{ $t('dates.planned') }}
+                                                    <span v-if="!confirmedDate && isPlanned" :class="isPastPlan ? 'unconfirmed-badge' : 'planned-badge'">
+                                                        {{ isPastPlan ? $t('dates.not_confirmed') : $t('dates.planned') }}
                                                         <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
                                                     <button
@@ -700,6 +706,14 @@ const isPlanned = computed(() =>
     !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
+// An explicitly-marked plan whose date has already passed without being
+// confirmed. The badge reads "not confirmed" (amber) for these instead of
+// "planned", prompting the owner to confirm or clear it. Without a start date
+// there is nothing to judge as passed, so those stay "planned".
+const isPastPlan = computed(() =>
+    !confirmedDate.value && !!markedPlannedDate.value && !!object.value?.start && !hasFutureStart.value
+);
+
 // Distinguishes a past-dated *plan* from a backdated record. Pre-feature and
 // imported plans carry no data.planned marker, so once their date passes
 // isPlanned() flips false — but they were created while their start was still
@@ -1186,6 +1200,22 @@ watch(() => object.value, (newObject) => {
     color: #0d6efd;
     background: rgba(13, 110, 253, 0.1);
     border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+/* Past plans that were never confirmed need attention — amber warning badge
+   instead of the blue "planned" one. */
+.unconfirmed-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.45);
     padding: 1px 6px;
     border-radius: 3px;
     margin-left: 4px;

@@ -81,7 +81,14 @@
                                                 </template>
                                                 <span v-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
                                                 <span
-                                                    v-if="isPlanned(thing)"
+                                                    v-if="isOverduePlan(thing)"
+                                                    class="unconfirmed-badge"
+                                                >
+                                                    {{ $t('dates.not_confirmed') }}
+                                                    <template v-if="thing.data?.planned">({{ thing.data.planned }})</template>
+                                                </span>
+                                                <span
+                                                    v-else-if="isPlanned(thing)"
                                                     class="planned-badge"
                                                 >
                                                     {{ $t('dates.planned') }}
@@ -195,6 +202,17 @@ function isPlanned(thing) {
     if (thing.data?.confirmed) return false;
     if (thing.data?.planned) return true;
     return isFutureDate(thing);
+}
+
+// An explicitly-marked plan whose date has already passed without being
+// confirmed. Such rows belong in the past section and read "not confirmed"
+// (amber) instead of "planned", prompting the owner to act. Without a start
+// date there is nothing to judge as passed, so those stay "planned".
+function isOverduePlan(thing) {
+    if (thing.data?.confirmed) return false;
+    if (!thing.data?.planned) return false;
+    if (!thing.start) return false;
+    return !isFutureDate(thing);
 }
 
 const props = defineProps({
@@ -603,6 +621,22 @@ onUnmounted(() => {
     color: #0d6efd;
     background: rgba(13, 110, 253, 0.1);
     border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+/* Past plans that were never confirmed need attention — amber warning badge
+   instead of the blue "planned" one. */
+.unconfirmed-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.45);
     padding: 1px 6px;
     border-radius: 3px;
     margin-left: 4px;
