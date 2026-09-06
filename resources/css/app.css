@@ -449,9 +449,58 @@
     border-top: 1px dashed #dee2e6;
 }
 
+/* Related lists render LinkDescription at .text-small (0.875rem) by default;
+   keep the compact related-link text smaller to match .link-item. */
+.links-list .link-description {
+    font-size: 0.7rem !important;
+}
+
 .result-separator {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
+}
+
+/* ==========================================================================
+   Filter Panel
+   ========================================================================== */
+
+.filter-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    animation: filter-slide-down 0.15s ease-out;
+}
+
+.filter-panel-inner {
+    padding: 12px;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+@keyframes filter-slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ==========================================================================
@@ -604,4 +653,30 @@
     .result-info-section {
         margin-top: -2px;
     }
+}
+
+/* Link-type label shown before the target in related-object rows. */
+.link-item-type {
+    font-size: 0.6rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+}
+
+.link-item-arrow {
+    color: #adb5bd;
+    font-size: 0.65rem;
+}
+
+/* .more-links is styled as a div; as a button it needs a reset so the
+   "+N more" toggles (search + object page) render as plain links. */
+button.more-links {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
 }

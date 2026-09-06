@@ -68,6 +68,27 @@
                                 </button>
                             </div>
                         </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6 offset-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="accepted_terms" id="accepted_terms" required value="1">
+                                    <label class="form-check-label" for="accepted_terms">
+                                        I accept the <a href="#" onclick="event.preventDefault(); window.open('/api/v1/legal/terms', '_blank')">Terms of Service</a>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6 offset-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="accepted_privacy" id="accepted_privacy" required value="1">
+                                    <label class="form-check-label" for="accepted_privacy">
+                                        I consent to the <a href="#" onclick="event.preventDefault(); window.open('/api/v1/legal/privacy', '_blank')">Privacy Policy</a> and agree to the processing of my personal data
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>

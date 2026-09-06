@@ -41,12 +41,19 @@ class RouteServiceProvider extends ServiceProvider
     /**
      * Configure the rate limiters for the application.
      *
+     * The SPA is request-heavy (class tree, object graph, search, editor
+     * lookups), so the default 60 req/min throttles normal editing. Logged-in
+     * users get a generous limit; guests (public content) keep a modest one.
+     *
      * @return void
      */
     protected function configureRateLimiting()
     {
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            if ($request->user()) {
+                return Limit::perMinute(1000)->by($request->user()?->id);
+            }
+            return Limit::perMinute(120)->by($request->ip());
         });
     }
 }

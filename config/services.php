@@ -31,4 +31,10 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'yandex' => [
+        // Yandex Geocoder API key (https://yandex.ru/dev/geocode/). When empty,
+        // the /geocode endpoint still works via Nominatim; Yandex responds 501.
+        'geocoder_key' => env('YANDEX_GEOCODER_KEY', ''),
+    ],
+
 ];

@@ -47,15 +47,29 @@
                         <!-- Header -->
                         <div class="object-header">
                             <h1 class="object-title">
-                                {{ object.name || $t('Unnamed') }}
-                                <IconPrivate v-if="!object.public" class="private-icon-header" />
+                                {{ $objectName(object) || $t('Unnamed') }}
+                                <TranslatedBadge :translations="object.name_translations" />
                             </h1>
-                            <div v-if="authenticated" class="object-actions">
+                            <div v-if="authenticated && editMode" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
-                                <button class="btn btn-primary" @click="openEditModal" :title="$t('Edit this object')">{{ $t('Edit') }}</button>
+                                <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
-                                <button class="btn btn-danger" @click="deleteObject" :title="$t('Delete this object')">{{ $t('Delete') }}</button>
+                                <button class="btn btn-danger" @click="deleteObject" :disabled="!canDelete" :title="canDelete ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
+                            <!-- Debug info: shows object owner and permissions -->
+                            <div v-if="object" class="debug-info" style="font-size:10px;color:#999;margin-top:4px;padding:2px 8px;background:#f5f5f5;border-radius:4px;display:inline-block;">
+                                owner: {{ object.owner || 'none' }} |
+                                canEdit: {{ canEdit }} |
+                                canDelete: {{ canDelete }} |
+                                auth: {{ authenticated }} |
+                                uid: {{ authStore.user?.thing_id || 'none' }}
+                            </div>
+                        </div>
+
+                        <!-- Warning when editing/deleting another user's object -->
+                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
+                            <i class="bi bi-person-exclamation me-1"></i>
+                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
                         </div>
 
                         <!-- Tabs -->
@@ -70,76 +84,157 @@
                                     {{ $t('Graph') }}
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" :class="{ active: activeTab === 'map' }" @click.prevent="activeTab = 'map'" href="#">
+                                    {{ $t('Map') }}
+                                </a>
+                            </li>
                         </ul>
 
                         <!-- Details -->
                         <div v-show="activeTab === 'details'">
-                            <div class="results-list">
 
-                                <!-- Main object card -->
-                                <div class="result-item">
-                                    <div class="result-content">
-                                        <div class="result-icon-section">
-                                            <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }" class="icon-link">
-                                                <Image
-                                                    :node-id="object.thing_id"
-                                                    :type="object.type"
-                                                    :is-private="!object.public"
-                                                    width="48px"
-                                                    side-bar="right"
-                                                />
+                            <!-- Main object details (title lives in the header above) -->
+                            <div class="details-grid">
+                                <div class="details-main">
+                            <div class="result-item">
+                                <div class="result-content">
+                                    <div class="result-icon-section">
+                                        <RouterLink :to="{ name: 'object', params: { uid: object.thing_id } }" class="icon-link">
+                                            <Image
+                                                :node-id="object.thing_id"
+                                                :type="object.type"
+                                                width="48px"
+                                                side-bar="right"
+                                            />
+                                        </RouterLink>
+                                    </div>
+
+                                    <div class="result-info-section">
+                                        <div v-if="canEdit && editMode" class="visibility-badge"
+                                            :class="object.public ? 'is-public' : 'is-private'"
+                                            @click="toggleObjectVisibility(object.public ? false : true)"
+                                            :title="$t('Toggle visibility')">
+                                            <IconPublic v-if="object.public" class="visibility-icon" />
+                                            <IconPrivate v-else class="visibility-icon" />
+                                            <span>{{ object.public ? $t('Public') : $t('Private') }}</span>
+                                        </div>
+
+                                        <div v-for="cls in $getClassesList(object)" :key="cls.thing_id" class="class-badge">
+                                            <Image :node-id="cls.thing_id" width="12px" class="class-badge-icon" />
+                                            <RouterLink :to="{ name: 'object', params: { uid: cls.thing_id } }" class="class-badge-link">
+                                                {{ $objectName(cls) }}
                                             </RouterLink>
                                         </div>
 
-                                        <div class="result-info-section">
-                                            <div class="result-header">
-                                                <div class="result-title">{{ object.name }}</div>
-                                            </div>
-
-                                            <div v-if="object.class" class="class-badge">
-                                                <Image :node-id="object.class.thing_id" width="12px" class="class-badge-icon" />
-                                                <RouterLink :to="{ name: 'object', params: { uid: object.class.thing_id } }" class="class-badge-link">
-                                                    {{ object.class.name }}
-                                                </RouterLink>
-                                            </div>
-
-                                            <div v-if="object.start || object.end || object.description" class="result-description">
-                                                <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="object.start">{{ $dateFromDb(object.start) }}</template>
-                                                        <template v-if="object.start && object.end"> → </template>
-                                                        <template v-else-if="object.end">{{ $t('until') }} </template>
-                                                        <template v-if="object.end">{{ $dateFromDb(object.end) }}</template>
+                                        <div v-if="object.start || object.end || object.description" class="result-description">
+                                            <span v-if="object.start || object.end" class="inline-date" style="margin-right: 8px;">
+                                                <span class="date-badge">
+                                                    📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
+                                                </span>
+                                                <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
+                                                    <span v-if="!confirmedDate && isPlanned" :class="isPastPlan ? 'unconfirmed-badge' : 'planned-badge'">
+                                                        {{ isPastPlan ? $t('dates.not_confirmed') : $t('dates.planned') }}
+                                                        <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
-                                                </span>
-                                                <span v-if="object.description">{{ object.description }}</span>
-                                            </div>
+                                                    <button
+                                                        v-if="!confirmedDate && canConfirmPlanned"
+                                                        class="confirm-badge"
+                                                        :title="$t('dates.confirm_hint')"
+                                                        @click="confirmPlanned"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirm') }}
+                                                    </button>
+                                                    <span
+                                                        v-else-if="confirmedDate"
+                                                        class="confirm-badge confirm-badge--done"
+                                                        :title="$t('dates.confirmed_title')"
+                                                    >
+                                                        <IconCheck />
+                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
+                                                    </span>
+                                                </template>
+                                            </span>
+                                            <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
+                                        </div>
 
-                                            <div v-if="object.record_created || object.record_updated" class="result-meta mt-1">
-                                                <span v-if="object.record_created" class="result-meta-row">
-                                                    {{ $t('Created') }}: {{ object.record_created }}
-                                                </span>
-                                                <span v-if="object.record_updated" class="result-meta-row">
-                                                    {{ $t('Updated') }}: {{ object.record_updated }}
-                                                </span>
-                                            </div>
+                                        <div v-if="object.record_created || object.record_updated || object.owner" class="result-meta mt-1">
+                                            <span v-if="object.record_created" class="result-meta-row">
+                                                {{ $t('Created') }}: {{ object.record_created }}
+                                            </span>
+                                            <span v-if="object.record_updated" class="result-meta-row">
+                                                {{ $t('Updated') }}: {{ object.record_updated }}
+                                            </span>
+                                            <span v-if="object.owner" class="result-meta-row">
+                                                {{ $t('Owner') }}:
+                                                <RouterLink
+                                                    v-if="object.owner_name"
+                                                    :to="{ name: 'object', params: { uid: object.owner } }"
+                                                    class="owner-link"
+                                                >
+                                                    {{ object.owner_name }}
+                                                </RouterLink>
+                                                <template v-else>{{ object.owner }}</template>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <!-- Separator before links -->
-                                <div v-if="object.links && object.links.length" class="result-separator"></div>
+                            <!-- Properties (data.properties): coordinates + other property values -->
+                            <div v-if="propertyEntries.length" class="result-separator"></div>
+                            <div v-if="propertyEntries.length" class="properties-section">
+                                <div class="properties-title">{{ $t('Properties') }}</div>
+                                <div class="properties-list">
+                                    <div v-for="p in propertyEntries" :key="p.property_id" class="property-row">
+                                        <span class="property-name">{{ p.name }}</span>
+                                        <span class="property-value">{{ p.text }}</span>
+                                        <a
+                                            v-if="p.isGeo"
+                                            class="property-map-link"
+                                            href="#"
+                                            :title="$t('Show on map')"
+                                            @click.prevent="activeTab = 'map'"
+                                        >
+                                            <i class="bi bi-geo-alt"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                                </div>
+                                <div v-if="hasGeoPreview" class="details-side">
+                                    <ObjectMapPreview ref="mapPreviewRef" :object="object" />
+                                </div>
+                            </div>
 
-                                <!-- Links list -->
-                                <div v-for="link in (object.links || [])" :key="link.link_id" class="result-item">
+                            <!-- Separator before links -->
+                            <div v-if="visibleLinks.length" class="result-separator"></div>
+
+                            <!-- Links list -->
+                            <div v-if="visibleLinks.length" class="results-list">
+                                <div v-for="(link, linkIndex) in visibleLinks" :key="link.link_id"
+                                    class="result-item object-link-item"
+                                    @mouseenter="hoveredLink = linkIndex"
+                                    @mouseleave="hoveredLink = null">
+                                    <!-- Date-group divider: the related object's date lives
+                                         here, so the per-link date row below is omitted. -->
+                                    <div v-if="linkDateDividers[linkIndex]" class="date-group-header">
+                                        <span class="date-group-date">
+                                            📅 {{ $flexibleDateFormatShort(link.start, link.end, link.start_meta, link.end_meta) }}
+                                        </span>
+                                        <span class="date-group-line"></span>
+                                        <template v-if="linkDateDividers[linkIndex].center">
+                                            <span class="date-group-label">{{ linkDateDividers[linkIndex].center.label }}</span>
+                                            <span class="date-group-line"></span>
+                                        </template>
+                                    </div>
                                     <div class="result-content">
                                         <div class="result-icon-section">
                                             <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="icon-link">
                                                 <Image
                                                     :node-id="getLinkTargetId(link)"
                                                     :type="link.type"
-                                                    :is-private="!link.public"
                                                     width="48px"
                                                     side-bar="right"
                                                 />
@@ -148,31 +243,24 @@
 
                                         <div class="result-info-section">
                                             <div class="result-header">
-                                                <div class="result-title" v-if="link.name">
+                                                <div class="result-title" v-if="getLinkTargetName(link)">
                                                     <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="title-link">
-                                                        {{ link.name }}
+                                                        {{ getLinkTargetName(link) }}
                                                     </RouterLink>
+                                                    <IconPrivate v-if="authenticated && !link.target_public" class="private-icon-link" @click="toggleLinkVisibility(link, true)" />
+                                                    <IconPublic v-if="authenticated && link.target_public && hoveredLink === linkIndex" class="public-icon-link" @click="toggleLinkVisibility(link, false)" />
                                                 </div>
                                             </div>
 
-                                            <div v-if="link.start || link.end || link.description" class="result-description">
-                                                <span v-if="link.start || link.end" class="inline-date" style="margin-right: 8px;">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="link.start">{{ $dateFromDb(link.start) }}</template>
-                                                        <template v-if="link.start && link.end"> → </template>
-                                                        <template v-if="link.end">{{ $dateFromDb(link.end) }}</template>
-                                                    </span>
-                                                </span>
-                                                <span v-if="link.description">{{ $truncateText(link.description, 300) }}</span>
+                                            <div v-if="link.description" class="result-description">
+                                                <span>{{ $truncateText(link.description, 300) }}</span>
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
-                                                <span v-if="link.link_start" class="result-meta-row">
-                                                    {{ $t('Link start') }}: {{ $dateFromDb(link.link_start) }}
-                                                </span>
-                                                <span v-if="link.link_end" class="result-meta-row">
-                                                    {{ $t('Link end') }}: {{ $dateFromDb(link.link_end) }}
+                                                <span class="result-meta-row">
+                                                    <span class="date-badge">
+                                                        📅 {{ $flexibleDateFormat(link.link_start, link.link_end, link.link_start_meta, link.link_end_meta) }}
+                                                    </span>
                                                 </span>
                                             </div>
 
@@ -180,24 +268,117 @@
                                                 <LinkDescription :link="link" :object="object" size="small" />
                                             </div>
 
-                                            <div v-if="link.translation" class="link-translation mt-1">
-                                                {{ link.translation }}
+                                            <div v-if="link.description" class="link-comment mt-1">
+                                                {{ link.description }}
                                             </div>
 
-                                            <div v-if="authenticated" class="link-actions">
+                                            <div v-if="authenticated && editMode" class="link-actions">
                                                 <button class="btn btn-primary btn-sm" @click="openEditLinkModal(link)">{{ $t('Edit') }}</button>
                                                 <button class="btn btn-danger btn-sm" @click="deleteLink(link.link_id)">{{ $t('Delete') }}</button>
+                                            </div>
+                                        </div>
+
+                                        <!-- RIGHT: related items of this link's target (compact, like search results) -->
+                                        <div
+                                            v-if="link.target && relatedItems(link).length > 0"
+                                            class="result-links-section"
+                                        >
+                                            <div class="links-container">
+                                                <div class="links-list">
+                                                    <template v-if="!expandedRelatedLinks.has(link.link_id)">
+                                                        <div
+                                                            v-for="(rl, rlIndex) in relatedItems(link).slice(0, 3)"
+                                                            :key="`${rl.link_id}-${rlIndex}`"
+                                                            class="link-item"
+                                                        >
+                                                            <LinkDescription :link="rl" :object="link.target" size="small" hide-object-name />
+                                                        </div>
+                                                        <button
+                                                            v-if="relatedItems(link).length > 3"
+                                                            type="button"
+                                                            class="more-links"
+                                                            @click="toggleLinkRelated(link)"
+                                                        >
+                                                            +{{ relatedItems(link).length - 3 }} more
+                                                        </button>
+                                                    </template>
+                                                    <RelatedList
+                                                        v-else
+                                                        :links="relatedItems(link)"
+                                                        :level="1"
+                                                        :filters="viewFilters"
+                                                        :on-expand="expandLinkTarget"
+                                                        :exclude-id="object?.thing_id"
+                                                        :parent="link.target"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                             </div>
+
+                            <!-- No rows match the active class/link-type filter -->
+                            <div
+                                v-else-if="filtersReady && object.links && object.links.length"
+                                class="no-filter-matches text-muted"
+                            >
+                                {{ $t('No related objects match the current filters') }}
+                            </div>
+
+                            <!-- Separator before external links -->
+                            <div v-if="object.external_links && object.external_links.length" class="result-separator"></div>
+
+                            <!-- External links list -->
+                            <div v-for="el in (object.external_links || [])" :key="el.id"
+                                class="result-item">
+                                <div class="result-content">
+                                    <div class="result-icon-section">
+                                        <img v-if="!el._faviconError" :src="faviconUrl(el.url)" :alt="getExternalLinkMeta(el.url).domain"
+                                            width="48" height="48" class="external-link-favicon"
+                                            @error="el._faviconError = true" />
+                                        <span v-else class="external-link-icon-wrap">
+                                            <IconExternal class="external-link-icon" />
+                                        </span>
+                                    </div>
+
+                                    <div class="result-info-section">
+                                        <div class="result-header">
+                                            <div class="result-title">
+                                                <a v-if="!isInternalUrl(el.url)" :href="el.url" target="_blank"
+                                                    rel="noopener noreferrer" class="title-link external-link-title">
+                                                    {{ getExternalLinkMeta(el.url).label }}
+                                                </a>
+                                                <RouterLink v-else :to="el.url" class="title-link">
+                                                    {{ getExternalLinkMeta(el.url).label }}
+                                                </RouterLink>
+                                            </div>
+                                        </div>
+
+                                        <div class="result-description">
+                                            <a v-if="!isInternalUrl(el.url)" :href="el.url" target="_blank"
+                                                rel="noopener noreferrer" class="external-link-url">
+                                                {{ el.url }}
+                                            </a>
+                                            <RouterLink v-else :to="el.url" class="external-link-url">
+                                                {{ el.url }}
+                                            </RouterLink>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
 
                         <!-- Graph -->
                         <div v-show="activeTab === 'graph'">
                             <Graph v-if="graphInitialized" ref="graphComponentRef" :object="object" />
+                        </div>
+
+                        <!-- Map -->
+                        <div v-show="activeTab === 'map'">
+                            <ObjectMap v-if="mapInitialized" ref="mapComponentRef" :object="object" />
                         </div>
 
                     </div>
@@ -244,22 +425,51 @@
             @save="handleNewLinkSave"
             @close="showCreateLinkModal = false"
         />
+        <ConfirmModal
+            :show="showConfirmModal"
+            :title="confirmTitle"
+            :message="confirmMessage"
+            :confirm-text="confirmButtonText"
+            :variant="confirmVariant"
+            @confirm="handleConfirm"
+            @cancel="showConfirmModal = false"
+        />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick, inject } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, inject, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
+import { fieldText, currentLocale } from '../utils/localized';
+import { dateBucket } from '../utils/dateGroupings';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
-import Graph from './Graph.vue';
+import { useObjectViewStore } from '@/stores/objectView';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
+import { useUiStore } from '../stores/ui';
+import { filterLinks } from '../utils/relatedFilters';
+import { eventBus } from '../eventBus';
 import Image from "./Image.vue";
+import RelatedList from './RelatedList.vue';
+import { useRelatedExpansion } from '../composables/useRelatedExpansion';
+import IconExternal from './icons/IconExternal.vue';
+import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
+import IconPrivate from './icons/IconPrivate.vue';
+import IconPublic from './icons/IconPublic.vue';
+import IconCheck from './icons/IconCheck.vue';
+import ConfirmModal from './ConfirmModal.vue';
+import { buildPropertyEntries } from '../utils/properties.js';
+import { UUID } from '../constants/uuid';
+import { buildMapFeatures } from '../utils/geo.js';
+
+const Graph = defineAsyncComponent(() => import('./Graph.vue'));
+const ObjectMap = defineAsyncComponent(() => import('./ObjectMap.vue'));
+const ObjectMapPreview = defineAsyncComponent(() => import('./ObjectMapPreview.vue'));
 
 // Inject thumbnail function (provided by Default.vue)
 const getThumbUrl = inject('getThumbUrl');
@@ -270,10 +480,163 @@ const { t } = useI18n();
 const authStore = useAuthStore();
 const cacheStore = useObjectCacheStore();
 const objectsStore = useObjectsStore();
+const uiStore = useUiStore();
+const editMode = computed(() => uiStore.editMode);
 
 const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
+
+// The class/link-type filter set by the left panel (checked = visible).
+// These drive the Details links list below (and, separately, Graph.vue).
+// `filtersReady` is false until the panel publishes its first selection, so
+// nothing is hidden before then.
+const objectViewStore = useObjectViewStore();
+const filtersReady = computed(() => objectViewStore.filtersReady);
+// {classIds, linkTypeIds} shape used by components that need both together;
+// null until the panel has published its first selection.
+const viewFilters = computed(() => objectViewStore.filtersReady
+    ? { classIds: objectViewStore.selectedClasses, linkTypeIds: objectViewStore.selectedLinkTypes }
+    : null);
+// Direct link rows after the current filter.
+const visibleLinks = computed(() => {
+    const links = object.value?.links || [];
+    if (!objectViewStore.filtersReady) return links;
+    return filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes);
+});
+
+const { loadDeeper } = useRelatedExpansion();
+
+// Related items shown in a link's right-column panel: the target's links,
+// filtered like the main list and minus the object currently being viewed
+// (a back-link to it is redundant).
+const relatedItems = (link) => {
+    const links = link.target?.links || [];
+    const filtered = objectViewStore.filtersReady
+        ? filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes)
+        : links;
+    return filtered.filter(l => l.target?.thing_id !== object.value?.thing_id);
+};
+
+// Load one more level of related objects for a link's target on demand.
+const expandLinkTarget = async (link) => {
+    const targetId = link.target?.thing_id;
+    if (!targetId) return;
+    try {
+        const deeper = await loadDeeper(targetId, 1);
+        link.target.links = deeper.filter(l => l.target?.thing_id !== object.value?.thing_id);
+    } catch (error) {
+        console.error('Object.vue - failed to load deeper related objects:', error);
+    }
+};
+
+// Per-link related-subtree visibility on the object page.
+const expandedRelatedLinks = ref(new Set());
+const toggleLinkRelated = async (link) => {
+    const key = link.link_id;
+    const set = new Set(expandedRelatedLinks.value);
+    if (set.has(key)) {
+        set.delete(key);
+        expandedRelatedLinks.value = set;
+        return;
+    }
+    if (!relatedItems(link).length) {
+        await expandLinkTarget(link);
+    }
+    set.add(key);
+    expandedRelatedLinks.value = set;
+};
+
+// ─── Properties shown in the Details tab ────────────────────────────────
+// The object's `data.properties` map holds values keyed by property thing_id.
+// Property names come from GET /api/v1/properties (loaded once, cached across
+// page loads), and each value is formatted for display (coordinates get a
+// readable lat/lng summary and a link to the Map tab).
+let propertyDefinitionsData = null; // module-level cache
+const propertyDefinitions = ref(null);
+const loadPropertyDefinitions = async () => {
+    if (propertyDefinitionsData) {
+        propertyDefinitions.value = propertyDefinitionsData;
+        return;
+    }
+    try {
+        const res = await axios.get('/properties');
+        const data = res.data?.data;
+        propertyDefinitionsData = Array.isArray(data) ? data : [];
+    } catch (error) {
+        propertyDefinitionsData = [];
+        console.error('Object.vue - failed to load property definitions:', error);
+    }
+    propertyDefinitions.value = propertyDefinitionsData;
+};
+
+// Property rows for the Details tab: name + formatted value (+ geo flag).
+const propertyEntries = computed(() =>
+    buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
+);
+
+// ─── Quick visibility toggle state ─────────────────────────────────
+const hoveredLink = ref(null);
+let quickMode = false;
+const showConfirmModal = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmButtonText = ref('');
+const confirmVariant = ref('primary');
+let pendingToggle = null;
+
+const toggleObjectVisibility = (makePublic) => {
+    if (!object.value) return;
+    doToggle(object.value.thing_id, makePublic, () => {
+        object.value.public = makePublic ? 1 : 0;
+    });
+};
+
+const toggleLinkVisibility = (link, makePublic) => {
+    if (!link) return;
+    const linkId = getLinkTargetId(link);
+    doToggle(linkId, makePublic, () => {
+        link.target_public = makePublic ? 1 : 0;
+    });
+};
+
+const doToggle = (thingId, makePublic, onSuccess) => {
+    if (quickMode) {
+        executeToggle(thingId, makePublic, onSuccess);
+        return;
+    }
+    if (makePublic) {
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
+        confirmVariant.value = 'danger';
+    }
+    pendingToggle = { thingId, makePublic, onSuccess };
+    showConfirmModal.value = true;
+};
+
+const handleConfirm = () => {
+    showConfirmModal.value = false;
+    if (!pendingToggle) return;
+    const { thingId, makePublic, onSuccess } = pendingToggle;
+    pendingToggle = null;
+    quickMode = true;
+    executeToggle(thingId, makePublic, onSuccess);
+};
+
+const executeToggle = async (thingId, makePublic, onSuccess) => {
+    try {
+        await axios.patch(`/object/${thingId}/visibility`, { public: makePublic ? 1 : 0 });
+        if (onSuccess) onSuccess();
+    } catch (error) {
+        console.error('Failed to toggle visibility:', error);
+    }
+};
 
 const activeTab = ref(localStorage.getItem('globalActiveTab') || 'details');
 
@@ -291,13 +654,20 @@ const newLinkData = ref(null);
 
 const graphInitialized = ref(false);
 const graphComponentRef = ref(null);
+const mapInitialized = ref(false);
+const mapComponentRef = ref(null);
+const mapPreviewRef = ref(null);
+
+// Whether anything on this page has coordinates (object itself or a related
+// object) — controls the small map preview on the Details tab.
+const hasGeoPreview = computed(() => buildMapFeatures(object.value).length > 0);
 
 const defaultLinkedObjects = computed(() => {
     const links = [];
     if (object.value) {
         links.push({
             other_thing_id: object.value.thing_id,
-            link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
+            link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
             description: `Linked to ${object.value.name}`,
         });
     }
@@ -307,19 +677,150 @@ const defaultLinkedObjects = computed(() => {
 const createLinkedParams = computed(() => ({ type: 3 }));
 const authenticated = computed(() => authStore?.authenticated || false);
 
+// System default owner UUIDs indicate objects that were created without an
+// explicit owner (the DB defaulted to VICTOR_FOKIN in older versions, or
+// SYSTEM_OWNER in newer ones). Treat them as unowned — any authenticated user
+// may edit/delete such objects. A null/undefined owner is also unowned.
+// NOTE: UUID.VICTOR_FOKIN is an ordinary identity (never a system owner) and
+// therefore does NOT grant everyone edit rights.
+const isSystemDefaultOwner = (uid) => !uid || uid === UUID.SYSTEM_OWNER;
+
+// Whether the current user may edit this object's own fields. Admins may edit
+// any object (system-owned ones included); everyone else only their own.
+// Links are always editable by authenticated users, so the Link/Create buttons
+// and the per-link Edit/Delete actions stay enabled regardless.
+const canEdit = computed(() => {
+    if (!authenticated.value) return false;
+    if (authStore.user?.is_admin) return true;
+    const uid = object.value?.owner;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
+});
+
+// Delete follows the same rule as edit: admins may delete any object,
+// everyone else only their own (the DELETE endpoint enforces this too).
+const canDelete = computed(() => {
+    if (!authenticated.value) return false;
+    if (authStore.user?.is_admin) return true;
+    const uid = object.value?.owner;
+    if (isSystemDefaultOwner(uid)) return true;
+    return authStore.user?.thing_id === uid;
+});
+
+// True when the viewed object belongs to a different account than the current
+// user. Editing/deleting such an object is an admin-only power for now, and the
+// UI warns about it — the check is written generically so it will also cover
+// future non-owner edit permissions.
+const isOtherOwnerObject = computed(() => {
+    if (!authenticated.value || !object.value?.owner) return false;
+    const uid = object.value.owner;
+    if (isSystemDefaultOwner(uid)) return false;
+    return uid !== authStore.user?.thing_id;
+});
+
+// ── Planned / confirmed (things.data JSON + future start) ────────────────
+// Canonical "now" (same digit-string shape as the DB's start column).
+function canonicalNow() {
+    const d = new Date();
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+const markedPlannedDate = computed(() => object.value?.data?.planned || null);
+const hasFutureStart = computed(() =>
+    !!object.value?.start && BigInt(String(object.value.start)) > BigInt(canonicalNow())
+);
+
+// A "plan" is an object with a future start date that hasn't been confirmed
+// yet. Explicitly-marked plans (data.planned) stay plans even after their date
+// passes; unmarked future-dated objects (created before this feature, or via
+// import) are derived as plans from their start date.
+const isPlanned = computed(() =>
+    !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
+);
+
+// An explicitly-marked plan whose date has already passed without being
+// confirmed. The badge reads "not confirmed" (amber) for these instead of
+// "planned", prompting the owner to confirm or clear it. Without a start date
+// there is nothing to judge as passed, so those stay "planned".
+const isPastPlan = computed(() =>
+    !confirmedDate.value && !!markedPlannedDate.value && !!object.value?.start && !hasFutureStart.value
+);
+
+// Distinguishes a past-dated *plan* from a backdated record. Pre-feature and
+// imported plans carry no data.planned marker, so once their date passes
+// isPlanned() flips false — but they were created while their start was still
+// in the future. An object created *after* its own start date (a backdated
+// record of something that already happened) was never a plan and must not
+// show the confirm button.
+const wasFutureDatedAtCreation = computed(() => {
+    const start = object.value?.start;
+    const created = object.value?.record_created;
+    if (!start || !created) return false;
+    // record_created arrives as "YYYY-MM-DD HH:MM:SS"; normalize to the same
+    // YYYYMMDDHHMMSS digit shape as the DB's start column.
+    const createdCanonical = String(created).replace(/[^\d]/g, '').slice(0, 14);
+    return BigInt(createdCanonical) < BigInt(String(start));
+});
+
+// The owner (or an admin) may confirm that a planned object happened. This
+// also covers past-dated objects that were auto-detected as plans (had a
+// future start date at creation but no explicit data.planned marker) — once
+// the date passes, isPlanned goes false but the owner should still be able
+// to confirm.
+const canConfirmPlanned = computed(() =>
+    canEdit.value && !confirmedDate.value && (isPlanned.value || wasFutureDatedAtCreation.value)
+);
+
+const confirmPlanned = async () => {
+    if (!object.value) return;
+    try {
+        const res = await axios.patch(`/object/${object.value.thing_id}/confirm`);
+        if (res.data?.data?.confirmed) {
+            object.value.data = {
+                ...(object.value.data || {}),
+                planned: res.data.data.planned || object.value.data?.planned,
+                confirmed: res.data.data.confirmed,
+            };
+        }
+    } catch (error) {
+        console.error('Failed to confirm planned object:', error);
+    }
+};
+
 const getLinkTargetId = (link) => {
     if (!object.value) return link.thing_id;
     return link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id;
 };
 
+// The API exposes both endpoint names (link.name = other_thing_id,
+// link.one_name = one_thing_id); pick the one that matches the target.
+const getLinkTargetName = (link) => {
+    const targetId = getLinkTargetId(link);
+    const name = targetId === link.one_thing_id ? (link.one_name || link.name) : (link.name || link.one_name);
+    const translations = targetId === link.one_thing_id ? link.one_name_translations : link.name_translations;
+    // Use name_translations for localized display when available
+    if (translations) {
+        return fieldText(name, translations, currentLocale());
+    }
+    return name;
+};
+
 const getObject = async () => {
     try {
-        loaded.value = false;
-        serverError.value = false;
-        const response = await axios.get(`/object/${route.params.uid}`);
+        loadPropertyDefinitions(); // names for the Details-tab property rows (cached)
+        // depth=2 attaches a `target` to each direct link AND pre-fills the
+        // related items of those targets, so the right-column panel can show
+        // a compact summary of each link's related objects immediately.
+        const response = await axios.get(`/object/${route.params.uid}?depth=2`);
         object.value = response.data.data;
+        serverError.value = false;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
+            // The left panel lists classes/link types of the neighborhood; let
+            // it refresh after a reload caused by an edit.
+            eventBus.emit('object-details-changed', object.value.thing_id);
         }
     } catch (error) {
         console.error('Get object error:', error);
@@ -375,8 +876,8 @@ const openCreateLinkModal = () => {
     newLinkData.value = {
         one_thing_id: object.value.thing_id,
         other_thing_id: null,
-        link_type_id: '2da45f14-69c6-4d56-9f2f-809fda14abf5',
-        translation: '',
+        link_type_id: '4b27fd0c-d8be-425c-a529-2186b2589e76',
+        description: '',
         link_id: null,
         link_start: null,
         link_end: null,
@@ -386,7 +887,10 @@ const openCreateLinkModal = () => {
 
 const deleteObject = async () => {
     if (!object.value) return;
-    if (!confirm(t('Are you sure you want to delete this object?'))) return;
+    const confirmMessage = canDelete.value && isOtherOwnerObject.value
+        ? `${t('You are going to delete the object that belongs to {owner}.', { owner: object.value.owner_name || t('another user') })} ${t('Are you sure you want to delete this object?')}`
+        : t('Are you sure you want to delete this object?');
+    if (!confirm(confirmMessage)) return;
     try {
         await axios.delete(`/object/${object.value.thing_id}`);
         if (object.value.type === 2) {
@@ -432,9 +936,11 @@ const updateLink = async (linkData) => {
             one_thing_id: linkData.one_thing_id,
             other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
-            translation: linkData.translation,
+            description: linkData.description,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
             link_id: linkData.link_id
         };
         if (linkData.link_id) {
@@ -455,9 +961,11 @@ const createLink = async (linkData) => {
             one_thing_id: linkData.one_thing_id,
             other_thing_id: linkData.other_thing_id,
             link_type_id: linkData.link_type_id,
-            translation: linkData.translation,
+            description: linkData.description,
             link_start: linkData.link_start,
             link_end: linkData.link_end,
+            link_start_meta: linkData.link_start_meta,
+            link_end_meta: linkData.link_end_meta,
         };
         await axios.post(`/link`, payload);
         await getObject();
@@ -484,14 +992,67 @@ const handleLinkedObjectCreated = async () => {
     await getObject();
 };
 
+// ─── Date-group dividers for the related-links list ─────────────────────────
+// Same pattern as the main search results: the related object's date sits on a
+// one-line divider (first divider of a month also centers the month/year), so
+// the per-link date rows can be dropped. See utils/dateGroupings.js.
+function relatedMonthLabel(coarseKey) {
+    if (!coarseKey) return null;
+    if (coarseKey[0] === 'y') {
+        const y = Number(coarseKey.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = coarseKey.match(/^m(-?\d+)-(\d{2})$/);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const label = new Intl.DateTimeFormat(currentLocale(), { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
+}
+
+const linkDateDividers = computed(() => {
+    const links = object.value?.links;
+    if (!Array.isArray(links)) return [];
+    const dividers = new Array(links.length).fill(null);
+    let lastBucket = null;
+    let lastCoarse = null;
+    links.forEach((link, i) => {
+        const bucket = dateBucket(link.start);
+        if (!bucket) return;
+        const newBucket = bucket.key !== lastBucket;
+        const firstOfMonth = bucket.coarse !== lastCoarse;
+        if (!newBucket && !firstOfMonth) return;
+        dividers[i] = {
+            bucket,
+            center: firstOfMonth ? { label: relatedMonthLabel(bucket.coarse) } : null,
+        };
+        lastBucket = bucket.key;
+        lastCoarse = bucket.coarse;
+    });
+    return dividers;
+});
+
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
     return object.value.links.map(link => ({
-        other_thing_id: link.one_thing_id === object.value.thing_id ? link.other_thing_id : link.one_thing_id,
-        link_type_id: link.link_type_id,
-        description: link.translation || '',
-        link_id: link.link_id,
+        // Pass through the link's actual direction. The currently edited object
+        // may be on either end (the direction can be swapped), so normalizing
+        // one_thing_id to the current object would silently flip incoming links.
         one_thing_id: link.one_thing_id,
+        other_thing_id: link.other_thing_id,
+        link_type_id: link.link_type_id,
+        description: link.description || '',
+        link_id: link.link_id,
+        // Flexible-date columns (canonical strings + jsonb meta) so the
+        // edit-modal link rows can edit them.
+        link_start: link.link_start || null,
+        link_end: link.link_end || null,
+        link_start_meta: link.link_start_meta || null,
+        link_end_meta: link.link_end_meta || null,
+        // Endpoint names from the API (name = other_thing_id, one_name = one_thing_id)
+        // so the edit-modal preview resolves immediately.
+        name: link.name || null,
+        one_name: link.one_name || null,
     }));
 });
 
@@ -499,20 +1060,31 @@ onMounted(() => {
     if (activeTab.value === 'graph') {
         graphInitialized.value = true;
     }
+    if (activeTab.value === 'map') {
+        mapInitialized.value = true;
+    }
     getObject();
 });
 
 watch(() => route.params.uid, (newUid, oldUid) => {
     if (newUid && newUid !== oldUid) {
-        object.value = null;
-        loaded.value = false;
-        serverError.value = false;
+        // Keep the current view (header/tabs/graph) mounted while the next
+        // object loads — swap its content in place instead of flashing a
+        // full-page spinner. Failure branches (not-found/error) replace the
+        // view only when the request actually fails.
         getObject();
     }
 });
 
 watch(activeTab, (newTab) => {
     localStorage.setItem('globalActiveTab', newTab);
+    if (newTab === 'details') {
+        // The preview mounts inside a v-show container; Leaflet keeps a stale
+        // size while the tab was hidden, so re-measure on return.
+        nextTick(() => {
+            if (mapPreviewRef.value) mapPreviewRef.value.invalidate();
+        });
+    }
     if (newTab === 'graph') {
         if (!graphInitialized.value) {
             graphInitialized.value = true;
@@ -522,16 +1094,26 @@ watch(activeTab, (newTab) => {
             });
         }
     }
+    if (newTab === 'map') {
+        if (!mapInitialized.value) {
+            mapInitialized.value = true;
+        } else {
+            nextTick(() => {
+                if (mapComponentRef.value) mapComponentRef.value.refreshView();
+            });
+        }
+    }
 }, { immediate: true });
 
 watch(() => object.value, (newObject) => {
+    // updateData diffs the mounted graph to the new object (add/remove nodes).
+    // While the graph tab is hidden, its container has no size — the activeTab
+    // watcher calls refreshView() when the tab is next shown to re-fit it.
     if (graphInitialized.value && graphComponentRef.value && newObject) {
         graphComponentRef.value.updateData(newObject);
-        if (activeTab.value === 'graph') {
-            setTimeout(() => {
-                if (graphComponentRef.value) graphComponentRef.value.refreshView();
-            }, 200);
-        }
+    }
+    if (mapInitialized.value && mapComponentRef.value && newObject) {
+        mapComponentRef.value.updateData(newObject);
     }
 }, { deep: true });
 </script>
@@ -632,10 +1214,72 @@ watch(() => object.value, (newObject) => {
     align-items: center;
     gap: 4px;
 }
-.link-translation {
+.owner-link {
+    color: #adb5bd;
+    text-decoration: underline;
+}
+.owner-link:hover {
+    color: #6c757d;
+}
+.link-comment {
     font-size: 0.75rem;
     color: #6c757d;
     font-style: italic;
+}
+.planned-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #0d6efd;
+    background: rgba(13, 110, 253, 0.1);
+    border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+/* Past plans that were never confirmed need attention — amber warning badge
+   instead of the blue "planned" one. */
+.unconfirmed-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.confirm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #198754;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.confirm-badge:hover {
+    background: #157347;
+}
+.confirm-badge--done {
+    background: #198754;
+    opacity: 0.85;
+    cursor: default;
 }
 .link-actions {
     margin-top: 8px;
@@ -646,6 +1290,64 @@ watch(() => object.value, (newObject) => {
     margin-top: 0.75rem;
     border-bottom: 1px solid #e9ecef;
 }
+/* Details tab: main details on the left, small map preview on the right */
+.details-grid {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+.details-main {
+    flex: 1;
+    min-width: 0;
+}
+.details-side {
+    width: 300px;
+    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .details-grid {
+        flex-direction: column;
+    }
+    .details-side {
+        width: 100%;
+    }
+}
+.properties-section {
+    margin-top: 0.25rem;
+}
+.properties-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 6px;
+}
+.properties-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.property-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+.property-name {
+    color: #6c757d;
+    min-width: 140px;
+}
+.property-value {
+    color: #212529;
+}
+.property-map-link {
+    color: #0d6efd;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.property-map-link:hover {
+    color: #0056b3;
+}
 .object-header {
     display: flex;
     justify-content: space-between;
@@ -654,15 +1356,42 @@ watch(() => object.value, (newObject) => {
     margin-bottom: 20px;
 }
 .object-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
     font-size: 2rem;
     font-weight: 600;
 }
-.private-icon-header {
-    font-size: 1rem;
+.visibility-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.visibility-badge.is-public {
+    background: #d4edda;
+    color: #155724;
+}
+.visibility-badge.is-private {
+    background: #f8d7da;
+    color: #721c24;
+}
+.visibility-badge:hover {
+    filter: brightness(0.95);
+}
+.private-icon-link {
+    font-size: 0.85rem;
     vertical-align: middle;
+    margin-left: 4px;
+}
+.public-icon-link {
+    font-size: 0.85rem;
+    vertical-align: middle;
+    margin-left: 4px;
 }
 .object-actions {
     display: flex;
@@ -723,5 +1452,80 @@ watch(() => object.value, (newObject) => {
 .spinner-border {
     width: 2rem;
     height: 2rem;
+}
+/* ========== external links ========== */
+.external-link-favicon {
+    border-radius: 6px;
+    background: #f8f9fa;
+    object-fit: contain;
+    padding: 4px;
+}
+.external-link-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    color: #198754;
+}
+.external-link-icon {
+    width: 28px;
+    height: 28px;
+}
+.external-link-title {
+    color: #0d6efd;
+}
+.external-link-url {
+    font-size: 0.85rem;
+    color: #6c757d;
+    word-break: break-all;
+}
+/* The global .more-links is styled for a div; as a button it needs a reset. */
+button.more-links {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+.object-link-item .result-content {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 260px;
+    gap: 1rem;
+    align-items: flex-start;
+}
+.object-link-item .result-links-section {
+    width: 260px;
+    max-width: 260px;
+}
+.object-link-item .date-group-header {
+    margin-bottom: 6px;
+}
+
+/* Date-group divider lines (same pattern as the search results list). */
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+.date-group-label {
+    white-space: nowrap;
+}
+.date-group-date {
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
 }
 </style>

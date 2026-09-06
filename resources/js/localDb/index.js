@@ -168,15 +168,18 @@ export async function getObject(thingId) {
  */
 export async function listObjects(filters = {}) {
     const db = getDb();
-    let query = db.objects.toCollection();
+    // Narrow the scan through the `type` index when a type filter is given —
+    // a full collection scan is the dominant cost of every search/options call.
+    const typeFilter = filters.type !== undefined
+        ? (Array.isArray(filters.type) ? filters.type : [filters.type])
+        : [];
+    let collection = typeFilter.length > 0
+        ? db.objects.where('type').anyOf(typeFilter)
+        : db.objects.toCollection();
 
     // Use Dexie .filter() for complex conditions
-    query = query.filter(obj => {
+    let query = collection.filter(obj => {
         if (obj.deleted && !filters.includeDeleted) return false;
-        if (filters.type !== undefined) {
-            const typeFilter = Array.isArray(filters.type) ? filters.type : [filters.type];
-            if (!typeFilter.includes(obj.type)) return false;
-        }
         if (filters.syncStatus && obj._syncStatus !== filters.syncStatus) return false;
         return true;
     });
@@ -191,6 +194,21 @@ export async function listObjects(filters = {}) {
 }
 
 /**
+ * Case-insensitive substring match against name/description (mirrors the
+ * server's ILIKE term match). Shared by searchObjects and the class-first
+ * search path in the local API handler.
+ *
+ * @param {object} obj
+ * @param {string} term - already lowercased
+ * @returns {boolean}
+ */
+export function matchesSearchText(obj, term) {
+    if (!term) return true;
+    return (obj.name && obj.name.toLowerCase().includes(term)) ||
+        (obj.description && obj.description.toLowerCase().includes(term));
+}
+
+/**
  * Search objects by name or description (case-insensitive).
  *
  * @param {string} searchTerm
@@ -200,12 +218,7 @@ export async function listObjects(filters = {}) {
 export async function searchObjects(searchTerm, filters = {}) {
     const results = await listObjects(filters);
     if (!searchTerm?.trim()) return results;
-
-    const term = searchTerm.toLowerCase();
-    return results.filter(obj =>
-        (obj.name && obj.name.toLowerCase().includes(term)) ||
-        (obj.description && obj.description.toLowerCase().includes(term))
-    );
+    return results.filter(obj => matchesSearchText(obj, searchTerm.trim().toLowerCase()));
 }
 
 /**
@@ -309,6 +322,7 @@ export async function clearAll() {
     await db.objects.clear();
     await db.links.clear();
     await db.media.clear();
+    await db.external_links?.clear();
     await db.pendingChanges.clear();
     await db.syncMetadata.clear();
 }

@@ -21,7 +21,22 @@ const DB_HELPER = {
                 console.log('\n🔄 Running database reset...');
             }
 
-            const resetResponse = await I.sendPostRequest('/api/test/reset');
+            // The test API can transiently reset the connection right after a
+            // heavy phase (e.g. PHPUnit). Retry a few times before giving up.
+            let resetResponse = null;
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    resetResponse = await I.sendPostRequest('/api/test/reset');
+                    break;
+                } catch (err) {
+                    if (attempt === maxAttempts) {
+                        throw err;
+                    }
+                    console.log(`⚠️  Reset attempt ${attempt} failed (${err.message}), retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
 
             if (resetResponse.data.success) {
                 if (!silent) {
@@ -57,12 +72,13 @@ const DB_HELPER = {
     async login(I, user) {
         I.amOnPage('/');
         I.waitForElement('[data-testid="user-dropdown-btn"]', 15);
+        I.wait(2);
         I.click('[data-testid="user-dropdown-btn"]');
         I.waitForElement('[data-testid="user-dropdown-menu"]', 5);
         const loginLinkCount = await I.grabNumberOfVisibleElements('[data-testid="login-link"]');
         if (loginLinkCount > 0) {
-            I.click('[data-testid="login-link"]');
-            I.see('Log in');
+            I.click('[data-testid="login-link"]', null, { force: true });
+            I.waitForElement('[data-testid="login-form"]', 15);
             I.fillField('[data-testid="login-email"]', user.email);
             I.fillField('[data-testid="login-password"]', user.password);
             I.click('[data-testid="login-submit-btn"]');

@@ -26,19 +26,56 @@ export async function bootstrapStandalone() {
     // Seed demo data on first run
     await seedDemoData();
 
+    // Resolve the on-device images folder so thumb URLs are stable from the
+    // first render (offline native builds).
+    try {
+        const { initDeviceThumbs } = await import('../media/deviceImages');
+        await initDeviceThumbs();
+    } catch (e) {
+        // web/browser fallback — no device folder available
+    }
+
     const { useAuthStore } = await import('../stores/auth');
+    const { useIdentityStore } = await import('../stores/identity');
 
     // Register the custom adapter
     axios.defaults.adapter = async (config) => {
         const authStore = useAuthStore();
+        const identityStore = useIdentityStore();
         await authStore.restoreAuth();
         if (authStore.token) {
             config.headers.Authorization = `Bearer ${authStore.token}`;
         }
+        await identityStore.restore();
 
         const url = config.url?.split('?')[0] || '';
         const method = config.method?.toLowerCase() || 'get';
         const data = config.data;
+
+        // In the offline app the (unlocked) PRIMARY identity IS the session
+        // owner: new objects belong to it. `visibleOwners` feeds the owner
+        // visibility filter — null disables filtering (no identity stored yet).
+        const context = {
+            // Only an UNLOCKED identity may own new data offline. authStore's
+            // user is just the session mirror of that identity (set by
+            // identityStore.refreshSession), so we do not fall back to it.
+            userThingId: identityStore.primary?.thingId || null,
+            visibleOwners: identityStore.currentVisibleOwners(),
+        };
+
+        // Guest (no unlocked identity) is read-only: creating/editing/deleting
+        // objects and links requires an identity so the new data has an owner.
+        const isObjectWrite = url.startsWith('/object') && ['post', 'put', 'delete'].includes(method)
+            && !/^\/object\/?$/.test(url); // bare POST /object is a search, not a write
+        const isLinkWrite = url.startsWith('/link') && ['post', 'put', 'delete'].includes(method);
+        if (!context.userThingId && (isObjectWrite || isLinkWrite)) {
+            throw {
+                response: {
+                    status: 403,
+                    data: { message: 'Offline data is read-only until you create or import an identity.' },
+                },
+            };
+        }
 
         let result;
         if (url === '/user' || url === 'user') {
@@ -61,7 +98,7 @@ export async function bootstrapStandalone() {
         } else if (url.startsWith('/link')) {
             result = await handleLocalLinkCall(method, url, data);
         } else {
-            result = await handleLocalApiCall(method, url, data);
+            result = await handleLocalApiCall(method, url, data, context);
         }
 
         return {

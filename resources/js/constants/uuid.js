@@ -11,6 +11,10 @@ export const UUID = {
     G_LINK: 4,
     G_EXTERNAL: 5,
     G_SERVER: 6,
+    G_MODEL: 7,
+
+    // ── System class UUIDs ──
+    G_SERVER_CLASS: 'f8c9f7a6-99ed-4156-81ff-991e8008f377',
 
     // ── System objects (things with these UUIDs exist in every installation) ──
     EVERYTHING:     '939cd822-9e23-450c-8c5e-c23f67cca792',
@@ -46,10 +50,14 @@ export const UUID = {
     INSIDE:         '922cca80-a0ba-4a5e-8344-769f083f0e72',
     VICTOR_FOKIN:   '0ac1b13b-acbf-4246-bed4-8f0c2a8b2546',
     EVIDENCE:       '4eff773a-6bbd-410f-a668-681b41d69051',
+    MEDIA_DEPICTS:  'b4d2a9c2-0001-4c1a-8000-000000000001',
+    SOURCE_CLASS:   'e1d4c1d1-0002-4c1a-8000-000000000001',
+    ARTICLE_CLASS:  'e1d4c1d1-0002-4c1a-8000-000000000002',
     HUMAN:          '4c8ee41a-9912-4dff-8b44-7779a66e4fcf',
     TRIP:           'e3cad1b0-74fa-44b2-9b2f-2adaf36baa14',
     FATHER:         '29cafd84-0fc9-4295-afcc-d73b9613e39f',
     MOTHER:         'b7c887b7-cee4-452d-b491-bd552de79d70',
+    MARRIED_TO:     'eb8fbbab-1f92-42e6-b878-0519b9652ab6',
     PRESENT:        '8811c270-4285-4534-bb2a-c4da1ba850e4',
     PRESENT_AS_ACTOR: '1e53a04c-15cf-49ba-9495-59d1d67500b6',
     EVENT:          '0eed3b56-bdd6-47f0-9413-d9640a9dcafc',
@@ -61,6 +69,7 @@ export const UUID = {
     MEMBER_OF:      '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf',
     GROUP_READ_ACCESS: 'ea206516-9e45-482f-89be-05313f52e5e3',
     BELONGS_TO_USER_GROUP: 'e18d73eb-a5d3-47be-a785-106f6f185651',
+    SYSTEM_OWNER:     'aaaaaaaa-0000-4000-a000-00000000000a',
 
     // ── Link type UUIDs (things of type G_LINK = 4) ──
     LINK_TYPE_CLASS:   'c217c185-742f-4a9f-8e69-acea2b4f5aea',
@@ -73,4 +82,39 @@ export const UUID = {
     // ── Server storage link ──
     // Links a thing to a server it's stored on (same UUID as LINK_TO_STORAGE)
     STORED_ON:         '1dcb897e-0f64-499f-b80d-2cac4a025ed4',
+
+    // ── User preference / history link types ──
+    MY_FAVORITE:       'f0f0f0f0-0001-4000-a000-000000000001',
+    RECENTLY_VIEWED:   'f0f0f0f0-0002-4000-a000-000000000002',
+
+    // ── Identity equivalence link types ──
+    DUPLICATE_OF:      '0dc6915e-b92c-4834-b9a3-091273d0d334',
+    ALSO_KNOWN_AS:     '0a1a2fe7-d4f7-4a85-8514-680cfd518bdb',
+
+    // ── Localization system objects (Property/Language classes, languages) ──
+    PROPERTY_CLASS:    'b1b1b1b1-0001-4000-8000-000000000001',
+    LANGUAGE_CLASS:    'b1b1b1b1-0002-4000-8000-000000000001',
+    PROPERTY_APPLIES_TO: 'b1b1b1b1-0003-4000-8000-000000000001',
+    LANG_EN:           'b1b1b1b1-0011-4000-8000-000000000001',
+    LANG_RU:           'b1b1b1b1-0012-4000-8000-000000000001',
+
+    // ── GEDCOM import system objects ──
+    GEDCOM_CLASS:      '10b04205-aecb-406d-befc-c6362f7ac9fb',
+    IMPORTED_FROM:     '7e58df61-3f99-4a82-9f0d-555a56abfb69',
+
+    // ── Geo system objects (Coordinates property, linked to the Place class) ──
+    PLACE_CLASS:         'dc006cda-047a-4862-acf7-e215355b6890',
+    COORDINATES_PROPERTY: 'c1c1c1c1-0002-4000-8000-000000000001',
+
+    // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
+    // ids mirror database/migrations/2026_08_31_000001_gedcom_event_classes.php
+    BIRTH_CLASS:       'a565fc22-6dae-4b7a-bd9e-30df8bc8acca',
+    DEATH_CLASS:       '6ea018a1-d71c-4655-89b9-9f469b979847',
+    RESIDENCE_CLASS:   'a70ae070-0c52-4a89-84a0-5c76f76e5aa7',
+    OCCUPATION_CLASS:  '7fae11dc-3411-4652-9712-18729bf1e3a7',
+    MARRIAGE_CLASS:    'f5fe8e87-da33-4a40-ad7f-1b62b4e62299',
+    BURIAL_CLASS:      '02a3040c-c9fd-48b7-9f1c-57ef66002aa6',
+    EDUCATION_CLASS:   '5092247b-8fff-475f-b90c-22b29bf59532',
+    CHRISTENING_CLASS: '2e3e8252-47c6-44e0-8804-6083ec506a92',
+    ADDRESS_CLASS:     '42a2e356-8ad1-406a-b78e-db13febf0415',
 };

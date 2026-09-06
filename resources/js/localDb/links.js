@@ -79,6 +79,36 @@ export async function getLink(linkId) {
 }
 
 /**
+ * Find a link by its canonical link_uuid.
+ *
+ * link_uuid is the cross-instance identity of a link; link_id is a local-only
+ * auto-increment PK that differs between instances and must never be used for
+ * matching in the sync layer.
+ *
+ * @param {string} linkUuid
+ * @returns {Promise<object|null>}
+ */
+export async function getLinkByUuid(linkUuid) {
+    const db = getDb();
+    const result = await db.links.where('link_uuid').equals(linkUuid).first();
+    return result ?? null;
+}
+
+/**
+ * Generate a unique local link_id for a link that has no local record yet.
+ * The `link-` prefix marks records minted on this instance (server link_id
+ * values are instance-specific and must not be reused as local PKs).
+ *
+ * @returns {string}
+ */
+export function newLinkId() {
+    // crypto.randomUUID is unavailable outside secure contexts; fall back like
+    // dataLayer does rather than crashing the sync apply.
+    const uuid = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `link-${uuid}`;
+}
+
+/**
  * List links for a given thing (as one_thing_id or other_thing_id).
  *
  * @param {string} thingId

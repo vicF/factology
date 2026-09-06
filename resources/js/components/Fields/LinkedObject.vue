@@ -6,11 +6,21 @@
                 <ObjectField
                     fieldName="one_thing"
                     v-model="link.one_thing_id"
-                    :isEditable="true"
-                    name="First object"
+                    :isEditable="!lockFirst"
+                    :name="lockFirst ? currentObjectDisplayName : 'First object'"
+                    :displayName="lockFirst ? currentObjectDisplayName : null"
                     :type="effectiveObjectType"
+                    :contextObjectType="contextObjectType"
+                    :contextLinkTypeId="contextLinkTypeId"
+                    :contextOneThingId="contextOneThingId"
+                    :excludeUuid="lockFirst ? null : (link.other_thing_id || null)"
                     required
                 />
+                <span
+                    v-if="lockFirst && currentObjectUnsaved"
+                    class="badge badge-unsaved"
+                    :title="$t('This object is not saved yet')"
+                >{{ unsavedLabel }}</span>
             </div>
 
             <div class="form-group flex-group">
@@ -18,42 +28,88 @@
                     fieldName="link_type"
                     v-model="link.link_type_id"
                     :isEditable="true"
-                    name="Link type"
+                    :name="$t('Link type')"
                     :type="LINK_TYPE"
                     required
                     class="flex-field"
                 />
                 <button
+                    type="button"
                     class="btn btn-primary flex-button"
                     @click="swapObjects"
-                    :disabled="!link.one_thing_id || !link.other_thing_id"
+                    :disabled="!link.one_thing_id || !link.other_thing_id || link.one_thing_id === link.other_thing_id"
+                    :title="lockFirst || lockSecond ? $t('Swap direction of the link') : $t('Swap the two objects')"
                 >
-                    Swap
+                    {{ $t('Swap') }}
                 </button>
             </div>
 
             <div class="form-group flex-group">
                 <ObjectField
+                    ref="secondObjectFieldRef"
                     fieldName="other_thing"
                     v-model="link.other_thing_id"
-                    :isEditable="true"
-                    name="Second object"
+                    :isEditable="!lockSecond"
+                    :name="lockSecond ? currentObjectDisplayName : $t('Second object')"
+                    :displayName="lockSecond ? currentObjectDisplayName : null"
                     :type="effectiveObjectType"
+                    :contextObjectType="contextObjectType"
+                    :contextLinkTypeId="contextLinkTypeId"
+                    :contextOneThingId="contextOneThingId"
+                    :excludeUuid="lockSecond ? null : (link.one_thing_id || null)"
                     required
                     class="flex-field"
                 />
-                <button class="btn btn-primary flex-button" @click="openCreateObjectModal">
-                    Create
+                <span
+                    v-if="lockSecond && currentObjectUnsaved"
+                    class="badge badge-unsaved"
+                    :title="$t('This object is not saved yet')"
+                >{{ unsavedLabel }}</span>
+                <button
+                    v-if="!lockSecond"
+                    type="button"
+                    class="btn btn-primary flex-button"
+                    @click="openCreateObjectModal"
+                >
+                    {{ $t('Create') }}
                 </button>
             </div>
 
             <div class="form-group">
                 <textarea
-                    v-model="link.translation"
+                    v-model="link.description"
                     class="form-control"
-                    placeholder="Enter description..."
+                    :placeholder="$t('Enter description...')"
                     rows="2"
                 ></textarea>
+            </div>
+
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <FlexibleDateField
+                        side="start"
+                        :start="link.link_start"
+                        :end="link.link_end"
+                        :startMeta="link.link_start_meta"
+                        :endMeta="link.link_end_meta"
+                        :isEditable="true"
+                        :label="$t('Link start')"
+                        @update:value="applyLinkStartDate"
+                    />
+                </div>
+                <div class="col-md-6">
+                    <FlexibleDateField
+                        side="end"
+                        :start="link.link_start"
+                        :end="link.link_end"
+                        :startMeta="link.link_start_meta"
+                        :endMeta="link.link_end_meta"
+                        :isEditable="true"
+                        :label="$t('Link end')"
+                        :disabled="startSpansDates"
+                        @update:value="applyLinkEndDate"
+                    />
+                </div>
             </div>
 
             <!-- Auto‑generated preview with safe fallback -->
@@ -73,7 +129,7 @@
             </div>
 
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-danger" @click="removeSelf">Delete</button>
+                <button type="button" class="btn btn-danger" @click="removeSelf">{{ $t('Delete') }}</button>
             </div>
         </div>
     </template>
@@ -85,7 +141,12 @@
                 v-model="link.other_thing_id"
                 :isEditable="true"
                 :label="targetLabel"
-                :type="CLASS_TYPE"
+                :type="parentTargetType"
+                :includeAbstract="props.objectType === LINK_TYPE"
+                :contextObjectType="contextObjectType"
+                :contextLinkTypeId="contextLinkTypeId"
+                :contextOneThingId="contextOneThingId"
+                :excludeUuid="currentObject?.thing_id || null"
                 required
                 class="flex-field"
             />
@@ -98,6 +159,7 @@ import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
+import FlexibleDateField from './FlexibleDateField.vue';
 import { CLASS_TYPE, LINK_TYPE, THING_TYPE } from "../../constants.js";
 import { eventBus } from "../../eventBus.js";
 
@@ -109,6 +171,16 @@ const props = defineProps({
     fixedLinkTypeUuid: { type: String, default: null },
     targetLabel: { type: String, default: 'Target object' },
     objectType: { type: Number, default: null },
+    // When true the current object is pinned to this link row: whichever slot
+    // holds it is shown read-only (the object being edited cannot be changed
+    // inside the link row). Used by the EditObject form, where one end of every
+    // link is always the object being edited; swapping direction only moves the
+    // read-only slot to the other end.
+    lockFirstObject: { type: Boolean, default: false },
+    // Marks the fixed first object as "not saved yet" (create mode).
+    currentObjectUnsaved: { type: Boolean, default: false },
+    currentObjectPlaceholder: { type: String, default: '<current object>' },
+    unsavedLabel: { type: String, default: 'not saved yet' },
 });
 
 const emit = defineEmits(['update', 'remove']);
@@ -121,10 +193,83 @@ const effectiveObjectType = computed(() => {
     return THING_TYPE;
 });
 
-const link = ref({ ...props.link });
+// Kind of the target picker for the single-field (parent) mode: classes pick
+// class parents, link types pick link-type parents.
+const parentTargetType = computed(() => props.objectType || CLASS_TYPE);
+
+const contextObjectType = computed(() => {
+    return effectiveObjectType.value;
+});
+
+// Live name for the fixed "first object" slot — shows the current object's
+// typed name, falling back to a placeholder while it is still unnamed.
+const currentObjectDisplayName = computed(() => {
+    const name = props.currentObject?.name;
+    return (name && String(name).trim()) ? String(name).trim() : props.currentObjectPlaceholder;
+});
+
+const contextLinkTypeId = computed(() => {
+    return link.value.link_type_id || props.fixedLinkTypeUuid;
+});
+
+const contextOneThingId = computed(() => {
+    return link.value.one_thing_id || props.currentObject?.thing_id;
+});
+
+const link = ref({
+    link_start: null,
+    link_end: null,
+    link_start_meta: null,
+    link_end_meta: null,
+    ...props.link,
+});
 if (props.singleField && props.fixedLinkTypeUuid) {
     link.value.link_type_id = props.fixedLinkTypeUuid;
 }
+
+// ── link dates ─────────────────────────────────────────────────
+// Mirrors EditObject's thing date handling: the Start field owns both
+// columns for spanning qualifiers (between/alternatives/before), so the
+// End field is disabled while one is active.
+const startSpansDates = computed(() => {
+    const q = link.value.link_start_meta?.qualifier;
+    return q === 'between' || q === 'alternatives' || q === 'before';
+});
+
+function applyLinkStartDate({ start, end, meta }) {
+    link.value.link_start = start || null;
+    link.value.link_start_meta = meta || null;
+    if (end != null && end !== '') {
+        link.value.link_end = end;
+    }
+}
+
+function applyLinkEndDate({ start, end, meta }) {
+    link.value.link_end = end || null;
+    link.value.link_end_meta = meta || null;
+}
+
+// The current object is pinned to this row (EditObject passes
+// lockFirstObject=true). The pinned object's identity is fixed by the form, so
+// whichever slot holds it is read-only — swapping direction just moves the
+// read-only slot to the other end instead of unlocking the object.
+const pinnedCurrentObject = computed(() =>
+    props.lockFirstObject && props.currentObject?.thing_id != null
+);
+const lockFirst = computed(() =>
+    pinnedCurrentObject.value && link.value.one_thing_id === props.currentObject.thing_id
+);
+const lockSecond = computed(() =>
+    pinnedCurrentObject.value && link.value.other_thing_id === props.currentObject.thing_id
+);
+
+// The second-object selector (the one the user actually needs to fill in when
+// adding a link) — used to move focus there instead of the fixed first slot.
+const secondObjectFieldRef = ref(null);
+const focusSecondObject = () => {
+    secondObjectFieldRef.value?.focus?.();
+};
+defineExpose({ focusSecondObject });
 
 let isUpdatingFromParent = false;
 let previousEmitted = JSON.stringify(link.value);
@@ -172,8 +317,15 @@ watch(() => [link.value.one_thing_id, link.value.other_thing_id, link.value.link
     { deep: true }
 );
 
+// The requestId of the create modal this row opened, so the link-created event
+// is matched exactly. With stacked modals several link rows may share an index,
+// so a prefix match is not enough — only the row that actually opened the modal
+// may consume the result.
+const pendingCreateRequestId = ref(null);
+
 const openCreateObjectModal = () => {
     const requestId = `link-${props.index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    pendingCreateRequestId.value = requestId;
     const payload = {
         title: 'Create new object',
         params: { type: effectiveObjectType.value },
@@ -183,7 +335,7 @@ const openCreateObjectModal = () => {
             targetComponent: 'linked-object',
             index: props.index,
             linkTypeUuid: link.value.link_type_id,
-            comment: link.value.translation
+            comment: link.value.description
         }
     };
     eventBus.emit('open-create-modal', payload);
@@ -200,13 +352,13 @@ const removeSelf = () => {
 };
 
 const handleLinkCreated = async (data) => {
-    if (data.requestId && data.requestId.startsWith(`link-${props.index}`)) {
+    if (data.requestId && data.requestId === pendingCreateRequestId.value) {
         const newId = data.newObjectId;
         if (newId && !link.value.other_thing_id) {
             await nextTick();
             link.value.other_thing_id = newId;
             if (data.linkTypeUuid) link.value.link_type_id = data.linkTypeUuid;
-            if (data.comment !== undefined) link.value.translation = data.comment;
+            if (data.comment !== undefined) link.value.description = data.comment;
 
             // No need to preload – the object is already created and cached by the modal
             emit('update', {
@@ -261,6 +413,17 @@ onUnmounted(() => {
     border-radius: 4px;
     font-size: 14px;
     line-height: 1;
+}
+.badge-unsaved {
+    flex-shrink: 0;
+    align-self: center;
+    background-color: #ffc107;
+    color: #212529;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
 }
 .form-control {
     width: 100%;

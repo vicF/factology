@@ -1,0 +1,23 @@
+{
+    "appId": "com.factology.desktop",
+    "productName": "Factology",
+    "directories": {
+        "buildResources": "resources"
+    },
+    "files": [
+        "app/**/*",
+        "src/**/*"
+    ],
+    "win": {
+        "target": "nsis",
+        "icon": null
+    },
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+        "target": "dmg",
+        "category": "public.app-category.productivity"
+    }
+}

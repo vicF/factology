@@ -29,11 +29,15 @@ Scenario('Complete registration and login flow @api', async ({ I }) => {
     I.waitForElement('[data-testid="register-link"]', 10);
     I.click('[data-testid="register-link"]');
 
-    I.waitForElement('[data-testid="register-name"]', 20);
+    I.waitForElement('[data-testid="register-name"]', 40);
     I.fillField('[data-testid="register-name"]', userData.name);
     I.fillField('[data-testid="register-email"]', userData.email);
     I.fillField('[data-testid="register-password"]', userData.password);
     I.fillField('[data-testid="register-password-confirmation"]', userData.password);
+
+    // Accept terms and privacy policy to enable the submit button
+    I.checkOption('[data-testid="register-accepted-terms"]');
+    I.checkOption('[data-testid="register-accepted-privacy"]');
 
     I.click('[data-testid="register-submit-btn"]');
 

@@ -72,7 +72,15 @@ class Media extends \App\Models\Classes\Thing
 
     protected static function _getRow($id)
     {
-        return DB::table('things')->join('photo_media', 'photo_media.thing_id', 'things.thing_id')->where(Thing::_ID, $id);
+        // Left join: media-classed Things may legitimately carry no local file
+        // (e.g. a Video/Image object that represents an external URL) — such rows
+        // must still resolve, with photo_media columns simply null.
+        // Select photo_media.* FIRST: both tables have a thing_id column and the
+        // later occurrence wins, so things.thing_id must come last to stay valid.
+        return DB::table('things')
+            ->select('photo_media.*', 'things.*')
+            ->leftJoin('photo_media', 'photo_media.thing_id', 'things.thing_id')
+            ->where(Thing::_ID, $id);
     }
 
     public static function findByParameters($size, $crc)

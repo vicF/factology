@@ -9,8 +9,11 @@ namespace App\Models\Classes;
 
 use App\Eloquent\Link;
 use App\Eloquent\Thing;
+use App\Services\GeoProperties;
+use App\Services\RelatedObjectsResolver;
+use Fokin\Facts\Data\FieldLanguage;
 use Fokin\Facts\Data\UUID;
-use http\Exception\InvalidArgumentException;
+use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -64,10 +67,19 @@ class Everything
         'LINK'     => UUID::G_LINK,
         'THING'    => UUID::G_THING,
         'EXTERNAL' => UUID::G_EXTERNAL,
+        'SERVER'   => UUID::G_SERVER,
     ];
 
     public const TIME_FORMAT = 'Y-m-d H:i:s';
     public const DATABASE_TIME_FORMAT = 'YmdHis';
+
+    /** Link date columns persisted by addLink/updateLink when present. */
+    public const LINK_DATE_FIELDS = [
+        'link_start',
+        'link_end',
+        'link_start_meta',
+        'link_end_meta',
+    ];
 
     public string $template = 'partials.object.view.main.properties';
     public string $additional_template = ''; //'partials.object.view.additional.properties';
@@ -78,33 +90,43 @@ class Everything
     protected $_tableFields = [
         'deleted',
         'description',
+        'description_translations',
+        'data',
         'end',
-        'end_variety',
+        'end_meta',
         'name',
+        'name_translations',
         'public',
         'start',
-        'start_variety',
+        'start_meta',
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
+
+    protected static ?string $_serverUuid = null;
 
     public $params = [
         'deleted',
         'description',
+        'description_translations',
+        'data',
         'end',
         'end_date',
-        'end_variety',
+        'end_meta',
         'name',
+        'name_translations',
         'public',
         'record_created',
         'record_updated',
         'start',
         'start_date',
-        'start_variety',
+        'start_meta',
         'thing_id',
         'type',
         'owner',
+        'server_uuid',
     ];
     public $defaults = ['end' => null, 'public' => 0];
     public $additionalParams = [];
@@ -259,6 +281,43 @@ class Everything
     }
 
     /**
+     * All classes an object belongs to (multi-class support), each with the
+     * data needed by the frontend badges: thing_id, name, translations and the
+     * PHP class_name (for model dispatch). Order follows the LINK_TO_CLASS
+     * link insertion order — the first entry is the object's primary class.
+     *
+     * @param string $id object thing_id
+     * @return array
+     */
+    public static function getClassesWithNames($id): array
+    {
+        return DB::table('links')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->leftJoin('classes', 'classes.thing_id', '=', 'c.thing_id')
+            ->where('links.one_thing_id', $id)
+            ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('links.deleted', false)
+            ->where('c.deleted', false)
+            // Deterministic insertion order → the first-created class link is
+            // the object's primary class.
+            ->orderBy('links.link_id')
+            ->select('c.thing_id', 'c.name', 'c.name_translations', 'classes.class_name')
+            ->get()
+            ->map(function ($r) {
+                return [
+                    'thing_id'          => $r->thing_id,
+                    'name'              => $r->name,
+                    'name_translations' => is_string($r->name_translations)
+                        ? json_decode($r->name_translations, true)
+                        : ($r->name_translations ?? null),
+                    'class_name'        => $r->class_name,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param $id
      * @return string
      */
@@ -292,7 +351,7 @@ class Everything
      * Returns data and links to display object on the web
      * @return void
      */
-    public static function getDataById($id): array
+    public static function getDataById($id, int $depth = 0): array
     {
         LOG::debug('retrieving object data for id: ' . $id);
         $class = self::getClassDataByObjectId($id);
@@ -300,7 +359,7 @@ class Everything
 
         try {
             /** @var Everything $className */
-            return $className::getClassSpecificDataById($id, $class);
+            return $className::getClassSpecificDataById($id, $class, $depth);
 
             /*$thing = $className::_getRow($id)->first();
             // Keep date in db format to be able to compare
@@ -311,11 +370,14 @@ class Everything
         }
     }
 
-    public static function getClassSpecificDataById($id, $class): array
+    public static function getClassSpecificDataById($id, $class, int $depth = 0): array
     {
         $thing = (array)static::_getRow($id)->first();
         if (empty($thing)) {
-            abort(404, 'Authorization required to access this resource');
+            // The row is missing either because it does not exist or because the
+            // auth() scope filtered it out (private, not owner). Keep the 404
+            // (never leak existence) but word it accurately for logged-in users.
+            abort(404, 'Object not found or you do not have access to it');
         }
 
         // Convert binary/resource values to strings (e.g. phash bytea from PostgreSQL)
@@ -325,36 +387,143 @@ class Everything
             }
         }
 
-        // Decode JSON data column from PostgreSQL (returns as string via query builder)
-        if (isset($thing['data']) && is_string($thing['data'])) {
-            $thing['data'] = json_decode($thing['data'], true);
+        // Decode JSON columns from PostgreSQL (query builder returns them as strings)
+        foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
+            if (isset($thing[$jsonField]) && is_string($thing[$jsonField])) {
+                $thing[$jsonField] = json_decode($thing[$jsonField], true);
+            }
         }
 
-        // Clean up class object: extract just relevant info, excluding heavy json from c.data
-        $thing['class'] = $class ? [
-            'thing_id'   => $class->thing_id ?? null,
-            'class_name' => $class->class_name ?? null,
-            'name'       => $class->name ?? null,
-        ] : null;
+        // Legacy objects may store data.properties as a list (old format); the
+        // property map must be an object (thing_id => value) so clients can
+        // attach values by property id. An empty list normalizes to an empty object.
+        if (isset($thing['data']['properties']) && $thing['data']['properties'] === []) {
+            $thing['data']['properties'] = new \stdClass();
+        }
 
+        // Geographic coordinates carried by the object's properties (by value shape).
+        $thing['geo'] = GeoProperties::extract(
+            isset($thing['data']['properties']) && is_array($thing['data']['properties'])
+                ? $thing['data']['properties']
+                : null
+        );
+
+        // Clean up class object: extract just relevant info, excluding heavy json from c.data.
+        // An object may belong to several classes (multi-class) — expose them all
+        // via `classes`, keeping `class` as the first/primary one for callers that
+        // still consume the singular shape.
+        $thing['classes'] = self::getClassesWithNames($id);
+        $thing['class']   = $thing['classes'][0] ?? null;
+
+        // Resolve the owner's display name (owner references a things.thing_id)
+        $thing['owner_name'] = null;
+        if (!empty($thing['owner'])) {
+            $thing['owner_name'] = DB::table('things')->where('thing_id', $thing['owner'])->value('name');
+        }
+
+        // Both endpoint names are exposed with a single contract so the
+        // frontend can render either direction without knowing which endpoint
+        // is the current object: `name` is always other_thing_id's name and
+        // `one_name` always one_thing_id's name (same as ApiController::search).
         $first = DB::table('links') // One way links
         ->where('links.one_thing_id', $thing['thing_id'])
             ->whereNot('link_type_id', UUID::LINK_TO_CLASS) // Exclude class link from all links
             ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'other_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
+            ->addSelect('other_thing.public as target_public')
+            ->addSelect('other_thing.name_translations')
+            ->addSelect('one_thing.name_translations as one_name_translations')
             ->limit(50);
 
         $second = DB::table('links') // other way links
         ->where('links.other_thing_id', $thing['thing_id'])
             ->leftJoin('things as one_thing', 'links.one_thing_id', '=', 'one_thing.thing_id')
             ->leftJoin('things as link_types', 'links.link_type_id', '=', 'link_types.thing_id')
-            ->select('links.*', 'one_thing.name', 'link_types.name as link_name')
+            ->leftJoin('things as other_thing', 'links.other_thing_id', '=', 'other_thing.thing_id')
+            ->select('links.*', 'other_thing.name', 'link_types.name as link_name', 'one_thing.name as one_name')
+            ->addSelect('link_types.name_translations as link_name_translations')
+            ->addSelect('one_thing.public as target_public')
+            ->addSelect('other_thing.name_translations')
+            ->addSelect('one_thing.name_translations as one_name_translations')
             ->limit(50);
+
+        // Only filter linked objects by visibility for non-admin users
+        if (!Auth::check() || !Auth::user()->is_admin) {
+            $first->where(function ($q) {
+                $q->where('other_thing.public', 1)
+                    ->orWhereNull('other_thing.public');
+                if (Auth::check()) {
+                    $q->orWhere('other_thing.owner', Auth::user()->thing_id);
+                }
+            });
+            $second->where(function ($q) {
+                $q->where('one_thing.public', 1)
+                    ->orWhereNull('one_thing.public');
+                if (Auth::check()) {
+                    $q->orWhere('one_thing.owner', Auth::user()->thing_id);
+                }
+            });
+        }
 
         $thing['links'] = $first
             ->union($second)
             ->orderBy('link_start')
+            ->get()
+            ->map(function ($link) {
+                // Decode the flexible-date meta JSON the same way as the thing columns.
+                foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+                    if (isset($link->{$metaField}) && is_string($link->{$metaField})) {
+                        $link->{$metaField} = json_decode($link->{$metaField}, true);
+                    }
+                }
+                return $link;
+            })
+            ->values()
+            ->toArray();
+
+        // Decode the link type's translations (jsonb comes back as a string).
+        foreach ($thing['links'] as &$flatLink) {
+            if (isset($flatLink->link_name_translations) && is_string($flatLink->link_name_translations)) {
+                $decoded = json_decode($flatLink->link_name_translations, true);
+                $flatLink->link_name_translations = $decoded ?: null;
+            }
+            if (isset($flatLink->name_translations) && is_string($flatLink->name_translations)) {
+                $decoded = json_decode($flatLink->name_translations, true);
+                $flatLink->name_translations = $decoded ?: null;
+            }
+            if (isset($flatLink->one_name_translations) && is_string($flatLink->one_name_translations)) {
+                $decoded = json_decode($flatLink->one_name_translations, true);
+                $flatLink->one_name_translations = $decoded ?: null;
+            }
+        }
+        unset($flatLink);
+
+        // Multilevel related objects: when a depth is requested, resolve the
+        // nested tree of related objects and attach a `target` (with nested
+        // `target.links` at deeper levels) onto the matching flat link rows.
+        // Additive only — the flat fields above are untouched, so existing
+        // consumers (edit form, links section) keep working unchanged.
+        if ($depth > 0 && !empty($thing['links'])) {
+            $related = (new RelatedObjectsResolver)->forObject($id, $depth, RelatedObjectsResolver::BREADTH_CAP);
+            $relatedByLinkId = [];
+            foreach ($related as $rel) {
+                $relatedByLinkId[$rel['link_id']] = $rel['target'];
+            }
+            foreach ($thing['links'] as &$link) {
+                if (isset($relatedByLinkId[$link->link_id])) {
+                    $link->target = $relatedByLinkId[$link->link_id];
+                }
+            }
+            unset($link);
+        }
+
+        // Annotations pointing to URLs instead of internal objects.
+        // The whole list is returned; the frontend diffs it on save.
+        $thing['external_links'] = DB::table('external_links')
+            ->where('thing_id', $thing['thing_id'])
             ->get()
             ->toArray();
         return $thing;
@@ -527,7 +696,7 @@ class Everything
         }
         if (!isset($this->type)) {
             $errors[] = 'Empty type';
-        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL], true)) {
+        } else if (!in_array((int)$this->type, [UUID::G_CLASS, UUID::G_MODEL, UUID::G_LINK, UUID::G_THING, UUID::GENERAL, UUID::G_EXTERNAL, UUID::G_SERVER], true)) {
             $errors[] = 'Unknown type: ' . $this->type;
         }
         if (count($errors) === 0) {
@@ -545,16 +714,56 @@ class Everything
             ->where('thing_id', $this->thing_id)
             ->first();
 
-        // Check ownership
-        if (!empty($existingRecord) && $existingRecord->owner != auth()->user()->thing_id) {
+        // Check ownership — admins may save/reassign any object (system ownership, re-owning).
+        // Guarded so internal flows without an auth user (e.g. UserClass seeding) still work.
+        // System default owners (VICTOR_FOKIN, SYSTEM_OWNER) are treated as unowned — any
+        // authenticated user may claim them.
+        $authUser = auth()->user();
+        $isAdmin = $authUser ? (bool) $authUser->is_admin : false;
+        $isSystemDefault = $existingRecord && in_array($existingRecord->owner, [
+            UUID::VICTOR_FOKIN, UUID::SYSTEM_OWNER,
+        ], true);
+        if (!empty($existingRecord) && !$isAdmin && $authUser && !$isSystemDefault && $existingRecord->owner != $authUser->thing_id) {
             throw new \Exception('You do not have permission to update this record', 403);
             // Or return response with 403 Forbidden status
         } elseif (empty($this->owner)) {
-            $this->owner = auth()->user()->thing_id;
+            if ($authUser) {
+                $this->owner = $authUser->thing_id;
+            }
         }
         $this->_validate();
+        // Auto-set server_uuid for objects created on this server
+        if (empty($this->server_uuid)) {
+            if (self::$_serverUuid === null) {
+                self::$_serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+            }
+            $this->server_uuid = self::$_serverUuid;
+        }
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
+
+        // Localization JSON columns (json/jsonb): encode arrays/objects into JSON strings,
+        // storing null for empty structures so the column stays `null` rather than `[]`.
+        // Guard: if a client sends translations without a `lang` key, default it from
+        // the corresponding plain field's script (so lang-less data is never persisted).
+        foreach (['name_translations' => 'name', 'description_translations' => 'description'] as $jsonField => $plainField) {
+            if (array_key_exists($jsonField, $data)
+                && is_array($data[$jsonField])
+                && count($data[$jsonField]) > 0
+                && !array_key_exists('lang', $data[$jsonField])) {
+                $data[$jsonField]['lang'] = FieldLanguage::detect($data[$plainField] ?? null);
+            }
+        }
+        foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
+            if (array_key_exists($jsonField, $data)) {
+                $value = $data[$jsonField];
+                if (is_array($value) || is_object($value)) {
+                    $encoded = json_encode($value);
+                    $data[$jsonField] = ($encoded === '[]' || $encoded === '{}') ? null : $encoded;
+                }
+            }
+        }
+
         if (empty($this->thing_id)) {
             // generating new UUID for the object
             $data['thing_id'] = $this->thing_id = (string)Str::uuid();
@@ -574,8 +783,17 @@ class Everything
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],
                 'owner'          => $data['owner'],
+                'server_uuid'    => $data['server_uuid'] ?? self::$_serverUuid,
                 'record_updated' => now(),
             ];
+
+            // Localization JSON columns are only written when present in the request,
+            // so an update that omits them never wipes existing translations/data.
+            foreach (['data', 'name_translations', 'description_translations', 'start_meta', 'end_meta'] as $jsonField) {
+                if (array_key_exists($jsonField, $data)) {
+                    $upsertData[$jsonField] = $data[$jsonField];
+                }
+            }
 
             // Perform upsert
             DB::table('things')->upsert(
@@ -596,13 +814,11 @@ class Everything
         /** @noinspection MkdirRaceConditionInspection */
         @mkdir(dirname($target), 0775, true);
         if (@$file) {
-            $image = new \claviska\SimpleImage();
-            @unlink($target);
-            $image->fromFile($file)
-                //->maxColors(8, false)
-                ->autoOrient()
-                ->resize(100)
-                ->toFile($target, 'image/jpeg', 20);
+            try {
+                \App\Services\ThumbStore::put($this->thing_id, $file, 'small');
+            } catch (\Throwable $e) {
+                Log::warning('Could not encode thumb for ' . $this->thing_id . ': ' . $e->getMessage());
+            }
         }
         if (!is_file($target)) {
             if (!empty($this->getClassId())) {
@@ -620,6 +836,13 @@ class Everything
     }
 
     /**
+     * Delete a thing record by id.
+     *
+     * Bypasses the AuthScope (read-visibility) global scope: deleteById is
+     * always called after explicit authorization, and the read scope would
+     * otherwise silently match 0 rows for private objects the acting user does
+     * not "see" — turning a legitimate admin/owner delete into a no-op.
+     *
      * @param $id
      * @return bool|null
      * @throws \Exception
@@ -627,59 +850,64 @@ class Everything
     public static function deleteById($id): ?bool
     {
         @unlink(self::getThumbPathById($id, false));
-        return Thing::where('thing_id', $id)->delete();
+        return Thing::withoutGlobalScopes()->where('thing_id', $id)->delete();
     }
 
     public function setClass(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is of class $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
         return $this->setLink($classLink);
     }
 
+    /**
+     * Replace the object's class membership with the given list (multi-class).
+     * Each entry is a LINK_TO_CLASS link payload; entries already linked (by
+     * link_id or by endpoint pair) are updated/reused, and LINK_TO_CLASS links
+     * that are no longer desired are soft-deleted. Non-class links are never
+     * touched.
+     *
+     * @param array $classLinks
+     * @return void
+     */
+    public function setClasses(array $classLinks): void
+    {
+        $desired = [];
+        foreach ($classLinks as $classLink) {
+            if (empty($classLink['other_thing_id'])) {
+                continue;
+            }
+            // A class-membership link always originates from the object being
+            // saved — normalize one_thing_id so a stale/missing client value
+            // never creates a link from the wrong object.
+            $classLink['one_thing_id'] = $this->thing_id;
+            $classLink['link_type_id'] = UUID::LINK_TO_CLASS;
+            $this->setLink($classLink);
+            $desired[$classLink['other_thing_id']] = true;
+        }
+        // Invalidate the cached class list so the diff below reads fresh data.
+        $this->_classes = null;
+        // Diff: soft-delete class links the caller no longer wants (edit flow).
+        foreach ($this->getClassesIds() as $existingClassId) {
+            if (isset($desired[$existingClassId])) {
+                continue;
+            }
+            DB::table('links')
+                ->where('one_thing_id', $this->thing_id)
+                ->where('link_type_id', UUID::LINK_TO_CLASS)
+                ->where('other_thing_id', $existingClassId)
+                ->where('deleted', false)
+                ->update(['deleted' => true]);
+        }
+    }
+
     public function setParent(array $classLink): bool
     {
-        if (empty($classLink['translation'])) {
-            try {
-                $className = $this->getObjectNameByUid($classLink['one_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for class {$classLink['other_thing_id']}", 500, $e);
-            }
-            $classLink['translation'] = "{$this->name} is a child of $className";
-        }
         $classLink['link_type_id'] = UUID::LINK_TO_PARENT;
         return $this->setLink($classLink);
     }
 
-    protected function setLinkTranslation(array &$link): void
-    {
-        if (empty($link['translation'])) {
-            try {
-                $linkedObjectName = $this->getObjectNameByUid($link['other_thing_id'])->name;
-            } catch (\ErrorException $e) {
-                throw new \RuntimeException("Unable to get name for object {$link['other_thing_id']}", 500, $e);
-            }
-            switch ($link['link_type_id']) {
-                case UUID::LINK_TO_CLASS:
-                    $link['translation'] = "{$this->name} is of class $linkedObjectName";
-                    break;
-                default:
-                    $link['translation'] = "{$this->name} is related to $linkedObjectName";
-            }
-
-        }
-    }
-
     public function setLink(array $link): bool
     {
-        //$this->setLinkTranslation($link);
         if (@$link['link_id']) {
             // update
             return $this->updateLink($link);
@@ -690,20 +918,27 @@ class Everything
 
     public function updateLink($link): int
     {
-        $this->setLinkTranslation($link);
+        $this->assertParentKindConsistent($link);
+        $update = [
+            'one_thing_id'   => $link['one_thing_id'],
+            'link_type_id'   => $link['link_type_id'],
+            'other_thing_id' => $link['other_thing_id'],
+        ];
+        if (array_key_exists('description', $link)) {
+            $update['description'] = $link['description'];
+        }
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $update[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
         return DB::table('links')
             ->where('link_id', $link['link_id'])
-            ->update([
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-                'translation'    => $link['translation'],
-            ]);
+            ->update($update);
     }
 
     public function addLink(array $link): bool
     {
-        $this->setLinkTranslation($link);
         // Ensure that both ids are in place
         if(empty($link['one_thing_id']) && empty($link['other_thing_id'])) {
             throw new InvalidArgumentException('Link object ids (one_thing_id, other_thing_id) are empty ');
@@ -713,15 +948,108 @@ class Everything
             $link['other_thing_id'] = $this->thing_id;
         }
 
-        return DB::table('links')->updateOrInsert(
-            [
-                'one_thing_id'   => $link['one_thing_id'],
-                'link_type_id'   => $link['link_type_id'],
-                'other_thing_id' => $link['other_thing_id'],
-            ],
-            [
-                'translation'    => $link['translation'],
-            ]
+        // Abstract link types are grouping containers, never real relations.
+        if (!empty($link['link_type_id'])
+            && DB::table('things')->where('thing_id', $link['link_type_id'])->value('abstract')) {
+            throw new InvalidArgumentException("Link type {$link['link_type_id']} is abstract and cannot be used to create a link");
+        }
+
+        $this->assertParentKindConsistent($link);
+
+        // Check if link already exists by unique constraint — the endpoint pair
+        // is matched in EITHER direction, so adding the reverse of an existing
+        // link reuses that row instead of creating a duplicate.
+        $existing = DB::table('links')
+            ->where('link_type_id', $link['link_type_id'])
+            ->where(function ($query) use ($link) {
+                $query->where('one_thing_id', $link['one_thing_id'])
+                    ->where('other_thing_id', $link['other_thing_id'])
+                    ->orWhere(function ($query) use ($link) {
+                        $query->where('one_thing_id', $link['other_thing_id'])
+                            ->where('other_thing_id', $link['one_thing_id']);
+                    });
+            })
+            ->first();
+
+        if ($existing) {
+            // Update existing — preserve link_uuid. Description (if provided)
+            // applies regardless of direction. A soft-deleted row is resurrected
+            // (the unique index only covers non-deleted rows, so re-adding a
+            // removed class/link would otherwise leave a stale deleted row).
+            $existingUpdate = [];
+            if ((bool) $existing->deleted) {
+                $existingUpdate['deleted'] = false;
+            }
+            if (array_key_exists('description', $link)) {
+                $existingUpdate['description'] = $link['description'];
+            }
+            if ($existingUpdate) {
+                return DB::table('links')
+                    ->where('link_id', $existing->link_id)
+                    ->update($existingUpdate) > 0;
+            }
+            return true;
+        }
+
+        // Insert new link with generated UUID
+        $insert = [
+            'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
+            'one_thing_id'  => $link['one_thing_id'],
+            'link_type_id'  => $link['link_type_id'],
+            'other_thing_id'=> $link['other_thing_id'],
+        ];
+        if (array_key_exists('description', $link)) {
+            $insert['description'] = $link['description'];
+        }
+        foreach (self::LINK_DATE_FIELDS as $field) {
+            if (array_key_exists($field, $link) && $link[$field] !== null && $link[$field] !== '') {
+                $insert[$field] = is_array($link[$field]) ? json_encode($link[$field]) : $link[$field];
+            }
+        }
+        return DB::table('links')->insert($insert);
+    }
+
+    /**
+     * The class hierarchy (under Everything/Something) and the link taxonomy
+     * (under Link) are two separate trees. A "is a superclass of" edge may only
+     * connect nodes of the same kind — a class/thing cannot hang under a link
+     * type, and a link type cannot hang under a class. The only exceptions are
+     * the structural roots that host the other kind by design (Everything hosts
+     * the Link taxonomy root; System hosts system-internal link types).
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertParentKindConsistent(array $link): void
+    {
+        if (($link['link_type_id'] ?? null) !== UUID::LINK_TO_PARENT) {
+            return;
+        }
+        $parentId = $link['one_thing_id'] ?? null;
+        $childId  = $link['other_thing_id'] ?? null;
+        if (empty($parentId) || empty($childId)) {
+            return; // partial link — normalized by the caller
+        }
+
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return; // an endpoint is not in the DB yet — let the insert fail naturally
+        }
+
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return; // same kind — fine
+        }
+        if (in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true)) {
+            return; // structural roots may host the other kind
+        }
+
+        $kind = fn (bool $isLink) => $isLink ? 'link type' : 'class';
+        throw new InvalidArgumentException(
+            "Cannot set a {$kind($parentIsLink)} as the parent of a {$kind($childIsLink)} — "
+            . 'classes and link types form separate trees.'
         );
     }
 
@@ -745,7 +1073,7 @@ class Everything
         $query = DB::table('external_links')->where('thing_id', $this->thing_id);
         $res = $query->get()->toArray();
         if (empty($res)) {
-            $res = [[]];
+            $res = [];
         }
         return $res;
     }
@@ -808,7 +1136,6 @@ class Everything
     protected function _getLinkDataFromPost($link)
     {
         $res = [
-            'translation'    => $link['description'],
             Thing::ID        => $this->{Thing::ID},
             'link_type_id'   => $link['type'],
             'other_thing_id' => $link['uuid'],
@@ -853,35 +1180,35 @@ class Everything
     }
 
     /**
-     * @param $data
+     * Save the full desired list of external links for this object.
+     * Diffes against the currently stored rows: inserts new ones,
+     * updates ones with an id, deletes ones not present in the list.
+     *
+     * @param array $input expects ['elink' => [['id' => ?, 'url' => ?], ...]]
      */
     public function saveExternalLinks($input)
     {
-        if (empty($input['elink'])) {
+        if (!array_key_exists('elink', $input) || !is_array($input['elink'])) {
             return;
         }
         $oldLinks = collect($this->getExternalLinks())->keyBy('id')->toArray();
-        $data = [];
-        foreach (array_keys($input['elink']) as $fieldKey) {
-            foreach ($input['elink'][$fieldKey] as $key => $value) {
-                $data[$key][$fieldKey] = $value;
-            }
-        }
-        foreach ($data as $link) {
+        foreach ($input['elink'] as $link) {
             if (empty($link['url'])) {
                 continue; // Just an empty form
             }
+            // Only url is ever written — client side-flags (e.g. a "create
+            // object" checkbox) must never leak into the external_links row.
+            $url = trim((string) $link['url']);
             if (empty($link['id'])) {
-                $link['id'] = Str::uuid();
-                $link['thing_id'] = $this->thing_id;
-                DB::table('external_links')->insert(
-                    $link);
+                DB::table('external_links')->insert([
+                    'id'       => Str::uuid(),
+                    'thing_id' => $this->thing_id,
+                    'url'      => $url,
+                ]);
             } else {
-                DB::table('external_links')->where('id', $link['id'])->update(
-                    $link);
+                DB::table('external_links')->where('id', $link['id'])->update(['url' => $url]);
                 unset($oldLinks[$link['id']]);
             }
-
         }
         if (!empty($oldLinks)) {
             DB::table('external_links')->whereIn('id', array_keys($oldLinks))->delete();
@@ -1038,7 +1365,7 @@ class Everything
         if ($format === null) {
             $format = self::TIME_FORMAT;
         }
-        if ($number === null) {
+        if ($number === null || $number === '') {
             return null;
         }
         if ($timeZone === null) {
@@ -1133,35 +1460,6 @@ class Everything
         $second = substr($thingId, 1, 1);
         //return $first . $second . $thingId . '.jpg';
         return ($webLink ? DIRECTORY_SEPARATOR : ('public' . DIRECTORY_SEPARATOR)) . 'thumbs' . DIRECTORY_SEPARATOR . $first . DIRECTORY_SEPARATOR . $second . DIRECTORY_SEPARATOR . $thingId . '.jpg';
-    }
-
-    public static function echoDateWithVariety($object, $type = 'start')
-    {
-        if ($type === 'end') {
-            $dateName = 'end_date';
-            $varietyName = 'end_variety';
-        } else {
-            $dateName = 'start_date';
-            $varietyName = 'start_variety';
-        }
-        $date = $object->$dateName;
-        if (empty($object->$varietyName)) {
-            echo $date;
-        } elseif ($object->$varietyName < 10000) {  // @todo  make it more exact
-            echo $date;
-        } elseif ($object->$varietyName < 240000) {
-            echo $date . ' (+1 hour)';
-        } elseif ($object->$varietyName < 31000000) {
-            [$date] = explode(' ', $date);
-            echo $date . ' (+1 day)';
-        } elseif ($object->$varietyName <= 10000000000) {
-            [$date] = explode('-', $date);
-            echo $date . " (+1 year)";
-        } else {
-            $years = floor($object->$varietyName / 10000000000);
-            [$date] = explode('-', $date);
-            echo $date . " (+$years years)";
-        }
     }
 
     public function createWithLinks()

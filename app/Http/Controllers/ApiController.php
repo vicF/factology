@@ -6,15 +6,26 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\MediaLink\MediaTitleResolver;
+use App\Services\MediaLink\UrlMediaClassifier;
+use App\Services\RelatedObjectsResolver;
+use App\Services\ThumbStore;
 use App\Models\Classes\MediaFile;
 use App\Models\Classes\Everything;
+use Fokin\Facts\Data\Era;
+use Fokin\Facts\Data\FlexibleDate;
 use Fokin\Facts\Data\UUID;
 use Fokin\PhotoFacts\Models\Photos;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ApiController extends BaseController
 {
@@ -39,10 +50,12 @@ class ApiController extends BaseController
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function get($id)
+    public function get($id, Request $request)
     {
         try {
-            $data = Everything::getDataById($id);
+            $depth = (int) $request->query('depth', 0);
+            $depth = min(max($depth, 0), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+            $data = Everything::getDataById($id, $depth);
             return response()->json(
                 [
                     'data'    => $data,
@@ -58,6 +71,250 @@ class ApiController extends BaseController
         }
     }
 
+    /**
+     * Full related-object graph for the Graph tab: the displayed node set of
+     * GET /object/{id}?depth=N plus EVERY link between any two displayed
+     * objects (cross-links the nested view prunes).
+     *
+     * @param string  $id
+     * @param Request $request query `depth` (1..cap), default 2
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function graph($id, Request $request)
+    {
+        $depth = (int) $request->query('depth', 2);
+        $depth = min(max($depth, 1), RelatedObjectsResolver::DETAIL_DEPTH_CAP);
+        $graph = (new RelatedObjectsResolver)->forGraph($id, $depth, RelatedObjectsResolver::BREADTH_CAP);
+
+        return response()->json(['data' => $graph, 'success' => true]);
+    }
+
+    /**
+     * Properties suggested for a class: things P linked to the class via a
+     * PROPERTY_APPLIES_TO link ("is a property of class"), plus properties
+     * linked to any ancestor class whose own `inherited` flag (data.inherited,
+     * default true) allows propagation. Used by the edit form to offer fields
+     * (e.g. Coordinates) for objects of that class.
+     *
+     * @param string $id class thing_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function classProperties($id)
+    {
+        // Walk up the LINK_TO_PARENT chain to collect the class + ancestors.
+        $classIds = [];
+        $queue = [$id];
+        $visited = [];
+        while ($queue && count($visited) < 20) {
+            $cid = array_shift($queue);
+            if (isset($visited[$cid])) {
+                continue;
+            }
+            $visited[$cid] = true;
+            $classIds[] = $cid;
+            // Hierarchy convention: one_thing_id = parent/superclass,
+            // other_thing_id = child/subclass — so a class's parents are links
+            // where other_thing_id = this class.
+            $parents = DB::table('links')
+                ->where('other_thing_id', $cid)
+                ->where('link_type_id', UUID::LINK_TO_PARENT)
+                ->where('deleted', false)
+                ->pluck('one_thing_id');
+            foreach ($parents as $parent) {
+                if (!isset($visited[$parent])) {
+                    $queue[] = $parent;
+                }
+            }
+        }
+
+        // Property ids directly linked to the class (always apply).
+        $directIds = array_flip(DB::table('links')
+            ->where('link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->where('other_thing_id', $id)
+            ->where('deleted', false)
+            ->pluck('one_thing_id')
+            ->all());
+
+        $rows = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::PROPERTY_APPLIES_TO)
+            ->whereIn('l.other_thing_id', $classIds)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations', 't.data')
+            ->get();
+
+        $properties = [];
+        foreach ($rows as $row) {
+            $propId = $row->thing_id;
+            if (isset($properties[$propId])) {
+                continue;
+            }
+            $data = $row->data ?? null;
+            if (is_string($data)) {
+                $data = json_decode($data, true);
+            }
+            $inherited = !is_array($data) || !array_key_exists('inherited', $data)
+                ? true
+                : (bool) $data['inherited'];
+            // Directly linked properties always apply; ancestor-linked ones only
+            // when the property's own inherited flag allows it.
+            if (!isset($directIds[$propId]) && !$inherited) {
+                continue;
+            }
+            $translations = $row->name_translations ?? null;
+            if (is_string($translations)) {
+                $translations = json_decode($translations, true) ?: null;
+            }
+            $properties[$propId] = [
+                'thing_id'          => $propId,
+                'name'              => $row->name ?? null,
+                'name_translations' => $translations,
+                'inherited'         => (bool) $inherited,
+            ];
+        }
+
+        return response()->json(
+            [
+                'data'    => array_values($properties),
+                'success' => true
+            ]);
+    }
+
+    /**
+     * All property definitions in the system (things of class Property) —
+     * for the edit form's "Add property" picker.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function properties()
+    {
+        $properties = DB::table('links as l')
+            ->join('things as t', 't.thing_id', '=', 'l.one_thing_id')
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('l.other_thing_id', UUID::PROPERTY_CLASS)
+            ->where('l.deleted', false)
+            ->where('t.deleted', false)
+            ->select('t.thing_id', 't.name', 't.name_translations')
+            ->get()
+            ->map(function ($row) {
+                $translations = $row->name_translations ?? null;
+                if (is_string($translations)) {
+                    $translations = json_decode($translations, true) ?: null;
+                }
+                return [
+                    'thing_id'          => $row->thing_id,
+                    'name'              => $row->name ?? null,
+                    'name_translations' => $translations,
+                ];
+            })
+            ->values();
+
+        return response()->json(
+            [
+                'data'    => $properties,
+                'success' => true
+            ]);
+    }
+
+    /**
+     * Forward geocoding proxy: address → list of { name, lat, lng }.
+     *
+     * Providers:
+     *  - "nominatim" (default): OpenStreetMap's geocoder, free, no key. Called
+     *    server-side with a proper User-Agent per its usage policy.
+     *  - "yandex": better RU street-level coverage; requires
+     *    YANDEX_GEOCODER_KEY env. Returns 501 when the key is not configured.
+     *
+     * @param  Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function geocode(Request $request)
+    {
+        $q = $request->query('q');
+        $provider = $request->query('provider', 'nominatim');
+
+        if (!is_string($q) || trim($q) === '' || mb_strlen($q) > 300) {
+            return response()->json(['success' => false, 'message' => 'Query is required'], 422);
+        }
+        if (!in_array($provider, ['nominatim', 'yandex'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unknown geocoder provider'], 422);
+        }
+        if ($provider === 'yandex' && !config('services.yandex.geocoder_key')) {
+            return response()->json(
+                ['success' => false, 'message' => 'Yandex geocoder API key is not configured (YANDEX_GEOCODER_KEY)'],
+                501
+            );
+        }
+
+        try {
+            $results = $provider === 'yandex'
+                ? $this->geocodeYandex($q)
+                : $this->geocodeNominatim($q);
+        } catch (\Throwable $e) {
+            Log::warning('geocode failed', ['provider' => $provider, 'q' => $q, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Geocoding service unavailable'], 502);
+        }
+
+        return response()->json(['success' => true, 'data' => $results]);
+    }
+
+    private function geocodeNominatim(string $q): array
+    {
+        $res = Http::timeout(12)
+            ->connectTimeout(8)
+            ->withHeaders([
+                'User-Agent' => 'factology/1.0 (local dev; https://factology.local)',
+                'Accept-Language' => 'ru',
+            ])
+            ->get('https://nominatim.openstreetmap.org/search', [
+                'format' => 'jsonv2',
+                'q'      => $q,
+                'limit'  => 5,
+            ]);
+        $res->throw();
+
+        return collect($res->json())
+            ->map(fn ($r) => [
+                'name' => $r['display_name'] ?? $r['name'] ?? '?',
+                'lat'  => (float) ($r['lat'] ?? 0),
+                'lng'  => (float) ($r['lon'] ?? 0),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function geocodeYandex(string $q): array
+    {
+        // The key is checked in geocode() before the try/catch, so this only
+        // guards against a key being removed between the two calls.
+        $key = config('services.yandex.geocoder_key');
+
+        $res = Http::timeout(12)->connectTimeout(8)->get('https://geocode-maps.yandex.ru/1.x/', [
+            'format'  => 'json',
+            'geocode' => $q,
+            'apikey'  => $key,
+            'results' => 5,
+            'lang'    => 'ru_RU',
+        ]);
+        $res->throw();
+
+        $features = $res->json('response.GeoObjectCollection.featureMember') ?? [];
+
+        return collect($features)
+            ->map(function ($f) {
+                $geo = $f['GeoObject'] ?? [];
+                $pos = explode(' ', $geo['Point']['pos'] ?? ''); // "lng lat"
+                return [
+                    'name' => $geo['metaDataProperty']['GeocoderMetaData']['text'] ?? $geo['name'] ?? '?',
+                    'lat'  => (float) ($pos[1] ?? 0),
+                    'lng'  => (float) ($pos[0] ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
 
     /**
      * Store object
@@ -67,6 +324,34 @@ class ApiController extends BaseController
      */
     public function store(Request $request): \Illuminate\Http\JsonResponse
     {
+        // Normalize raw date values to canonical form BEFORE validation so the
+        // end>=start check compares chronologically-correct padded values
+        // (a raw '20260817' would otherwise sort below canonical '20260811120000'
+        // in bccomp) and no legacy-style unpadded digits re-enter the DB.
+        $normalizedDates = [];
+        foreach (['start', 'end'] as $dateField) {
+            $raw = $request->input($dateField);
+            if ($raw !== null && $raw !== '') {
+                $normalizedDates[$dateField] = self::normalizeDateField($raw);
+            }
+        }
+        if ($normalizedDates) {
+            $request->merge($normalizedDates);
+        }
+        // Objects created with a start date in the future are "planned": record
+        // when they were marked (data.planned) so the UI can offer a one-click
+        // confirm once they are supposed to have happened. Create-only — edits
+        // to existing objects never touch the data payload.
+        if ($request->isMethod('post') && !empty($normalizedDates['start'])) {
+            $nowCanonical = now()->format('YmdHis');
+            if (bccomp($normalizedDates['start'], $nowCanonical) > 0) {
+                $data = $request->input('data', []) ?: [];
+                if (empty($data['confirmed']) && empty($data['planned'])) {
+                    $data['planned'] = now()->format('Y-m-d');
+                    $request->merge(['data' => $data]);
+                }
+            }
+        }
         $validated = $request->validate([
             /**
              * UUID of the main object
@@ -90,7 +375,7 @@ class ApiController extends BaseController
              * Start date/time as numeric string: YYYYMMDDHHMMSS
              * @example 20260228111234
              */
-            'start' => ['nullable', 'string', 'regex:/^\d*$/'],
+            'start' => ['nullable', 'string', 'regex:/^-?\d*$/'],
 
             /**
              * End date/time as numeric string: YYYYMMDDHHMMSS
@@ -99,19 +384,46 @@ class ApiController extends BaseController
             'end' => [
                 'nullable',
                 'string',
-                'regex:/^\d*$/',
+                'regex:/^-?\d*$/',
                 function ($attribute, $value, $fail) use ($request) {
-                    if ($request->has('start') && $value < $request->start) {
+                    if ($request->has('start') && $request->start !== null && bccomp($value, $request->start) < 0) {
                         $fail('The end date must be after the start date.');
                     }
                 },
             ],
 
             /**
+             * Flexible-date display metadata for the start/end bounds.
+             * Shape: { qualifier, era, precision, alternatives: [...], comment }.
+             */
+            'start_meta' => ['nullable', 'array'],
+            'start_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'start_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'start_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'start_meta.alternatives' => ['nullable', 'array'],
+            'start_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'start_meta.comment' => ['nullable', 'string', 'max:500'],
+
+            'end_meta' => ['nullable', 'array'],
+            'end_meta.qualifier' => ['nullable', Rule::in(FlexibleDate::QUALIFIERS)],
+            'end_meta.era' => ['nullable', Rule::in(Era::keys())],
+            'end_meta.precision' => ['nullable', Rule::in(FlexibleDate::PRECISIONS)],
+            'end_meta.alternatives' => ['nullable', 'array'],
+            'end_meta.alternatives.*' => ['string', 'regex:/^-?\d*$/'],
+            'end_meta.comment' => ['nullable', 'string', 'max:500'],
+
+            /**
              * Public flag (0 or 1)
              * @example 1
              */
             'public' => ['required', 'integer', 'in:0,1'],
+
+            /**
+             * Owner (thing UUID) — admins only. Lets an admin mark an object as
+             * system-owned (owner = UUID::SYSTEM_OWNER) or reassign it.
+             * @example "aaaaaaaa-0000-4000-a000-00000000000a"
+             */
+            'owner' => ['sometimes', 'string', 'uuid'],
 
             /**
              * UUID of parent object (if any)
@@ -123,7 +435,7 @@ class ApiController extends BaseController
              * Type identifier
              * @example 3
              */
-            'type' => ['required', 'integer', 'min:1', 'max:5'],
+            'type' => ['required', 'integer', 'min:1', 'max:7'],
 
             /**
              * Class relationship data (optional)
@@ -159,17 +471,97 @@ class ApiController extends BaseController
              * @example 1
              */
             'class.public' => ['nullable', 'integer', 'in:0,1'],
+
+            /**
+             * Multiple class relationships (multi-class). Each entry has the
+             * same shape as the singular `class` above. When present, it
+             * replaces the object's full class membership (edit flow diffs).
+             */
+            'classes' => ['sometimes', 'array'],
+            'classes.*.one_thing_id'  => ['required', 'string', 'uuid'],
+            'classes.*.link_type_id'  => ['required', 'string', 'uuid'],
+            'classes.*.other_thing_id' => ['required', 'string', 'uuid'],
+            'classes.*.description'   => ['nullable', 'string', 'max:1000'],
+            'classes.*.public'        => ['nullable', 'integer', 'in:0,1'],
+
+            /**
+             * External links (annotations pointing to URLs).
+             * Full desired list — the backend diffs it against existing rows.
+             */
+            'external_links' => ['nullable', 'array'],
+            'external_links.*.id'  => ['nullable', 'string', 'uuid'],
+            'external_links.*.url' => ['nullable', 'string', 'max:2048'],
+
+            /**
+             * Localized name variants: { "lang": <code of name's language>, <code>: <text>, ... }
+             * @example {"lang":"ru","en":"island"}
+             */
+            'name_translations' => ['nullable', 'array'],
+
+            /**
+             * Localized description variants (same shape as name_translations)
+             */
+            'description_translations' => ['nullable', 'array'],
+
+            /**
+             * Object metadata: { "properties": { <propertyThingId>: <value> } }
+             */
+            'data' => ['nullable', 'array'],
+            'data.properties' => ['nullable', 'array'],
         ]);
+
+        // Only admins may change an object's owner (system ownership / reassignment).
+        // Non-admins never send it — the model defaults to their own thing_id.
+        if ($request->has('owner') && !Auth::user()->is_admin) {
+            throw ValidationException::withMessages(['owner' => 'Only admins can change ownership.']);
+        }
+
+        // Objects (type 3) must belong to at least one class. Applies only on
+        // CREATE (POST): an update (PUT) is a partial patch of an existing
+        // object that already carries its classes, so it must not be blocked.
+        // Internal creation paths (Photos package, ExportImportController, test
+        // user things) bypass this endpoint. Class membership can be declared
+        // via `class`, `classes`, a LINK_TO_CLASS entry in `links_to_add`, or
+        // the legacy transposed `link` payload — any of them satisfies the rule.
+        if ($request->isMethod('post') && (int) $request->input('type') === UUID::G_THING) {
+            $hasClassInfo = !empty($request->input('class')) || !empty($request->input('classes'));
+            if (!$hasClassInfo) {
+                foreach ((array) $request->input('links_to_add', []) as $link) {
+                    if (($link['link_type_id'] ?? null) === UUID::LINK_TO_CLASS) {
+                        $hasClassInfo = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasClassInfo) {
+                foreach ((array) $request->input('link', []) as $link) {
+                    if (($link['type'] ?? null) === UUID::LINK_TO_CLASS) {
+                        $hasClassInfo = true;
+                        break;
+                    }
+                }
+            }
+            if (!$hasClassInfo) {
+                throw ValidationException::withMessages([
+                    'classes' => 'Objects must belong to at least one class.',
+                ]);
+            }
+        }
+
         return DB::transaction(static function () use ($request) {
             $model = new Everything($request->toArray());
             try {
                 $model->save();
             } catch(\Throwable $e) {
+                $statusCode = $e->getCode();
+                if ($statusCode < 100 || $statusCode > 599) {
+                    $statusCode = 500;
+                }
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to save the record',
+                    'message' => $e->getMessage() ?? 'Failed to save the record',
                     'errors' => $e->getMessage() ?? 'Unknown error occurred'
-                ], $e->getCode() ?:500);
+                ], $statusCode);
             }
             /*if ($request->parent_id) {
 
@@ -180,7 +572,10 @@ class ApiController extends BaseController
             if ($request->parent) {
                 $model->setParent($request->parent);
             }
-            if ($request->class) {
+            if (!empty($request['classes'])) {
+                // Multi-class: full replacement of the object's class membership.
+                $model->setClasses($request['classes']);
+            } elseif ($request->class) {
                 $model->setClass($request->class);
             }
             if (!empty($request['links'])) { // @TODO likely will not be used
@@ -198,12 +593,33 @@ class ApiController extends BaseController
                     $model->updateLink($link);
                 }
             }
+            if (array_key_exists('external_links', $request->all())) {
+                $model->saveExternalLinks(['elink' => $request->input('external_links', [])]);
+            }
             return response()->json(
                 [
                     'data'    => $model->toArray(),
                     'success' => true
                 ]);
         });
+    }
+
+    /**
+     * Normalize a raw date digit string to its canonical padded form
+     * ('2026081112' → '20260811120000'). Canonical values (length ≥ 11:
+     * variable year + exactly 10-digit MMDDHHMMSS tail) pass through, so the
+     * flexible-date frontend (which always sends canonical values) is unaffected.
+     */
+    private static function normalizeDateField(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        if (strlen(ltrim($value, '-')) >= 11) {
+            return $value;
+        }
+        $parsed = FlexibleDate::parse($value);
+        return $parsed !== null && $parsed->value !== null ? $parsed->value : $value;
     }
 
     /**
@@ -215,11 +631,85 @@ class ApiController extends BaseController
     public function storeLink(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->toArray();
+        // The translation column no longer exists; ignore stale payloads.
+        unset($data['translation']);
+        // Flexible-date meta columns are jsonb: encode arrays to JSON strings.
+        foreach (['link_start_meta', 'link_end_meta'] as $metaField) {
+            if (isset($data[$metaField]) && is_array($data[$metaField])) {
+                $data[$metaField] = json_encode($data[$metaField]);
+            }
+        }
+        // Normalize raw link date values to canonical form.
+        foreach (['link_start', 'link_end'] as $dateField) {
+            if (isset($data[$dateField]) && $data[$dateField] !== null && $data[$dateField] !== '') {
+                $data[$dateField] = self::normalizeDateField($data[$dateField]);
+            }
+        }
+        // Abstract link types are grouping containers, never real relations.
+        if (!empty($data['link_type_id'])
+            && DB::table('things')->where('thing_id', $data['link_type_id'])->value('abstract')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Abstract link types cannot be used to create a link',
+                'errors'  => ['link_type_id' => 'This link type is abstract and only groups its children.'],
+            ], 422);
+        }
+        // Classes and link types form two separate trees — a "is a superclass of"
+        // edge may only connect same-kind endpoints (except the structural roots).
+        if (($data['link_type_id'] ?? null) === UUID::LINK_TO_PARENT
+            && !empty($data['one_thing_id'])
+            && !empty($data['other_thing_id'])
+            && !$this->isParentKindConsistent($data['one_thing_id'], $data['other_thing_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Classes and link types form separate trees — the parent must be of the same kind as the child.',
+                'errors'  => ['other_thing_id' => 'Cannot set a class/link-type of the other kind as the parent.'],
+            ], 422);
+        }
+        // Date-modified stamp for LWW conflict resolution; authoritative
+        // server-side value (never trust a client-supplied one).
+        $data['record_updated'] = now();
         if(!empty($data['link_id'])) {
             DB::table('links')
                 ->where('link_id', $data['link_id'])
                 ->update($data);
         } else {
+            // Prevent reversed duplicates: the endpoint pair is matched in EITHER
+            // direction. If the same pair+type already exists, reuse that row
+            // instead of inserting a new one.
+            if (!empty($data['one_thing_id']) && !empty($data['other_thing_id']) && !empty($data['link_type_id'])) {
+                $existing = DB::table('links')
+                    ->where('link_type_id', $data['link_type_id'])
+                    ->where(function ($query) use ($data) {
+                        $query->where('one_thing_id', $data['one_thing_id'])
+                            ->where('other_thing_id', $data['other_thing_id'])
+                            ->orWhere(function ($query) use ($data) {
+                                $query->where('one_thing_id', $data['other_thing_id'])
+                                    ->where('other_thing_id', $data['one_thing_id']);
+                            });
+                    })
+                    ->first();
+
+                if ($existing) {
+                    $sameDirection = $existing->one_thing_id === $data['one_thing_id']
+                        && $existing->other_thing_id === $data['other_thing_id'];
+                    if ($sameDirection && array_key_exists('description', $data)) {
+                        DB::table('links')
+                            ->where('link_id', $existing->link_id)
+                            ->update(['description' => $data['description'], 'record_updated' => now()]);
+                    }
+                    $data['link_id'] = $existing->link_id;
+                    return response()->json(
+                        [
+                            'data'    => $data,
+                            'success' => true
+                        ]);
+                }
+            }
+            // Generate link_uuid for stable export/import matching if not provided
+            if (empty($data['link_uuid'])) {
+                $data['link_uuid'] = (string) Str::uuid();
+            }
             DB::table('links')
                 ->insert($data);
         }
@@ -228,6 +718,28 @@ class ApiController extends BaseController
                 'data'    => $data,
                 'success' => true
             ]);
+    }
+
+    /**
+     * Whether a "is a superclass of" edge between $parentId and $childId keeps
+     * the class/link-tree invariant: both endpoints must be the same kind (both
+     * link types or both non-link), unless the parent is a structural root that
+     * hosts the other kind by design (Everything → Link, System → system links).
+     */
+    private function isParentKindConsistent(string $parentId, string $childId): bool
+    {
+        $types = DB::table('things')
+            ->whereIn('thing_id', [$parentId, $childId])
+            ->pluck('type', 'thing_id');
+        if ($types->count() < 2) {
+            return true; // an endpoint is not in the DB yet — don't pre-empt a later failure
+        }
+        $parentIsLink = (int) $types[$parentId] === UUID::G_LINK;
+        $childIsLink  = (int) $types[$childId] === UUID::G_LINK;
+        if ($parentIsLink === $childIsLink) {
+            return true;
+        }
+        return in_array($parentId, [UUID::EVERYTHING, UUID::SYSTEM], true);
     }
 
     /**
@@ -286,6 +798,164 @@ class ApiController extends BaseController
     }
 
     /**
+     * Set an object's image/icon.
+     *
+     * Accepts either a multipart `file` upload or a JSON `{ "url": ... }` to
+     * import from the web. `size` picks the storage profile: small (default,
+     * the historic ~1 KB icon profile), medium or original — see ThumbStore.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeThumb(Request $request, $id)
+    {
+        Log::info('storeThumb request', [
+            'id'           => $id,
+            'content_type' => $request->header('Content-Type'),
+            'has_file'     => $request->hasFile('file'),
+            'file_size'    => $request->hasFile('file') ? $request->file('file')->getSize() : null,
+            'file_name'    => $request->hasFile('file') ? $request->file('file')->getClientOriginalName() : null,
+            'file_error'   => $request->hasFile('file') ? $request->file('file')->getError() : null,
+            'input_keys'   => array_keys($request->all()),
+            'url'          => $request->input('url'),
+            'size'         => $request->input('size'),
+        ]);
+
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to edit this object\'s image',
+            ], 403);
+        }
+
+        $size = (string) $request->input('size', 'small');
+        if (!ThumbStore::isValidSize($size)) {
+            throw ValidationException::withMessages(['size' => 'The size must be one of: small, medium, original.']);
+        }
+
+        // An UploadedFile temp is removed by Laravel after the request;
+        // a URL download lands in our own temp file that we must clean up.
+        $downloadedTemp = null;
+        try {
+            if ($request->hasFile('file')) {
+                $request->validate([
+                    'file' => ['required', 'image', 'mimes:jpeg,jpg,png,gif,webp,bmp', 'max:25000'],
+                ]);
+                $sourcePath = $request->file('file')->getRealPath();
+            } elseif ($request->filled('url')) {
+                $url = trim((string) $request->input('url'));
+                if (!preg_match('#^https?://#i', $url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                    throw ValidationException::withMessages(['url' => 'The url must be a valid http(s) address.']);
+                }
+                $response = Http::timeout(20)->get($url);
+                if ($response->failed()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Could not download the image from the given URL.',
+                    ], 422);
+                }
+                $contentType = strtolower((string) $response->header('Content-Type', ''));
+                if ($contentType !== '' && strpos($contentType, 'image/') !== 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The URL does not point to an image.',
+                    ], 422);
+                }
+                $contentLength = (int) $response->header('Content-Length', 0);
+                if ($contentLength && $contentLength > ThumbStore::MAX_SOURCE_BYTES) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The remote image is too large.',
+                    ], 422);
+                }
+                $body = $response->body();
+                if (strlen($body) > ThumbStore::MAX_SOURCE_BYTES) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The remote image is too large.',
+                    ], 422);
+                }
+                $downloadedTemp = tempnam(sys_get_temp_dir(), 'factology_thumb_');
+                if ($downloadedTemp === false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Could not create a temporary file for the download.',
+                    ], 500);
+                }
+                file_put_contents($downloadedTemp, $body);
+                $sourcePath = $downloadedTemp;
+            } else {
+                throw ValidationException::withMessages(['file' => 'Provide either a file or a url.']);
+            }
+
+            if (!is_file($sourcePath)) {
+                throw new \RuntimeException('The image could not be read.');
+            }
+            $result = ThumbStore::put($id, $sourcePath, $size);
+
+            return response()->json(['success' => true] + $result);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } finally {
+            if ($downloadedTemp && is_file($downloadedTemp)) {
+                @unlink($downloadedTemp);
+            }
+        }
+    }
+
+    /**
+     * Remove an object's custom image/icon, restoring the class/parent icon
+     * fallback so the thumb URL keeps resolving.
+     *
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function removeThumb($id)
+    {
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to edit this object\'s image',
+            ], 403);
+        }
+
+        $hadThumb = ThumbStore::remove($id);
+
+        return response()->json([
+            'success'    => true,
+            'thing_id'   => $id,
+            'had_thumb'  => (bool) $hadThumb,
+            'thumb'      => ThumbStore::webPath($id),
+        ]);
+    }
+
+    /**
+     * Report whether an object currently has a real custom image (vs the
+     * class/parent icon fallback the web server symlinks into its slot).
+     *
+     * @param string $id object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function thumbStatus($id)
+    {
+        $path = ThumbStore::localPath($id);
+        $custom = is_file($path) && !is_link($path);
+
+        return response()->json([
+            'success'  => true,
+            'thing_id' => $id,
+            'custom'   => $custom,
+            'thumb'    => ThumbStore::webPath($id),
+        ]);
+    }
+
+    /**
      * Delete object
      *
      * @param $id
@@ -294,8 +964,243 @@ class ApiController extends BaseController
      */
     public function delete($id)
     {
+        $existing = DB::table('things')->where('thing_id', $id)->first();
+        // Admins may delete any object; everyone else only their own.
+        if (!$existing || (!auth()->user()->is_admin && $existing->owner !== auth()->user()->thing_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to delete this record',
+            ], 403);
+        }
         Everything::deleteById($id);
         return response()->json(['success' => true]);
+    }
+
+    /** Object classes a pasted link may be promoted into. */
+    private const PROMOTE_CLASSES = [
+        'video'   => ['class' => UUID::VIDEO, 'kind' => 'video',   'label' => ['en' => 'Video', 'ru' => 'Видео']],
+        'image'   => ['class' => UUID::PHOTO, 'kind' => 'image',   'label' => ['en' => 'Image', 'ru' => 'Изображение']],
+        'audio'   => ['class' => UUID::AUDIO, 'kind' => 'audio',   'label' => ['en' => 'Audio', 'ru' => 'Аудио']],
+        'article' => ['class' => UUID::ARTICLE_CLASS, 'kind' => 'article', 'label' => ['en' => 'Article', 'ru' => 'Статья']],
+    ];
+
+    /**
+     * Promote an external link into a dedicated media object.
+     *
+     * Given an object (e.g. a regatta event) and a pasted URL (YouTube/VK
+     * video, image, audio, article), this creates a new Thing of the matching
+     * class, stores the URL as an external link ON the new object, and links
+     * the edited object → new object with the "has media depicting" link type.
+     * One object per video; extra copy URLs are later added directly on the
+     * media object.
+     *
+     * The class may be given explicitly (manual override for URLs that are not
+     * auto-classifiable); otherwise it is inferred server-side. The name may
+     * also be given explicitly; otherwise a real title is fetched (YouTube/
+     * Vimeo oEmbed → OpenGraph) with a placeholder fallback.
+     *
+     * POST /api/v1/object/{id}/media-from-url
+     */
+    public function createMediaFromUrl(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'url'   => ['required', 'url', 'max:2048'],
+            'class' => ['nullable', 'string', Rule::in(array_keys(self::PROMOTE_CLASSES))],
+            'name'  => ['nullable', 'string', 'max:191'],
+        ]);
+        $url = trim($validated['url']);
+
+        if (!empty($validated['class'])) {
+            $classified = self::PROMOTE_CLASSES[$validated['class']];
+        } else {
+            $classified = UrlMediaClassifier::classify($url);
+            if ($classified === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This link does not look like a video, image or audio file. Choose the object type manually.',
+                ], 422);
+            }
+        }
+
+        $user = Auth::user();
+
+        $parent = DB::table('things')->where('thing_id', $id)->first();
+        if (!$parent) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+        // Same rights as delete: admins may act on any object, everyone else only their own.
+        if (!$user->is_admin && (string) $parent->owner !== (string) $user->thing_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to modify this record',
+            ], 403);
+        }
+
+        // An explicitly typed name wins; otherwise resolve the real title
+        // before the transaction (the fetch must never hold a DB lock). Raw
+        // file URLs (direct .jpg/.mp3 links) have no title page; tests and
+        // offline sandboxes skip the network call entirely.
+        $requestName = isset($validated['name']) ? trim($validated['name']) : '';
+        if ($requestName !== '') {
+            $name = $requestName;
+        } else {
+            $pathExtension = strtolower((string) pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+            $title = $pathExtension === '' && app()->environment() !== 'testing'
+                ? (new MediaTitleResolver())->resolve($url)
+                : null;
+            $name = $this->promoteObjectName($url, $classified, $title);
+        }
+
+        $mediaId = (string) Str::uuid();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+        $public = (bool) $parent->public;
+
+        DB::transaction(function () use ($mediaId, $id, $url, $classified, $name, $user, $serverUuid, $public) {
+            DB::table('things')->insert([
+                'thing_id'    => $mediaId,
+                'name'        => $name,
+                'type'        => UUID::G_THING,
+                'owner'       => $user->thing_id,
+                'public'      => $public,
+                'deleted'     => false,
+                'server_uuid' => $serverUuid,
+            ]);
+
+            DB::table('links')->insert([
+                'link_uuid'      => (string) Str::uuid(),
+                'one_thing_id'   => $mediaId,
+                'link_type_id'   => UUID::LINK_TO_CLASS,
+                'other_thing_id' => $classified['class'],
+                'public'         => $public,
+            ]);
+
+            DB::table('external_links')->insert([
+                'id'       => (string) Str::uuid(),
+                'thing_id' => $mediaId,
+                'url'      => $url,
+            ]);
+
+            DB::table('links')->insert([
+                'link_uuid'      => (string) Str::uuid(),
+                'one_thing_id'   => $id,
+                'link_type_id'   => UUID::MEDIA_DEPICTS,
+                'other_thing_id' => $mediaId,
+                'public'         => $public,
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'media'   => [
+                'thing_id' => $mediaId,
+                'name'     => $name,
+                'class_id' => $classified['class'],
+                'url'      => $url,
+            ],
+        ]);
+    }
+
+    /**
+     * Build a name for a promoted object: the fetched title when available,
+     * otherwise a descriptive fallback derived from the URL.
+     */
+    private function promoteObjectName(string $url, array $classified, ?string $title): string
+    {
+        if ($title !== null && trim($title) !== '') {
+            return trim($title);
+        }
+        $kindEn = $classified['label']['en']; // Video / Image / Audio / Article
+        if ($classified['kind'] === 'image') {
+            $filename = basename((string) parse_url($url, PHP_URL_PATH));
+            if ($filename !== '' && preg_match('/\.(?:jpe?g|png|gif|webp|bmp|heic)$/i', $filename)) {
+                return 'Image: ' . pathinfo($filename, PATHINFO_FILENAME);
+            }
+        }
+        $provider = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $provider = preg_replace('/^www\./', '', $provider) ?? $provider;
+        return ucfirst($provider) . ' ' . strtolower($kindEn) . ' — ' . now()->format('Y-m-d');
+    }
+
+    /**
+     * Toggle object visibility (public/private)
+     *
+     * Lightweight endpoint — only updates the `public` field.
+     * Full object edit still requires PUT /object/{id}.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleVisibility(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'public' => ['required', 'integer', 'in:0,1'],
+        ]);
+
+        $query = DB::table('things')->where('thing_id', $id);
+        if (!auth()->user()->is_admin) {
+            $query->where('owner', auth()->user()->thing_id);
+        }
+        $updated = $query->update([
+            'public'         => $validated['public'],
+            'record_updated' => now(),
+        ]);
+
+        if ($updated === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Object not found or you do not have permission',
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['public' => (bool) $validated['public']],
+        ]);
+    }
+
+    /**
+     * Confirm that a "planned" object actually happened. Owner-only (admins may
+     * confirm any object). Stores the confirmation date in things.data.confirmed
+     * and keeps the original planned date so the UI can show both.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function confirmPlanned(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $query = DB::table('things')->where('thing_id', $id);
+        if (!auth()->user()->is_admin) {
+            $query->where('owner', auth()->user()->thing_id);
+        }
+        $thing = $query->first();
+
+        if (!$thing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Object not found or you do not have permission',
+            ], 403);
+        }
+
+        $data = is_string($thing->data)
+            ? (json_decode($thing->data, true) ?: [])
+            : ($thing->data ?: []);
+        $confirmed = now()->format('Y-m-d');
+        $data['confirmed'] = $confirmed;
+        if (empty($data['planned'])) {
+            $data['planned'] = $confirmed;
+        }
+
+        DB::table('things')->where('thing_id', $id)->update([
+            'data'           => json_encode($data),
+            'record_updated' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['planned' => $data['planned'], 'confirmed' => $confirmed],
+        ]);
     }
 
 
@@ -321,6 +1226,192 @@ class ApiController extends BaseController
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to delete link', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Suggest objects commonly linked together via the same link type (across all users).
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function suggestLinks(Request $request)
+    {
+        $validated = $request->validate([
+            'one_thing_id' => ['required', 'string', 'uuid'],
+            'link_type_id' => ['required', 'string', 'uuid'],
+            'limit'        => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $limit = $validated['limit'] ?? 12;
+
+        $results = DB::table('links')
+            ->select('other_thing_id', DB::raw('COUNT(*) as frequency'))
+            ->where('link_type_id', $validated['link_type_id'])
+            ->whereNotNull('other_thing_id')
+            ->groupBy('other_thing_id')
+            ->orderByDesc('frequency')
+            ->limit($limit)
+            ->get()
+            ->pluck('other_thing_id');
+
+        return response()->json([
+            'data'    => $results,
+            'success' => true,
+        ]);
+    }
+
+    /**
+     * Per-user "quick lists" for the object / link-type / class dropdowns.
+     *
+     * Returns the link types, things and classes this user uses most, derived
+     * from links attached to objects they own. Short user lists are padded with
+     * globally popular objects of the same type so a fresh user still gets a
+     * useful dropdown. The client fetches this once at app load and seeds its
+     * local history cache from it, so opening a dropdown makes no per-open
+     * network request — the server is only hit when the user searches.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function suggestLists(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $userThingId = Auth::user()->thing_id;
+        $limit = 30;
+
+        // Rank the values of $column by how often they appear in links whose
+        // subject (one_thing_id) is an object owned by the current user.
+        $rankOwned = function (string $column, bool $whereNotNull = false) use ($userThingId, $limit) {
+            $query = DB::table('links as l')
+                ->join('things as o', function ($join) use ($userThingId) {
+                    $join->on('o.thing_id', '=', 'l.one_thing_id')
+                        ->where('o.owner', '=', $userThingId)
+                        ->where('o.deleted', false);
+                })
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE')
+                ->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($limit);
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->get()->pluck('id')->all();
+        };
+
+        // Link types the user uses most.
+        $linkTypeIds = $rankOwned('link_type_id');
+        // Things the user links to most (the other end of their links).
+        $thingIds    = $rankOwned('other_thing_id', true);
+        // Classes the user's own things belong to (LINK_TO_CLASS links).
+        $classIds = DB::table('links as l')
+            ->join('things as o', function ($join) use ($userThingId) {
+                $join->on('o.thing_id', '=', 'l.one_thing_id')
+                    ->where('o.owner', '=', $userThingId)
+                    ->where('o.deleted', false);
+            })
+            ->select('l.other_thing_id as id', DB::raw('COUNT(*) as cnt'))
+            ->where('l.link_type_id', UUID::LINK_TO_CLASS)
+            ->whereRaw('l.deleted IS NOT TRUE')
+            ->whereNotNull('l.other_thing_id')
+            ->groupBy('l.other_thing_id')
+            ->orderByDesc('cnt')
+            ->limit($limit)
+            ->get()
+            ->pluck('id')
+            ->all();
+
+        // Pad short user lists with globally popular objects of the same type —
+        // only when the user's own usage does not already fill the list, so a
+        // well-established user never pays for the global GROUP BY queries.
+        $globalRank = function (string $column, int $needed, bool $linkToClassOnly = false, bool $whereNotNull = false) {
+            if ($needed <= 0) {
+                return [];
+            }
+            $query = DB::table('links as l')
+                ->select('l.' . $column . ' as id', DB::raw('COUNT(*) as cnt'))
+                ->whereRaw('l.deleted IS NOT TRUE');
+            if ($linkToClassOnly) {
+                $query->where('l.link_type_id', UUID::LINK_TO_CLASS);
+            }
+            if ($whereNotNull) {
+                $query->whereNotNull('l.' . $column);
+            }
+            return $query->groupBy('l.' . $column)
+                ->orderByDesc('cnt')
+                ->limit($needed)
+                ->get()
+                ->pluck('id')
+                ->all();
+        };
+
+        $linkTypeIds = array_merge($linkTypeIds, $globalRank('link_type_id', $limit - count($linkTypeIds)));
+        $thingIds    = array_merge($thingIds, $globalRank('other_thing_id', $limit - count($thingIds), false, true));
+        $classIds    = array_merge($classIds, $globalRank('other_thing_id', $limit - count($classIds), true, true));
+
+        // Resolve full thing rows, keeping the ranked order and applying the
+        // standard visibility scope (abstract system objects are excluded, same
+        // as the search endpoint).
+        $resolve = function (array $ids) {
+            $ids = array_values(array_filter(array_unique($ids)));
+            if (!$ids) {
+                return [];
+            }
+            $rows = DB::table('things')
+                ->auth()
+                ->where('things.deleted', false)
+                ->where('things.abstract', false)
+                ->whereIn('things.thing_id', $ids)
+                ->get()
+                ->keyBy('thing_id');
+            $ordered = [];
+            foreach ($ids as $id) {
+                if ($rows->has((string) $id)) {
+                    $ordered[] = $rows[(string) $id];
+                }
+            }
+            return $ordered;
+        };
+
+        return response()->json([
+            'links'   => ThingResource::collection($resolve($linkTypeIds)),
+            'things'  => ThingResource::collection($resolve($thingIds)),
+            'classes' => ThingResource::collection($resolve($classIds)),
+        ]);
+    }
+
+    /**
+     * Toggle favorite status for an object.
+     *
+     * Creates or deletes a MY_FAVORITE link between the current user and the target object.
+     *
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleFavorite(string $id)
+    {
+        $userThingId = auth()->user()->thing_id;
+        $linkTypeId = UUID::MY_FAVORITE;
+
+        $existing = DB::table('links')
+            ->where('one_thing_id', $userThingId)
+            ->where('link_type_id', $linkTypeId)
+            ->where('other_thing_id', $id)
+            ->first();
+
+        if ($existing) {
+            DB::table('links')->where('link_id', $existing->link_id)->delete();
+            return response()->json(['favorite' => false, 'success' => true]);
+        }
+
+        DB::table('links')->insert([
+            'link_uuid'     => (string) \Illuminate\Support\Str::uuid(),
+            'one_thing_id'  => $userThingId,
+            'link_type_id'  => $linkTypeId,
+            'other_thing_id'=> $id,
+            'public'        => 0,
+        ]);
+
+        return response()->json(['favorite' => true, 'success' => true]);
     }
 
     /**
@@ -389,7 +1480,14 @@ class ApiController extends BaseController
     public function search(SearchRequest $request): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validated();
-        $requestBody = json_decode(file_get_contents('php://input'), true);
+        // Read the raw body first (works for string JSON bodies without a
+        // Content-Type header, e.g. axios JSON.stringify payloads), then fall
+        // back to $request->input() for Laravel feature tests where php://input
+        // is empty. Relying on $request->input() alone would mis-parse those
+        // requests and silently disable every search filter.
+        $requestBody = json_decode(file_get_contents('php://input'), true)
+            ?: $request->input()
+            ?: [];
         if (@$requestBody['tree']) {
             return $this->searchTree();
         }
@@ -398,21 +1496,79 @@ class ApiController extends BaseController
             ->auth()
             ->where('things.deleted', 0);
 
+        // Abstract things are grouping containers (e.g. the base link types), not
+        // real objects: they are never selectable. Exclude them unless the caller
+        // explicitly asks to include them (e.g. a future filter tree).
+        if (empty($requestBody['include_abstract'])) {
+            $query->where('things.abstract', false);
+        }
+
+        // Reference-type filter: restrict results to only things that are
+        // actually referenced as an owner or server by other things.
+        if (!empty($requestBody['filter_type'])) {
+            if ($requestBody['filter_type'] === 'owner') {
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select('o.owner')
+                        ->from('things as o')
+                        ->whereNotNull('o.owner')
+                        ->where('o.deleted', 0);
+                });
+            } elseif ($requestBody['filter_type'] === 'server') {
+                $query->whereIn('things.thing_id', function ($sub) {
+                    $sub->select('o.server_uuid')
+                        ->from('things as o')
+                        ->whereNotNull('o.server_uuid')
+                        ->where('o.deleted', 0);
+                });
+            }
+        }
+
         if (!empty($requestBody['classes'])) {
             $query->leftJoin('links', function ($join) {
                 $join->on('things.thing_id', '=', 'links.one_thing_id');
                 $join->where('links.link_type_id', '=', UUID::LINK_TO_CLASS);
             });
             $query->whereIn('links.other_thing_id', $requestBody['classes']);
+            // A class-tree filter means "objects of these classes". Classes and
+            // link types can themselves be members of a class (LINK_TO_CLASS),
+            // so without an explicit type filter the selected class nodes leak
+            // into the results. Default to objects-only unless the caller asked
+            // for another type explicitly.
+            if (empty($requestBody['type'])) {
+                $query->where('things.type', 3);
+            }
         }
 
         if (@$requestBody['search']) {
-            $query->where(function ($query) use ($requestBody) {
-                $query->where('name', 'ilike', '%' . $requestBody['search'] . '%')
-                    ->orWhere('description', 'ilike', '%' . $requestBody['search'] . '%');
+            $raw    = trim((string) $requestBody['search']);
+            $prefix = $raw . '%';
+            $term   = '%' . $raw . '%';
+            $query->where(function ($query) use ($term) {
+                $query->where('things.name', 'ilike', $term)
+                    ->orWhere('things.description', 'ilike', $term)
+                    // Translation search runs against generated columns holding
+                    // every translation value except the reserved "lang" key
+                    // (which only holds a language code) — see the
+                    // add_search_performance_indexes migration. A plain-column
+                    // ILIKE can use the pg_trgm GIN indexes, unlike the former
+                    // jsonb_each_text EXISTS subqueries (unindexable full scan).
+                    ->orWhere('things.name_search_text', 'ilike', $term)
+                    ->orWhere('things.description_search_text', 'ilike', $term);
             });
-            // Sort name matches above description-only matches
-            $query->orderByRaw('CASE WHEN name ILIKE ? THEN 0 ELSE 1 END', ['%' . $requestBody['search'] . '%']);
+            // Sort by relevance: an EXACT source-name match first (typing
+            // "Yellow Pillow" must surface the thing itself, not the many
+            // "Yellow Pillow 001.jpg" photos), then name-prefix, then any
+            // source-name substring, then source-description matches, then
+            // translation-only matches. Within a tier the caller's sort_by
+            // applies (start date for the timeline, name for pickers).
+            // Columns are table-qualified: the classes/favorites filters join
+            // `links`, which also has a `description` column.
+            $query->orderByRaw('CASE
+                WHEN things.name ILIKE ? THEN 0
+                WHEN things.name ILIKE ? THEN 1
+                WHEN things.name ILIKE ? THEN 2
+                WHEN things.description ILIKE ? THEN 3
+                ELSE 4 END', [$raw, $prefix, $term, $term]);
         }
         if (!empty(@$requestBody['type'])) {
             $query->where(function ($query) use ($requestBody) {
@@ -421,6 +1577,29 @@ class ApiController extends BaseController
                 }
             });
         }
+        // Visibility filter (new structured filter)
+        if (!empty($requestBody['visibility']) && $requestBody['visibility'] !== 'all') {
+            if ($requestBody['visibility'] === 'public') {
+                $query->where('public', 1);
+            } elseif ($requestBody['visibility'] === 'private') {
+                $query->where('public', 0);
+            } elseif ($requestBody['visibility'] === 'group' && Auth::check()) {
+                // Group access: objects linked to groups the current user belongs to
+                $userThingId = Auth::user()->thing_id;
+                $query->whereExists(function ($sub) use ($userThingId) {
+                    $sub->select(DB::raw(1))
+                        ->from('links as grp_link')
+                        ->join('links as user_link', function ($join) {
+                            $join->on('grp_link.one_thing_id', '=', 'user_link.other_thing_id')
+                                ->where('user_link.link_type_id', '=', UUID::BELONGS_TO_USER_GROUP)
+                                ->where('user_link.one_thing_id', '=', DB::raw("'$userThingId'"));
+                        })
+                        ->whereColumn('grp_link.other_thing_id', 'things.thing_id')
+                        ->where('grp_link.link_type_id', '=', UUID::GROUP_READ_ACCESS);
+                });
+            }
+        }
+        // Legacy public/private filter (keep for backward compatibility)
         if (@$_POST['public'] != @$_POST['private']) {
             if (@$_POST['public']) {
                 $query->where('public', 1);
@@ -428,17 +1607,98 @@ class ApiController extends BaseController
                 $query->where('public', 0);
             }
         }
-        $data = $query->orderBy('record_updated', 'DESC')->limit(100)->get()->keyBy('thing_id');
+        // Favorites filter: return objects favorited by the current user
+        if (!empty($requestBody['favorites']) && Auth::check()) {
+            $query->join('links as fav_links', function ($join) {
+                $join->on('things.thing_id', '=', 'fav_links.other_thing_id')
+                    ->where('fav_links.link_type_id', '=', UUID::MY_FAVORITE)
+                    ->where('fav_links.one_thing_id', '=', Auth::user()->thing_id);
+            });
+        }
+        // Date range filter — interval-overlap semantics so flexible dates
+        // (before/after/between with open bounds) match correctly:
+        //   [thing.start, thing.end] ∩ [date_from, date_to] ≠ ∅
+        if (!empty($requestBody['date_from'])) {
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.end')->orWhere('things.end', '>=', $requestBody['date_from']);
+            });
+        }
+        if (!empty($requestBody['date_to'])) {
+            $query->where(function ($q) use ($requestBody) {
+                $q->whereNull('things.start')->orWhere('things.start', '<=', $requestBody['date_to']);
+            });
+        }
+        // Owner filter — exact UUID match when possible, ILIKE fallback
+        if (!empty($requestBody['owner'])) {
+            if (Str::isUuid($requestBody['owner'])) {
+                $query->where('things.owner', $requestBody['owner']);
+            } else {
+                $query->where('things.owner', 'ilike', '%' . $requestBody['owner'] . '%');
+            }
+        }
+        // Server filter
+        if (!empty($requestBody['server'])) {
+            $query->where('things.server_uuid', $requestBody['server']);
+        }
+        // Dynamic sort
+        $sortMap = [
+            'updated' => 'record_updated',
+            'created' => 'record_created',
+            'start'   => 'start',
+            'name'    => 'name',
+        ];
+        $sortCol = $sortMap[$requestBody['sort_by'] ?? 'start'] ?? 'start';
+        $sortDir = ($requestBody['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        // When sorting by a date column, undated objects (NULL) must go last
+        // regardless of direction — Postgres would otherwise put them first on
+        // DESC. Column names come from the fixed map above, so this is safe.
+        // Plain numeric sort is chronologically correct for canonical values:
+        // value = year × 10^10 + MMDDHHMMSS tail, monotonic in the year for
+        // both positive and negative (BC) values. The backfill migration makes
+        // every stored start/end canonical, so no zero-extension is needed.
+        if ($sortCol === 'start') {
+            $query->orderByRaw('start ' . $sortDir . ' NULLS LAST');
+        } else {
+            $query->orderBy($sortCol, $sortDir);
+        }
+        // groupBy(thing_id): the class filter (and favorites join) can match
+        // an object through several links at once; group by the PK so each
+        // object appears exactly once. (Postgres accepts selecting the other
+        // columns because they are functionally dependent on the PK, and it
+        // works even though things.data is plain `json`, which DISTINCT can't
+        // dedupe.)
+        $data = $query->groupBy('things.thing_id')->limit(100)->get();
+
+        // Attach each result's class membership (multi-class: `classes` array,
+        // `class` = first/primary). Only things have a class; skip for other
+        // type searches (link types, class types) to avoid an unnecessary query.
+        $requestTypes = array_map('intval', (array) ($requestBody['type'] ?? []));
+        if (empty($requestTypes) || in_array(UUID::G_THING, $requestTypes, true)) {
+            $this->attachClasses($data);
+        }
+
+        // Link-type results carry their taxonomy base category (the abstract
+        // base they hang under, e.g. "Kinship", "Hierarchy") so the picker can
+        // group them.
+        if (in_array(UUID::G_LINK, $requestTypes, true)) {
+            $this->attachLinkTypeCategories($data);
+        }
 
         $ids = $data->pluck('thing_id')->toArray();
         $links = [];
         if (!empty($ids)) {
             $links = DB::table('links')
-                ->select('links.*', 'things.name', 'link_types.name as link_name')
+                ->select('links.*', 'things.name', 'one_side.name as one_name', 'link_types.name as link_name')
+                ->addSelect('link_types.name_translations as link_name_translations')
+                ->addSelect('things.name_translations')
+                ->addSelect('one_side.name_translations as one_name_translations')
                 ->whereIn('links.one_thing_id', $ids)
                 ->orWhereIn('links.other_thing_id', $ids)
                 ->leftJoin('things', function ($join) {
                     $join->on('links.other_thing_id', '=', 'things.thing_id');
+                })
+                ->leftJoin('things as one_side', function ($join) {
+                    $join->on('links.one_thing_id', '=', 'one_side.thing_id');
                 })
                 ->leftJoin('things as link_types', function ($join) {
                     $join->on('links.link_type_id', '=', 'link_types.thing_id');
@@ -446,11 +1706,217 @@ class ApiController extends BaseController
                 ->get()->toArray();
         }
 
+        // Multilevel related objects: attach direct related links (with a
+        // shallow resolved `target`) to each result thing. Deeper levels are
+        // fetched on demand via GET /object/{id}?depth=N.
+        $depth = (int) ($requestBody['depth'] ?? RelatedObjectsResolver::DEFAULT_SEARCH_DEPTH);
+        $depth = min(max($depth, 0), RelatedObjectsResolver::SEARCH_DEPTH_CAP);
+
+        $linksByRoot = $depth > 0
+            ? (new RelatedObjectsResolver)->forMany($ids, RelatedObjectsResolver::SEARCH_BREADTH)
+            : [];
+
+        $things = $data->map(function ($thing) use ($linksByRoot) {
+            if (isset($linksByRoot[$thing->thing_id])) {
+                $thing->links = $linksByRoot[$thing->thing_id];
+            }
+            return $thing;
+        });
+
         return response()->json([
-            'things' => ThingResource::collection($data),
+            'things' => ThingResource::collection($things),
             'links'  => LinkResource::collection($links),
         ]);
 
+    }
+
+    /**
+     * Attach class membership to search results (multi-class). Each result gets
+     * a `classes` array [{ thing_id, name, name_translations, class_name }] and
+     * `class` = the first/primary class (backward-compat singular shape). One
+     * batched query covers all results.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachClasses($things): void
+    {
+        $ids = $things->pluck('thing_id')->toArray();
+        if (empty($ids)) {
+            return;
+        }
+
+        $rows = DB::table('links')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->leftJoin('classes', 'classes.thing_id', '=', 'c.thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_CLASS)
+            ->where('links.deleted', false)
+            ->where('c.deleted', false)
+            ->whereIn('links.one_thing_id', $ids)
+            // Insertion order → first class is the primary one.
+            ->orderBy('links.link_id')
+            ->select('links.one_thing_id as thing_id', 'c.thing_id as class_thing_id', 'c.name', 'c.name_translations', 'classes.class_name')
+            ->get()
+            ->groupBy('thing_id');
+
+        foreach ($things as $thing) {
+            $classes = ($rows[$thing->thing_id] ?? collect())->map(function ($r) {
+                return [
+                    'thing_id'          => $r->class_thing_id,
+                    'name'              => $r->name,
+                    'name_translations' => is_string($r->name_translations)
+                        ? json_decode($r->name_translations, true)
+                        : ($r->name_translations ?? null),
+                    'class_name'        => $r->class_name,
+                ];
+            })->values()->all();
+            $thing->classes = $classes;
+            $thing->class   = $classes[0] ?? null;
+        }
+    }
+
+    /**
+     * Attach the taxonomy base category to link-type search results so the
+     * picker can group them (e.g. "Kinship", "Hierarchy"). The base is the
+     * direct child of the Link root that the link type hangs under; for link
+     * types directly under Link it is the link type itself. Link types that
+     * are not part of the tree (system-internal ones) get no category.
+     *
+     * @param \Illuminate\Support\Collection $things
+     */
+    private function attachLinkTypeCategories($things): void
+    {
+        $bases = DB::table('links')
+            ->join('things as t', 't.thing_id', '=', 'links.other_thing_id')
+            ->where('links.one_thing_id', UUID::LINK)
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('t.type', UUID::G_LINK)
+            ->where('t.deleted', false)
+            ->get(['t.thing_id', 't.name', 't.name_translations'])
+            ->keyBy('thing_id');
+
+        if ($bases->isEmpty()) {
+            return;
+        }
+
+        // child => parent edges among link types (any depth).
+        $parents = DB::table('links')
+            ->join('things as p', 'p.thing_id', '=', 'links.one_thing_id')
+            ->join('things as c', 'c.thing_id', '=', 'links.other_thing_id')
+            ->where('links.link_type_id', UUID::LINK_TO_PARENT)
+            ->where('links.deleted', false)
+            ->where('p.type', UUID::G_LINK)->where('p.deleted', false)
+            ->where('c.type', UUID::G_LINK)->where('c.deleted', false)
+            ->pluck('links.one_thing_id', 'links.other_thing_id');
+
+        foreach ($things as $thing) {
+            if ((int) $thing->type !== UUID::G_LINK) {
+                continue;
+            }
+            $base = $this->resolveLinkBase($thing->thing_id, $bases, $parents);
+            if ($base) {
+                $thing->category_id           = $base->thing_id;
+                $thing->category_name         = $base->name;
+                $thing->category_translations = $base->name_translations;
+            }
+        }
+    }
+
+    private function resolveLinkBase(string $thingId, $bases, $parents): ?object
+    {
+        if (isset($bases[$thingId])) {
+            return $bases[$thingId];
+        }
+        $node  = $thingId;
+        $guard = 0;
+        while (isset($parents[$node]) && $guard++ < 20) {
+            $node = $parents[$node];
+            if (isset($bases[$node])) {
+                return $bases[$node];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get available filter options (owners and servers) for the search filter panel.
+     * Returns only owners/servers that actually have visible objects assigned,
+     * so a user never sees filter values for objects they have no access to.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchOptions(): \Illuminate\Http\JsonResponse
+    {
+        // The owner/server lists are two GROUP BY scans over the whole things
+        // table (~100ms+ each at scale). They only change when objects are
+        // created/updated/deleted or visibility toggles, so a short per-user
+        // TTL is a cheap win; the filter dropdown tolerates slightly stale counts.
+        $cacheKey = 'search-options:' . (Auth::check() ? Auth::user()->thing_id : 'anon');
+
+        $options = Cache::remember($cacheKey, 60, function () {
+            // Distinct owners with names and object counts.
+            $owners = DB::table('things as o')
+                ->select('o.owner as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+                ->leftJoin('things as t', 'o.owner', '=', 't.thing_id')
+                ->where('o.deleted', 0)
+                ->whereNotNull('o.owner')
+                ->where($this->visibleObjectsScope('o'))
+                ->groupBy('o.owner', 't.name', 't.type')
+                ->orderByDesc(DB::raw('COUNT(*)'))
+                ->limit(100)
+                ->get();
+
+            // Distinct server UUIDs with names and object counts
+            $servers = DB::table('things as o')
+                ->select('o.server_uuid as thing_id', 't.name', 't.type', DB::raw('COUNT(*) as count'))
+                ->leftJoin('things as t', 'o.server_uuid', '=', 't.thing_id')
+                ->where('o.deleted', 0)
+                ->whereNotNull('o.server_uuid')
+                ->where($this->visibleObjectsScope('o'))
+                ->groupBy('o.server_uuid', 't.name', 't.type')
+                ->orderByDesc(DB::raw('COUNT(*)'))
+                ->limit(100)
+                ->get();
+
+            return [
+                'owners' => $owners,
+                'servers' => $servers,
+            ];
+        });
+
+        return response()->json($options);
+    }
+
+    /**
+     * Closure restricting a things query (aliased) to records the current user
+     * may see: public (or null), the user's own, and group-accessible. Mirrors
+     * the auth() query builder macro, but for a configurable table alias so it
+     * can be applied to the referencing side of the options query.
+     */
+    private function visibleObjectsScope(string $alias = 'o'): \Closure
+    {
+        return function ($query) use ($alias) {
+            $query->where($alias . '.public', 1)
+                ->orWhereNull($alias . '.public');
+
+            if (Auth::check()) {
+                $userThingId = Auth::user()->thing_id;
+
+                // Objects the user owns
+                $query->orWhere($alias . '.owner', $userThingId);
+
+                // Group-based access: visible via GROUP_READ_ACCESS links to
+                // a group the user belongs to (BELONGS_TO_USER_GROUP)
+                $query->orWhereIn($alias . '.thing_id', function ($sub) use ($userThingId) {
+                    $sub->select('gl.one_thing_id')
+                        ->from('links as gl')
+                        ->join('links as ug', 'ug.other_thing_id', '=', 'gl.other_thing_id')
+                        ->where('gl.link_type_id', UUID::GROUP_READ_ACCESS)
+                        ->where('ug.link_type_id', UUID::BELONGS_TO_USER_GROUP)
+                        ->where('ug.one_thing_id', $userThingId);
+                });
+            }
+        };
     }
 
     /**
@@ -463,24 +1929,30 @@ class ApiController extends BaseController
         $rootId = UUID::EVERYTHING;
         $linkTypeParent = UUID::LINK_TO_PARENT;
         $classType = UUID::G_CLASS;
+        $modelType = UUID::G_MODEL;
         $linkType = UUID::G_LINK;
+        $systemId = UUID::SYSTEM;
         $isAuthenticated = Auth::check();
 
         // Only filter by public if user is not authenticated
         $publicCondition = $isAuthenticated ? '' : 'AND c.public IS TRUE';
 
+        // Sort siblings so classes and models come first, then link types, and "System" last
+        $sortPriority = 'CASE WHEN id = ? THEN 2 WHEN type IN (?, ?) THEN 0 ELSE 1 END';
+
         $rawSql = "
-    WITH RECURSIVE descendants (name, level, id, parent_id, description, translation, public) AS (
+    WITH RECURSIVE descendants (name, level, id, parent_id, description, type, public, name_translations) AS (
         SELECT
             c.name,
             1,
             c.thing_id,
             CAST(NULL AS UUID),
             c.description,
-            CAST(NULL AS VARCHAR(255)),
-            c.public
+            c.type,
+            c.public,
+            c.name_translations
         FROM things c
-        WHERE c.thing_id = ? $publicCondition
+        WHERE c.thing_id = ?
 
         UNION ALL
 
@@ -490,21 +1962,27 @@ class ApiController extends BaseController
             c.thing_id,
             l.one_thing_id,
             c.description,
-            CAST(l.translation AS VARCHAR(255)),
-            c.public
+            c.type,
+            c.public,
+            c.name_translations
         FROM descendants d
-        JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ?
+        JOIN links l ON d.id = l.one_thing_id AND l.link_type_id = ? AND l.deleted IS NOT TRUE
         JOIN things c ON l.other_thing_id = c.thing_id
-        WHERE (c.type = ? OR c.type = ?) AND d.level < 10 $publicCondition
+        WHERE c.type IN (?, ?, ?) AND c.deleted IS NOT TRUE AND d.level < 10 $publicCondition
     )
-    SELECT * FROM descendants ORDER BY level;
+    SELECT * FROM descendants
+    ORDER BY level, $sortPriority, name;
     ";
 
         $results = DB::select($rawSql, [
             $rootId,
             $linkTypeParent,
             $classType,
+            $modelType,
             $linkType,
+            $systemId,
+            $classType,
+            $modelType,
         ]);
 
         // Remove duplicate nodes, keep the one with the smallest level
@@ -521,6 +1999,9 @@ class ApiController extends BaseController
         foreach ($results as $row) {
             if (isset($row->public)) {
                 $row->public = $row->public === true || $row->public === 't' ? 1 : 0;
+            }
+            if (isset($row->name_translations) && is_string($row->name_translations)) {
+                $row->name_translations = json_decode($row->name_translations, true);
             }
         }
 
@@ -565,7 +2046,7 @@ class ApiController extends BaseController
                 $join->on('things.thing_id', 'links.one_thing_id')
                     ->whereRaw('links.link_type_id = ?', UUID::LINK_TO_PARENT);
             })
-            ->whereIn('type', [UUID::G_CLASS, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
+            ->whereIn('type', [UUID::G_CLASS, UUID::G_MODEL, UUID::GENERAL, UUID::G_LINK, UUID::G_EXTERNAL])
             ->orderByRaw('type = ?, type = ? DESC', [UUID::GENERAL, UUID::G_CLASS])->get())->keyBy('thing_id')->toArray();
 
         foreach ($data as $id => $node) {

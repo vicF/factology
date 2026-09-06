@@ -33,11 +33,13 @@ class ApiTest extends TestCase
             'start'       => date('Ymd', strtotime('-1 day')), // Yesterday in YYYYMMDD format
             'end'         => date('Ymd'), // Today in YYYYMMDD format
             'public'      => 1,
-            'link'        => [
+            'classes'     => [
                 [
-                    'type'        => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
-                    'uuid'        => UUID::SOMETHING,
-                    'description' => 'This test object is of class Something'
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => 'c217c185-742f-4a9f-8e69-acea2b4f5aea',
+                    'other_thing_id' => UUID::SOMETHING,
+                    'description'    => 'This test object is of class Something',
+                    'public'         => 1,
                 ]
             ]
         ];
@@ -310,6 +312,225 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('end', $json['data'][0]);
     }
 
+    public function testSearchWithClassesReturnsEachObjectOnce(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // Object linked to two selected classes (Something AND Event): with the
+        // recursive class filter the expanded set contains both, and without a
+        // dedupe step the leftJoin would return this object twice.
+        $thingA = $this->createTestObject($user, [
+            'name' => 'Dup Class Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING],
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // Object linked to a single selected class.
+        $thingB = $this->createTestObject($user, [
+            'name' => 'Single Class Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING],
+            ],
+        ]);
+
+        $res = $this->postJson('/api/v1/object', ['classes' => [UUID::SOMETHING, UUID::EVENT]]);
+        $res->assertStatus(200);
+
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertSame(
+            1,
+            $ids->filter(fn ($id) => $id === $thingA)->count(),
+            'Object linked to two selected classes must appear exactly once'
+        );
+        $this->assertSame(
+            1,
+            $ids->filter(fn ($id) => $id === $thingB)->count(),
+            'Object linked to one selected class must appear exactly once'
+        );
+    }
+
+    public function testCreateWithMultipleClassesReturnsAllClasses(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $json = $this->postApi('/api/v1/object/' . $uuid, $this->getDefaultObjectData([
+            'thing_id' => $uuid,
+            'name'     => 'Multi Class Object',
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'public' => 1],
+            ],
+        ]));
+
+        // The store() response is the raw model data; the enriched `classes`
+        // array is exposed by the detail endpoint.
+        $detail = $this->getApi('/api/v1/object/' . $uuid);
+        $this->assertSame([UUID::SOMETHING, UUID::EVENT], array_column($detail['data']['classes'], 'thing_id'));
+        // `class` (primary) stays the first entry for backward compatibility.
+        $this->assertSame(UUID::SOMETHING, $detail['data']['class']['thing_id']);
+    }
+
+    public function testCreateThingWithoutClassIsRejected(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $response = $this->postJson('/api/v1/object/' . $uuid, $this->getMinimalObjectData([
+            'thing_id' => $uuid,
+        ]));
+
+        $response->assertStatus(422);
+        $this->assertArrayHasKey('classes', $response->json('errors'));
+    }
+
+    public function testUpdateDiffsRemovedClasses(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $uuid = uuid_create();
+        $this->postApi('/api/v1/object/' . $uuid, $this->getDefaultObjectData([
+            'thing_id' => $uuid,
+            'name'     => 'To Remove Class',
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'public' => 1],
+            ],
+        ]));
+
+        // Update: drop the Event class — only Something should remain.
+        $this->putApi('/api/v1/object/' . $uuid, [
+            'thing_id' => $uuid,
+            'name'     => 'To Remove Class',
+            'type'     => UUID::G_THING,
+            'public'   => 1,
+            'classes'  => [
+                ['one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'public' => 1],
+            ],
+        ]);
+
+        $this->assertDatabaseHas('links', [
+            'one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::SOMETHING, 'deleted' => false,
+        ]);
+        // The removed class link is soft-deleted, not hard-deleted.
+        $this->assertDatabaseHas('links', [
+            'one_thing_id' => $uuid, 'link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT, 'deleted' => true,
+        ]);
+    }
+
+    public function testSearchWithClassesDoesNotReturnClassNodes(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A real object of class Event.
+        $objectId = $this->createTestObject($user, [
+            'name' => 'Event Member Object',
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // A CLASS node that is itself a member of Event (LINK_TO_CLASS). It
+        // matches the same class filter but must NOT appear in the results —
+        // a class-tree filter selects objects, never the class nodes.
+        $classId = $this->createTestObject($user, [
+            'name' => 'Leak Class Member',
+            'type' => UUID::G_CLASS,
+            'links_to_add' => [
+                ['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => UUID::EVENT],
+            ],
+        ]);
+
+        // No `type` in the body: the backend must default to objects-only.
+        $res = $this->postJson('/api/v1/object', ['classes' => [UUID::EVENT]]);
+        $res->assertStatus(200);
+
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($objectId), 'The real object must be returned');
+        $this->assertFalse($ids->contains($classId), 'A class node must not leak into the results');
+    }
+
+    public function testLinkTypeSearchAttachesTaxonomyCategory(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // A nested link type (mother → biological parent → Kinship) resolves to
+        // its abstract base category, with localized name available.
+        $res = $this->postJson('/api/v1/object', ['search' => 'mother', 'type' => [UUID::G_LINK]]);
+        $res->assertStatus(200);
+        $mother = collect($res->json('things'))->firstWhere('name', 'is a mother of');
+        $this->assertNotNull($mother, 'is a mother of should be found');
+        $this->assertSame('Kinship', $mother['category_name']);
+        $this->assertSame('Родственные отношения', $mother['category_translations']['ru'] ?? null);
+
+        // A link type directly under the Link root gets itself as the category.
+        $res2 = $this->postJson('/api/v1/object', ['search' => 'related to', 'type' => [UUID::G_LINK]]);
+        $res2->assertStatus(200);
+        $related = collect($res2->json('things'))->firstWhere('name', 'is related to');
+        $this->assertSame('is related to', $related['category_name'] ?? null);
+    }
+
+    public function testParentLinkKindConsistencyIsEnforced(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $classId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Class',
+            'type' => UUID::G_CLASS,
+        ]);
+        $linkTypeId = $this->createTestObject($user, [
+            'name' => 'Kind Guard Test Link',
+            'type' => UUID::G_LINK,
+        ]);
+
+        $linkUri = '/api/v1/link';
+        $kinship = 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde'; // abstract Kinship base (link kind)
+
+        // 1. A class may not hang under a link type.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $classId,
+        ])->assertStatus(422);
+
+        // 2. A link type may not hang under a plain class.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(422);
+
+        // 3. Same-kind edges still work: a link type under a link-type parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => $kinship,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+
+        // 4. And a class under a class parent.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SOMETHING,
+            'other_thing_id' => $classId,
+        ])->assertStatus(200);
+
+        // 5. Structural-root exception: a link type under System stays allowed.
+        $this->postJson($linkUri, [
+            'link_type_id'  => UUID::LINK_TO_PARENT,
+            'one_thing_id'  => UUID::SYSTEM,
+            'other_thing_id' => $linkTypeId,
+        ])->assertStatus(200);
+    }
+
     public function testGetTest(): void
     {
         $user = $this->createTestUser()->getUser();
@@ -325,6 +546,8 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('description', $json['data']);
         $this->assertArrayHasKey('start', $json['data']);
         $this->assertArrayHasKey('end', $json['data']);
+        $this->assertArrayHasKey('owner', $json['data']);
+        $this->assertArrayHasKey('owner_name', $json['data']);
     }
 
     /**
@@ -493,6 +716,68 @@ class ApiTest extends TestCase
     }
 
     /**
+     * Test that non-admin users cannot delete another user's object
+     */
+    public function testUserCannotDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $otherUser = $this->createTestUser()->getUser();
+        $otherUser->thing_id = $this->createUserThing($otherUser);
+        $otherUser->save();
+
+        Sanctum::actingAs($otherUser, ['*']);
+        $response = $this->deleteJson('/api/v1/object/' . $thingId);
+        $this->assertEquals(403, $response->getStatusCode(),
+            'Expected 403 Forbidden when a non-admin user tries to delete another user\'s object');
+
+        // Verify the object was NOT deleted
+        $this->assertDatabaseHas('things', [
+            'thing_id' => $thingId,
+        ]);
+
+        // Clean up as owner
+        Sanctum::actingAs($owner, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+    }
+
+    /**
+     * Test that admins can delete another user's object
+     */
+    public function testAdminCanDeleteAnotherUsersObject(): void
+    {
+        $owner = $this->createTestUser()->getUser();
+        $owner->thing_id = $this->createUserThing($owner);
+        $owner->save();
+
+        $thingId = $this->createTestObject($owner, [
+            'name'        => 'Owner\'s Object',
+            'description' => 'This belongs to owner',
+        ]);
+
+        $admin = $this->createTestUser()->getUser();
+        $admin->thing_id = $this->createUserThing($admin);
+        $admin->is_admin = true;
+        $admin->save();
+
+        // Admin deletes the owner's object
+        Sanctum::actingAs($admin, ['*']);
+        $this->deleteApi('/api/v1/object/' . $thingId);
+
+        // Verify the object was deleted
+        $this->assertDatabaseMissing('things', [
+            'thing_id' => $thingId,
+        ]);
+    }
+
+    /**
      * Test creating an object with minimal required fields
      */
     public function testCreateWithMinimalFields(): void
@@ -508,9 +793,17 @@ class ApiTest extends TestCase
         $uuid = uuid_create();
         $createUri = '/api/v1/object/' . $uuid;
 
-        // Use minimal data
+        // Use minimal data (objects must still belong to at least one class)
         $minimalData = $this->getMinimalObjectData([
             'thing_id' => $uuid,
+            'classes'  => [
+                [
+                    'one_thing_id'   => $uuid,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::SOMETHING,
+                    'public'         => 1,
+                ],
+            ],
         ]);
 
         $json = $this->postApi($createUri, $minimalData);
@@ -530,6 +823,7 @@ class ApiTest extends TestCase
     private function createUserThing(User $user): string
     {
         $thingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $thingId,
             'name'        => 'thing-' . $user->name,
@@ -537,7 +831,301 @@ class ApiTest extends TestCase
             'type'        => 3,
             'owner'       => $thingId,
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
         return $thingId;
+    }
+
+    /**
+     * Flexible dates: search uses interval-overlap so before/after/between
+     * dates match correctly.
+     */
+    public function testSearchDateIntervalOverlap(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs — use a unique per-run
+        // suffix so the top-100 search limit and leftover objects from earlier
+        // runs never hide the NULL-start fixture (it sorts last).
+        $suffix = substr(uuid_create(), 0, 8);
+
+        // "before 1500" — open start, bound end.
+        $before1500 = $this->createTestObject($user, [
+            'name'     => "Flexible Before 1500 $suffix",
+            'start'    => null,
+            'end'      => '15000101000000',
+            'end_meta' => ['qualifier' => 'before', 'precision' => 'year'],
+        ]);
+
+        // "between 1600 and 1700" — both bounds set.
+        $between1600_1700 = $this->createTestObject($user, [
+            'name'       => "Flexible Between 1600 and 1700 $suffix",
+            'start'      => '16000101000000',
+            'end'        => '17000101000000',
+            'start_meta' => ['qualifier' => 'between', 'precision' => 'year'],
+        ]);
+
+        // "after 1800" — open end.
+        $after1800 = $this->createTestObject($user, [
+            'name'       => "Flexible After 1800 $suffix",
+            'start'      => '18000101000000',
+            'end'        => null,
+            'start_meta' => ['qualifier' => 'after', 'precision' => 'year'],
+        ]);
+
+        // Window 1450–1650: before-1500 and between-1600-1700 overlap; after-1800 does not.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '14500101000000',
+            'date_to'   => '16500101000000',
+            'search'    => $suffix,
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($before1500), 'A "before 1500" date must match the 1450–1650 window');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1450–1650 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1450–1650 window');
+
+        // Window 1650–1750: only between-1600-1700 overlaps.
+        $res = $this->postJson('/api/v1/object', [
+            'date_from' => '16500101000000',
+            'date_to'   => '17500101000000',
+            'search'    => $suffix,
+        ]);
+        $res->assertStatus(200);
+        $ids = collect($res->json('things'))->pluck('thing_id');
+        $this->assertTrue($ids->contains($between1600_1700), 'A 1600–1700 range must overlap the 1650–1750 window');
+        $this->assertFalse($ids->contains($before1500), 'A "before 1500" date must not match the 1650–1750 window');
+        $this->assertFalse($ids->contains($after1800), 'An "after 1800" date must not match the 1650–1750 window');
+    }
+
+    /**
+     * Flexible dates: start_meta/end_meta survive a store round-trip.
+     */
+    public function testCreateWithFlexibleDateMeta(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start'      => '15000101000000',
+            'end'        => '16000101000000',
+            'start_meta' => [
+                'qualifier' => 'approx',
+                'precision' => 'year',
+                'era'       => 'gregorian',
+            ],
+            'end_meta' => [
+                'qualifier' => 'between',
+                'precision' => 'year',
+            ],
+        ]);
+
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+        $this->assertSame('approx', $json['data']['start_meta']['qualifier']);
+        $this->assertSame('between', $json['data']['end_meta']['qualifier']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('approx', json_decode($row->start_meta, true)['qualifier']);
+        $this->assertSame('between', json_decode($row->end_meta, true)['qualifier']);
+        $this->assertSame('15000101000000', $row->start);
+        $this->assertSame('16000101000000', $row->end);
+
+        // The detail (GET) endpoint must return the meta decoded as an object —
+        // the edit modal re-sends it verbatim and the store validates start_meta
+        // as an array, so a raw JSON string here would fail on the next save.
+        $detail = $this->getApi('/api/v1/object/' . $uniqueId);
+        $this->assertIsArray($detail['data']['start_meta']);
+        $this->assertSame('approx', $detail['data']['start_meta']['qualifier']);
+        $this->assertIsArray($detail['data']['end_meta']);
+        $this->assertSame('between', $detail['data']['end_meta']['qualifier']);
+    }
+
+    /**
+     * Flexible dates: invalid start_meta.qualifier is rejected.
+     */
+    public function testFlexibleDateMetaValidation(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id'   => $uniqueId,
+            'start_meta' => ['qualifier' => 'bogus'],
+        ]);
+        try {
+            $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData, 422);
+            $this->assertArrayHasKey('errors', $json, 'Validation should fail for an invalid start_meta.qualifier');
+            $this->assertArrayHasKey('start_meta.qualifier', $json['errors']);
+        } catch (AssertionFailedError $e) {
+            $this->fail('Expected 422 for invalid start_meta.qualifier: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Flexible dates: BC (negative) start dates are accepted.
+     */
+    public function testBcStartDateAccepted(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '-15000101235959', // 1500 BC
+            'end'      => '15000101000000',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('-15000101235959', $row->start);
+    }
+
+    /**
+     * Raw unpadded date values sent to the API are normalized to canonical
+     * form on save, so legacy-style digit strings never re-enter the database.
+     */
+    public function testStoreNormalizesUnpaddedDates(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $uniqueId = uuid_create();
+        $requestData = $this->getDefaultObjectData([
+            'thing_id' => $uniqueId,
+            'start'    => '20200101', // raw day-precision
+            'end'      => '20200102',
+        ]);
+        $json = $this->postApi('/api/v1/object/' . $uniqueId, $requestData);
+        $this->assertArrayHasKey('thing_id', $json['data']);
+
+        $row = DB::table('things')->where('thing_id', $uniqueId)->first();
+        $this->assertSame('20200101000000', $row->start);
+        $this->assertSame('20200102000000', $row->end);
+
+        // Canonical values pass through untouched.
+        $canonicalId = uuid_create();
+        $requestData2 = $this->getDefaultObjectData([
+            'thing_id' => $canonicalId,
+            'start'    => '20260811120000',
+        ]);
+        $this->postApi('/api/v1/object/' . $canonicalId, $requestData2);
+        $row2 = DB::table('things')->where('thing_id', $canonicalId)->first();
+        $this->assertSame('20260811120000', $row2->start);
+    }
+
+    /**
+     * Search defaults to sorting by start date DESC, with undated objects last
+     * (Postgres puts NULLs first on DESC without an explicit NULLS LAST).
+     */
+    public function testSearchDefaultsToStartDateDescending(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs, so use a unique per-run
+        // suffix to avoid matching leftover objects from earlier test runs.
+        $suffix = substr(uuid_create(), 0, 8);
+        $names = [
+            'older'   => "Sort Older $suffix",
+            'middle'  => "Sort Middle $suffix",
+            'newer'   => "Sort Newer $suffix",
+            'undated' => "Sort Undated $suffix",
+        ];
+        $this->createTestObject($user, ['name' => $names['older'], 'start' => '20200101']);
+        $this->createTestObject($user, ['name' => $names['newer'], 'start' => '20220101']);
+        $this->createTestObject($user, ['name' => $names['middle'], 'start' => '20210101']);
+        $this->createTestObject($user, ['name' => $names['undated'], 'start' => null, 'end' => null]);
+
+        // Scope the search to this run's own objects (unique suffix) so the
+        // persistent shared DB and the 100-result limit don't hide them.
+        $res = $this->postJson('/api/v1/object', ['search' => $suffix]);
+        $res->assertStatus(200);
+
+        $ours = collect($res->json('things'))
+            ->whereIn('name', array_values($names))
+            ->pluck('name')
+            ->values()
+            ->all();
+        $this->assertSame([$names['newer'], $names['middle'], $names['older'], $names['undated']], $ours);
+    }
+
+    /**
+     * Search ranks an EXACT name match above prefix matches above substring
+     * matches above description-only matches — even when a lower tier has a
+     * newer start date (relevance must win over the date sort).
+     */
+    public function testSearchRanksExactNameBeforePrefixBeforeSubstring(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        // ApiTest shares one persistent DB across runs, so use a unique per-run
+        // token so the search term only ever matches this run's objects.
+        $token = 'Zzpillow' . substr(uuid_create(), 0, 8);
+        $this->createTestObject($user, ['name' => $token, 'description' => 'the thing itself, undated']);
+        $this->createTestObject($user, ['name' => "$token photo.jpg", 'start' => '20240101']);       // prefix, newer
+        $this->createTestObject($user, ['name' => "Foo $token Bar", 'start' => '20250101']);         // substring, newest
+        $this->createTestObject($user, ['name' => 'Unrelated photo', 'description' => "mentions $token"]); // description only
+
+        $res = $this->postJson('/api/v1/object', ['search' => $token]);
+        $res->assertStatus(200);
+
+        $ours = collect($res->json('things'))
+            ->filter(fn ($t) => in_array($t['name'], [$token, "$token photo.jpg", "Foo $token Bar", 'Unrelated photo'], true))
+            ->pluck('name')
+            ->values()
+            ->all();
+        $this->assertSame(
+            [$token, "$token photo.jpg", "Foo $token Bar", 'Unrelated photo'],
+            $ours,
+            'Expected exact → prefix → substring → description-only order'
+        );
+    }
+
+    /**
+     * Link descriptions: the detail endpoint exposes BOTH endpoint names for
+     * every link (`one_name` = one_thing_id's name, `name` = other_thing_id's
+     * name) regardless of direction, so the frontend can render incoming and
+     * outgoing links alike (previously an incoming link lost the one endpoint
+     * and rendered "Unknown").
+     */
+    public function testObjectDetailLinksExposeBothEndpointNames(): void
+    {
+        $user = $this->createTestUser()->getUser();
+        Sanctum::actingAs($user, ['*']);
+
+        $holder = $this->createTestObject($user, ['name' => 'Detail Link Holder']);
+        $target = $this->createTestObject($user, ['name' => 'Detail Link Target']);
+
+        // holder → target: from the target's perspective this is an INCOMING
+        // link, the case that previously dropped the one-endpoint name.
+        $this->putApi('/api/v1/object/' . $holder, array_merge(
+            $this->getFullObjectDataForUpdate($holder),
+            ['links_to_add' => [['link_type_id' => UUID::LINK_TO_CLASS, 'other_thing_id' => $target]]],
+        ));
+
+        $json = $this->getApi('/api/v1/object/' . $target);
+        $links = $json['data']['links'] ?? [];
+        $incoming = collect($links)->firstWhere('one_thing_id', $holder);
+        $this->assertNotNull($incoming, 'target should have an incoming link from the holder');
+        $this->assertSame('Detail Link Holder', $incoming['one_name']);
+        $this->assertSame('Detail Link Target', $incoming['name']);
     }
 }

@@ -30,6 +30,8 @@ class SettingsTest extends TestCase
             'email'                 => 'newuser@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response->assertStatus(201);
@@ -45,6 +47,8 @@ class SettingsTest extends TestCase
             'email'                 => 'blocked@example.com',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
+            'accepted_terms'        => 1,
+            'accepted_privacy'      => 1,
         ]);
 
         $response->assertStatus(403);
@@ -68,7 +72,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'everyone']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -81,7 +85,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'registered_only']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(401);
         $response->assertJson([
@@ -98,7 +102,7 @@ class SettingsTest extends TestCase
         $user = $this->createTestUser()->getUser();
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
     }
@@ -127,6 +131,7 @@ class SettingsTest extends TestCase
         // Create a private object (public = false)
         $thingId = uuid_create();
         $ownerThingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $thingId,
             'name'        => 'Private Test Object',
@@ -134,6 +139,7 @@ class SettingsTest extends TestCase
             'type'        => UUID::G_THING,
             'owner'       => $ownerThingId,
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
 
         $response = $this->getJson(self::API_PREFIX . '/object/' . $thingId);
@@ -150,12 +156,14 @@ class SettingsTest extends TestCase
 
         // Create the things record for the user FIRST (FK constraint)
         $userThingId = uuid_create();
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
         DB::table('things')->insert([
             'thing_id'    => $userThingId,
             'name'        => 'thing-' . $user->name,
             'type'        => UUID::G_THING,
             'owner'       => uuid_create(),
             'public'      => false,
+            'server_uuid' => $serverUuid,
         ]);
 
         // Set the user's thing_id to match the things record
@@ -171,6 +179,7 @@ class SettingsTest extends TestCase
             'type'        => UUID::G_THING,
             'owner'       => $user->thing_id,
             'public'      => false,
+            'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
         ]);
 
         Sanctum::actingAs($user, ['*']);
@@ -211,7 +220,7 @@ class SettingsTest extends TestCase
     {
         config(['app.public_objects_visibility' => 'everyone']);
 
-        $response = $this->getJson(self::API_PREFIX . '/object/939cd822-9e23-450c-8c5e-c23f67cca792');
+        $response = $this->getJson(self::API_PREFIX . '/object/' . UUID::SOMETHING);
 
         $response->assertStatus(200);
         $data = $response->json('data');

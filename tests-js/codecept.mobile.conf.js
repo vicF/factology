@@ -11,42 +11,59 @@
 //   @native — native-specific features (install, permissions)
 //   @web    — skipped on native (auth, server-specific)
 
+const path = require('path');
+
 const DEVICE_OS = process.env.DEVICE_OS || 'android';
-const APK_PATH = process.env.APK_PATH || '../android/app/build/outputs/apk/debug/app-debug.apk';
+const APK_PATH = process.env.APK_PATH
+    || path.resolve(__dirname, '..', 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const DEVICE_NAME = process.env.DEVICE_NAME || (DEVICE_OS === 'android' ? 'emulator-5554' : 'iPhone 15');
 
-const commonCapabilities = {
-    // Wait strategy
-    autoWebview: true,
-    autoGrantPermissions: true,
-    noReset: false,
-};
-
+// CodeceptJS helper-level options. `platform`/`app`/`device` are aliases the
+// helper validates and maps into the session capabilities.
+// Note: the webview context must be switched explicitly via I.switchToWeb()
+// (the helper has no autoWebview support).
 const androidCapabilities = {
-    ...commonCapabilities,
-    platformName: 'Android',
-    deviceName: DEVICE_NAME,
+    platform: 'Android',
     app: APK_PATH,
-    automationName: 'UiAutomator2',
-    appPackage: 'com.factology.app',
-    appActivity: 'com.factology.app.MainActivity',
-    avdLaunchTimeout: 120000,
+    device: DEVICE_NAME,
+    // Appium capabilities. With appiumV2 (default true) the codeceptjs Appium
+    // helper prefixes these with `appium:` automatically (except platformName).
+    desiredCapabilities: {
+        platformName: 'Android',
+        deviceName: DEVICE_NAME,
+        app: APK_PATH,
+        automationName: 'UiAutomator2',
+        appPackage: 'com.factology.app',
+        appActivity: 'com.factology.app.MainActivity',
+        noReset: false,
+        avdLaunchTimeout: 120000,
+        'appium:chromedriverAutodownload': true,
+    },
 };
 
 const iosCapabilities = {
-    ...commonCapabilities,
-    platformName: 'iOS',
-    deviceName: DEVICE_NAME,
+    platform: 'iOS',
     app: './ios/App/build/Debug-iphonesimulator/App.app',
-    automationName: 'XCUITest',
-    autoAcceptAlerts: true,
+    device: DEVICE_NAME,
+    desiredCapabilities: {
+        platformName: 'iOS',
+        deviceName: DEVICE_NAME,
+        app: './ios/App/build/Debug-iphonesimulator/App.app',
+        automationName: 'XCUITest',
+        autoAcceptAlerts: true,
+    },
 };
 
 exports.config = {
-    tests: `./e2e/**/*_test.js`,
+    tests: `./mobile/**/*_test.js`,
     output: './output',
     helpers: {
         Appium: {
+            // Appium 2.x serves at the root base path (the codeceptjs default
+            // of /wd/hub is Appium 1.x-style).
+            host: '127.0.0.1',
+            port: 4723,
+            path: '/',
             ...(DEVICE_OS === 'android' ? androidCapabilities : iosCapabilities),
         },
     },

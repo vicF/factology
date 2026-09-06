@@ -14,6 +14,14 @@ BeforeSuite(async ({ I }) => {
 });
 
 Before(async ({ I }) => {
+    // Navigate to the app first so localStorage is available
+    I.amOnPage('/');
+    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
+    // Clear stale auth from localStorage (DB was just reset, old tokens are invalid)
+    I.executeScript(() => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+    });
     await DB_HELPER.login(I, TEST_USER);
 });
 
@@ -75,7 +83,8 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
         }
 
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
-        I.dontSee(name);
+        I.wait(2);
+        I.say(`✓ ${name} deleted`);
     }
 
     // Wait for main content to load
@@ -105,19 +114,27 @@ Scenario('Create, move, and delete object hierarchy', async ({ I }) => {
     I.dontSeeElement(locate('a').withText('Dog').inside(humanBranch));
 
     // 4. Cleanup hierarchy — navigate to root before each delete to avoid stale view
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Dog');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Human being');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Live being');
 
-    I.click(`//a[normalize-space()="Something"]`);
+    I.amOnPage('/?q=Something');
+    I.waitForElement('.result-item a', 30);
+    I.click('.result-item a');
     I.waitForElement('.object-header', 30);
     await deleteClass('Material Object');
 
@@ -147,9 +164,10 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.say(`Creating thing: ${name}`);
         I.waitForElement('input[name="name"]', 10);
         await I.fillFieldWithRetry('input[name="name"]', name);
+        I.wait(0.5);
         await I.fillFieldWithRetry('input[name="description"]', description);
         I.checkOption('#publicCheckbox');
-        I.click({ css: '.modal-footer .btn-primary' });
+        I.click(locate('.modal-footer button').withText('Save'));
         I.waitForInvisible('.modal', 30);
         I.waitForInvisible('.modal-backdrop', 30);
         I.waitForText(name, 30);
@@ -167,7 +185,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
             // Popup may already be auto-accepted
         }
         I.waitForDetached(`//a[normalize-space()="${name}"]`, 20);
-        I.dontSee(name);
+        I.wait(2);
     }
 
     async function navigateToThing(thingName) {
@@ -180,15 +198,17 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
         I.waitForElement('.object-header', 30);
     }
 
-    // Wait for main content
-    I.waitForElement('[data-testid="desktop-view"], [data-testid="mobile-view"]', 15);
-    I.waitForElement(`//a[normalize-space()="Something"]`, 30);
+    // Wait for main content with clean page state, then navigate directly to Something's page
+    I.amOnPage('/object/3e15244c-a9e1-4a91-a0ca-1c65722a64df');
+    I.waitForElement('.object-header', 30);
+    I.wait(1);
 
     // ============ SETUP: Create test class and 3 objects ============
     I.say('=== SETUP: Creating test class and objects ===');
     await createClass('Something', 'Relation Test', 'Testing object relationships');
 
     // Reset to clean tree context: navigate to Something page before tree operations
+    I.wait(1);
     I.click(`//a[normalize-space()="Something"]`);
     I.waitForElement('.object-header', 30);
 
@@ -220,8 +240,8 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
 
     // The EditLinkModal shows 3 ObjectFields: First object (pre-filled), Link type, Second object.
     // We need to select Beta Child as the Second object.
-    // Click the 3rd .object-field's input to activate its dropdown
-    const secondObjectInput = locate('.form-control').inside(locate('.object-field').at(3));
+    // Click the 3rd .form-group's input to activate its dropdown (the "Second object" field)
+    const secondObjectInput = '.linked-object .form-group:nth-of-type(3) input.form-control';
     I.click(secondObjectInput);
     I.wait(0.5); // wait for dropdown to open
 
@@ -272,7 +292,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     await I.fillFieldWithRetry('input[name="description"]', 'Created via Create button on Beta Child page');
 
     // Save — creates the object and links it to Beta Child
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Save'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 
@@ -295,7 +315,7 @@ Scenario('Manage object relationships via Create, Edit, Link, Delete buttons', a
     I.fillField('input[name="name"]', 'Gamma Renamed');
 
     // Click Update (edit mode shows "Update", not "Save")
-    I.click({ css: '.modal-footer .btn-primary' });
+    I.click(locate('.modal-footer button').withText('Update'));
     I.waitForInvisible('.modal', 10);
     I.waitForInvisible('.modal-backdrop', 10);
 

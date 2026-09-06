@@ -3,7 +3,11 @@
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\LegalController;
+use App\Http\Controllers\ExportImportController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\TestDatabaseController;
+use App\Http\Controllers\ToolsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -20,14 +24,25 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
 
+    // Legal document routes (public)
+    Route::get('/legal', [LegalController::class, 'index'])->name('legal.index');
+    Route::get('/legal/{type}', [LegalController::class, 'show'])->name('legal.show');
+
     // Public authentication routes
     Route::post('/login',    [LoginController::class, 'login'])->name('login');
     Route::post('/register', [RegisterController::class, 'register'])->name('register');
     Route::post('/logout',   [LoginController::class, 'logout'])->name('logout');
 
-    // Get current authenticated user
+    // Get current authenticated user (explicitly expose is_admin)
     Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-        return $request->user();
+        $user = $request->user();
+        return response()->json([
+            'id'       => $user->id,
+            'name'     => $user->name,
+            'email'    => $user->email,
+            'thing_id' => $user->thing_id,
+            'is_admin' => (bool) $user->is_admin,
+        ]);
     })->name('user');
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -49,22 +64,66 @@ Route::prefix('v1')->group(function () {
     // ────────────────────────────────────────────────────────────────────────────────
 
     Route::middleware('check.public.access')->group(function () {
-        Route::get('/object',     [ApiController::class, 'list']);
-        Route::post('/object',    [ApiController::class, 'search']);
-        Route::get('/object/{id}', [ApiController::class, 'get']);
+        Route::get('/object',       [ApiController::class, 'list']);
+        Route::post('/object',      [ApiController::class, 'search']);
+        Route::get('/object/{id}',  [ApiController::class, 'get']);
+        Route::get('/object/{id}/graph', [ApiController::class, 'graph']);
+        Route::get('/properties',   [ApiController::class, 'properties']);
+        Route::get('/geocode',      [ApiController::class, 'geocode']);
+        Route::get('/class/{id}/properties', [ApiController::class, 'classProperties']);
         Route::get('/thumbs/{a}/{b}/{id}', [ApiController::class, 'thumb']);
+        Route::get('/search/options', [ApiController::class, 'searchOptions']);
+    });
+
+    // Client-side error reporting (no auth required)
+    Route::post('/client-error', function (Request $request) {
+        $validated = $request->validate([
+            'message'  => 'required|string',
+            'type'     => 'nullable|string',
+            'url'      => 'nullable|string',
+            'stack'    => 'nullable|string',
+            'status'   => 'nullable|integer',
+        ]);
+
+        \Illuminate\Support\Facades\Log::channel('json')->warning('client_error', $validated);
+        return response()->json(['success' => true]);
     });
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
+        Route::patch('/object/{id}/visibility', [ApiController::class, 'toggleVisibility']);
+        Route::patch('/object/{id}/confirm',    [ApiController::class, 'confirmPlanned']);
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
+        Route::post('/object/{id}/media-from-url', [ApiController::class, 'createMediaFromUrl']);
         Route::post('/link',                  [ApiController::class, 'storeLink']);     // create
         Route::put('/link/{id}',              [ApiController::class, 'storeLink']);     // update
         Route::delete('/link/{id}',           [ApiController::class, 'deleteLink']);
         Route::post('/photos',                [ApiController::class, 'photos']);
         Route::post('/check_photos',          [ApiController::class, 'checkPhotos']);
         Route::post('/photos/thumbs_upload',  [ApiController::class, 'upload']);
+
+        // History / favorites
+        Route::post('/suggest/links',         [ApiController::class, 'suggestLinks']);
+        Route::get('/suggest/lists',          [ApiController::class, 'suggestLists']);
+        Route::post('/object/{id}/favorite',  [ApiController::class, 'toggleFavorite']);
+        Route::get('/object/{id}/thumb',      [ApiController::class, 'thumbStatus']);
+        // PHP only parses multipart/form-data into $_FILES for POST, so file
+        // uploads must be POST (JSON url imports may use either verb).
+        Route::match(['post', 'put'], '/object/{id}/thumb', [ApiController::class, 'storeThumb']);
+        Route::delete('/object/{id}/thumb',   [ApiController::class, 'removeThumb']);
+
+        // Export/Import (admin-only, enforced in controller)
+        Route::get('/export',                 [ExportImportController::class, 'export']);
+        Route::post('/import',                [ExportImportController::class, 'import']);
+
+        // GEDCOM import (any authenticated user imports into their own tree)
+        Route::post('/import/gedcom',         [ImportController::class, 'importGedcom']);
+        Route::post('/import/find-duplicates', [ImportController::class, 'findDuplicates']);
+
+        // Database consistency audit (all authenticated users; scoped for non-admins)
+        Route::post('/tools/consistency-check', [ToolsController::class, 'consistencyCheck']);
+        Route::post('/tools/consistency-delete', [ToolsController::class, 'deleteSelected']);
     });
 });
 
@@ -84,5 +143,8 @@ if (app()->environment('testing')) {
         // User management
         Route::post('/create-user',    [TestDatabaseController::class, 'createUser']);
         Route::delete('/users/{id}',   [TestDatabaseController::class, 'deleteUser']);
+
+        // Seed test data for acceptance tests
+        Route::post('/seed-objects',   [TestDatabaseController::class, 'seedTestObjects']);
     });
 }

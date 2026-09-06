@@ -45,6 +45,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Slow Request Threshold (ms)
+    |--------------------------------------------------------------------------
+    |
+    | Requests taking longer than this threshold will be logged as warnings
+    | by the RequestLogger middleware.
+    |
+    */
+    'slow_request_threshold_ms' => env('SLOW_REQUEST_THRESHOLD_MS', 1000),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |
@@ -226,5 +237,21 @@ return [
 
     'public_objects_visibility' => env('PUBLIC_OBJECTS_VISIBILITY', 'everyone'),
     'registration_enabled' => env('REGISTRATION_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legal Settings
+    |--------------------------------------------------------------------------
+    |
+    | These settings control legal consent requirements during registration.
+    | The responsibility for providing accurate legal documents lies with
+    | the application deployer.
+    |
+    */
+    'legal' => [
+        'terms_required' => env('LEGAL_TERMS_REQUIRED', true),
+        'privacy_required' => env('LEGAL_PRIVACY_REQUIRED', true),
+        'default_country' => env('LEGAL_DEFAULT_COUNTRY', '*'),
+    ],
 
 ];

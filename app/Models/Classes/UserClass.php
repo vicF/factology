@@ -54,8 +54,17 @@ class UserClass extends Everything
                 'name'        => 'user-' . $this->name,
                 'description' => 'User account for ' . $this->name,
                 'type'        => UUID::G_THING,
-                'owner'       => $this->thing_id,
+                'owner'       => $userThingId,
                 'public'      => false,
+                'server_uuid' => DB::table('settings')->where('key', 'server_uuid')->value('value'),
+            ]);
+            // The account thing (users.thing_id) is the canonical user object —
+            // give it the system User class so users can be found via the User
+            // class filter in the sidebar.
+            $this->setLink([
+                'one_thing_id'   => $userThingId,
+                'link_type_id'   => UUID::LINK_TO_CLASS,
+                'other_thing_id' => UUID::USER,
             ]);
             $this->user = User::create([
                 'name'     => $this->name,

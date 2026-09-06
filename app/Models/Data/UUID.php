@@ -16,8 +16,10 @@ class UUID
     public const G_LINK = 4;
     public const G_THING = 3;
     public const G_CLASS = 2;
+    public const G_MODEL = 7;
     public const G_EXTERNAL = 5;
     public const G_SERVER = 6;
+    public const G_SERVER_CLASS = 'f8c9f7a6-99ed-4156-81ff-991e8008f377';
 
     public const EVERYTHING = '939cd822-9e23-450c-8c5e-c23f67cca792';
     public const LINK = '4b27fd0c-d8be-425c-a529-2186b2589e76';
@@ -52,10 +54,14 @@ class UUID
     public const INSIDE = '922cca80-a0ba-4a5e-8344-769f083f0e72';
     public const VICTOR_FOKIN = '0ac1b13b-acbf-4246-bed4-8f0c2a8b2546';
     public const EVIDENCE = '4eff773a-6bbd-410f-a668-681b41d69051';
+    public const MEDIA_DEPICTS = 'b4d2a9c2-0001-4c1a-8000-000000000001';
+    public const SOURCE_CLASS = 'e1d4c1d1-0002-4c1a-8000-000000000001';
+    public const ARTICLE_CLASS = 'e1d4c1d1-0002-4c1a-8000-000000000002';
     public const HUMAN = '4c8ee41a-9912-4dff-8b44-7779a66e4fcf';
     public const TRIP = 'e3cad1b0-74fa-44b2-9b2f-2adaf36baa14';
     public const FATHER = '29cafd84-0fc9-4295-afcc-d73b9613e39f';
     public const MOTHER = 'b7c887b7-cee4-452d-b491-bd552de79d70';
+    public const MARRIED_TO = 'eb8fbbab-1f92-42e6-b878-0519b9652ab6';
     public const PRESENT = '8811c270-4285-4534-bb2a-c4da1ba850e4';
     public const PRESENT_AS_ACTOR = '1e53a04c-15cf-49ba-9495-59d1d67500b6';
     public const EVENT = '0eed3b56-bdd6-47f0-9413-d9640a9dcafc';
@@ -67,6 +73,47 @@ class UUID
     public const MEMBER_OF = '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf';
     public const GROUP_READ_ACCESS = 'ea206516-9e45-482f-89be-05313f52e5e3';
     public const BELONGS_TO_USER_GROUP = 'e18d73eb-a5d3-47be-a785-106f6f185651';
+    public const SYSTEM_OWNER = 'aaaaaaaa-0000-4000-a000-00000000000a';
+
+    // ── User preference / history link types ──
+    public const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';
+    public const RECENTLY_VIEWED = 'f0f0f0f0-0002-4000-a000-000000000002';
+
+    // ── Identity equivalence link types ──
+    public const DUPLICATE_OF = '0dc6915e-b92c-4834-b9a3-091273d0d334';
+    public const ALSO_KNOWN_AS = '0a1a2fe7-d4f7-4a85-8514-680cfd518bdb';
+
+    // ── Localization system objects (Property/Language classes, languages) ──
+    public const PROPERTY_CLASS = 'b1b1b1b1-0001-4000-8000-000000000001';
+    public const LANGUAGE_CLASS = 'b1b1b1b1-0002-4000-8000-000000000001';
+    public const PROPERTY_APPLIES_TO = 'b1b1b1b1-0003-4000-8000-000000000001';
+    public const LANG_EN = 'b1b1b1b1-0011-4000-8000-000000000001';
+    public const LANG_RU = 'b1b1b1b1-0012-4000-8000-000000000001';
+
+    // ── Geo system objects (Coordinates property, linked to the Place class) ──
+    public const PLACE_CLASS = 'dc006cda-047a-4862-acf7-e215355b6890';
+    public const COORDINATES_PROPERTY = 'c1c1c1c1-0002-4000-8000-000000000001';
+
+    // ── GEDCOM import system objects ──
+    public const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
+    public const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';
+
+    // ── GEDCOM event-specific classes (replacing generic EVENT) ──
+    public const BIRTH_CLASS = 'a565fc22-6dae-4b7a-bd9e-30df8bc8acca';
+    public const DEATH_CLASS = '6ea018a1-d71c-4655-89b9-9f469b979847';
+    public const RESIDENCE_CLASS = 'a70ae070-0c52-4a89-84a0-5c76f76e5aa7';
+    public const OCCUPATION_CLASS = '7fae11dc-3411-4652-9712-18729bf1e3a7';
+    public const MARRIAGE_CLASS = 'f5fe8e87-da33-4a40-ad7f-1b62b4e62299';
+    public const BURIAL_CLASS = '02a3040c-c9fd-48b7-9f1c-57ef66002aa6';
+    public const EDUCATION_CLASS = '5092247b-8fff-475f-b90c-22b29bf59532';
+    public const CHRISTENING_CLASS = '2e3e8252-47c6-44e0-8804-6083ec506a92';
+    public const ADDRESS_CLASS = '42a2e356-8ad1-406a-b78e-db13febf0415';
+
+    // ── Archive chain classes (ISAD-G): Archive → Fonds → Series → File ──
+    public const ARCHIVE_CLASS = 'c2c2c2c2-0001-4000-8000-000000000001';
+    public const FONDS_CLASS = 'c2c2c2c2-0002-4000-8000-000000000001';
+    public const SERIES_CLASS = 'c2c2c2c2-0003-4000-8000-000000000001';
+    public const FILE_CLASS = 'c2c2c2c2-0004-4000-8000-000000000001';
 
     public static function contains(array $data,
                                     array $otherThings,

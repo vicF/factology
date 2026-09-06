@@ -2,7 +2,11 @@
 // New stores should import this instead of calling localStorage/window directly.
 
 function isNative() {
-  return typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+  const result = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+  if (typeof window !== 'undefined' && window.Capacitor) {
+    console.log('[storage] isNative:', result, 'platform:', window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'unknown');
+  }
+  return result;
 }
 
 export const storage = {

@@ -27,8 +27,8 @@ class TestDatabaseSeeder extends Seeder
             ]
         ))->save();
 
-        // Optional: Add an admin user
-        (new UserClass(
+        // Create admin user
+        $adminUserClass = new UserClass(
             [
                 'name' => 'Admin User',
                 'email' => 'admin@test.com',
@@ -38,7 +38,11 @@ class TestDatabaseSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
-        ))->save();
+        );
+        $adminUserClass->save();
+        $adminUser = $adminUserClass->getUser();
+        $adminUser->is_admin = true;
+        $adminUser->save();
 
         // You can add more default users here
         // DB::table('users')->updateOrInsert(...);

@@ -3,25 +3,51 @@
         <!-- Navigation loading bar -->
         <div class="nav-loading-bar"></div>
         <!-- Main Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d6efd;">
+        <nav class="navbar navbar-expand-lg navbar-dark" :style="navbarStyle">
             <div class="container-fluid">
                 <div class="collapse navbar-collapse d-flex justify-content-between align-items-center" id="navbarNavDropdown">
                     <ul class="navbar-nav flex-shrink-0 me-2">
                         <li class="nav-item">
-                            <router-link :to="{name:'dashboard'}" class="nav-link" title="Home" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
+                            <router-link :to="{name:'dashboard'}" class="nav-link" :title="$t('Home')" data-testid="home-link" style="display: flex; align-items: center; padding: 0.5rem 0;">
                                 <IconHome class="icon-xl" />
                             </router-link>
                         </li>
                     </ul>
 
-                    <form class="d-flex flex-grow-1 mx-2" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
-                        <input class="form-control me-2" type="search" placeholder="Search" v-model="searchQuery" aria-label="Search" data-testid="search-input">
+                    <form class="d-flex flex-grow-1 mx-2 position-relative" @submit.prevent="submitSearch" data-testid="search-form" v-if="!authStore.hidePublicContent">
+                        <input class="form-control me-2" type="search" :placeholder="$t('Search')" v-model="searchQuery" :aria-label="$t('Search')" data-testid="search-input">
+                        <button class="btn btn-outline-light flex-shrink-0 search-btn" type="button" @click="toggleFilters" :title="$t('Filters')" style="display: flex; align-items: center; justify-content: center; margin-right: 4px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="6" x2="20" y2="6"></line>
+                                <line x1="8" y1="12" x2="20" y2="12"></line>
+                                <line x1="12" y1="18" x2="20" y2="18"></line>
+                                <circle cx="6" cy="6" r="1.5" fill="currentColor"></circle>
+                                <circle cx="10" cy="12" r="1.5" fill="currentColor"></circle>
+                                <circle cx="14" cy="18" r="1.5" fill="currentColor"></circle>
+                            </svg>
+                        </button>
                         <button class="btn btn-outline-light flex-shrink-0 search-btn" type="submit" data-testid="search-button" style="display: flex; align-items: center; justify-content: center;">
                             <IconSearch class="icon-md" />
                         </button>
+                        <SearchFilterPanel />
                     </form>
 
                     <div class="d-flex flex-shrink-0 align-items-center" style="gap: 0.5rem;">
+                        <!-- Edit Mode Toggle (authenticated only) -->
+                        <button
+                            v-if="authenticated"
+                            class="btn btn-link nav-link d-flex align-items-center edit-mode-toggle"
+                            :class="{ 'active': uiStore.editMode }"
+                            type="button"
+                            data-testid="edit-mode-toggle"
+                            @click="uiStore.toggleEditMode()"
+                            :title="uiStore.editMode ? $t('Edit mode is on — click to switch to view mode') : $t('View mode is on — click to switch to edit mode')"
+                            style="color: white; text-decoration: none; padding: 0.5rem 0;"
+                        >
+                            <IconEdit class="icon-md" />
+                            <span v-if="uiStore.editMode" class="edit-mode-dot" data-testid="edit-mode-active-dot"></span>
+                        </button>
+
                         <!-- Compact Language Switcher -->
                         <div class="language-switcher" data-testid="language-switcher">
                             <button
@@ -58,16 +84,19 @@
                                 aria-expanded="false"
                                 data-testid="user-dropdown-btn"
                                 style="color: white; text-decoration: none; padding: 0.5rem 0;"
-                                :title="authenticated && user ? `Logged in as ${user.name}` : 'Not logged in'"
+                                :title="authenticated && user ? $t('Logged in as {name}', { name: user.name }) + (isAdmin ? ' (' + $t('Admin') + ')' : '') : $t('Not logged in')"
                             >
                                 <div class="user-icon-container">
-                                    <IconUser class="icon-lg" />
-                                    <div v-if="authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
+                                    <IconAdmin v-if="isAdmin" class="icon-lg" data-testid="admin-icon" />
+                                    <IconUser v-else class="icon-lg" />
+                                    <!-- In admin mode the red bar + admin icon already signal the
+                                         state, so the status dot is hidden (it would overlap the gear). -->
+                                    <div v-if="!isAdmin && authenticated && user" class="status-indicator logged-in" data-testid="logged-in-indicator">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 -960 960 960" fill="white">
                                             <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
                                         </svg>
                                     </div>
-                                    <div v-else class="status-indicator logged-out" data-testid="logged-out-indicator">
+                                    <div v-else-if="!isAdmin" class="status-indicator logged-out" data-testid="logged-out-indicator">
                                         <IconUser class="icon-xs" />
                                     </div>
                                 </div>
@@ -76,14 +105,19 @@
                             <ul class="dropdown-menu dropdown-menu-end" data-testid="user-dropdown-menu">
                                 <!-- Guest links -->
                                 <template v-if="!authenticated">
-                                    <li class="dropdown-header text-muted small">Guest Mode</li>
+                                    <li class="dropdown-header text-muted small">{{ $t('Guest Mode') }}</li>
                                     <li><router-link class="dropdown-item" to="/login" data-testid="login-link">
                                         <IconLogin class="icon-sm me-2" />
-                                        Login
+                                        {{ $t('Login') }}
                                     </router-link></li>
                                     <li v-if="authStore.registrationEnabled"><router-link class="dropdown-item" to="/register" data-testid="register-link">
                                         <IconAdd class="icon-sm me-2" />
-                                        Register
+                                        {{ $t('Register') }}
+                                    </router-link></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><router-link class="dropdown-item" to="/identity" data-testid="identity-link-guest">
+                                        <IconKey class="icon-sm me-2" />
+                                        {{ $t('Identity') }}
                                     </router-link></li>
                                 </template>
 
@@ -91,18 +125,35 @@
                                 <template v-else>
                                     <li class="dropdown-header text-muted small">
                                         <IconCheck class="icon-xs me-1" />
-                                        Logged in as
+                                        {{ $t('Logged in as') }}
+                                        <span v-if="isAdmin" class="admin-role-badge" data-testid="admin-role-badge">{{ $t('Admin') }}</span>
                                     </li>
                                     <li><router-link class="dropdown-item fw-semibold" :to="`/object/${user.thing_id}`" data-testid="profile-link">
                                         <IconUser class="icon-sm me-2" />
                                         {{ user.name }}
                                     </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/identity" data-testid="identity-link">
+                                        <IconKey class="icon-sm me-2" />
+                                        {{ $t('Identity') }}
+                                    </router-link></li>
+                                    <li><router-link class="dropdown-item" to="/tools" data-testid="tools-link">
+                                        <IconTools class="icon-sm me-2" />
+                                        {{ $t('Tools') }}
+                                    </router-link></li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" href="#" @click.prevent="logout" data-testid="logout-link">
                                         <IconLogout class="icon-sm me-2" />
-                                        Logout
+                                        {{ $t('Logout') }}
                                     </a></li>
                                 </template>
+                                <li><router-link class="dropdown-item" to="/logs" data-testid="logs-link">
+                                    <i class="bi bi-journal-text icon-sm me-2"></i>
+                                    {{ $t('Logs') }}
+                                </router-link></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li class="dropdown-header text-muted small" style="font-size: 10px; padding: 4px 12px;">
+                                    build {{ buildId }} <span style="cursor:pointer" @click.stop="onBuildIdTap">⚠️</span>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -149,7 +200,8 @@
                         <!-- Screen 1: Tree -->
                         <div class="swipe-screen" data-testid="tree-screen">
                             <div class="screen-content" ref="screen1Content">
-                                <class-tree></class-tree>
+                                <ClassTree v-if="!isObjectPage"></ClassTree>
+                                <ObjectViewSidebar v-else />
                             </div>
                         </div>
 
@@ -179,7 +231,8 @@
             <div v-else-if="!authStore.hidePublicContent" class="container ps-5" data-testid="desktop-view">
                 <div class="row">
                     <div class="col-3 ps-0" data-testid="tree-column">
-                        <class-tree></class-tree>
+                        <ClassTree v-if="!isObjectPage"></ClassTree>
+                        <ObjectViewSidebar v-else />
                     </div>
                     <div class="col-9" data-testid="content-column">
                         <router-view></router-view>
@@ -203,32 +256,60 @@
             >
                 <div class="error-icon">⚠️</div>
                 <div class="error-content">
-                    <div class="error-title">Error</div>
+                    <div class="error-title">{{ $t('Error') }}</div>
                     <div class="error-message">{{ error.message }}</div>
                 </div>
                 <button class="error-close" @click="removeError(error.id)">×</button>
+            </div>
+        </div>
+
+        <!-- Floating diagnostic button (always visible) -->
+        <div class="diag-fab" @click="onDiagnostic" title="Show diagnostic info">🔍</div>
+
+        <!-- Diagnostic modal -->
+        <div v-if="showDiagnostic" class="diag-overlay" @click="showDiagnostic = false">
+            <div class="diag-modal" @click.stop>
+                <pre>{{ diagnosticInfo }}</pre>
+                <button class="btn btn-sm btn-primary mt-2" @click="showDiagnostic = false">Close</button>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-import LanguageSwitcher from "../LanguageSwitcher.vue"
 import ClassTree from "../ClassTree.vue"
+import SearchFilterPanel from "../SearchFilterPanel.vue"
+
+// The related-objects filter panel that replaces the search classes tree while
+// an object is open. Lazy so the search page never pulls it in.
+const ObjectViewSidebar = defineAsyncComponent(() => import("../ObjectViewSidebar.vue"))
+import { setLanguage } from '../../lang/i18n.js'
 
 import { eventBus } from '../../eventBus.js'
+import { thumbUrl, thumbRevision } from '../../utils/objectImages'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'
 import { useObjectsStore } from '../../stores/objects'
+import { useUiStore } from '../../stores/ui'
+import { onError } from '../../utils/errorTracker.js'
 import axios from 'axios'
 
-// Provide getThumbUrl function for child components
+// Provide getThumbUrl function for child components. Resolution accounts for
+// the runtime: web → same-origin /thumbs/…; remote Capacitor → API server
+// origin; offline builds → Electron's local static route or Capacitor's
+// convertFileSrc (device folder). A cache-buster (?v=revision) is appended so
+// an image replaced for the same UUID re-fetches immediately — reading
+// thumbRevision (a reactive ref) inside the provided function makes every
+// consumer's computed image URL reactive to image changes.
+provide('thumbRevision', thumbRevision);
 const getThumbUrl = (thing_id) => {
-    if (!thing_id) return '';
-    return `/thumbs/${thing_id.charAt(0)}/${thing_id.charAt(1)}/${thing_id}.jpg`;
+    const url = thumbUrl(thing_id);
+    if (!url) return '';
+    const rev = thumbRevision.value;
+    return rev ? `${url}${url.includes('?') ? '&' : '?'}v=${rev}` : url;
 };
 provide('getThumbUrl', getThumbUrl);
 
@@ -238,8 +319,52 @@ const route = useRoute()
 const authStore = useAuthStore()
 const searchStore = useSearchStore()
 const objectsStore = useObjectsStore()
+const uiStore = useUiStore()
+
+// On the object page the left tree column hosts the related-objects filter
+// panel instead of the search classes tree.
+const isObjectPage = computed(() => route.name === 'object')
 const showModal    = ref(false)
 const selectedType = ref('')
+
+// Injected at build time by vite.config.capacitor.js — identifies which APK is running.
+const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
+// Dev-mode error toasts are gated behind this.
+const isDevelopment = import.meta.env.DEV
+
+// Debug: diagnostic button (always visible, outside dropdown)
+const showDiagnostic = ref(false)
+const diagnosticInfo = ref('')
+const onDiagnostic = async () => {
+  const auth = authStore
+  let treeInfo = ''
+  let checkedInfo = ''
+  try {
+    const { useTreeState } = await import('@/composables/useTreeState')
+    const ts = useTreeState()
+    treeInfo = 'treeState: ' + JSON.stringify(ts._debugState())
+  } catch (_) { treeInfo = 'treeState: (error)' }
+  try {
+    const { useSearchStore } = await import('@/stores/search')
+    const ss = useSearchStore()
+    checkedInfo = `checkedItems: ${ss.checkedItems.length} userInit: ${ss.checkedUserInitiated}`
+  } catch (_) { checkedInfo = 'searchStore: (error)' }
+  const info = [
+    `build: ${buildId}`,
+    `route: ${route.path}`,
+    `auth: ${auth.authenticated}`,
+    `thing_id: ${auth.user?.thing_id || 'none'}`,
+    `is_admin: ${auth.user?.is_admin || 'no'}`,
+    `window: ${window.innerWidth}x${window.innerHeight}`,
+    `isMobile: ${window.innerWidth < 768}`,
+    `currentScreen: ${currentScreen.value}`,
+    treeInfo,
+    checkedInfo,
+  ].join('\n')
+  diagnosticInfo.value = info
+  showDiagnostic.value = true
+  console.log('[DIAG]', info)
+}
 
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 768)
 const swipeContainer = ref(null)
@@ -262,16 +387,20 @@ const pullStartY = ref(0)
 const wasAtTop = ref(false)
 
 // Language switcher data
-const currentLocale = ref('en')
+const currentLocale = ref(localStorage.getItem('locale') || 'en')
+// Only languages with installed UI translations (i18n.js catalogs) are offered.
+// Content-translation languages live separately as Language-class objects and
+// are offered in the object editor, not here.
 const availableLocales = [
     { code: 'en', name: 'English' },
     { code: 'ru', name: 'Русский' },
-    { code: 'fr', name: 'Français' },
-    { code: 'de', name: 'Deutsch' },
-    { code: 'es', name: 'Español' }
 ]
 
 const switchLanguage = (locale) => {
+    // Persist to localStorage and reload via the real i18n setter — otherwise
+    // only the local ref changes and neither the UI chrome nor the object
+    // content is re-rendered in the new language.
+    setLanguage(locale)
     currentLocale.value = locale
     console.log('Language switched to:', locale)
 }
@@ -436,8 +565,8 @@ const onTouchEnd = (e) => {
 const checkAuth = async () => {
     try {
         const response = await axios.get('user', { noAuthRedirect: true })
-        if (response.data && !authStore.authenticated) {
-            authStore.login(response.data)
+        if (response.data && !authStore.authenticated && authStore.token) {
+            authStore.login(response.data, authStore.token)
         }
         console.log('Authenticated:', authStore.authenticated)
         console.log('User:', authStore.user)
@@ -465,32 +594,25 @@ const searchQuery = computed({
 
 const submitSearch = () => {
     console.log('default.vue - Emitting trigger-search')
+    const query = { q: searchQuery.value };
+    const filterParams = searchStore.getFilterParams();
+    Object.assign(query, filterParams);
+    if (!query.q) delete query.q;
     eventBus.emit('trigger-search')
-    router.push({ path: '/', query: { q: searchQuery.value } })
+    router.push({ path: '/', query })
 }
 
-// ========== GLOBAL ERROR HANDLING (Development only, filters expected errors) ==========
-const isDevelopment = import.meta.env.DEV
+const toggleFilters = () => {
+    searchStore.toggleFilters();
+}
+
+// ========== GLOBAL ERROR TOASTS ==========
 const errorMessages = ref([])
 
-// Helper: decide if an error should be ignored (no toast)
-const shouldIgnoreError = (message, statusCode = null, url = null) => {
-    const lowerMsg = (message || '').toLowerCase()
-    // Ignore 401 Unauthorized when user is not logged in
-    if (statusCode === 401) return true
-    // Ignore any message containing "unauthorized" or "unauthenticated"
-    if (lowerMsg.includes('unauthorized') || lowerMsg.includes('unauthenticated')) return true
-    // Ignore aborted requests (e.g., navigation cancellations)
-    if (lowerMsg.includes('aborted') || lowerMsg.includes('canceled')) return true
-    // Ignore network errors that are expected (like offline checks)
-    if (lowerMsg.includes('network error') && !navigator.onLine) return true
-    // Ignore harmless ResizeObserver loop warning (browser-level, no functional impact)
-    if (lowerMsg.includes('resizeobserver loop')) return true
-    return false
-}
-
 const addError = (message, statusCode = null, url = null) => {
-    if (shouldIgnoreError(message, statusCode, url)) return
+    // errorTracker.shouldIgnoreError is already applied by tracker before
+    // dispatching to subscribers, so only filter obviously empty messages here
+    if (!message) return
     const id = Date.now() + Math.random()
     errorMessages.value.push({ id, message, timestamp: Date.now() })
     setTimeout(() => removeError(id), 5000)
@@ -501,43 +623,18 @@ const removeError = (id) => {
     if (index !== -1) errorMessages.value.splice(index, 1)
 }
 
-// Listen to custom errors via eventBus
+// Listen to custom errors via eventBus (legacy support)
 eventBus.on('global-error', ({ message, statusCode, url }) => {
-    if (isDevelopment) addError(message, statusCode, url)
+    if (message) addError(message, statusCode, url)
 })
 
-// Global unhandled rejection handler
-window.addEventListener('unhandledrejection', (event) => {
-    if (isDevelopment) {
-        const error = event.reason
-        const statusCode = error?.response?.status
-        const message = error?.response?.data?.message || error?.message || event.reason || 'Unhandled Promise Rejection'
-        addError(message, statusCode)
-    }
+// Subscribe to unified errorTracker — works in all environments
+onError((error, context) => {
+    const statusCode = error.response?.status
+    const serverMsg = error.response?.data?.error?.message
+    const message = serverMsg || error.message || 'An error occurred'
+    addError(message, statusCode, error.config?.url)
 })
-
-// Global error handler
-const originalErrorHandler = window.onerror
-window.onerror = (message, source, lineno, colno, error) => {
-    if (isDevelopment) {
-        const statusCode = error?.response?.status
-        addError(error?.message || message, statusCode)
-    }
-    if (originalErrorHandler) originalErrorHandler(message, source, lineno, colno, error)
-}
-
-// Axios interceptor for errors
-axios.interceptors.response.use(
-    response => response,
-    error => {
-        if (isDevelopment) {
-            const statusCode = error.response?.status
-            const message = error.response?.data?.message || error.message || 'Network error'
-            addError(message, statusCode, error.config?.url)
-        }
-        return Promise.reject(error)
-    }
-)
 // ==============================================================
 
 // ---------------------------------------------------------------------------
@@ -611,6 +708,14 @@ watch(isMobile, (newVal) => {
 const user = computed(() => authStore.user || null)
 const authenticated = computed(() => authStore.authenticated)
 
+// Admin mode — logged in as an administrator (is_admin flag from the server).
+// The account is meant for special operations only, so the UI clearly signals
+// that the user is NOT in normal mode: red top bar + admin icon/badge.
+const isAdmin = computed(() => !!user.value?.is_admin)
+const navbarStyle = computed(() => ({
+    backgroundColor: isAdmin.value ? '#b02a37' : '#0d6efd',
+}))
+
 // ---------------------------------------------------------------------------
 
 const logout = async () => {
@@ -664,6 +769,21 @@ onUnmounted(() => {
 .icon-md { width: 20px; height: 20px; }
 .icon-lg { width: 24px; height: 24px; }
 .icon-xl { width: 28px; height: 28px; }
+
+/* Edit mode toggle active state */
+.edit-mode-toggle.active {
+    color: #ffd75e !important;
+}
+.edit-mode-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffd75e;
+    margin-left: 2px;
+    position: relative;
+    top: -6px;
+    left: -4px;
+}
 
 .me-1 { margin-right: 0.25rem; }
 .me-2 { margin-right: 0.5rem; }
@@ -755,6 +875,20 @@ form.mx-2 {
 
 .status-indicator.logged-out {
     background-color: #dc3545;
+}
+
+/* Admin role label inside the user dropdown header */
+.admin-role-badge {
+    background-color: #b02a37;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 1px 6px;
+    margin-left: 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    vertical-align: middle;
 }
 
 /* Fix for mobile dropdowns */
@@ -1027,5 +1161,46 @@ body:not(.page-loading) .nav-loading-bar {
     width: 100%;
     opacity: 0;
     transition: width 0.2s ease, opacity 0.4s ease 0.1s;
+}
+
+/* Floating diagnostic button */
+.diag-fab {
+    position: fixed;
+    bottom: 60px;
+    right: 12px;
+    z-index: 99999;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(13, 110, 253, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    user-select: none;
+}
+.diag-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.diag-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.diag-modal pre {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
 }
 </style>

@@ -1,13 +1,15 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import {CLASS_TYPE, LINK_TYPE, SOMETHING} from "../constants.js"
+import {EVENT} from "../constants.js"
 import { eventBus } from "../eventBus.js"
+import { useSearchStore, checkedRestorePromise } from './search'
+import { collectSubtreeIds } from '../utils/classTree'
 
 export const useObjectsStore = defineStore('objects', {
     state: () => ({
         rootNodes: [],        // array of top-level nodes (Something, link, system, ...)
         objects: [],
-        loading: false,
+        loading: true,
         searchText: '',
         processing: false,
         validationErrors: {}
@@ -16,13 +18,32 @@ export const useObjectsStore = defineStore('objects', {
     getters: {},
 
     actions: {
-        async loadClassTree(thing_id, levels) {
+        async loadClassTree(thing_id, levels, options = {}) {
             this.loading = true
             try {
+                // autoSelect:false is used by the object-page sidebar: merely
+                // opening an object page must not change the dashboard's default
+                // "Event" pre-selection.
+                const autoSelect = options.autoSelect !== false;
+
+                // Wait for persisted checkedItems to be restored from storage
+                // (Capacitor Preferences are async on native). This prevents
+                // re-checking Event on rotation if the user had unchecked it.
+                const searchStore = useSearchStore();
+                if (searchStore.checkedItems.length === 0) {
+                    await Promise.race([
+                        checkedRestorePromise,
+                        new Promise(r => setTimeout(r, 5000)),
+                    ]);
+                }
+
+                // NOTE: no `type` filter is sent. The tree endpoint returns the
+                // whole class/model/link-type taxonomy regardless; sending type
+                // values above 5 (e.g. MODEL_TYPE=7) 422s against SearchRequest
+                // and silently kills the dashboard tree.
                 const response = await axios.post('/object', JSON.stringify({
                     tree: true,
                     search: this.searchText,
-                    type: [CLASS_TYPE, LINK_TYPE]
                 }))
                 this.validationErrors = {}
                 console.log('response', response.data.things)
@@ -31,6 +52,19 @@ export const useObjectsStore = defineStore('objects', {
                 // We want all of them as root nodes.
                 this.rootNodes = response.data.things || []
                 console.log('rootNodes', this.rootNodes)
+
+                // Default selection: check "Event" + its whole subtree so the
+                // default view shows Event and all its subclasses (recursive
+                // class filter). Applied only if:
+                //   1. The user has no persisted selection (checkedItems empty)
+                //   2. The user has never manually toggled any checkbox
+                //   3. The tree data is loaded (need rootNodes for findNodeById)
+                if (autoSelect && searchStore.checkedItems.length === 0 && !searchStore.checkedUserInitiated) {
+                    const event = this.findNodeById(EVENT);
+                    if (event) {
+                        searchStore.checkSubtree([event.id, ...collectSubtreeIds(event.nodes)]);
+                    }
+                }
             } catch (error) {
                 console.log('catch', error)
                 if (error.response?.status === 422) {
@@ -95,84 +129,7 @@ export const useObjectsStore = defineStore('objects', {
             eventBus.emit('trigger-search')
         },
 
-        updateClassInTree(classId, newClassName) {
-            const updateNode = (nodes) => {
-                for (const node of nodes) {
-                    if (node.id === classId) {
-                        node.name = newClassName
-                        return true
-                    }
-                    if (node.nodes && updateNode(node.nodes)) return true
-                }
-                return false
-            }
-            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
-            const updated = updateNode(newRoots)
-            if (updated) {
-                this.rootNodes = newRoots
-                eventBus.emit('tree-updated', this.rootNodes)
-                eventBus.emit('trigger-search')
-            } else {
-                console.warn('Class not found:', classId)
-            }
-        },
 
-        moveClassInTree(classId, newParentId) {
-            let movedNode = null
-            const findAndRemove = (nodes) => {
-                for (let i = 0; i < nodes.length; i++) {
-                    if (nodes[i].id === classId) {
-                        movedNode = nodes[i]
-                        nodes.splice(i, 1)
-                        return true
-                    }
-                    if (nodes[i].nodes && findAndRemove(nodes[i].nodes)) return true
-                }
-                return false
-            }
-
-            const newRoots = JSON.parse(JSON.stringify(this.rootNodes))
-            let removed = false
-            for (let i = 0; i < newRoots.length; i++) {
-                if (newRoots[i].id === classId) {
-                    movedNode = newRoots[i]
-                    newRoots.splice(i, 1)
-                    removed = true
-                    break
-                }
-                if (newRoots[i].nodes && findAndRemove(newRoots[i].nodes)) {
-                    removed = true
-                    break
-                }
-            }
-
-            if (removed && movedNode) {
-                if (!newParentId) {
-                    // Move to root level
-                    newRoots.push(movedNode)
-                } else {
-                    const addToParent = (nodes) => {
-                        for (const node of nodes) {
-                            if (node.id === newParentId) {
-                                if (!node.nodes) node.nodes = []
-                                node.nodes.push(movedNode)
-                                return true
-                            }
-                            if (node.nodes && addToParent(node.nodes)) return true
-                        }
-                        return false
-                    }
-                    const found = addToParent(newRoots)
-                    if (!found) {
-                        console.warn('New parent not found, moving to root')
-                        newRoots.push(movedNode)
-                    }
-                }
-                this.rootNodes = newRoots
-                eventBus.emit('tree-updated', this.rootNodes)
-                eventBus.emit('trigger-search')
-            }
-        },
 
         removeClassFromTree(classId) {
             const findAndRemove = (nodes) => {

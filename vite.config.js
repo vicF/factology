@@ -27,8 +27,22 @@ export default defineConfig({
                 stabilityThreshold: 500,
                 pollInterval: 100
             },
-            // Ignore heavy directories to save CPU cycles
-            ignored: ['**/node_modules/**', '**/vendor/**', '**/storage/**']
+            // Ignore heavy directories to save CPU cycles.
+            // Thumbs caches (public/dist) contain hundreds of thousands of
+            // small files — keeping them out of the watcher keeps the Docker
+            // file-sharing mount fast. They are served by the backend, not vite.
+            ignored: [
+                '**/node_modules/**',
+                '**/vendor/**',
+                '**/storage/**',
+                '**/public/thumbs/**',
+                '**/public/thumbs__/**',
+                '**/dist/thumbs/**',
+                '**/dist/thumbs__/**',
+                '**/dist/**',
+                '**/dist-capacitor/**',
+                '**/electron/**',
+            ]
         },
     },
     css: {
