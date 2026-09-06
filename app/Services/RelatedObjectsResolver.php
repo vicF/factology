@@ -73,6 +73,87 @@ class RelatedObjectsResolver
     }
 
     /**
+     * Full graph for the Graph tab: the same displayed node set as the nested
+     * detail view, but with EVERY link between any two displayed nodes —
+     * including owner/spouse/sibling cross-links that the spanning-tree
+     * assembly in `forObject` prunes.
+     *
+     * @return array {root_id, nodes:[...], edges:[...]}
+     */
+    public function forGraph(string $rootId, int $depth, int $breadth): array
+    {
+        $linksByParent = $this->resolveLevels([$rootId], $depth, $breadth, seedVisited: [$rootId], topLevelBreadth: null);
+
+        $nodeIds = [$rootId];
+        foreach ($linksByParent as $items) {
+            foreach ($items as $item) {
+                $nodeIds[] = $item['child_id'];
+            }
+        }
+        $nodeIds = array_values(array_unique($nodeIds));
+        $nodeSet = array_flip($nodeIds);
+
+        // Nodes with the metadata the graph needs (name, classes, dates).
+        $meta = $this->fetchMetadata($nodeIds);
+        $classes = $this->fetchClasses($nodeIds);
+        $nodes = [];
+        foreach ($nodeIds as $nid) {
+            $row = $meta[$nid] ?? null;
+            if ($row === null) {
+                continue;
+            }
+            $nameTranslations = $row->name_translations ?? null;
+            if (is_string($nameTranslations)) {
+                $nameTranslations = json_decode($nameTranslations, true) ?: null;
+            }
+            $classList = $classes[$nid] ?? [];
+            $nodes[] = [
+                'thing_id'          => $row->thing_id,
+                'name'              => $row->name ?? null,
+                'name_translations' => $nameTranslations,
+                'type'              => $row->type !== null ? (int) $row->type : null,
+                'start'             => $row->start !== null ? (string) $row->start : null,
+                'end'               => $row->end !== null ? (string) $row->end : null,
+                'classes'           => $classList,
+                'class'             => $classList[0] ?? null,
+            ];
+        }
+
+        // Every link whose two endpoints are both displayed (undirected).
+        $linkRows = $this->fetchLinks($nodeIds);
+        $typeIds = [];
+        foreach ($linkRows as $link) {
+            $typeIds[] = $link->link_type_id;
+        }
+        $typeNames = $this->fetchLinkTypeNames($typeIds);
+        $edges = [];
+        $seen = [];
+        foreach ($linkRows as $link) {
+            if (!isset($nodeSet[$link->one_thing_id]) || !isset($nodeSet[$link->other_thing_id])) {
+                continue;
+            }
+            if ($link->one_thing_id === $link->other_thing_id) {
+                continue;
+            }
+            if (isset($seen[$link->link_id])) {
+                continue;
+            }
+            $seen[$link->link_id] = true;
+            $type = $typeNames[$link->link_type_id] ?? null;
+            $edges[] = [
+                'link_id'               => $link->link_id,
+                'one_thing_id'          => $link->one_thing_id,
+                'other_thing_id'        => $link->other_thing_id,
+                'link_type_id'          => $link->link_type_id,
+                'link_name'             => $link->link_name ?? ($type['name'] ?? null),
+                'link_name_translations' => $type['name_translations'] ?? null,
+            ];
+        }
+
+        return ['root_id' => $rootId, 'nodes' => $nodes, 'edges' => $edges];
+    }
+
+    /**
      * BFS over `links`. Returns parentId => [item...] where each item is
      * ['link' => flat link stdClass with `target` set, 'child_id' => string,
      *  'sort' => [richness, has_link_start, link_start, record_updated, name]].
@@ -264,6 +345,8 @@ class RelatedObjectsResolver
                 't.name',
                 't.name_translations',
                 't.type',
+                't.start',
+                't.end',
                 't.public',
                 't.description',
                 't.data',
@@ -383,6 +466,8 @@ class RelatedObjectsResolver
             'name'              => $row->name ?? null,
             'name_translations' => $nameTranslations,
             'type'              => $row->type !== null ? (int) $row->type : null,
+            'start'             => $row->start !== null ? (string) $row->start : null,
+            'end'               => $row->end !== null ? (string) $row->end : null,
             'classes'           => $class, // multi-class: array of {thing_id, name}
             'class'             => $class[0] ?? null, // primary class (backward compat)
             'public'            => $row->public !== null ? (bool) $row->public : null,

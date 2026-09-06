@@ -66,6 +66,12 @@
                             </div>
                         </div>
 
+                        <!-- Warning when editing/deleting another user's object -->
+                        <div v-if="canEdit && isOtherOwnerObject" class="alert alert-warning mt-3 mb-3" role="alert">
+                            <i class="bi bi-person-exclamation me-1"></i>
+                            {{ $t('You are editing an object that belongs to {owner}.', { owner: object.owner_name || $t('another user') }) }}
+                        </div>
+
                         <!-- Tabs -->
                         <ul class="nav nav-tabs justify-content-end mb-3">
                             <li class="nav-item">
@@ -127,8 +133,8 @@
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
                                                 <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
-                                                    <span v-if="!confirmedDate && isPlanned" class="planned-badge">
-                                                        {{ $t('dates.planned') }}
+                                                    <span v-if="!confirmedDate && isPlanned" :class="isPastPlan ? 'unconfirmed-badge' : 'planned-badge'">
+                                                        {{ isPastPlan ? $t('dates.not_confirmed') : $t('dates.planned') }}
                                                         <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
                                                     <button
@@ -203,14 +209,26 @@
                             </div>
 
                             <!-- Separator before links -->
-                            <div v-if="object.links && object.links.length" class="result-separator"></div>
+                            <div v-if="visibleLinks.length" class="result-separator"></div>
 
                             <!-- Links list -->
-                            <div v-if="object.links && object.links.length" class="results-list">
-                                <div v-for="(link, linkIndex) in object.links" :key="link.link_id"
+                            <div v-if="visibleLinks.length" class="results-list">
+                                <div v-for="(link, linkIndex) in visibleLinks" :key="link.link_id"
                                     class="result-item object-link-item"
                                     @mouseenter="hoveredLink = linkIndex"
                                     @mouseleave="hoveredLink = null">
+                                    <!-- Date-group divider: the related object's date lives
+                                         here, so the per-link date row below is omitted. -->
+                                    <div v-if="linkDateDividers[linkIndex]" class="date-group-header">
+                                        <span class="date-group-date">
+                                            📅 {{ $flexibleDateFormatShort(link.start, link.end, link.start_meta, link.end_meta) }}
+                                        </span>
+                                        <span class="date-group-line"></span>
+                                        <template v-if="linkDateDividers[linkIndex].center">
+                                            <span class="date-group-label">{{ linkDateDividers[linkIndex].center.label }}</span>
+                                            <span class="date-group-line"></span>
+                                        </template>
+                                    </div>
                                     <div class="result-content">
                                         <div class="result-icon-section">
                                             <RouterLink :to="{ name: 'object', params: { uid: getLinkTargetId(link) } }" class="icon-link">
@@ -234,16 +252,8 @@
                                                 </div>
                                             </div>
 
-                                            <div v-if="link.start || link.end || link.description" class="result-description">
-                                                <span v-if="link.start || link.end" class="inline-date" style="margin-right: 8px;">
-                                                    <span class="date-badge">
-                                                        📅
-                                                        <template v-if="link.start">{{ $dateFromDb(link.start) }}</template>
-                                                        <template v-if="link.start && link.end"> → </template>
-                                                        <template v-if="link.end">{{ $dateFromDb(link.end) }}</template>
-                                                    </span>
-                                                </span>
-                                                <span v-if="link.description">{{ $truncateText(link.description, 300) }}</span>
+                                            <div v-if="link.description" class="result-description">
+                                                <span>{{ $truncateText(link.description, 300) }}</span>
                                             </div>
 
                                             <div v-if="link.link_start || link.link_end" class="result-meta">
@@ -296,6 +306,7 @@
                                                         v-else
                                                         :links="relatedItems(link)"
                                                         :level="1"
+                                                        :filters="viewFilters"
                                                         :on-expand="expandLinkTarget"
                                                         :exclude-id="object?.thing_id"
                                                         :parent="link.target"
@@ -306,6 +317,14 @@
                                     </div>
                                 </div>
 
+                            </div>
+
+                            <!-- No rows match the active class/link-type filter -->
+                            <div
+                                v-else-if="filtersReady && object.links && object.links.length"
+                                class="no-filter-matches text-muted"
+                            >
+                                {{ $t('No related objects match the current filters') }}
                             </div>
 
                             <!-- Separator before external links -->
@@ -426,11 +445,15 @@ import { useI18n } from 'vue-i18n';
 import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { fieldText, currentLocale } from '../utils/localized';
+import { dateBucket } from '../utils/dateGroupings';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { useObjectViewStore } from '@/stores/objectView';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
+import { filterLinks } from '../utils/relatedFilters';
+import { eventBus } from '../eventBus';
 import Image from "./Image.vue";
 import RelatedList from './RelatedList.vue';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
@@ -464,13 +487,35 @@ const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
 
+// The class/link-type filter set by the left panel (checked = visible).
+// These drive the Details links list below (and, separately, Graph.vue).
+// `filtersReady` is false until the panel publishes its first selection, so
+// nothing is hidden before then.
+const objectViewStore = useObjectViewStore();
+const filtersReady = computed(() => objectViewStore.filtersReady);
+// {classIds, linkTypeIds} shape used by components that need both together;
+// null until the panel has published its first selection.
+const viewFilters = computed(() => objectViewStore.filtersReady
+    ? { classIds: objectViewStore.selectedClasses, linkTypeIds: objectViewStore.selectedLinkTypes }
+    : null);
+// Direct link rows after the current filter.
+const visibleLinks = computed(() => {
+    const links = object.value?.links || [];
+    if (!objectViewStore.filtersReady) return links;
+    return filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes);
+});
+
 const { loadDeeper } = useRelatedExpansion();
 
 // Related items shown in a link's right-column panel: the target's links,
-// minus the object currently being viewed (a back-link to it is redundant).
+// filtered like the main list and minus the object currently being viewed
+// (a back-link to it is redundant).
 const relatedItems = (link) => {
     const links = link.target?.links || [];
-    return links.filter(l => l.target?.thing_id !== object.value?.thing_id);
+    const filtered = objectViewStore.filtersReady
+        ? filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes)
+        : links;
+    return filtered.filter(l => l.target?.thing_id !== object.value?.thing_id);
 };
 
 // Load one more level of related objects for a link's target on demand.
@@ -695,6 +740,14 @@ const isPlanned = computed(() =>
     !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
+// An explicitly-marked plan whose date has already passed without being
+// confirmed. The badge reads "not confirmed" (amber) for these instead of
+// "planned", prompting the owner to confirm or clear it. Without a start date
+// there is nothing to judge as passed, so those stay "planned".
+const isPastPlan = computed(() =>
+    !confirmedDate.value && !!markedPlannedDate.value && !!object.value?.start && !hasFutureStart.value
+);
+
 // Distinguishes a past-dated *plan* from a backdated record. Pre-feature and
 // imported plans carry no data.planned marker, so once their date passes
 // isPlanned() flips false — but they were created while their start was still
@@ -756,16 +809,18 @@ const getLinkTargetName = (link) => {
 
 const getObject = async () => {
     try {
-        loaded.value = false;
-        serverError.value = false;
         loadPropertyDefinitions(); // names for the Details-tab property rows (cached)
         // depth=2 attaches a `target` to each direct link AND pre-fills the
         // related items of those targets, so the right-column panel can show
         // a compact summary of each link's related objects immediately.
         const response = await axios.get(`/object/${route.params.uid}?depth=2`);
         object.value = response.data.data;
+        serverError.value = false;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
+            // The left panel lists classes/link types of the neighborhood; let
+            // it refresh after a reload caused by an edit.
+            eventBus.emit('object-details-changed', object.value.thing_id);
         }
     } catch (error) {
         console.error('Get object error:', error);
@@ -937,6 +992,46 @@ const handleLinkedObjectCreated = async () => {
     await getObject();
 };
 
+// ─── Date-group dividers for the related-links list ─────────────────────────
+// Same pattern as the main search results: the related object's date sits on a
+// one-line divider (first divider of a month also centers the month/year), so
+// the per-link date rows can be dropped. See utils/dateGroupings.js.
+function relatedMonthLabel(coarseKey) {
+    if (!coarseKey) return null;
+    if (coarseKey[0] === 'y') {
+        const y = Number(coarseKey.slice(1));
+        return y < 0 ? Math.abs(y) + ' ' + t('dates.bc') : String(y);
+    }
+    const m = coarseKey.match(/^m(-?\d+)-(\d{2})$/);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const label = new Intl.DateTimeFormat(currentLocale(), { month: 'long', year: 'numeric' })
+        .format(new Date(Math.max(year, 0), parseInt(m[2], 10) - 1, 1));
+    return year < 0 ? label + ' ' + t('dates.bc') : label;
+}
+
+const linkDateDividers = computed(() => {
+    const links = object.value?.links;
+    if (!Array.isArray(links)) return [];
+    const dividers = new Array(links.length).fill(null);
+    let lastBucket = null;
+    let lastCoarse = null;
+    links.forEach((link, i) => {
+        const bucket = dateBucket(link.start);
+        if (!bucket) return;
+        const newBucket = bucket.key !== lastBucket;
+        const firstOfMonth = bucket.coarse !== lastCoarse;
+        if (!newBucket && !firstOfMonth) return;
+        dividers[i] = {
+            bucket,
+            center: firstOfMonth ? { label: relatedMonthLabel(bucket.coarse) } : null,
+        };
+        lastBucket = bucket.key;
+        lastCoarse = bucket.coarse;
+    });
+    return dividers;
+});
+
 const linkRecords = computed(() => {
     if (!object.value || !Array.isArray(object.value.links)) return [];
     return object.value.links.map(link => ({
@@ -973,9 +1068,10 @@ onMounted(() => {
 
 watch(() => route.params.uid, (newUid, oldUid) => {
     if (newUid && newUid !== oldUid) {
-        object.value = null;
-        loaded.value = false;
-        serverError.value = false;
+        // Keep the current view (header/tabs/graph) mounted while the next
+        // object loads — swap its content in place instead of flashing a
+        // full-page spinner. Failure branches (not-found/error) replace the
+        // view only when the request actually fails.
         getObject();
     }
 });
@@ -1010,16 +1106,12 @@ watch(activeTab, (newTab) => {
 }, { immediate: true });
 
 watch(() => object.value, (newObject) => {
+    // updateData diffs the mounted graph to the new object (add/remove nodes).
+    // While the graph tab is hidden, its container has no size — the activeTab
+    // watcher calls refreshView() when the tab is next shown to re-fit it.
     if (graphInitialized.value && graphComponentRef.value && newObject) {
         graphComponentRef.value.updateData(newObject);
-        if (activeTab.value === 'graph') {
-            setTimeout(() => {
-                if (graphComponentRef.value) graphComponentRef.value.refreshView();
-            }, 200);
-        }
     }
-    // updateData (showMap) already fetches and re-renders; refreshView is only
-    // needed when the tab becomes visible (handled in the activeTab watcher).
     if (mapInitialized.value && mapComponentRef.value && newObject) {
         mapComponentRef.value.updateData(newObject);
     }
@@ -1141,6 +1233,22 @@ watch(() => object.value, (newObject) => {
     color: #0d6efd;
     background: rgba(13, 110, 253, 0.1);
     border: 1px solid rgba(13, 110, 253, 0.3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+/* Past plans that were never confirmed need attention — amber warning badge
+   instead of the blue "planned" one. */
+.unconfirmed-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.45);
     padding: 1px 6px;
     border-radius: 3px;
     margin-left: 4px;
@@ -1390,5 +1498,34 @@ button.more-links {
 .object-link-item .result-links-section {
     width: 260px;
     max-width: 260px;
+}
+.object-link-item .date-group-header {
+    margin-bottom: 6px;
+}
+
+/* Date-group divider lines (same pattern as the search results list). */
+.date-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 8px;
+    color: #6c757d;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.date-group-line {
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+.date-group-label {
+    white-space: nowrap;
+}
+.date-group-date {
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
 }
 </style>

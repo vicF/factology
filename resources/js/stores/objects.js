@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import {CLASS_TYPE, MODEL_TYPE, LINK_TYPE, EVENT} from "../constants.js"
+import {EVENT} from "../constants.js"
 import { eventBus } from "../eventBus.js"
 import { useSearchStore, checkedRestorePromise } from './search'
 import { collectSubtreeIds } from '../utils/classTree'
@@ -18,9 +18,14 @@ export const useObjectsStore = defineStore('objects', {
     getters: {},
 
     actions: {
-        async loadClassTree(thing_id, levels) {
+        async loadClassTree(thing_id, levels, options = {}) {
             this.loading = true
             try {
+                // autoSelect:false is used by the object-page sidebar: merely
+                // opening an object page must not change the dashboard's default
+                // "Event" pre-selection.
+                const autoSelect = options.autoSelect !== false;
+
                 // Wait for persisted checkedItems to be restored from storage
                 // (Capacitor Preferences are async on native). This prevents
                 // re-checking Event on rotation if the user had unchecked it.
@@ -32,10 +37,13 @@ export const useObjectsStore = defineStore('objects', {
                     ]);
                 }
 
+                // NOTE: no `type` filter is sent. The tree endpoint returns the
+                // whole class/model/link-type taxonomy regardless; sending type
+                // values above 5 (e.g. MODEL_TYPE=7) 422s against SearchRequest
+                // and silently kills the dashboard tree.
                 const response = await axios.post('/object', JSON.stringify({
                     tree: true,
                     search: this.searchText,
-                    type: [CLASS_TYPE, MODEL_TYPE, LINK_TYPE]
                 }))
                 this.validationErrors = {}
                 console.log('response', response.data.things)
@@ -51,7 +59,7 @@ export const useObjectsStore = defineStore('objects', {
                 //   1. The user has no persisted selection (checkedItems empty)
                 //   2. The user has never manually toggled any checkbox
                 //   3. The tree data is loaded (need rootNodes for findNodeById)
-                if (searchStore.checkedItems.length === 0 && !searchStore.checkedUserInitiated) {
+                if (autoSelect && searchStore.checkedItems.length === 0 && !searchStore.checkedUserInitiated) {
                     const event = this.findNodeById(EVENT);
                     if (event) {
                         searchStore.checkSubtree([event.id, ...collectSubtreeIds(event.nodes)]);
