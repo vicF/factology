@@ -1,6 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
+import { createPinia } from 'pinia'
 import Graph from '@/components/Graph.vue'
 
 // ---------------------------------------------------------------------------
@@ -112,7 +113,7 @@ const DIRECT = [VICTOR, OLGA, TREE, SPB]
 function mountGraph(object = { thing_id: WED }) {
     fullData.instance = makeInstance()
     fullData.setJsonDataCalls = []
-    return mount(Graph, { props: { object }, global: { provide: { getThumbUrl } } })
+    return mount(Graph, { props: { object }, global: { provide: { getThumbUrl }, plugins: [createPinia()] } })
 }
 
 describe('Graph incremental depth switch', () => {

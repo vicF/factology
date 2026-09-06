@@ -1,6 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
+import { createPinia } from 'pinia'
 import Graph from '@/components/Graph.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -56,7 +57,7 @@ function graphPayload(root, nodes, edges) {
 function mountGraph(object = { thing_id: 'root' }) {
     return mount(Graph, {
         props: { object },
-        global: { provide: { getThumbUrl } },
+        global: { provide: { getThumbUrl }, plugins: [createPinia()] },
     })
 }
 

@@ -12,7 +12,7 @@
                         type="button"
                         class="btn"
                         :class="selectedDepth === lvl ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="selectedDepth = lvl"
+                        @click="setDepth(lvl)"
                     >{{ lvl }}</button>
                 </div>
                 <button
@@ -130,13 +130,15 @@
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
 import axios from 'axios'
-import { inject, nextTick, reactive, ref, watch, onMounted } from 'vue'
+import { inject, nextTick, reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
 import { UUID } from '../constants/uuid.js'
 import { foldChildren } from '../utils/graphFold.js'
 import { nodeSignature, planGraphUpdate } from '../utils/graphDiff.js'
+import { nodeClassIds } from '../utils/relatedFilters.js'
+import { useObjectViewStore } from '@/stores/objectView'
 
 const getThumbUrl = inject('getThumbUrl')
 
@@ -158,8 +160,12 @@ const onThumbError = (id) => {
     thumbFailed[id] = true
 }
 
-// How many levels of related objects the graph renders (refetched on change).
-const selectedDepth = ref(2)
+// Depth and the class/link-type filters are owned by the object-page sidebar
+// (ObjectViewSidebar + objectView store) so the Details list and the Graph stay
+// in sync. This graph's own floating "Levels" buttons write the same store.
+const viewStore = useObjectViewStore()
+const selectedDepth = computed(() => viewStore.depth)
+const setDepth = (lvl) => viewStore.setDepth(lvl)
 // The fetched full graph {root_id, nodes:[], edges:[]} (depth = selectedDepth).
 const graphObject = ref(null)
 // Every link between the displayed objects (drawn in addition to the tree).
@@ -215,6 +221,34 @@ const graphOptions = {
     }
 }
 
+// ---- object-page sidebar filters (class / link type) -----------------------
+// ObjectViewSidebar owns class/link-type checks (inclusion semantics: what is
+// checked stays visible). Before it has published its first selection
+// (filtersReady=false) nothing is filtered. When active, a spanning edge keeps
+// its child only if the link type is checked AND the child object belongs to a
+// checked class; extra cross-links only need a checked link type (both their
+// endpoints are already visible objects).
+const graphFilterIds = () => (viewStore.filtersReady
+    ? { classIds: viewStore.selectedClasses, linkTypeIds: viewStore.selectedLinkTypes }
+    : null)
+
+const edgeShownForChild = (edge, childMeta) => {
+    const f = graphFilterIds()
+    if (!f) return true
+    if (f.linkTypeIds != null && !f.linkTypeIds.includes(edge.link_type_id)) return false
+    if (f.classIds != null) {
+        const ids = nodeClassIds(childMeta)
+        if (!ids.some((id) => f.classIds.includes(id))) return false
+    }
+    return true
+}
+
+const edgeShownForCross = (edge) => {
+    const f = graphFilterIds()
+    if (!f) return true
+    return f.linkTypeIds == null || f.linkTypeIds.includes(edge.link_type_id)
+}
+
 const classOf = (thing) => thing?.class || thing?.classes?.[0] || null
 const localizedClassName = (cls) => (cls
     ? (cls.name_translations ? fieldText(cls.name, cls.name_translations) : cls.name)
@@ -250,7 +284,7 @@ const glyphSvg = (node) => {
  * (`graphEdges`) is still drawn later as a cross-link between any two visible
  * nodes.
  */
-const buildTreeFromGraph = (rootId, nodesById, edges) => {
+const buildTreeFromGraph = (rootId, nodesById, edges, allowEdge = null) => {
     const adj = new Map()
     const addAdj = (id, other, edge) => {
         if (!adj.has(id)) adj.set(id, [])
@@ -286,10 +320,11 @@ const buildTreeFromGraph = (rootId, nodesById, edges) => {
     while (queue.length) {
         const cur = queue.shift()
         for (const { other, edge } of adj.get(cur.id) || []) {
-            if (seen.has(other)) continue
-            seen.add(other)
             const meta = nodesById.get(other)
             if (!meta) continue
+            if (allowEdge && !allowEdge(edge, meta)) continue // filtered out
+            if (seen.has(other)) continue
+            seen.add(other)
             const child = makeNode(meta, edge)
             cur.children.push(child)
             queue.push(child)
@@ -418,6 +453,7 @@ const buildGraphJson = (root, allEdges = []) => {
         const b = edge.other_thing_id
         if (!a || !b || a === b) continue
         if (!visible.has(a) || !visible.has(b)) continue
+        if (!edgeShownForCross(edge)) continue // sidebar link-type filter
         const key = pairKey(a, b)
         if (drawn.has(key)) continue
         drawn.add(key)
@@ -485,10 +521,17 @@ const supportsIncremental = (inst) => !!inst
     && typeof inst.setRootNodeId === 'function'
 
 const renderGraph = async () => {
-    if (!graphRef.value || !treeRoot.value) return
-    const { nodes, lines } = buildGraphJson(treeRoot.value, graphEdges.value)
+    if (!graphRef.value || !graphObject.value) return
+    // Re-derive the visible spanning tree on every render so the object-page
+    // class/link-type filters (viewStore) apply to the graph too.
+    const go = graphObject.value
+    const nodesById = new Map((go.nodes || []).map((n) => [n.thing_id, n]))
+    const root = buildTreeFromGraph(go.root_id, nodesById, graphEdges.value, edgeShownForChild)
+    if (!root) return
+    treeRoot.value = root
+    const { nodes, lines } = buildGraphJson(root, graphEdges.value)
     if (nodes.length === 0) return
-    const rootId = graphObject.value?.root_id
+    const rootId = go.root_id
 
     const inst = instanceOf()
     if (!supportsIncremental(inst) || lastRender.nodeSigs.size === 0) {
@@ -556,9 +599,8 @@ const showGraph = () => queueRender(async () => {
     const data = await fetchGraph(uid, depth)
     if (uid !== props.object?.thing_id || depth !== selectedDepth.value) return // superseded
     graphObject.value = data
-    const nodesById = new Map((data?.nodes || []).map((n) => [n.thing_id, n]))
     graphEdges.value = data?.edges || []
-    treeRoot.value = data ? buildTreeFromGraph(data.root_id, nodesById, graphEdges.value) : null
+    treeRoot.value = null
     collapsed.value = new Set()
     expandedGroups.value = new Set()
     // Keep the previous paint's bookkeeping: when this Graph stays mounted
@@ -647,6 +689,12 @@ defineExpose({
 watch(selectedDepth, async () => {
     await showGraph()
 })
+
+// Sidebar class/link-type filter toggles re-render the already-fetched graph —
+// no refetch, the tree is re-derived with the filters in renderGraph().
+watch(() => [viewStore.filtersReady, viewStore.selectedClasses, viewStore.selectedLinkTypes], () => {
+    if (graphObject.value) queueRender(renderGraph)
+}, { deep: true })
 
 watch(groupCfg, () => {
     expandedGroups.value = new Set()
