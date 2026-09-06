@@ -53,6 +53,18 @@ vi.mock('@/stores/ui', () => ({
     useUiStore: () => uiState,
 }))
 
+// Object view filter panel state — no filter published yet (shows everything).
+const viewState = vi.hoisted(() => ({
+    uid: null,
+    depth: 2,
+    selectedClasses: [],
+    selectedLinkTypes: [],
+    filtersReady: false,
+}))
+vi.mock('@/stores/objectView', () => ({
+    useObjectViewStore: () => viewState,
+}))
+
 // Graph is a defineAsyncComponent; give it a trivial module so v-show doesn't
 // try to pull in the heavy graph library during tests.
 vi.mock('@/components/Graph.vue', () => ({

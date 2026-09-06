@@ -192,7 +192,8 @@
                         <!-- Screen 1: Tree -->
                         <div class="swipe-screen" data-testid="tree-screen">
                             <div class="screen-content" ref="screen1Content">
-                                <class-tree></class-tree>
+                                <ClassTree v-if="!isObjectPage"></ClassTree>
+                                <ObjectViewSidebar v-else />
                             </div>
                         </div>
 
@@ -222,7 +223,8 @@
             <div v-else-if="!authStore.hidePublicContent" class="container ps-5" data-testid="desktop-view">
                 <div class="row">
                     <div class="col-3 ps-0" data-testid="tree-column">
-                        <class-tree></class-tree>
+                        <ClassTree v-if="!isObjectPage"></ClassTree>
+                        <ObjectViewSidebar v-else />
                     </div>
                     <div class="col-9" data-testid="content-column">
                         <router-view></router-view>
@@ -267,11 +269,15 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, provide, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import ClassTree from "../ClassTree.vue"
 import SearchFilterPanel from "../SearchFilterPanel.vue"
+
+// The related-objects filter panel that replaces the search classes tree while
+// an object is open. Lazy so the search page never pulls it in.
+const ObjectViewSidebar = defineAsyncComponent(() => import("../ObjectViewSidebar.vue"))
 import { setLanguage } from '../../lang/i18n.js'
 
 import { eventBus } from '../../eventBus.js'
@@ -306,6 +312,10 @@ const authStore = useAuthStore()
 const searchStore = useSearchStore()
 const objectsStore = useObjectsStore()
 const uiStore = useUiStore()
+
+// On the object page the left tree column hosts the related-objects filter
+// panel instead of the search classes tree.
+const isObjectPage = computed(() => route.name === 'object')
 const showModal    = ref(false)
 const selectedType = ref('')
 

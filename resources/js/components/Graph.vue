@@ -1,19 +1,7 @@
 <template>
     <div>
-        <!-- Multilevel control: how many levels of related objects to show -->
         <div class="graph-levels mb-1 d-flex align-items-center gap-2">
-            <span class="small text-muted">{{ t('Levels') }}</span>
-            <div class="btn-group btn-group-sm" role="group" aria-label="Graph levels">
-                <button
-                    v-for="lvl in [1, 2, 3, 4]"
-                    :key="lvl"
-                    type="button"
-                    class="btn"
-                    :class="selectedDepth === lvl ? 'btn-primary' : 'btn-outline-secondary'"
-                    @click="selectedDepth = lvl"
-                >{{ lvl }}</button>
-            </div>
-            <span class="small text-muted ms-2">{{ t('Click a node to expand it') }}</span>
+            <span class="small text-muted">{{ t('Click a node to expand it') }}</span>
         </div>
         <div style="height:calc(100vh - 95px);">
             <RelationGraph
@@ -42,10 +30,12 @@
 <script setup>
 import RelationGraph from 'relation-graph-vue3'
 import axios from 'axios'
-import { inject, ref, watch, onMounted } from 'vue'
+import { inject, ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName } from '../utils/localized.js'
+import { linkPassesFilter } from '../utils/relatedFilters.js'
+import { useObjectViewStore } from '@/stores/objectView';
 import Image from './Image.vue'
 
 const getThumbUrl = inject('getThumbUrl');
@@ -61,8 +51,10 @@ const router = useRouter()
 const { t } = useI18n()
 const graphRef = ref(null)
 
-// How many levels of related objects the graph renders (refetched on change).
-const selectedDepth = ref(2)
+// Depth and class/link-type filters are owned by the object-page sidebar
+// (shared store); this component re-renders when they change.
+const viewStore = useObjectViewStore();
+const selectedDepth = computed(() => viewStore.depth);
 // The fetched root object carrying nested `links` (depth = selectedDepth).
 const graphObject = ref(null)
 
@@ -104,9 +96,13 @@ const getNodeStyle = (node) => {
 /**
  * Build {nodes, lines} from a (possibly nested) object. Walk related links
  * recursively via each link's `target.links`, deduping node ids so a thing
- * reachable via several paths appears once.
+ * reachable via several paths appears once. `classIds`/`linkTypeIds` come from
+ * the object-page filter panel: rows whose target class (resp. link type) is
+ * not selected are pruned, together with their subtrees. The anchor object is
+ * always kept; its primary-class meta node stays unless a class filter is
+ * active and the anchor's own class is excluded.
  */
-const buildGraphData = (object) => {
+const buildGraphData = (object, classIds = [], linkTypeIds = []) => {
     if (!object) return { nodes: [], lines: [] }
 
     const nodes = []
@@ -120,7 +116,7 @@ const buildGraphData = (object) => {
         return true
     }
 
-    // Главный узел
+    // Главный узел (anchor) — never filtered out.
     addNode({
         id: object.thing_id,
         text: objectName(object) || t('Unnamed'),
@@ -134,7 +130,11 @@ const buildGraphData = (object) => {
     })
 
     // Класс объекта
-    if (object.class && object.class.thing_id) {
+    const anchorClass = object.class && object.class.thing_id ? object.class.thing_id : null;
+    const classFilterActive = classIds != null;
+    const showAnchorClass = anchorClass &&
+        (!classFilterActive || classIds.includes(anchorClass));
+    if (showAnchorClass && object.class.thing_id) {
         if (addNode({
             id: object.class.thing_id,
             text: objectName(object.class) || t('Class'),
@@ -160,6 +160,7 @@ const buildGraphData = (object) => {
     const walk = (parentId, links) => {
         if (!Array.isArray(links)) return
         for (const link of links) {
+            if (!linkPassesFilter(link, classIds, linkTypeIds)) continue
             const target = link.target
             if (!target || !target.thing_id) continue
             const isNew = addNode({
@@ -198,7 +199,13 @@ const fetchObject = async (uid, depth) => {
 
 const renderGraph = async () => {
     if (!graphRef.value || !graphObject.value) return
-    const graphData = buildGraphData(graphObject.value)
+    // Before the panel publishes its first selection, no filter applies.
+    const ready = viewStore.filtersReady;
+    const graphData = buildGraphData(
+        graphObject.value,
+        ready ? viewStore.selectedClasses : null,
+        ready ? viewStore.selectedLinkTypes : null
+    )
     if (graphData.nodes.length === 0) return
     await graphRef.value.setJsonData({
         rootId: graphObject.value.thing_id,
@@ -270,9 +277,14 @@ watch(() => props.object, async () => {
     await showGraph()
 })
 
-watch(selectedDepth, async () => {
+watch(() => viewStore.depth, async () => {
     await showGraph()
 })
+
+// Filter toggles only re-render the already-fetched graph — no refetch.
+watch(() => [viewStore.filtersReady, viewStore.selectedClasses, viewStore.selectedLinkTypes], () => {
+    renderGraph()
+}, { deep: true })
 
 onMounted(async () => {
     if (props.object) {

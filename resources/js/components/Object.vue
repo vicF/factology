@@ -203,11 +203,11 @@
                             </div>
 
                             <!-- Separator before links -->
-                            <div v-if="object.links && object.links.length" class="result-separator"></div>
+                            <div v-if="visibleLinks.length" class="result-separator"></div>
 
                             <!-- Links list -->
-                            <div v-if="object.links && object.links.length" class="results-list">
-                                <div v-for="(link, linkIndex) in object.links" :key="link.link_id"
+                            <div v-if="visibleLinks.length" class="results-list">
+                                <div v-for="(link, linkIndex) in visibleLinks" :key="link.link_id"
                                     class="result-item object-link-item"
                                     @mouseenter="hoveredLink = linkIndex"
                                     @mouseleave="hoveredLink = null">
@@ -296,6 +296,7 @@
                                                         v-else
                                                         :links="relatedItems(link)"
                                                         :level="1"
+                                                        :filters="viewFilters"
                                                         :on-expand="expandLinkTarget"
                                                         :exclude-id="object?.thing_id"
                                                         :parent="link.target"
@@ -306,6 +307,14 @@
                                     </div>
                                 </div>
 
+                            </div>
+
+                            <!-- No rows match the active class/link-type filter -->
+                            <div
+                                v-else-if="filtersReady && object.links && object.links.length"
+                                class="no-filter-matches text-muted"
+                            >
+                                {{ $t('No related objects match the current filters') }}
                             </div>
 
                             <!-- Separator before external links -->
@@ -427,9 +436,12 @@ import EditObject from './EditObject.vue';
 import EditLinkModal from './EditLinkModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
+import { useObjectViewStore } from '@/stores/objectView';
 import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
+import { filterLinks } from '../utils/relatedFilters';
+import { eventBus } from '../eventBus';
 import Image from "./Image.vue";
 import RelatedList from './RelatedList.vue';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
@@ -463,13 +475,35 @@ const object = ref(null);
 const loaded = ref(false);
 const serverError = ref(false);
 
+// The class/link-type filter set by the left panel (checked = visible).
+// These drive the Details links list below (and, separately, Graph.vue).
+// `filtersReady` is false until the panel publishes its first selection, so
+// nothing is hidden before then.
+const objectViewStore = useObjectViewStore();
+const filtersReady = computed(() => objectViewStore.filtersReady);
+// {classIds, linkTypeIds} shape used by components that need both together;
+// null until the panel has published its first selection.
+const viewFilters = computed(() => objectViewStore.filtersReady
+    ? { classIds: objectViewStore.selectedClasses, linkTypeIds: objectViewStore.selectedLinkTypes }
+    : null);
+// Direct link rows after the current filter.
+const visibleLinks = computed(() => {
+    const links = object.value?.links || [];
+    if (!objectViewStore.filtersReady) return links;
+    return filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes);
+});
+
 const { loadDeeper } = useRelatedExpansion();
 
 // Related items shown in a link's right-column panel: the target's links,
-// minus the object currently being viewed (a back-link to it is redundant).
+// filtered like the main list and minus the object currently being viewed
+// (a back-link to it is redundant).
 const relatedItems = (link) => {
     const links = link.target?.links || [];
-    return links.filter(l => l.target?.thing_id !== object.value?.thing_id);
+    const filtered = objectViewStore.filtersReady
+        ? filterLinks(links, objectViewStore.selectedClasses, objectViewStore.selectedLinkTypes)
+        : links;
+    return filtered.filter(l => l.target?.thing_id !== object.value?.thing_id);
 };
 
 // Load one more level of related objects for a link's target on demand.
@@ -741,6 +775,9 @@ const getObject = async () => {
         object.value = response.data.data;
         if (object.value?.thing_id) {
             cacheStore.cacheObject(object.value.thing_id, object.value, object.value.type);
+            // The left panel lists classes/link types of the neighborhood; let
+            // it refresh after a reload caused by an edit.
+            eventBus.emit('object-details-changed', object.value.thing_id);
         }
     } catch (error) {
         console.error('Get object error:', error);

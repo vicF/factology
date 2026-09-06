@@ -45,10 +45,10 @@
             </div>
 
             <div
-                v-if="isOpen(linkKey(link, idx)) && link.target && link.target.links && link.target.links.length"
+                v-if="isOpen(linkKey(link, idx)) && childrenOf(link).length"
                 class="related-children"
             >
-                <RelatedList :links="link.target.links" :level="level + 1" :on-expand="onExpand" :exclude-id="excludeId" :parent="link.target" />
+                <RelatedList :links="childrenOf(link)" :level="level + 1" :filters="filters" :on-expand="onExpand" :exclude-id="excludeId" :parent="link.target" />
             </div>
         </div>
     </div>
@@ -59,6 +59,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
 import { fieldText } from '../utils/localized.js';
+import { filterLinks } from '../utils/relatedFilters.js';
 import Image from './Image.vue';
 import LinkDescription from './LinkDescription.vue';
 
@@ -97,6 +98,12 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    // Active object-page filter {classIds, linkTypeIds}; rows/children that do
+    // not match are hidden. Applies at every recursion level.
+    filters: {
+        type: Object,
+        default: null,
+    },
 });
 
 defineOptions({ name: 'RelatedList' });
@@ -104,18 +111,39 @@ defineOptions({ name: 'RelatedList' });
 const { t } = useI18n();
 const { isOpen, toggle } = useRelatedExpansion();
 
+const hasFilters = computed(() => props.filters != null);
+const classIds = computed(() => props.filters?.classIds ?? null);
+const linkTypeIds = computed(() => props.filters?.linkTypeIds ?? null);
+
 const visibleLinks = computed(() => {
-    if (!props.excludeId) return props.links;
-    return props.links.filter(l => l.target?.thing_id !== props.excludeId);
+    let links = props.links;
+    if (hasFilters.value) {
+        links = filterLinks(links, classIds.value, linkTypeIds.value);
+    }
+    if (props.excludeId) {
+        links = links.filter(l => l.target?.thing_id !== props.excludeId);
+    }
+    return links;
 });
+
+// Filtered children of one link row (no filters prop → the original list).
+function childrenOf(link) {
+    if (!hasFilters.value) return link.target?.links || [];
+    return filterLinks(link.target?.links || [], classIds.value, linkTypeIds.value);
+}
 
 const indentStyle = computed(() => ({ paddingLeft: `${(props.level - 1) * 14}px` }));
 
 const linkKey = (link, idx) => link.link_id ?? `l${props.level}-${idx}`;
 
-const expandable = (link) =>
-    !!link.target &&
-    (link.target.links?.length > 0 || typeof props.onExpand === 'function');
+const expandable = (link) => {
+    if (!link.target) return false;
+    // A row is expandable when it already has (matching) children or when its
+    // children were never loaded and an onExpand provider exists.
+    if (childrenOf(link).length > 0) return true;
+    const rawChildren = link.target.links || [];
+    return rawChildren.length === 0 && typeof props.onExpand === 'function';
+};
 
 const toggleExpand = async (link, idx) => {
     const key = linkKey(link, idx);
