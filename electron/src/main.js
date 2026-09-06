@@ -124,6 +124,17 @@ async function createWindow() {
         mainWindow.show();
     });
 
+    // Reliable DevTools shortcut inside the window (the global F12 hotkey can
+    // be stolen by the OS / other apps; this cannot).
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        const ctrlShiftI = input.control && input.shift && input.key.toLowerCase() === 'i';
+        if (input.key === 'F12' || ctrlShiftI) {
+            event.preventDefault();
+            mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
+    });
+
     // Load the Capacitor-built SPA from the local HTTP server
     await mainWindow.loadURL(`${serverUrl}/`);
 
