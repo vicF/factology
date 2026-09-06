@@ -273,3 +273,29 @@ describe('duplicate finder', () => {
         expect(result.links_created).toBe(0);
     });
 });
+
+describe('export progress events', () => {
+    it('posts things and links progress while exporting', async () => {
+        const id = crypto.randomUUID();
+        const classId = UUID.EVERYTHING;
+        await getDb().objects.put({ thing_id: id, name: 'Mine', type: UUID.G_THING, owner: OWNER, deleted: 0 });
+
+        const events = [];
+        const unsubscribe = onImportProgress(info => events.push(info));
+        let text;
+        try {
+            text = await localExportJson({ visibleOwners: [OWNER], exportedBy: OWNER });
+        } finally {
+            unsubscribe();
+        }
+
+        const parsed = JSON.parse(text);
+        expect(parsed.data.things.some(t => t.thing_id === id)).toBe(true);
+
+        const thingsEvents = events.filter(e => e.phase === 'things');
+        expect(thingsEvents.length).toBeGreaterThan(0);
+        const end = thingsEvents[thingsEvents.length - 1];
+        expect(end.done).toBe(end.total);
+        expect(end.percent).toBe(100);
+    });
+});

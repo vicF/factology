@@ -23,6 +23,19 @@
                         {{ $t('Include deleted') }}
                     </label>
                 </div>
+                <div v-if="exporting" class="mt-3">
+                    <div class="progress" style="height: 8px;">
+                        <div
+                            class="progress-bar progress-bar-striped"
+                            :class="{ 'progress-bar-animated': exportPercent <= 0 }"
+                            :style="exportPercent > 0 ? { width: exportPercent + '%' } : { width: '100%' }"
+                            role="progressbar"
+                        ></div>
+                    </div>
+                    <div v-if="exportPercent > 0" class="small text-muted mt-1 text-end">
+                        {{ exportPercent }}%
+                    </div>
+                </div>
             </div>
             <ImportModal v-if="showImportModal" @close="showImportModal = false" />
         </section>
@@ -221,11 +234,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import axios from 'axios';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { storageSync } from '../utils/storage';
+import { onImportProgress } from '../utils/importProgress';
 import ImportModal from "./ImportModal.vue";
 
 defineOptions({ name: 'Tools' });
@@ -237,10 +251,30 @@ const authStore = useAuthStore();
 const exporting = ref(false);
 const includeDeleted = ref(false);
 const showImportModal = ref(false);
+const exportProg = ref({ things: { done: 0, total: 0 }, links: { done: 0, total: 0 } });
+const exportPercent = computed(() => {
+    const { things, links } = exportProg.value;
+    const total = things.total + links.total;
+    if (!total) return 0;
+    return Math.round(((things.done + links.done) / total) * 100);
+});
 
 const exportData = async () => {
     exporting.value = true;
+    exportProg.value = { things: { done: 0, total: 0 }, links: { done: 0, total: 0 } };
+
+    // Offline (standalone) exports post row-progress through the bus; the web
+    // export streams from the server with no byte length, so the bar stays
+    // indeterminate there until the download arrives.
+    let unsubscribe = null;
     try {
+        unsubscribe = onImportProgress((info) => {
+            const side = info.phase === 'links' ? 'links' : 'things';
+            const cur = exportProg.value[side];
+            cur.done = info.done;
+            cur.total = info.total;
+        });
+
         const response = await axios.get('/export', {
             params: { include_deleted: includeDeleted.value },
             responseType: 'blob',
@@ -261,6 +295,10 @@ const exportData = async () => {
         console.error('Export failed:', error);
         alert('Export failed: ' + (error.response?.data?.message || error.message));
     } finally {
+        if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+        }
         exporting.value = false;
     }
 };
