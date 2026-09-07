@@ -253,6 +253,12 @@
                                 <label class="form-label fw-semibold">{{ $t('Repeat passphrase') }}</label>
                                 <input type="password" class="form-control" v-model="passphrase2" autocomplete="new-password" data-testid="restore-passphrase2" />
                             </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="require-open-restore" v-model="requireOnOpen" data-testid="restore-require-open" />
+                                <label class="form-check-label" for="require-open-restore">
+                                    {{ $t('Ask for the passphrase whenever the app opens') }}
+                                </label>
+                            </div>
                             <button type="submit" class="btn btn-primary" :disabled="recovering" data-testid="restore-submit">
                                 {{ recovering ? $t('Please wait…') : $t('Restore identity') }}
                             </button>
@@ -415,11 +421,13 @@ const unlockedIdentities = computed(() => identityStore.items
     .map((i) => identityStore.unlockedMap.get(i.thingId) || i));
 const unlockedNames = computed(() => unlockedIdentities.value.map((i) => i.name));
 
-// Only a real server account (numeric id) can bind the public key. Offline /
-// guest sessions use a uuid "id" and have no account to bind to.
+// Only a real server account (numeric id) whose owner matches the unlocked
+// identity can bind the public key. Offline/guest sessions use a uuid "id"
+// and self-sovereign identities with a different owner are not eligible.
 const canConnectIdentity = computed(() =>
     authStore.authenticated
     && Number.isInteger(authStore.user?.id)
+    && identityStore.primary?.thingId === authStore.user?.thing_id
     && !!identityStore.primary?.file?.public_key,
 );
 
@@ -668,7 +676,9 @@ async function restoreFromMnemonic() {
             name: name.value || t('Identity'),
             passphrase: passphrase.value,
         });
-        const opened = await identityStore.adoptFile(file, passphrase.value);
+        const opened = await identityStore.adoptFile(file, passphrase.value, {
+            requirePassphraseOnOpen: requireOnOpen.value,
+        });
         setMessage(
             t('Identity restored: {name} ({id}).\nStore this new identity file in a safe place, or split its backup phrase below.', {
                 name: opened.name,
@@ -677,6 +687,7 @@ async function restoreFromMnemonic() {
         );
         passphrase.value = '';
         passphrase2.value = '';
+        requireOnOpen.value = false;
         recoverMnemonic.value = '';
         mode.value = 'create';
         showSetup.value = false;
