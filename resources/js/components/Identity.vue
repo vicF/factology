@@ -28,6 +28,19 @@
                 <button v-if="identityStore.unlockedSet.size > 1" class="btn btn-outline-secondary btn-sm ms-2" @click="identityStore.lockAll()">
                     Lock all identities
                 </button>
+                <div v-if="canConnectIdentity" class="d-flex gap-2 align-items-center flex-wrap mt-2">
+                    <button
+                        class="btn btn-outline-primary btn-sm"
+                        :disabled="bindingIdentity"
+                        @click="connectToAccount"
+                        data-testid="connect-identity-btn"
+                    >
+                        {{ bindingIdentity ? 'Please wait…' : 'Connect to this account' }}
+                    </button>
+                    <span v-if="identityConnected" class="small text-success" data-testid="identity-connected-hint">
+                        Connected — you can now sign in with this identity file.
+                    </span>
+                </div>
             </div>
         </div>
         <div v-else-if="identityStore.items.length > 0" class="alert alert-warning">
@@ -243,10 +256,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
 import { importExportData } from '../localDb/importData';
 import { onImportProgress } from '../utils/importProgress';
+import { signBytes } from '../identity/identity';
 
 const route = useRoute();
 const router = useRouter();
@@ -279,12 +294,24 @@ const dataImportPct = computed(() => {
 const importIdentityId = ref(null);
 const unlockTarget = ref(null);
 const removeTarget = ref(null);
+const bindingIdentity = ref(false);
+const identityConnected = ref(false);
 
 const messageLines = computed(() => (message.value ? message.value.split('\n') : []));
 const unlockedIdentities = computed(() => identityStore.items
     .filter((i) => identityStore.unlockedSet.has(i.thingId))
     .map((i) => identityStore.unlockedMap.get(i.thingId) || i));
 const unlockedNames = computed(() => unlockedIdentities.value.map((i) => i.name));
+
+// Bind a real server account (numeric id) to the unlocked identity that
+// belongs to it (same thing_id). Offline/guest sessions use a uuid "id" and
+// self-sovereign identities with a different owner are not eligible.
+const canConnectIdentity = computed(() =>
+    authStore.authenticated
+    && Number.isInteger(authStore.user?.id)
+    && identityStore.primary?.thingId === authStore.user?.thing_id
+    && !!identityStore.primary?.file?.public_key,
+);
 
 function shortId(uid) {
     return uid ? uid.slice(0, 8) : '';
@@ -427,6 +454,37 @@ async function removeIdentity(item, wipeData) {
         setMessage(`Identity removed${wipeData ? ' and its data erased' : ''}.`);
     } catch (error) {
         setMessage(error.message, 'error');
+    }
+}
+
+async function connectToAccount() {
+    setMessage('');
+    const identity = identityStore.primary;
+    if (!identity?.file?.public_key) {
+        setMessage('Unlock an identity first.', 'error');
+        return;
+    }
+    bindingIdentity.value = true;
+    identityConnected.value = false;
+    try {
+        const publicKey = identity.file.public_key;
+        const { data: challengeData } = await axios.post('/identity/bind-challenge', { public_key: publicKey });
+        const signature = signBytes(challengeData.challenge, identity.secretKey);
+        await axios.post('/identity/bind', {
+            public_key: publicKey,
+            challenge: challengeData.challenge,
+            signature,
+        });
+        identityConnected.value = true;
+        setMessage('Identity connected to this account — you can now sign in with the identity file.');
+    } catch (error) {
+        const detail = error.response?.data?.errors?.public_key?.[0]
+            || error.response?.data?.errors?.signature?.[0]
+            || error.response?.data?.message
+            || error.message;
+        setMessage(`Could not connect identity: ${detail}`, 'error');
+    } finally {
+        bindingIdentity.value = false;
     }
 }
 
