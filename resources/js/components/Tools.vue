@@ -239,7 +239,7 @@ import axios from 'axios';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { storageSync } from '../utils/storage';
-import { onImportProgress } from '../utils/importProgress';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 import ImportModal from "./ImportModal.vue";
 
 defineOptions({ name: 'Tools' });

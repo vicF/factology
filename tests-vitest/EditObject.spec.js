@@ -26,7 +26,7 @@ const { busHandlers, eventBusMock } = vi.hoisted(() => {
     return { busHandlers, eventBusMock }
 })
 
-vi.mock('@/eventBus', () => ({ eventBus: eventBusMock }))
+vi.mock('@factology/engine/eventBus.js', () => ({ eventBus: eventBusMock }))
 
 vi.mock('bootstrap', () => ({
     Modal: class {

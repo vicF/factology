@@ -17,8 +17,8 @@ import {
     QUALIFIER_BETWEEN,
     QUALIFIER_ALTERNATIVES,
     QUALIFIER_UNKNOWN,
-} from '@/utils/flexibleDate'
-import { Era, ERA_KEYS } from '@/constants/eras'
+} from '@factology/engine/utils/flexibleDate.js'
+import { Era, ERA_KEYS } from '@factology/engine/constants/eras.js'
 import IconCheck from '../icons/IconCheck.vue'
 import DateCalendarPicker from './DateCalendarPicker.vue'
 

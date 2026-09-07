@@ -6,8 +6,8 @@ import {
     filterVisible,
     visibleOwnerSet,
     SYSTEM_SHARED_OWNERS,
-} from '@/localDb/visibility';
-import { UUID } from '@/constants/uuid';
+} from '@factology/engine/localDb/visibility.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 const ID_A = 'identity-A';
 const ID_B = 'identity-B';

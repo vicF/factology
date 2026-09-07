@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useIdentityStore } from '@/stores/identity';
-import { createIdentity, buildAutoOpenToken, openIdentityFileWithToken } from '@/identity/identity';
+import { createIdentity, buildAutoOpenToken, openIdentityFileWithToken } from '@factology/engine/identity/identity.js';
 
 const PW = 'test-passphrase-123';
 

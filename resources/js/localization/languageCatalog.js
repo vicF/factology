@@ -7,7 +7,7 @@
 // Falls back to a static [en, ru] list when the catalog is unavailable
 // (e.g. fresh client before sync).
 
-import { getDb } from '../localDb/index';
+import { getDb } from '@factology/engine/localDb/index.js';
 import { objectName } from '../utils/localized.js';
 
 export const DEFAULT_LANGUAGES = [

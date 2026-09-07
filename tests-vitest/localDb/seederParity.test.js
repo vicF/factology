@@ -5,16 +5,16 @@
 // every class, and every class-hierarchy link declared in seedData.js.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll, SYNC_STATUS } from '@/localDb/index';
-import { seedLocalDb } from '@/localDb/seeder';
-import { UUID } from '@/constants/uuid';
-import { SEED_TRANSLATIONS } from '@/localDb/seedTranslations';
+import { getDb, clearAll, SYNC_STATUS } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
+import { SEED_TRANSLATIONS } from '@factology/engine/localDb/seedTranslations.js';
 import {
     BOOTSTRAP_THINGS,
     BOOTSTRAP_LINKS,
     CLASSES,
     CLASS_LINKS,
-} from '@/localDb/seedData';
+} from '@factology/engine/localDb/seedData.js';
 
 describe('Seeder parity with web DatabaseSeeder', () => {
     beforeEach(async () => {

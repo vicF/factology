@@ -6,8 +6,8 @@ import {
     detectFieldConflicts,
     resolveConflict,
     RESOLVE_STRATEGY,
-} from '@/sync/ConflictResolver';
-import { SYNC_STATUS } from '@/localDb/index';
+} from '@factology/engine/sync/ConflictResolver.js';
+import { SYNC_STATUS } from '@factology/engine/localDb/index.js';
 
 describe('ConflictResolver — Detection', () => {
     it('detects conflict when both sides changed', () => {

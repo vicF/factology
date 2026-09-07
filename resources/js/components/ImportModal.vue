@@ -110,7 +110,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import axios from 'axios';
-import { onImportProgress } from '../utils/importProgress';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 
 const emit = defineEmits(['close']);
 

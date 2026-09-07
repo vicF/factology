@@ -25,7 +25,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import EditObject from './EditObject.vue';
-import { eventBus } from '../eventBus';
+import { eventBus } from '@factology/engine/eventBus.js';
 
 // Note: Icons are globally registered, no need to import them here
 

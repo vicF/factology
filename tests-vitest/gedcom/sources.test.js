@@ -10,17 +10,17 @@
 // Mirrors the server GedcomImportSourcesTest.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { clearAll, getDb } from '@/localDb';
-import { seedLocalDb } from '@/localDb/seeder';
-import { createDexieStore } from '@/gedcom/dexieStore';
-import { importGedcom } from '@/gedcom/gedcomImporter';
+import { clearAll, getDb } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { createDexieStore } from '@factology/engine/gedcom/dexieStore.js';
+import { importGedcom } from '@factology/engine/gedcom/gedcomImporter.js';
 import {
     STANDALONE_BIBLIOGRAPHIC_GEDCOM,
     CITED_BIBLIOGRAPHIC_GEDCOM,
     URL_ONLY_SOURCE_GEDCOM,
     UNCITED_URL_ONLY_GEDCOM,
 } from '@/gedcom/gedcomFixtures';
-import { UUID } from '@/constants/uuid';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 const TEST_FILE = 'deadbeefdeadbeef';
 const OWNER = UUID.VICTOR_FOKIN;

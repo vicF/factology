@@ -7,7 +7,7 @@
 // Used by the main search results (Search.vue) and the related-links list on
 // the object page (Object.vue). The object's own date moves onto the divider,
 // so the per-object date rows are dropped (saves vertical space).
-import { FlexibleDate } from './flexibleDate.js';
+import { FlexibleDate } from '@factology/engine/utils/flexibleDate.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 

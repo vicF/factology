@@ -1,8 +1,8 @@
 // tests-vitest/flexibleDate.test.js
 // Mirrors tests/Unit/FlexibleDateTest.php — the fixtures here must stay in
 // sync so the PHP and JS implementations prove identical behavior.
-import { Era } from '../resources/js/constants/eras.js'
-import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR, formatRangeShort, parseFuzz, formatBoundLocalized } from '../resources/js/utils/flexibleDate.js'
+import { Era } from '@factology/engine/constants/eras.js'
+import { FlexibleDate, QUALIFIER_BETWEEN, QUALIFIER_ALTERNATIVES, PRECISION_YEAR, formatRangeShort, parseFuzz, formatBoundLocalized } from '@factology/engine/utils/flexibleDate.js'
 import i18n from '../resources/js/lang/i18n.js'
 
 const t = (key) => i18n.global.t(key)

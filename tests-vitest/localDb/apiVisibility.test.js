@@ -5,11 +5,11 @@
 // union of unlocked identities is what is visible.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
-import { seedLocalDb } from '@/localDb/seeder';
-import { handleLocalApiCall } from '@/localDb/apiHandler';
-import { visibleOwnerSet } from '@/localDb/visibility';
-import { UUID } from '@/constants/uuid';
+import { getDb, clearAll } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { handleLocalApiCall } from '@factology/engine/localDb/apiHandler.js';
+import { visibleOwnerSet } from '@factology/engine/localDb/visibility.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 const ID_A = 'identity-A';
 const ID_B = 'identity-B';

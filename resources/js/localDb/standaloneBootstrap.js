@@ -9,7 +9,7 @@
 // only loads in standalone mode.
 
 import axios from 'axios';
-import { createDatabase } from './schema';
+import { createDatabase } from '@factology/engine/localDb/schema.js';
 
 // Initialize the database schema immediately
 createDatabase();
@@ -21,7 +21,7 @@ createDatabase();
  */
 export async function bootstrapStandalone() {
     const { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall, seedDemoData } =
-        await import('./apiHandler');
+        await import('@factology/engine/localDb/apiHandler.js');
 
     // Seed demo data on first run
     await seedDemoData();
@@ -29,7 +29,7 @@ export async function bootstrapStandalone() {
     // Resolve the on-device images folder so thumb URLs are stable from the
     // first render (offline native builds).
     try {
-        const { initDeviceThumbs } = await import('../media/deviceImages');
+        const { initDeviceThumbs } = await import('@factology/engine/media/deviceImages.js');
         await initDeviceThumbs();
     } catch (e) {
         // web/browser fallback — no device folder available

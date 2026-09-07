@@ -1,8 +1,8 @@
 // TEMP probe (not committed) — verify localImportJson emits progress + speed.
 import { describe, it, expect } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
-import { localImportJson } from '@/localDb/localTools';
-import { onImportProgress } from '@/utils/importProgress';
+import { getDb, clearAll } from '@factology/engine/localDb/index.js';
+import { localImportJson } from '@factology/engine/localDb/localTools.js';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 
 describe('probe import', () => {
     it('emits progress and completes fast on a moderately large file', async () => {

@@ -62,7 +62,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { useSearchStore } from '../stores/search';
 import { useObjectsStore } from '../stores/objects';
-import { eventBus } from '../eventBus';
+import { eventBus } from '@factology/engine/eventBus.js';
 import { LINK_TO_CLASS, THING_TYPE, CLASS_TYPE, LINK_TYPE, LINK_TO_PARENT } from '../constants.js';
 import { useAuthStore } from "../stores/auth";
 import { useUiStore } from '../stores/ui';

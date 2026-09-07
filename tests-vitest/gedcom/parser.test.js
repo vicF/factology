@@ -15,7 +15,7 @@ import {
     convertGedcomDateToIso,
     extractPlaceName,
     extractPlaceCoordinates,
-} from '@/gedcom/gedcomParser';
+} from '@factology/engine/gedcom/gedcomParser.js';
 
 const SAMPLE = [
     '0 HEAD',

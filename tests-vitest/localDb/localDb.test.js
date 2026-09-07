@@ -17,8 +17,8 @@ import {
     clearAll,
     SYNC_STATUS,
     CHANGE_OP,
-} from '@/localDb/index';
-import { getDb } from '@/localDb/index';
+} from '@factology/engine/localDb/index.js';
+import { getDb } from '@factology/engine/localDb/index.js';
 
 describe('LocalDB — Object CRUD', () => {
     beforeEach(async () => {

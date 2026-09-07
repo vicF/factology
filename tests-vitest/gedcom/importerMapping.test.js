@@ -7,12 +7,12 @@
 // mirroring the server GedcomImportTest.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { clearAll, getDb } from '@/localDb';
-import { seedLocalDb } from '@/localDb/seeder';
-import { createDexieStore } from '@/gedcom/dexieStore';
-import { importGedcom } from '@/gedcom/gedcomImporter';
+import { clearAll, getDb } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { createDexieStore } from '@factology/engine/gedcom/dexieStore.js';
+import { importGedcom } from '@factology/engine/gedcom/gedcomImporter.js';
 import { SIMPLE_FAMILY_GEDCOM, MARRIED_WOMAN_GEDCOM, RESIDENCE_PLACE_GEDCOM } from '@/gedcom/gedcomFixtures';
-import { UUID } from '@/constants/uuid';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 const TEST_FILE = 'deadbeefdeadbeef'; // fixed 16-hex fileKey (avoids crypto.subtle)
 const OWNER = UUID.VICTOR_FOKIN;

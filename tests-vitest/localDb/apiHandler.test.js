@@ -6,11 +6,11 @@
 //  2. the class tree is rooted at Everything and mirrors the web hierarchy
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
-import { seedLocalDb } from '@/localDb/seeder';
-import { saveLink } from '@/localDb/links';
-import { UUID } from '@/constants/uuid';
-import { handleLocalApiCall, handleLocalLinkCall } from '@/localDb/apiHandler';
+import { getDb, clearAll } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { saveLink } from '@factology/engine/localDb/links.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
+import { handleLocalApiCall, handleLocalLinkCall } from '@factology/engine/localDb/apiHandler.js';
 
 // Current user, injected by the standalone adapter on create/update.
 const CURRENT_USER = UUID.VICTOR_FOKIN;

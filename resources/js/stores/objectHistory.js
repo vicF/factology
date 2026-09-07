@@ -9,7 +9,7 @@ import { storage, storageSync } from '@/utils/storage.js';
 import { useAuthStore } from './auth';
 import { useObjectCacheStore } from './objectCache';
 import axios from 'axios';
-import { UUID } from '@/constants/uuid.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
 import { THING_TYPE, LINK_TYPE, CLASS_TYPE } from '@/constants.js';
 
 const STORAGE_PREFIX = 'objectHistory';

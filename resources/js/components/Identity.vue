@@ -238,8 +238,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
-import { importExportData } from '../localDb/importData';
-import { onImportProgress } from '../utils/importProgress';
+import { importExportData } from '@factology/engine/localDb/importData.js';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 
 const route = useRoute();
 const router = useRouter();

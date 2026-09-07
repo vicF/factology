@@ -453,7 +453,7 @@ import LinkDescription from './LinkDescription.vue';
 import { useObjectsStore } from '../stores/objects';
 import { useUiStore } from '../stores/ui';
 import { filterLinks } from '../utils/relatedFilters';
-import { eventBus } from '../eventBus';
+import { eventBus } from '@factology/engine/eventBus.js';
 import Image from "./Image.vue";
 import RelatedList from './RelatedList.vue';
 import { useRelatedExpansion } from '../composables/useRelatedExpansion';
@@ -464,7 +464,7 @@ import IconPublic from './icons/IconPublic.vue';
 import IconCheck from './icons/IconCheck.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import { buildPropertyEntries } from '../utils/properties.js';
-import { UUID } from '../constants/uuid';
+import { UUID } from '@factology/engine/constants/uuid.js';
 import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));

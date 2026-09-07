@@ -6,7 +6,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { useObjectHistoryStore } from './stores/objectHistory';
-import { dateFromDb } from './utils/dateUtils.js';
+import { dateFromDb } from '@factology/engine/utils/dateUtils.js';
 const pinia = createPinia();
 
 import App from './components/App.vue';
@@ -144,7 +144,7 @@ if (!(isCapacitor && !apiBaseUrl)) {
 app.config.globalProperties.$dateFromDb = dateFromDb;
 
 // Flexible dates: localized display + the value object itself
-import * as flexibleDate from './utils/flexibleDate.js';
+import * as flexibleDate from '@factology/engine/utils/flexibleDate.js';
 app.config.globalProperties.$flexibleDate = flexibleDate.FlexibleDate;
 app.config.globalProperties.$flexibleDateFormat = function(start, end, startMeta, endMeta) {
     return flexibleDate.formatLocalized(start, end, startMeta, endMeta, (key) => i18n.global.t(key));

@@ -25,7 +25,7 @@ import {
     openIdentityFile,
     buildAutoOpenToken,
     openIdentityFileWithToken,
-} from '../identity/identity';
+} from '@factology/engine/identity/identity.js';
 
 const REGISTRY_KEY = 'factology_identity_registry';
 const LEGACY_KEY = 'factology_identity_file';
@@ -417,7 +417,7 @@ export const useIdentityStore = defineStore('identity', () => {
             registry.value.primaryThingId = items.value[0]?.thingId ?? null;
         }
         if (wipeData) {
-            const { wipeOwnerRows } = await import('../localDb/wipe');
+            const { wipeOwnerRows } = await import('@factology/engine/localDb/wipe.js');
             await wipeOwnerRows(thingId);
         }
         await persist();
@@ -461,7 +461,7 @@ export const useIdentityStore = defineStore('identity', () => {
             console.warn('identity: failed to remove storage keys', e);
         }
         try {
-            const { getDb } = await import('../localDb/index');
+            const { getDb } = await import('@factology/engine/localDb/index.js');
             await getDb().delete();
         } catch (e) {
             console.warn('identity: failed to delete local database', e);

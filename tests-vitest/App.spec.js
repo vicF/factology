@@ -29,7 +29,7 @@ const { busHandlers, eventBusMock, routerPush } = vi.hoisted(() => {
     return { busHandlers, eventBusMock, routerPush: vi.fn() }
 })
 
-vi.mock('@/eventBus', () => ({ eventBus: eventBusMock }))
+vi.mock('@factology/engine/eventBus.js', () => ({ eventBus: eventBusMock }))
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({ push: routerPush }),

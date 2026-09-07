@@ -161,7 +161,7 @@ import ObjectField from "./ObjectField.vue";
 import LinkDescription from './../LinkDescription.vue';
 import FlexibleDateField from './FlexibleDateField.vue';
 import { CLASS_TYPE, LINK_TYPE, THING_TYPE } from "../../constants.js";
-import { eventBus } from "../../eventBus.js";
+import { eventBus } from "@factology/engine/eventBus.js";
 
 const props = defineProps({
     link: { type: Object, required: true },

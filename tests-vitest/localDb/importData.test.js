@@ -1,12 +1,12 @@
 // tests-vitest/localDb/importData.test.js
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { importExportData } from '@/localDb/importData';
-import { onImportProgress } from '@/utils/importProgress';
-import { clearAll, getDb, getObject, SYNC_STATUS } from '@/localDb/index';
-import { getLinkByUuid } from '@/localDb/links';
-import { seedLocalDb } from '@/localDb/seeder';
-import { UUID } from '@/constants/uuid';
+import { importExportData } from '@factology/engine/localDb/importData.js';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
+import { clearAll, getDb, getObject, SYNC_STATUS } from '@factology/engine/localDb/index.js';
+import { getLinkByUuid } from '@factology/engine/localDb/links.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 const MY_ID = 'me-0000-0000-0000-000000000001';
 

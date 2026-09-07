@@ -134,7 +134,7 @@ import { inject, nextTick, reactive, ref, computed, watch, onMounted } from 'vue
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { objectName, fieldText } from '../utils/localized.js'
-import { UUID } from '../constants/uuid.js'
+import { UUID } from '@factology/engine/constants/uuid.js'
 import { foldChildren } from '../utils/graphFold.js'
 import { nodeSignature, planGraphUpdate } from '../utils/graphDiff.js'
 import { nodeClassIds } from '../utils/relatedFilters.js'

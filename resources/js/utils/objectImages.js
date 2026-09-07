@@ -83,7 +83,7 @@ function deviceThumbsBaseForUrl() {
 }
 
 async function deviceImages() {
-    return import('../media/deviceImages');
+    return import('@factology/engine/media/deviceImages.js');
 }
 
 /**

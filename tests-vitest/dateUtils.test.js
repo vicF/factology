@@ -1,5 +1,5 @@
 // tests-vitest/dateUtils.test.js
-import { dateFromDb } from '../resources/js/utils/dateUtils.js'
+import { dateFromDb } from '@factology/engine/utils/dateUtils.js'
 
 describe('dateFromDb', () => {
     // These tests PASS

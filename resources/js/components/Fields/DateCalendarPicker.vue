@@ -6,7 +6,7 @@
 // including negative (BC) and huge years.
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Era } from '@/constants/eras'
+import { Era } from '@factology/engine/constants/eras.js'
 import { currentLocale } from '@/utils/localized.js'
 
 const props = defineProps({

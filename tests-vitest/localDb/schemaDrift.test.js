@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { schemaMap } from '@/localDb/schemaMap';
+import { schemaMap } from '@factology/engine/localDb/schemaMap.js';
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, '../../database/migrations');
 // Some environments (e.g. the frontend-only node container) don't mount the

@@ -77,7 +77,7 @@ import {
     topLevelTaxonomyNodes,
 } from '@/utils/relatedFilters';
 import { LINK_TYPE } from '@/constants.js';
-import { eventBus } from '@/eventBus';
+import { eventBus } from '@factology/engine/eventBus.js';
 import ObjectFilterItem from './ObjectFilterItem.vue';
 
 const LEVELS = [1, 2, 3, 4];

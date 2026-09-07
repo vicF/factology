@@ -7,10 +7,10 @@
 //    no null.type crash).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
-import { seedLocalDb } from '@/localDb/seeder';
-import { UUID } from '@/constants/uuid';
-import { handleLocalApiCall } from '@/localDb/apiHandler';
+import { getDb, clearAll } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
+import { handleLocalApiCall } from '@factology/engine/localDb/apiHandler.js';
 
 const CONTEXT = { userThingId: UUID.VICTOR_FOKIN, visibleOwners: new Set([UUID.VICTOR_FOKIN]) };
 

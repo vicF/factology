@@ -9,9 +9,9 @@ import {
     newLinkId,
     listLinksForThing,
     replaceLinksForThing,
-} from '@/localDb/links';
-import { clearAll, getPendingCount, popPendingChanges } from '@/localDb/index';
-import { CHANGE_OP } from '@/localDb/index';
+} from '@factology/engine/localDb/links.js';
+import { clearAll, getPendingCount, popPendingChanges } from '@factology/engine/localDb/index.js';
+import { CHANGE_OP } from '@factology/engine/localDb/index.js';
 
 describe('LocalDB — Link CRUD', () => {
     beforeEach(async () => {

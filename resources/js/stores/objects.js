@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import {EVENT} from "../constants.js"
-import { eventBus } from "../eventBus.js"
+import { eventBus } from "@factology/engine/eventBus.js"
 import { useSearchStore, checkedRestorePromise } from './search'
 import { collectSubtreeIds } from '../utils/classTree'
 

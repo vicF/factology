@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
-import { SyncEngine } from '@/sync/SyncEngine';
+import { SyncEngine } from '@factology/engine/sync/SyncEngine.js';
 import {
     createObject,
     updateObject,
@@ -17,8 +17,8 @@ import {
     SYNC_STATUS,
     CHANGE_OP,
     getDb,
-} from '@/localDb/index';
-import { saveLink, getLink, getLinkByUuid, listLinksForThing } from '@/localDb/links';
+} from '@factology/engine/localDb/index.js';
+import { saveLink, getLink, getLinkByUuid, listLinksForThing } from '@factology/engine/localDb/links.js';
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -31,7 +31,7 @@ vi.mock('axios', () => ({
 }));
 
 // Mock eventBus
-vi.mock('@/eventBus', () => ({
+vi.mock('@factology/engine/eventBus.js', () => ({
     eventBus: {
         on: vi.fn(),
         off: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock('@/eventBus', () => ({
 }));
 
 // Mock networkMonitor
-vi.mock('@/utils/networkMonitor', () => ({
+vi.mock('@factology/engine/utils/networkMonitor.js', () => ({
     networkMonitor: {
         isOnline: { value: true },
         isServerReachable: { value: true },

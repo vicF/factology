@@ -15,7 +15,7 @@ import {
     verifyJson,
     IDENTITY_FILE_TYPE,
     IDENTITY_FILE_VERSION,
-} from '@/identity/identity';
+} from '@factology/engine/identity/identity.js';
 
 const NAME = 'Victor Fokin';
 const THING_ID = 'test-thing-id-0001';

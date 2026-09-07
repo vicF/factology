@@ -54,6 +54,6 @@ vi.mock('@/composables/useClickOutside', () => ({
     useClickOutside: vi.fn()
 }))
 
-vi.mock('@/eventBus', () => ({
+vi.mock('@factology/engine/eventBus.js', () => ({
     eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() }
 }))

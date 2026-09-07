@@ -288,7 +288,7 @@ import SearchFilterPanel from "../SearchFilterPanel.vue"
 const ObjectViewSidebar = defineAsyncComponent(() => import("../ObjectViewSidebar.vue"))
 import { setLanguage } from '../../lang/i18n.js'
 
-import { eventBus } from '../../eventBus.js'
+import { eventBus } from '@factology/engine/eventBus.js'
 import { thumbUrl, thumbRevision } from '../../utils/objectImages'
 import { useAuthStore } from '../../stores/auth'
 import { useSearchStore } from '../../stores/search'

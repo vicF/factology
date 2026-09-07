@@ -8,17 +8,17 @@
 //  - duplicate finder links likely-same persons
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getDb, clearAll } from '@/localDb/index';
-import { seedLocalDb } from '@/localDb/seeder';
-import { UUID } from '@/constants/uuid';
-import { onImportProgress } from '@/utils/importProgress';
+import { getDb, clearAll } from '@factology/engine/localDb/index.js';
+import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
+import { UUID } from '@factology/engine/constants/uuid.js';
+import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 import {
     localConsistencyCheck,
     localConsistencyDelete,
     localExportJson,
     localImportJson,
     localFindDuplicates,
-} from '@/localDb/localTools';
+} from '@factology/engine/localDb/localTools.js';
 
 const OWNER = UUID.VICTOR_FOKIN;
 

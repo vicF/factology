@@ -5,8 +5,8 @@
 // that data created before identities existed does not "disappear" behind the
 // owner-visibility filter.
 
-import { getDb } from './index';
-import { BOOTSTRAP_THINGS, CLASSES } from './seedData';
+import { getDb } from '@factology/engine/localDb/index.js';
+import { BOOTSTRAP_THINGS, CLASSES } from '@factology/engine/localDb/seedData.js';
 
 // Seed/system thing ids must never be adopted — they are re-owned to
 // SYSTEM_OWNER by seeder.normalizeSystemOwners instead.

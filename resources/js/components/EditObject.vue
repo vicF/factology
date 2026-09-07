@@ -596,13 +596,13 @@ import ObjectField from './Fields/ObjectField.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TO_RELATED, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
-import { eventBus } from "../eventBus.js";
+import { eventBus } from "@factology/engine/eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
 import ObjectImageEditor from "./ObjectImageEditor.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { useAuthStore } from '@/stores/auth';
-import { UUID } from '../constants/uuid';
+import { UUID } from '@factology/engine/constants/uuid.js';
 import { currentLocale, changeSourceLang, objectName } from '../utils/localized.js';
 import { GEO_TYPES, appendVertex, closePolygon, extractCoordinates, isGeoPropertyName, isLegacyLatLng, latLngToPoint, stripBlankCoords } from '../utils/geo.js';
 import GeoPicker from './GeoPicker.vue';
