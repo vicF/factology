@@ -237,6 +237,116 @@
             </div>
         </div>
 
+        <!-- Restore from backup phrase -->
+        <div class="card mb-4 shadow-sm" data-testid="restore-panel">
+            <div class="card-body">
+                <h5 class="card-title">Restore identity from backup phrase</h5>
+                <p class="text-muted small">
+                    Rebuild your identity from the 24-word backup phrase if you lost the identity file.
+                    The rebuilt file has the same public key, so any server that had it connected still
+                    recognises it.
+                </p>
+                <form @submit.prevent="restoreFromMnemonic">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Backup phrase (24 words)</label>
+                        <textarea class="form-control font-monospace" rows="3" v-model="recoverMnemonic" data-testid="restore-mnemonic" placeholder="word1 word2 … word24"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Name</label>
+                        <input type="text" class="form-control" v-model="name" data-testid="restore-name" placeholder="Your name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">New passphrase (protects the rebuilt file)</label>
+                        <input type="password" class="form-control" v-model="passphrase" autocomplete="new-password" data-testid="restore-passphrase" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Repeat passphrase</label>
+                        <input type="password" class="form-control" v-model="passphrase2" autocomplete="new-password" data-testid="restore-passphrase2" />
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="require-open-restore" v-model="requireOnOpen" data-testid="restore-require-open" />
+                        <label class="form-check-label" for="require-open-restore">
+                            Ask for the passphrase whenever the app opens
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary" :disabled="recovering" data-testid="restore-submit">
+                        {{ recovering ? 'Please wait…' : 'Restore identity' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Social backup: split the backup phrase between friends -->
+        <div class="card mb-4 shadow-sm" data-testid="social-backup-card">
+            <div class="card-body">
+                <h5 class="card-title">Backup with friends (optional)</h5>
+                <p class="text-muted small">
+                    Split your backup phrase into N shares; any K of them rebuild it. Give one share to
+                    each of several trusted people/places. If you lose everything, ask any K of them for
+                    their shares. Fewer than K shares reveal nothing about the phrase.
+                </p>
+
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: backupMode === 'split' }" @click="backupMode = 'split'" data-testid="tab-shares-split">Split phrase</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: backupMode === 'combine' }" @click="backupMode = 'combine'" data-testid="tab-shares-combine">Recover from shares</button>
+                    </li>
+                </ul>
+
+                <template v-if="backupMode === 'split'">
+                    <form @submit.prevent="splitBackup">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Backup phrase to protect</label>
+                            <textarea class="form-control font-monospace" rows="2" v-model="sharePhrase" data-testid="share-phrase" placeholder="24 words"></textarea>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Total shares (N)</label>
+                                <input type="number" class="form-control" min="2" max="255" v-model.number="shareTotal" data-testid="share-total" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Needed to recover (K)</label>
+                                <input type="number" class="form-control" min="2" v-model.number="shareThreshold" data-testid="share-threshold" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" data-testid="share-split-submit">Split into shares</button>
+                    </form>
+
+                    <div v-if="generatedShares.length" class="mt-3">
+                        <h6 class="mb-2">Your shares — send one to each friend</h6>
+                        <div v-for="(share, i) in generatedShares" :key="i" class="mb-2">
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge bg-secondary flex-shrink-0">Share {{ i + 1 }}</span>
+                                <textarea class="form-control font-monospace form-control-sm" :value="share" rows="2" readonly data-testid="generated-share"></textarea>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" @click="copyText(share)" data-testid="copy-share">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template v-else>
+                    <form @submit.prevent="recoverFromShares">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Shares (one per line)</label>
+                            <textarea class="form-control font-monospace" rows="5" v-model="shareTexts" data-testid="share-texts" placeholder='Paste each share on its own line'></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary" :disabled="recoveringShares" data-testid="shares-recover-submit">
+                            {{ recoveringShares ? 'Please wait…' : 'Recover backup phrase' }}
+                        </button>
+                    </form>
+                    <div v-if="recoveredPhrase" class="mt-3 alert alert-success">
+                        <h6 class="text-success">Recovered backup phrase</h6>
+                        <textarea class="form-control font-monospace mb-2" :value="recoveredPhrase" rows="2" readonly data-testid="recovered-phrase"></textarea>
+                        <button type="button" class="btn btn-outline-success btn-sm" @click="useRecoveredPhrase" data-testid="use-recovered-phrase">
+                            Use it to restore my identity
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Danger zone -->
         <div class="card border-danger shadow-sm">
             <div class="card-body">
@@ -261,7 +371,8 @@ import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
 import { importExportData } from '../localDb/importData';
 import { onImportProgress } from '../utils/importProgress';
-import { signBytes } from '../identity/identity';
+import { isValidMnemonic, recoverIdentityFile, signBytes } from '../identity/identity';
+import { combineSharesToString, parseShare, serializeShare, splitSecretString } from '../identity/shamir';
 
 const route = useRoute();
 const router = useRouter();
@@ -296,6 +407,20 @@ const unlockTarget = ref(null);
 const removeTarget = ref(null);
 const bindingIdentity = ref(false);
 const identityConnected = ref(false);
+
+// Restore from backup phrase
+const recoverMnemonic = ref('');
+const recovering = ref(false);
+
+// Social backup (Shamir)
+const backupMode = ref('split');
+const sharePhrase = ref('');
+const shareTotal = ref(3);
+const shareThreshold = ref(2);
+const generatedShares = ref([]);
+const shareTexts = ref('');
+const recoveringShares = ref(false);
+const recoveredPhrase = ref('');
 
 const messageLines = computed(() => (message.value ? message.value.split('\n') : []));
 const unlockedIdentities = computed(() => identityStore.items
@@ -455,6 +580,100 @@ async function removeIdentity(item, wipeData) {
     } catch (error) {
         setMessage(error.message, 'error');
     }
+}
+
+/**
+ * Rebuild the identity file from the BIP-39 backup phrase and adopt it into
+ * the registry (same key/public_key, so bound servers still recognise it).
+ */
+async function restoreFromMnemonic() {
+    setMessage('');
+    if (passphrase.value !== passphrase2.value) {
+        setMessage('Passphrases do not match.', 'error');
+        return;
+    }
+    if (!passphrase.value || passphrase.value.length < 8) {
+        setMessage('Passphrase must be at least 8 characters.', 'error');
+        return;
+    }
+    recovering.value = true;
+    try {
+        const { file } = await recoverIdentityFile({
+            mnemonic: recoverMnemonic.value,
+            name: name.value || 'Identity',
+            passphrase: passphrase.value,
+        });
+        const opened = await identityStore.adoptFile(file, passphrase.value, {
+            requirePassphraseOnOpen: requireOnOpen.value,
+        });
+        setMessage(
+            `Identity restored: ${opened.name} (${opened.thingId}).\n` +
+            'Store the new identity file in a safe place, or split its backup phrase below.',
+        );
+        passphrase.value = '';
+        passphrase2.value = '';
+        requireOnOpen.value = false;
+        recoverMnemonic.value = '';
+        importIdentityId.value = opened.thingId;
+    } catch (error) {
+        setMessage(error.message, 'error');
+    } finally {
+        recovering.value = false;
+    }
+}
+
+function splitBackup() {
+    setMessage('');
+    const phrase = sharePhrase.value.trim();
+    if (!isValidMnemonic(phrase)) {
+        setMessage('That does not look like a valid 12/24-word backup phrase.', 'error');
+        return;
+    }
+    const total = Number(shareTotal.value);
+    const threshold = Number(shareThreshold.value);
+    if (!Number.isInteger(total) || !Number.isInteger(threshold)
+        || threshold < 2 || threshold > total || total > 255) {
+        setMessage('Shares and threshold must satisfy 2 ≤ threshold ≤ total ≤ 255.', 'error');
+        return;
+    }
+    try {
+        generatedShares.value = splitSecretString(phrase, total, threshold).map(serializeShare);
+        setMessage(
+            `Backup phrase split into ${total} shares — any ${threshold} of them rebuild it. ` +
+            'Give exactly one share to each of your trusted people/places. Never send two shares together.',
+        );
+    } catch (error) {
+        setMessage(error.message, 'error');
+    }
+}
+
+async function recoverFromShares() {
+    setMessage('');
+    const lines = shareTexts.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (lines.length < 2) {
+        setMessage('Paste at least two shares, one per line.', 'error');
+        return;
+    }
+    recoveringShares.value = true;
+    try {
+        const phrase = combineSharesToString(lines.map(parseShare));
+        recoveredPhrase.value = phrase;
+        setMessage('Backup phrase recovered. Use it to restore the identity in the section above.');
+    } catch (error) {
+        setMessage(error.message, 'error');
+    } finally {
+        recoveringShares.value = false;
+    }
+}
+
+function copyText(text) {
+    navigator.clipboard?.writeText(text);
+}
+
+function useRecoveredPhrase() {
+    recoverMnemonic.value = recoveredPhrase.value;
+    recoveredPhrase.value = '';
+    setMessage('Backup phrase filled in above — set a passphrase and click "Restore identity".');
 }
 
 async function connectToAccount() {
