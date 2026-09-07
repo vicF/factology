@@ -50,6 +50,8 @@ const props = defineProps({
 })
 
 const getThumbUrl = inject('getThumbUrl')
+// Provided by Default.vue; bumps whenever any object's image changes.
+const thumbRevision = inject('thumbRevision', null)
 const emit = defineEmits(['has-image'])
 const imageError = ref(false)
 const imageReady = ref(false)
@@ -104,6 +106,15 @@ watch(() => props.alternativeUuids, () => {
         currentImageIndex.value = 0
     }
 }, { deep: true })
+
+// A revision bump means some image changed on the server. Reset error/fallback
+// state so the node's own image re-attempts with its new cache-buster — an
+// image that once failed (placeholder shown) would otherwise never reload.
+watch(() => thumbRevision?.value, () => {
+    imageError.value = false
+    imageReady.value = false
+    currentImageIndex.value = 0
+})
 
 const handleImageLoad = () => {
     imageReady.value = true

@@ -11,10 +11,10 @@
 <script setup>
 import L from 'leaflet'
 import axios from 'axios'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { objectName } from '../utils/localized.js'
+import { objectName, currentLocale } from '../utils/localized.js'
 import { buildMapFeatures } from '../utils/geo.js'
 import { createBaseMap, createPinIcon, DEFAULT_CENTER, DEFAULT_ZOOM } from '../utils/leaflet.js'
 
@@ -127,6 +127,16 @@ onMounted(async () => {
     if (props.object) {
         await showMap()
     }
+})
+
+// Tooltip/popup labels (object names) are baked into the Leaflet layers, so a
+// UI language change must re-render the features to re-bind them. Skip while
+// the container is hidden (0 width) — the parent's refreshView() re-renders
+// then instead.
+watch(() => currentLocale(), () => {
+    if (!map || !features.value.length) return
+    if (!mapEl.value || mapEl.value.clientWidth === 0) return
+    renderFeatures()
 })
 
 onBeforeUnmount(() => {

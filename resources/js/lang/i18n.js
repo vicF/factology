@@ -824,7 +824,11 @@ export function setLanguage(lang) {
         i18n.global.locale = lang;
     }
     localStorage.setItem("locale", lang);
-    window.location.reload();
+    // Deliberately no window.location.reload(): the locale ref is reactive, so
+    // every template/computed that reads it ($t, t(), currentLocale()) re-renders
+    // on its own. Components that render through non-Vue libraries or module
+    // caches (Graph's RelationGraph, ObjectMap's Leaflet layers, the language
+    // catalog) watch the locale and re-render the affected part themselves.
 }
 
 export { i18n };

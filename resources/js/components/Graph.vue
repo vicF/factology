@@ -133,7 +133,7 @@ import axios from 'axios'
 import { inject, nextTick, reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { objectName, fieldText } from '../utils/localized.js'
+import { objectName, fieldText, currentLocale } from '../utils/localized.js'
 import { UUID } from '../constants/uuid.js'
 import { foldChildren } from '../utils/graphFold.js'
 import { nodeSignature, planGraphUpdate } from '../utils/graphDiff.js'
@@ -703,6 +703,18 @@ watch(groupCfg, () => {
     expandedGroups.value = new Set()
     if (treeRoot.value) queueRender(renderGraph)
 }, { deep: true })
+
+// Object/link labels are baked into relation-graph's own node/line objects when
+// they are created, so a locale change has to rebuild the canvas (setJsonData)
+// to re-derive every label from the fetched graph data. Clearing the signature
+// map makes renderGraph take its full-rebuild path instead of the diff path.
+// (currentLocale() is read through a getter so the watcher follows the shared
+// i18n locale ref reactively.)
+watch(() => currentLocale(), () => {
+    if (!graphObject.value) return
+    lastRender.nodeSigs = new Map()
+    queueRender(renderGraph)
+})
 
 onMounted(async () => {
     if (props.object) {

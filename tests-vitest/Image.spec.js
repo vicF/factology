@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
 import Image from '@/components/Image.vue'
 
 vi.mock('jdenticon', () => ({
@@ -8,10 +9,10 @@ vi.mock('jdenticon', () => ({
 
 const getThumbUrl = (id) => `/thumbs/${id.slice(0, 1)}/${id.slice(1, 2)}/${id}.jpg`
 
-function mountImage(extraProps = {}) {
+function mountImage(extraProps = {}, provide = {}) {
     return mount(Image, {
         props: { nodeId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ...extraProps },
-        global: { provide: { getThumbUrl } },
+        global: { provide: { getThumbUrl, ...provide } },
     })
 }
 
@@ -40,5 +41,29 @@ describe('Image', () => {
         await img.trigger('load')
         expect(wrapper.emitted('has-image')).toEqual([[true]])
         expect(wrapper.find('img').attributes('style')).not.toContain('display: none')
+    })
+
+    it('re-attempts loading when the thumb revision bumps after a failure (image added later)', async () => {
+        // The thumbnail 404s at first, so the identicon placeholder shows…
+        const revision = ref(0)
+        const wrapper = mountImage({}, {
+            thumbRevision: revision,
+            getThumbUrl: (id) => `/thumbs/${id.slice(0, 1)}/${id.slice(1, 2)}/${id}.jpg?v=${revision.value}`,
+        })
+        await wrapper.find('img').trigger('error')
+        expect(wrapper.find('.placeholder').exists()).toBe(true)
+
+        // …then the image is saved (revision bumps, cache-buster changes)…
+        revision.value = 1
+        await nextTick()
+
+        // …and the component must try loading again instead of keeping the placeholder.
+        expect(wrapper.find('.placeholder').exists()).toBe(false)
+        const img = wrapper.find('img')
+        expect(img.exists()).toBe(true)
+        expect(img.attributes('src')).toContain('?v=1')
+        await img.trigger('load')
+        expect(wrapper.find('img').exists()).toBe(true)
+        expect(wrapper.find('.placeholder').exists()).toBe(false)
     })
 })
