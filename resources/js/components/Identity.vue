@@ -16,7 +16,21 @@
                 </h5>
                 <div class="small text-muted mb-2">Owner uuid (thing_id): <code>{{ identityStore.identity.thingId }}</code></div>
                 <div class="small text-muted mb-3">Public key: <code class="text-break">{{ identityStore.identity.file.public_key }}</code></div>
-                <button class="btn btn-outline-secondary btn-sm" @click="identityStore.lock()">Lock this device</button>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <button class="btn btn-outline-secondary btn-sm" @click="identityStore.lock()">Lock this device</button>
+                    <button
+                        v-if="canConnectIdentity"
+                        class="btn btn-outline-primary btn-sm"
+                        :disabled="bindingIdentity"
+                        @click="connectIdentityToAccount"
+                        data-testid="connect-identity-btn"
+                    >
+                        {{ bindingIdentity ? 'Please wait…' : 'Connect to this account' }}
+                    </button>
+                    <span v-if="identityConnected" class="small text-success" data-testid="identity-connected-hint">
+                        Connected — you can now sign in with this identity file.
+                    </span>
+                </div>
             </div>
         </div>
         <div v-else-if="identityStore.identityFile" class="alert alert-warning">
@@ -157,8 +171,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
+import { signBytes } from '../identity/identity';
 import { importExportData } from '../localDb/importData';
 
 const authStore = useAuthStore();
@@ -178,8 +194,18 @@ const messageType = ref('success');
 const dataFile = ref(null);
 const dataImporting = ref(false);
 const dataReport = ref(null);
+const bindingIdentity = ref(false);
+const identityConnected = ref(false);
 
 const messageLines = computed(() => (message.value ? message.value.split('\n') : []));
+
+// Only a real server account (numeric id) can bind the public key. Offline /
+// guest sessions use a uuid "id" and have no account to bind to.
+const canConnectIdentity = computed(() =>
+    authStore.authenticated
+    && Number.isInteger(authStore.user?.id)
+    && !!identityStore.identity?.file?.public_key,
+);
 
 function setMessage(text, type = 'success') {
     message.value = text;
@@ -282,6 +308,42 @@ async function importData() {
 
 function copyMnemonic() {
     navigator.clipboard?.writeText(mnemonic.value);
+}
+
+/**
+ * Register the unlocked identity's public key with the current server account.
+ * The server issues a single-use challenge; signing it proves we hold the
+ * private key before the key is bound (enables identity-file login).
+ */
+async function connectIdentityToAccount() {
+    setMessage('');
+    const identity = identityStore.identity;
+    if (!identity?.file?.public_key) {
+        setMessage('Unlock an identity first.', 'error');
+        return;
+    }
+    bindingIdentity.value = true;
+    identityConnected.value = false;
+    try {
+        const publicKey = identity.file.public_key;
+        const { data: challengeData } = await axios.post('/identity/bind-challenge', { public_key: publicKey });
+        const signature = signBytes(challengeData.challenge, identity.secretKey);
+        await axios.post('/identity/bind', {
+            public_key: publicKey,
+            challenge: challengeData.challenge,
+            signature,
+        });
+        identityConnected.value = true;
+        setMessage('Identity connected to this account — you can now sign in with the identity file.');
+    } catch (error) {
+        const detail = error.response?.data?.errors?.public_key?.[0]
+            || error.response?.data?.errors?.signature?.[0]
+            || error.response?.data?.message
+            || error.message;
+        setMessage(`Could not connect identity: ${detail}`, 'error');
+    } finally {
+        bindingIdentity.value = false;
+    }
 }
 
 onMounted(async () => {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApiController;
+use App\Http\Controllers\Auth\IdentityController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\LegalController;
@@ -30,6 +31,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/login',    [LoginController::class, 'login'])->name('login');
     Route::post('/register', [RegisterController::class, 'register'])->name('register');
     Route::post('/logout',   [LoginController::class, 'logout'])->name('logout');
+
+    // Identity-file login (challenge/response). The public key must already be
+    // bound to an account via the auth-protected /identity/bind routes below.
+    Route::post('/identity/challenge', [IdentityController::class, 'challenge']);
+    Route::post('/identity/login',     [IdentityController::class, 'login']);
 
     // Get current authenticated user (explicitly expose is_admin)
     Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
@@ -87,6 +93,11 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        // Identity-file login: bind this account's Ed25519 public key.
+        // Binding requires proof of key possession (challenge + signature).
+        Route::post('/identity/bind-challenge', [IdentityController::class, 'bindChallenge']);
+        Route::post('/identity/bind',           [IdentityController::class, 'bind']);
+
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
         Route::patch('/object/{id}/visibility', [ApiController::class, 'toggleVisibility']);
