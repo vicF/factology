@@ -132,6 +132,32 @@ class ObjectThumbTest extends TestCase
         $this->assertLessThanOrEqual(100, $width);
     }
 
+    public function test_url_import_resolves_yandex_disk_share_page_before_fetch(): void
+    {
+        [$user, $thingId] = $this->makeUserAndObject();
+        Http::fake([
+            // The pasted link is an HTML viewer page, so the server first asks
+            // Yandex's public API for the direct download href…
+            'cloud-api.yandex.net/*' => Http::response([
+                'href' => 'https://downloader.disk.yandex.ru/disk/final.jpg',
+            ]),
+            // …then fetches that href, which serves the real image bytes.
+            'downloader.disk.yandex.ru/*' => Http::response(
+                file_get_contents($this->makeImage(300, 150)),
+                200,
+                ['Content-Type' => 'image/jpeg']
+            ),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/v1/object/{$thingId}/thumb", [
+            'url' => 'https://disk.yandex.ru/i/kGiFB1RmcmtEGg',
+        ]);
+
+        $response->assertOk();
+        $this->assertTrue($response->json('success'));
+        $this->assertFileExists(ThumbStore::localPath($thingId));
+    }
+
     public function test_url_import_rejects_non_image_content_type(): void
     {
         [$user, $thingId] = $this->makeUserAndObject();

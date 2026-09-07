@@ -8,7 +8,7 @@
 // (e.g. fresh client before sync).
 
 import { getDb } from '@factology/engine/localDb/index.js';
-import { objectName } from '../utils/localized.js';
+import { objectName, currentLocale } from '../utils/localized.js';
 
 export const DEFAULT_LANGUAGES = [
     { code: 'en', name: 'English' },
@@ -16,12 +16,16 @@ export const DEFAULT_LANGUAGES = [
 ];
 
 let cache = null;
+let cacheLocale = null;
 
 /**
  * @returns {Promise<Array<{ thing_id: string, code: string, name: string }>>}
  */
 export async function loadLanguages() {
-    if (cache) return cache;
+    // Language display names are resolved with objectName() in the current UI
+    // language, so cache per locale — a locale switch must recompute names.
+    const locale = currentLocale();
+    if (cache && cacheLocale === locale) return cache;
 
     let langs = [];
     try {
@@ -46,9 +50,11 @@ export async function loadLanguages() {
     if (cache.length === 0) {
         cache = DEFAULT_LANGUAGES.map((l) => ({ thing_id: null, ...l }));
     }
+    cacheLocale = locale;
     return cache;
 }
 
 export function clearLanguagesCache() {
     cache = null;
+    cacheLocale = null;
 }

@@ -6,6 +6,7 @@ use App\Http\Requests\SearchRequest;
 use App\Http\Resources\LinkResource;
 use App\Http\Resources\ThingResource;
 use App\Models\Classes\Media;
+use App\Services\ImageShareResolver;
 use App\Services\MediaLink\MediaTitleResolver;
 use App\Services\MediaLink\UrlMediaClassifier;
 use App\Services\RelatedObjectsResolver;
@@ -849,7 +850,10 @@ class ApiController extends BaseController
                 if (!preg_match('#^https?://#i', $url) || !filter_var($url, FILTER_VALIDATE_URL)) {
                     throw ValidationException::withMessages(['url' => 'The url must be a valid http(s) address.']);
                 }
-                $response = Http::timeout(20)->get($url);
+                // Some hosts (e.g. Yandex Disk) serve a public link as an HTML
+                // viewer page, so resolve it to the real image URL first.
+                $fetchUrl = ImageShareResolver::resolveImageUrl($url) ?? $url;
+                $response = Http::timeout(20)->get($fetchUrl);
                 if ($response->failed()) {
                     return response()->json([
                         'success' => false,

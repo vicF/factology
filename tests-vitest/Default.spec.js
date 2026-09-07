@@ -56,6 +56,7 @@ vi.mock('@/stores/ui', () => ({
 
 vi.mock('@/lang/i18n', () => ({
     setLanguage: vi.fn(),
+    i18n: { global: { locale: 'en' } },
 }))
 
 function mountLayout(user = null) {

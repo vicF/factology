@@ -19,12 +19,12 @@ step() { echo -e "\n${COLOR_CYAN}==>${COLOR_RESET} ${COLOR_BOLD}$1${COLOR_RESET}
 
 step "Resetting admin password"
 
-CMD="php artisan factology:reset-admin-password"
+# Production compose names the app service `factology` (not `factology-app`).
 if [ -n "$EMAIL" ]; then
-    CMD="$CMD --email=$EMAIL"
+    docker compose exec factology php artisan factology:reset-admin-password --email="$EMAIL"
+else
+    docker compose exec factology php artisan factology:reset-admin-password
 fi
-
-docker compose exec factology-app $CMD
 
 echo ""
 echo -e "${COLOR_GREEN}${COLOR_BOLD}  Password reset complete.${COLOR_RESET}"

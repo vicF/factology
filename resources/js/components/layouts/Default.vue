@@ -286,7 +286,7 @@ import SearchFilterPanel from "../SearchFilterPanel.vue"
 // The related-objects filter panel that replaces the search classes tree while
 // an object is open. Lazy so the search page never pulls it in.
 const ObjectViewSidebar = defineAsyncComponent(() => import("../ObjectViewSidebar.vue"))
-import { setLanguage } from '../../lang/i18n.js'
+import { setLanguage, i18n } from '../../lang/i18n.js'
 
 import { eventBus } from '@factology/engine/eventBus.js'
 import { thumbUrl, thumbRevision } from '../../utils/objectImages'
@@ -386,23 +386,19 @@ const isPullAnimating = ref(false)
 const pullStartY = ref(0)
 const wasAtTop = ref(false)
 
-// Language switcher data
-const currentLocale = ref(localStorage.getItem('locale') || 'en')
+// Language switcher data. The displayed code/highlight is derived from the
+// vue-i18n locale itself (reactive), so it follows any switch automatically.
 // Only languages with installed UI translations (i18n.js catalogs) are offered.
 // Content-translation languages live separately as Language-class objects and
 // are offered in the object editor, not here.
+const currentLocale = computed(() => i18n.global.locale.value)
 const availableLocales = [
     { code: 'en', name: 'English' },
     { code: 'ru', name: 'Русский' },
 ]
 
-const switchLanguage = (locale) => {
-    // Persist to localStorage and reload via the real i18n setter — otherwise
-    // only the local ref changes and neither the UI chrome nor the object
-    // content is re-rendered in the new language.
-    setLanguage(locale)
-    currentLocale.value = locale
-    console.log('Language switched to:', locale)
+const switchLanguage = (lang) => {
+    setLanguage(lang)
 }
 
 // Check if mobile

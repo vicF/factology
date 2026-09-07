@@ -17,12 +17,26 @@
                 <div class="small mb-3" v-if="identityStore.items.length > 1">
                     {{ $t('Multiple identities unlocked: you see the combined data of {names}. New objects are owned by the primary identity.', { names: unlockedNames.join(', ') }) }}
                 </div>
-                <button class="btn btn-outline-secondary btn-sm" @click="lockCurrent" data-testid="lock-current">
-                    {{ $t('Lock this identity') }}
-                </button>
-                <button v-if="identityStore.unlockedSet.size > 1" class="btn btn-outline-secondary btn-sm ms-2" @click="identityStore.lockAll()">
-                    {{ $t('Lock all identities') }}
-                </button>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <button class="btn btn-outline-secondary btn-sm" @click="lockCurrent" data-testid="lock-current">
+                        {{ $t('Lock this identity') }}
+                    </button>
+                    <button v-if="identityStore.unlockedSet.size > 1" class="btn btn-outline-secondary btn-sm" @click="identityStore.lockAll()">
+                        {{ $t('Lock all identities') }}
+                    </button>
+                    <button
+                        v-if="canConnectIdentity"
+                        class="btn btn-outline-primary btn-sm"
+                        :disabled="bindingIdentity"
+                        @click="connectIdentityToAccount"
+                        data-testid="connect-identity-btn"
+                    >
+                        {{ bindingIdentity ? $t('Please wait…') : $t('Connect to this account') }}
+                    </button>
+                    <span v-if="identityConnected" class="small text-success" data-testid="identity-connected-hint">
+                        {{ $t('Connected — you can now sign in with this identity file.') }}
+                    </span>
+                </div>
             </div>
         </div>
         <div v-else-if="identityStore.items.length > 0" class="alert alert-warning">
@@ -140,7 +154,7 @@
             </div>
         </template>
 
-        <!-- Create / import an identity -->
+        <!-- Create / import / restore an identity -->
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
                 <button v-if="!showSetup" class="btn btn-primary" @click="showSetup = true" data-testid="add-identity">
@@ -154,6 +168,9 @@
                         </li>
                         <li class="nav-item">
                             <button class="nav-link" :class="{ active: mode === 'import' }" @click="mode = 'import'" data-testid="tab-import">{{ $t('Import identity file') }}</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" :class="{ active: mode === 'restore' }" @click="mode = 'restore'" data-testid="tab-restore">{{ $t('Restore from backup phrase') }}</button>
                         </li>
                     </ul>
 
@@ -194,7 +211,7 @@
                     </form>
 
                     <!-- Import -->
-                    <form v-else @submit.prevent="importFile" data-testid="import-panel">
+                    <form v-else-if="mode === 'import'" @submit.prevent="importFile" data-testid="import-panel">
                         <div class="mb-3">
                             <label class="form-label fw-semibold">{{ $t('Identity file') }}</label>
                             <input type="file" class="form-control" accept="application/json,.json" @change="onFileChange" data-testid="import-file" />
@@ -213,7 +230,110 @@
                             {{ importing ? $t('Please wait…') : $t('Import identity') }}
                         </button>
                     </form>
+
+                    <!-- Restore from backup phrase -->
+                    <div v-else-if="mode === 'restore'" data-testid="restore-panel">
+                        <p class="text-muted small">
+                            {{ $t('Rebuild your identity from the 24-word backup phrase if you lost the identity file. The rebuilt file has the same public key, so any server that had it connected still recognises it.') }}
+                        </p>
+                        <form @submit.prevent="restoreFromMnemonic">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">{{ $t('Backup phrase (24 words)') }}</label>
+                                <textarea class="form-control font-monospace" rows="3" v-model="recoverMnemonic" data-testid="restore-mnemonic" :placeholder="$t('word1 word2 … word24')"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">{{ $t('Name') }}</label>
+                                <input type="text" class="form-control" v-model="name" data-testid="restore-name" :placeholder="$t('Your name')" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">{{ $t('New passphrase (protects the rebuilt file)') }}</label>
+                                <input type="password" class="form-control" v-model="passphrase" autocomplete="new-password" data-testid="restore-passphrase" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">{{ $t('Repeat passphrase') }}</label>
+                                <input type="password" class="form-control" v-model="passphrase2" autocomplete="new-password" data-testid="restore-passphrase2" />
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="require-open-restore" v-model="requireOnOpen" data-testid="restore-require-open" />
+                                <label class="form-check-label" for="require-open-restore">
+                                    {{ $t('Ask for the passphrase whenever the app opens') }}
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary" :disabled="recovering" data-testid="restore-submit">
+                                {{ recovering ? $t('Please wait…') : $t('Restore identity') }}
+                            </button>
+                        </form>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Social backup: split the backup phrase between friends -->
+        <div class="card mb-4 shadow-sm" data-testid="social-backup-card">
+            <div class="card-body">
+                <h5 class="card-title">{{ $t('Backup with friends (optional)') }}</h5>
+                <p class="text-muted small">
+                    {{ $t('Split your backup phrase into N shares; any K of them rebuild it. Give one share to each of several trusted people/places. If you lose everything, ask any K of them for their shares. Fewer than K shares reveal nothing about the phrase.') }}
+                </p>
+
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: backupMode === 'split' }" @click="backupMode = 'split'" data-testid="tab-shares-split">{{ $t('Split phrase') }}</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: backupMode === 'combine' }" @click="backupMode = 'combine'" data-testid="tab-shares-combine">{{ $t('Recover from shares') }}</button>
+                    </li>
+                </ul>
+
+                <template v-if="backupMode === 'split'">
+                    <form @submit.prevent="splitBackup">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ $t('Backup phrase to protect') }}</label>
+                            <textarea class="form-control font-monospace" rows="2" v-model="sharePhrase" data-testid="share-phrase" :placeholder="$t('word1 word2 … word24')"></textarea>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">{{ $t('Total shares (N)') }}</label>
+                                <input type="number" class="form-control" min="2" max="255" v-model.number="shareTotal" data-testid="share-total" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">{{ $t('Needed to recover (K)') }}</label>
+                                <input type="number" class="form-control" min="2" v-model.number="shareThreshold" data-testid="share-threshold" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" data-testid="share-split-submit">{{ $t('Split into shares') }}</button>
+                    </form>
+
+                    <div v-if="generatedShares.length" class="mt-3">
+                        <h6 class="mb-2">{{ $t('Your shares — send one to each friend') }}</h6>
+                        <div v-for="(share, i) in generatedShares" :key="i" class="mb-2">
+                            <div class="d-flex gap-2 align-items-center">
+                                <span class="badge bg-secondary flex-shrink-0">{{ $t('Share {number}', { number: i + 1 }) }}</span>
+                                <textarea class="form-control font-monospace form-control-sm" :value="share" rows="2" readonly data-testid="generated-share"></textarea>
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" @click="copyText(share)" data-testid="copy-share">{{ $t('Copy') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template v-else>
+                    <form @submit.prevent="recoverFromShares">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ $t('Shares (one per line)') }}</label>
+                            <textarea class="form-control font-monospace" rows="5" v-model="shareTexts" data-testid="share-texts" :placeholder="$t('Paste each share on its own line')"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary" :disabled="recoveringShares" data-testid="shares-recover-submit">
+                            {{ recoveringShares ? $t('Please wait…') : $t('Recover backup phrase') }}
+                        </button>
+                    </form>
+                    <div v-if="recoveredPhrase" class="mt-3 alert alert-success">
+                        <h6 class="text-success">{{ $t('Recovered backup phrase') }}</h6>
+                        <textarea class="form-control font-monospace mb-2" :value="recoveredPhrase" rows="2" readonly data-testid="recovered-phrase"></textarea>
+                        <button type="button" class="btn btn-outline-success btn-sm" @click="useRecoveredPhrase" data-testid="use-recovered-phrase">
+                            {{ $t('Use it to restore my identity') }}
+                        </button>
+                    </div>
+                </template>
             </div>
         </div>
 
@@ -236,8 +356,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { useIdentityStore } from '../stores/identity';
+import { isValidMnemonic, recoverIdentityFile, signBytes } from '@factology/engine/identity/identity.js';
+import { combineSharesToString, parseShare, serializeShare, splitSecretString } from '@factology/engine/identity/shamir.js';
 import { importExportData } from '@factology/engine/localDb/importData.js';
 import { onImportProgress } from '@factology/engine/utils/importProgress.js';
 
@@ -274,11 +397,39 @@ const importIdentityId = ref(null);
 const unlockTarget = ref(null);
 const removeTarget = ref(null);
 
+// Connect this device's identity to the server account (identity-file login)
+const bindingIdentity = ref(false);
+const identityConnected = ref(false);
+
+// Restore from backup phrase
+const recoverMnemonic = ref('');
+const recovering = ref(false);
+
+// Social backup (Shamir)
+const backupMode = ref('split');
+const sharePhrase = ref('');
+const shareTotal = ref(3);
+const shareThreshold = ref(2);
+const generatedShares = ref([]);
+const shareTexts = ref('');
+const recoveringShares = ref(false);
+const recoveredPhrase = ref('');
+
 const messageLines = computed(() => (message.value ? message.value.split('\n') : []));
 const unlockedIdentities = computed(() => identityStore.items
     .filter((i) => identityStore.unlockedSet.has(i.thingId))
     .map((i) => identityStore.unlockedMap.get(i.thingId) || i));
 const unlockedNames = computed(() => unlockedIdentities.value.map((i) => i.name));
+
+// Only a real server account (numeric id) whose owner matches the unlocked
+// identity can bind the public key. Offline/guest sessions use a uuid "id"
+// and self-sovereign identities with a different owner are not eligible.
+const canConnectIdentity = computed(() =>
+    authStore.authenticated
+    && Number.isInteger(authStore.user?.id)
+    && identityStore.primary?.thingId === authStore.user?.thing_id
+    && !!identityStore.primary?.file?.public_key,
+);
 
 function shortId(uid) {
     return uid ? uid.slice(0, 8) : '';
@@ -465,6 +616,141 @@ async function clearAll() {
     if (!ok) return;
     await identityStore.clearAllData();
     window.location.reload();
+}
+
+/**
+ * Register the unlocked primary identity's public key with the current server
+ * account. The server issues a single-use challenge; signing it proves we hold
+ * the private key before the key is bound (enables identity-file login).
+ */
+async function connectIdentityToAccount() {
+    setMessage('');
+    const identity = identityStore.primary;
+    if (!identity?.file?.public_key) {
+        setMessage(t('Unlock an identity first.'), 'error');
+        return;
+    }
+    bindingIdentity.value = true;
+    identityConnected.value = false;
+    try {
+        const publicKey = identity.file.public_key;
+        const { data: challengeData } = await axios.post('/identity/bind-challenge', { public_key: publicKey });
+        const signature = signBytes(challengeData.challenge, identity.secretKey);
+        await axios.post('/identity/bind', {
+            public_key: publicKey,
+            challenge: challengeData.challenge,
+            signature,
+        });
+        identityConnected.value = true;
+        setMessage(t('Connected — you can now sign in with this identity file.'));
+    } catch (error) {
+        const detail = error.response?.data?.errors?.public_key?.[0]
+            || error.response?.data?.errors?.signature?.[0]
+            || error.response?.data?.message
+            || error.message;
+        setMessage(t('Could not connect identity: {detail}', { detail }), 'error');
+    } finally {
+        bindingIdentity.value = false;
+    }
+}
+
+/**
+ * Rebuild the identity file from the BIP-39 backup phrase and adopt it as the
+ * current identity (same key, same public_key — servers/apps that had the key
+ * bound still recognise it).
+ */
+async function restoreFromMnemonic() {
+    setMessage('');
+    if (passphrase.value !== passphrase2.value) {
+        setMessage(t('Passphrases do not match.'), 'error');
+        return;
+    }
+    if (!passphrase.value || passphrase.value.length < 8) {
+        setMessage(t('Passphrase must be at least 8 characters.'), 'error');
+        return;
+    }
+    recovering.value = true;
+    try {
+        const { file } = await recoverIdentityFile({
+            mnemonic: recoverMnemonic.value,
+            name: name.value || t('Identity'),
+            passphrase: passphrase.value,
+        });
+        const opened = await identityStore.adoptFile(file, passphrase.value, {
+            requirePassphraseOnOpen: requireOnOpen.value,
+        });
+        setMessage(
+            t('Identity restored: {name} ({id}).\nStore this new identity file in a safe place, or split its backup phrase below.', {
+                name: opened.name,
+                id: opened.thingId,
+            }),
+        );
+        passphrase.value = '';
+        passphrase2.value = '';
+        requireOnOpen.value = false;
+        recoverMnemonic.value = '';
+        mode.value = 'create';
+        showSetup.value = false;
+        importIdentityId.value = opened.thingId;
+    } catch (error) {
+        setMessage(error.message, 'error');
+    } finally {
+        recovering.value = false;
+    }
+}
+
+function splitBackup() {
+    setMessage('');
+    const phrase = sharePhrase.value.trim();
+    if (!isValidMnemonic(phrase)) {
+        setMessage(t('That does not look like a valid 12/24-word backup phrase.'), 'error');
+        return;
+    }
+    const total = Number(shareTotal.value);
+    const threshold = Number(shareThreshold.value);
+    if (!Number.isInteger(total) || !Number.isInteger(threshold)
+        || threshold < 2 || threshold > total || total > 255) {
+        setMessage(t('Shares and threshold must satisfy 2 ≤ threshold ≤ total ≤ 255.'), 'error');
+        return;
+    }
+    try {
+        generatedShares.value = splitSecretString(phrase, total, threshold).map(serializeShare);
+        setMessage(
+            t('Backup phrase split into {total} shares — any {threshold} of them rebuild it. Give exactly one share to each of your trusted people/places. Never send two shares together.', { total, threshold }),
+        );
+    } catch (error) {
+        setMessage(error.message, 'error');
+    }
+}
+
+async function recoverFromShares() {
+    setMessage('');
+    const lines = shareTexts.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (lines.length < 2) {
+        setMessage(t('Paste at least two shares, one per line.'), 'error');
+        return;
+    }
+    recoveringShares.value = true;
+    try {
+        const phrase = combineSharesToString(lines.map(parseShare));
+        recoveredPhrase.value = phrase;
+        setMessage(t('Backup phrase recovered. Use it to restore the identity in the tab above.'));
+    } catch (error) {
+        setMessage(error.message, 'error');
+    } finally {
+        recoveringShares.value = false;
+    }
+}
+
+function copyText(text) {
+    navigator.clipboard?.writeText(text);
+}
+
+function useRecoveredPhrase() {
+    recoverMnemonic.value = recoveredPhrase.value;
+    recoveredPhrase.value = '';
+    mode.value = 'restore';
+    showSetup.value = true;
 }
 
 onMounted(async () => {

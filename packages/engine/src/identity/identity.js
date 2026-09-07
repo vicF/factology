@@ -241,3 +241,47 @@ export function signJson(payload, secretKey) {
 export function verifyJson(payload, publicKeyB64, signatureB64) {
     return verifyBytes(te.encode(JSON.stringify(payload)), publicKeyB64, signatureB64);
 }
+
+// ─── Recovery from the backup phrase ─────────────────────────────────────
+
+/** True if `mnemonic` is a well-formed BIP-39 phrase from the English wordlist. */
+export function isValidMnemonic(mnemonic) {
+    if (typeof mnemonic !== 'string') return false;
+    try {
+        bip39.mnemonicToEntropy(mnemonic.trim(), wordlist);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Rebuild the identity FILE from the BIP-39 backup phrase (the only way back
+ * if the original file is lost).
+ *
+ * The rebuilt file carries the same public key, so any server/app that had the
+ * key bound still recognises it. The owner uuid defaults to the key-derived
+ * one (self-sovereign identities); pass `thingId` explicitly when the original
+ * identity was bound to an account (its uuid is not derivable from the key).
+ *
+ * @returns {Promise<{ file: object, publicKey: Uint8Array, secretKey: Uint8Array }>}
+ */
+export async function recoverIdentityFile({ mnemonic, name = 'Identity', passphrase, thingId = null, createdBy = 'recover' }) {
+    if (!passphrase || passphrase.length < MIN_PASSPHRASE_LENGTH) {
+        throw new Error(`Passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters.`);
+    }
+    const phrase = String(mnemonic || '').trim();
+    if (!isValidMnemonic(phrase)) {
+        throw new Error('Invalid backup phrase — check the words and their order.');
+    }
+    const { secretKey, publicKey } = keypairFromMnemonic(phrase);
+    const resolvedThingId = thingId || thingIdFromPublicKey(publicKey);
+    const file = await buildIdentityFile({
+        thingId: resolvedThingId,
+        name,
+        mnemonic: phrase,
+        passphrase,
+        createdBy,
+    });
+    return { file, secretKey, publicKey };
+}
