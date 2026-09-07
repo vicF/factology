@@ -43,8 +43,10 @@ ok "Docker Compose available"
 # ── Clone / pull ───────────────────────────────────────────────────────────────
 step "Downloading Factology"
 
+IS_UPDATE=0
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   echo "  Updating existing installation..."
+  IS_UPDATE=1
   cd "$INSTALL_DIR" && git pull
 else
   cd "$(dirname "$INSTALL_DIR")" 2>/dev/null || mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -96,31 +98,42 @@ for VAR in DB_PASSWORD DB_ROOT_PASSWORD; do
 done
 
 # ── Admin account ─────────────────────────────────────────────────────────────
-step "Admin account setup"
-
+# Admin creation is only offered on a brand-new install. On an update the
+# database already has users and `factology:install-admin` skips once ANY user
+# exists, so a freshly generated password would never be applied — that only
+# produces a "password does not work" surprise. Reset instead.
 ADMIN_EMAIL=""
 ADMIN_PASSWORD=""
 ADMIN_NAME=""
 
-echo ""
-echo "  Factology needs an admin account to get started."
-echo "  You can create one now or skip and use the command later."
-echo ""
-echo -n "  Admin email [admin@factology.local] (or 's' to skip): "
-read -r INPUT </dev/tty || INPUT="admin@factology.local"
-INPUT="${INPUT:-admin@factology.local}"
-
-if [[ "$INPUT" == "s" || "$INPUT" == "S" || "$INPUT" == "skip" ]]; then
+if [[ "$IS_UPDATE" == "1" ]]; then
   echo ""
-  warn "Skipping admin creation. To create one later:"
-  echo "    cd $INSTALL_DIR && docker compose exec factology-app php artisan factology:install-admin"
+  warn "Existing installation — admin account left unchanged."
+  echo "  Forgot the admin password? Reset it:"
+  echo "    cd $INSTALL_DIR && ./bin/reset-admin-password.sh [email]"
+  echo "  No admin exists yet? Create the first one:"
+  echo "    cd $INSTALL_DIR && docker compose exec factology php artisan factology:install-admin"
 else
-  ADMIN_EMAIL="$INPUT"
-  echo -n "  Admin name [Admin]: "
-  read -r ADMIN_NAME </dev/tty || ADMIN_NAME="Admin"
-  ADMIN_NAME="${ADMIN_NAME:-Admin}"
-  ADMIN_PASSWORD=$(gen_pass)
-  ok "Password auto-generated"
+  echo ""
+  echo "  Factology needs an admin account to get started."
+  echo "  You can create one now or skip and use the command later."
+  echo ""
+  echo -n "  Admin email [admin@factology.local] (or 's' to skip): "
+  read -r INPUT </dev/tty || INPUT="admin@factology.local"
+  INPUT="${INPUT:-admin@factology.local}"
+
+  if [[ "$INPUT" == "s" || "$INPUT" == "S" || "$INPUT" == "skip" ]]; then
+    echo ""
+    warn "Skipping admin creation. To create one later:"
+    echo "    cd $INSTALL_DIR && docker compose exec factology php artisan factology:install-admin"
+  else
+    ADMIN_EMAIL="$INPUT"
+    echo -n "  Admin name [Admin]: "
+    read -r ADMIN_NAME </dev/tty || ADMIN_NAME="Admin"
+    ADMIN_NAME="${ADMIN_NAME:-Admin}"
+    ADMIN_PASSWORD=$(gen_pass)
+    ok "Password auto-generated"
+  fi
 fi
 
 # ── Launch ─────────────────────────────────────────────────────────────────────
@@ -134,7 +147,14 @@ ok "Containers started"
 echo ""
 echo -e "${COLOR_GREEN}${COLOR_BOLD}  Factology is running!${COLOR_RESET}"
 echo ""
-echo "  Open:   http://localhost:8003"
+
+# Show the host port actually mapped by the app container (from the compose
+# "ports:" mapping) rather than a hardcoded guess.
+APP_PORT=""
+if PORT_LINE=$($DOCKER_CMD compose port factology 80 2>/dev/null | head -n 1); then
+  APP_PORT="${PORT_LINE##*:}"
+fi
+echo "  Open:   http://localhost:${APP_PORT:-80}"
 
 if [ -n "$ADMIN_EMAIL" ]; then
   echo ""
