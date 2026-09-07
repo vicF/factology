@@ -258,7 +258,40 @@ const localizedClassName = (cls) => (cls
     ? (cls.name_translations ? fieldText(cls.name, cls.name_translations) : cls.name)
     : '')
 
-/** Small SVG icon shown inside a node circle while no photo is available. */
+// Life-event classes (parent Event + GEDCOM event subclasses) → calendar icon.
+const EVENT_CLASSES = new Set([
+    UUID.EVENT, UUID.BIRTH_CLASS, UUID.DEATH_CLASS, UUID.RESIDENCE_CLASS,
+    UUID.OCCUPATION_CLASS, UUID.MARRIAGE_CLASS, UUID.BURIAL_CLASS,
+    UUID.EDUCATION_CLASS, UUID.CHRISTENING_CLASS, UUID.TRIP,
+    UUID.PERFORMANCE, UUID.MEETING, UUID.PHOTO_SESSION, UUID.CHECK_IN,
+])
+// Places and their children (addresses) → location pin.
+const PLACE_CLASSES = new Set([UUID.PLACE_CLASS, UUID.ADDRESS_CLASS])
+const MEDIA_CLASSES = new Set([UUID.PHOTO, UUID.VIDEO, UUID.AUDIO])
+
+// Symmetric relations — no arrow in either direction. Everything else points
+// from `one_thing_id` (the subject of the relation label, e.g. the father in
+// a FATHER link) to `other_thing_id`, matching how links read elsewhere
+// ("объект1 → relates-to → объект2").
+const SYMMETRIC_LINK_TYPES = new Set([
+    UUID.MARRIED_TO,
+    UUID.DUPLICATE_OF,
+    UUID.ALSO_KNOWN_AS,
+])
+
+/** All class ids a node belongs to (primary + any secondary memberships). */
+const classIdsOf = (data) => {
+    const ids = [data._clsId]
+    for (const c of data.classes || []) {
+        ids.push(c.thing_id || c.id)
+    }
+    return ids.filter(Boolean)
+}
+
+/**
+ * Small SVG icon shown inside a node circle while no photo is available.
+ * One glyph per major class so e.g. a Place never renders as a person.
+ */
 const glyphSvg = (node) => {
     const data = node.data || {}
     const color = data._clsColor || '#4a6bff'
@@ -267,16 +300,20 @@ const glyphSvg = (node) => {
              stroke-linecap="round" stroke-linejoin="round" width="42" height="42">
              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`
     }
-    const clsId = data._clsId
-    let icon = 'default'
-    if (clsId === UUID.HUMAN) icon = 'person'
-    else if (clsId === UUID.PHOTO || clsId === UUID.VIDEO) icon = 'media'
-    else if (clsId === UUID.MUSIC_BAND) icon = 'music'
+    const clsIds = classIdsOf(data)
+    let icon = 'generic'
+    if (clsIds.includes(UUID.HUMAN)) icon = 'person'
+    else if (clsIds.some((id) => MEDIA_CLASSES.has(id))) icon = 'media'
+    else if (clsIds.includes(UUID.MUSIC_BAND)) icon = 'music'
+    else if (clsIds.some((id) => PLACE_CLASSES.has(id))) icon = 'place'
+    else if (clsIds.some((id) => EVENT_CLASSES.has(id))) icon = 'event'
     const paths = {
         person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4.2 4.4-6.5 8-6.5s6.8 2.3 8 6.5"/>',
         media: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9.5" cy="11" r="2.2"/><path d="M21 15l-4.5-4.5L8 19"/>',
         music: '<path d="M9 18V6l10-2v11.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
-        default: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="9.5" r="2.6"/><path d="M5.6 19.2c1-3.6 3.6-5.6 6.4-5.6s5.4 2 6.4 5.6"/>',
+        place: '<path d="M12 21.5s-7.2-5.8-7.2-11.4a7.2 7.2 0 0 1 14.4 0C19.2 15.7 12 21.5 12 21.5z"/><circle cx="12" cy="10" r="2.5"/>',
+        event: '<rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/>',
+        generic: '<path d="M12 2.7l8.2 4.8v9L12 21.3l-8.2-4.8v-9z"/>',
     }
     return `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8"
              stroke-linecap="round" stroke-linejoin="round" width="42" height="42">${paths[icon]}</svg>`
@@ -387,9 +424,30 @@ const baseJsonNode = (id, text, data) => ({
 const buildGraphJson = (root, allEdges = []) => {
     const nodes = []
     const lines = []
-    const addLine = (from, to, text, groupKey) => {
+    /**
+     * Orient the arrowhead on a drawn line so it points at the semantic
+     * "object" of the link. Lines are laid out parent→child from the graph
+     * root, which is NOT the relation's direction — so when the link's
+     * subject sits on the line's `to` side the arrow must sit at the start.
+     */
+    const applyArrow = (line, edge) => {
+        if (edge && !SYMMETRIC_LINK_TYPES.has(edge.link_type_id)) {
+            if (line.from === edge.one_thing_id) {
+                line.showEndArrow = true
+                line.showStartArrow = false
+            } else {
+                line.showStartArrow = true
+                line.showEndArrow = false
+            }
+        } else {
+            line.showStartArrow = false
+            line.showEndArrow = false
+        }
+    }
+    const addLine = (from, to, text, groupKey, edge) => {
         const line = { id: `${from}→${to}`, from, to, text: text ?? '', color: '#a7b1d6' }
         if (groupKey) line.groupKey = groupKey
+        applyArrow(line, edge)
         lines.push(line)
     }
 
@@ -409,7 +467,7 @@ const buildGraphJson = (root, allEdges = []) => {
         if (isCollapsedNode) return
         for (const entry of entriesOf(treeNode)) {
             if (entry.type === 'child') {
-                addLine(nodeId, entry.child.id, linkLabel(entry.child) || t('connected'))
+                addLine(nodeId, entry.child.id, linkLabel(entry.child) || t('connected'), null, entry.child._inLink)
                 visit(entry.child)
                 continue
             }
@@ -461,13 +519,15 @@ const buildGraphJson = (root, allEdges = []) => {
         const key = pairKey(a, b)
         if (drawn.has(key)) continue
         drawn.add(key)
-        lines.push({
+        const xLine = {
             id: `x:${edge.link_id || key}`,
             from: a,
             to: b,
             text: linkLabel(edge) || t('connected'),
             color: '#8fa2d0',
-        })
+        }
+        applyArrow(xLine, edge)
+        lines.push(xLine)
     }
     return { nodes, lines }
 }
@@ -856,6 +916,33 @@ onMounted(async () => {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+/* The graph's main (current) object must stand out: bigger ring, thicker
+   border and a soft halo around it. */
+.rg-node.is-root .rg-ring {
+    width: 104px;
+    height: 104px;
+    border-width: 4px;
+    box-shadow:
+        0 0 0 5px rgba(74, 107, 255, 0.18),
+        0 0 0 9px rgba(74, 107, 255, 0.08),
+        0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.rg-node.is-root .rg-name {
+    font-size: 14px;
+    font-weight: 800;
+    color: #10131c;
+    max-width: 128px;
+}
+
+/* When the root also has a hover ring, keep the halo from jumping. */
+.rg-node.is-root .rg-ring:hover {
+    box-shadow:
+        0 0 0 5px rgba(74, 107, 255, 0.18),
+        0 0 0 9px rgba(74, 107, 255, 0.08),
+        0 7px 26px rgba(0, 0, 0, 0.36);
 }
 
 /* ------------------------------------------------------------------ */
