@@ -82,6 +82,15 @@ class PlannedConfirmTest extends TestCase
             'end'         => null,
             'public'      => 1,
             'data'        => [],
+            // POSTs of type G_THING must belong to at least one class.
+            'classes'     => [
+                [
+                    'one_thing_id'   => $thingId,
+                    'link_type_id'   => UUID::LINK_TO_CLASS,
+                    'other_thing_id' => UUID::EVENT,
+                    'public'         => 1,
+                ],
+            ],
         ];
     }
 

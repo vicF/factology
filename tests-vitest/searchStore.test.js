@@ -4,6 +4,10 @@ import { useSearchStore } from '@/stores/search'
 
 describe('search store class selection', () => {
     beforeEach(() => {
+        // The store persists its selection to storage; clear it so each test
+        // starts from the same fresh state instead of inheriting the previous
+        // test's checkedItems.
+        localStorage.clear()
         setActivePinia(createPinia())
     })
 

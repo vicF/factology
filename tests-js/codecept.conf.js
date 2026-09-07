@@ -41,7 +41,7 @@ exports.config = {
         I: './steps_file.js'
     },
     plugins: {
-        screenshot: { enabled: true },
+        screenshotOnFail: { enabled: true },
         pauseOnFail: {
             // Only enable if NOT running in a CI environment
             enabled: !process.env.CI
