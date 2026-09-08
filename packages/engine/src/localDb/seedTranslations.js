@@ -105,4 +105,10 @@ export const SEED_TRANSLATIONS = {
     '4eff773a-6bbd-410f-a668-681b41d69051': {"ru":"подтверждается источником","lang":"en"},
     '29cafd84-0fc9-4295-afcc-d73b9613e39f': {"ru":"отец","lang":"en"},
     'b7c887b7-cee4-452d-b491-bd552de79d70': {"ru":"мать","lang":"en"},
+    // ── SetTempo music classes ──
+    '5e849170-8421-4ab4-8f4f-357f81390d31': {"ru":"Песня","lang":"en"},
+    '303667f6-297f-496d-84b6-71dec1ef0d34': {"ru":"Часть","lang":"en"},
+    'fceb25e2-5faf-4f87-8b92-cbafdb3d6072': {"ru":"Сет-лист","lang":"en"},
+    'fc9962c2-7ee0-4028-ad12-469d66aaa322': {"ru":"Список для практики","lang":"en"},
+    '8ac90c98-de0a-4525-a16f-31ba305e98b5': {"ru":"Репертуар","lang":"en"},
 };

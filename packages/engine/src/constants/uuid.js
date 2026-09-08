@@ -117,4 +117,18 @@ export const UUID = {
     EDUCATION_CLASS:   '5092247b-8fff-475f-b90c-22b29bf59532',
     CHRISTENING_CLASS: '2e3e8252-47c6-44e0-8804-6083ec506a92',
     ADDRESS_CLASS:     '42a2e356-8ad1-406a-b78e-db13febf0415',
+
+    // ── SetTempo music classes (universal taxonomy) ──
+    SONG_CLASS:          '5e849170-8421-4ab4-8f4f-357f81390d31',
+    PART_CLASS:          '303667f6-297f-496d-84b6-71dec1ef0d34',
+    SETLIST_CLASS:       'fceb25e2-5faf-4f87-8b92-cbafdb3d6072',
+    PRACTICE_LIST_CLASS: 'fc9962c2-7ee0-4028-ad12-469d66aaa322',
+    REPERTOIRE_CLASS:    '8ac90c98-de0a-4525-a16f-31ba305e98b5',
+
+    // ── Canonical music catalog owner (MusicBrainz) ──
+    // Objects owned by this id are canonical public catalog rows (thing_id =
+    // the MusicBrainz MBID) shared across users — readable by everyone, but
+    // edited only by catalog imports. Mirrors how SYSTEM_OWNER marks shared
+    // seed rows; this id is NOT seeded as an object row itself.
+    MUSICBRAINZ_OWNER:   '8e6442a7-d450-424e-8a83-c833ce2cd33f',
 };

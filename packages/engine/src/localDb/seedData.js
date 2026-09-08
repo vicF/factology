@@ -232,6 +232,12 @@ export const CLASSES = [
     { thing_id: UUID.CHRISTENING_CLASS, name: 'Christening',    description: 'Christening / baptism',                                                                  type: UUID.G_CLASS, public: true },
     { thing_id: UUID.ADDRESS_CLASS,     name: 'Address',        description: 'Postal / street address',                                                                type: UUID.G_CLASS, public: true },
     { thing_id: UUID.GEDCOM_CLASS,      name: 'GEDCOM',         description: 'A GEDCOM genealogy file or other external data source',                                  type: UUID.G_CLASS, public: true },
+    // ── SetTempo music domain classes (canonical universal taxonomy) ──
+    { thing_id: UUID.SONG_CLASS,          name: 'Song',          description: 'A song — musical composition (for practice and performance)',                                 type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.PART_CLASS,          name: 'Part',          description: 'A named section/excerpt of a song (intro, solo, bridge)',                                   type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.SETLIST_CLASS,       name: 'Setlist',       description: 'A performance setlist (ordered songs for a gig)',                                             type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.PRACTICE_LIST_CLASS, name: 'Practice list', description: 'A list of parts/songs for practice',                                                          type: UUID.G_CLASS, public: true },
+    { thing_id: UUID.REPERTOIRE_CLASS,    name: 'Repertoire',    description: 'A selection of songs a performer keeps in shape',                                            type: UUID.G_CLASS, public: true },
 ];
 
 // ── Class hierarchy links (LINK_TO_PARENT edges) — mirrors DatabaseSeeder.php ──
@@ -341,4 +347,11 @@ export const CLASS_LINKS = [
     { one: 'dc006cda-047a-4862-acf7-e215355b6890', other: UUID.ADDRESS_CLASS,     description: 'Address is subclass of Place' },
     // System → GEDCOM (external data source class)
     { one: UUID.SYSTEM, other: UUID.GEDCOM_CLASS, description: 'GEDCOM is subclass of System' },
+    // Music → SetTempo subclasses
+    { one: '4fdcbd06-3233-4dcc-8259-fd6150cce007', other: UUID.SONG_CLASS, description: 'Song is subclass of Music' },
+    { one: '4fdcbd06-3233-4dcc-8259-fd6150cce007', other: UUID.PART_CLASS, description: 'Part is subclass of Music' },
+    // List → SetTempo list subclasses
+    { one: '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', other: UUID.SETLIST_CLASS,       description: 'Setlist is subclass of List' },
+    { one: '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', other: UUID.PRACTICE_LIST_CLASS, description: 'Practice list is subclass of List' },
+    { one: '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8', other: UUID.REPERTOIRE_CLASS,    description: 'Repertoire is subclass of List' },
 ];
