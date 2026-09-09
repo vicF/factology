@@ -132,8 +132,14 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
-                                                <template v-if="isPlanned || confirmedDate || canConfirmPlanned">
-                                                    <span v-if="!confirmedDate && isPlanned" :class="isPastPlan ? 'unconfirmed-badge' : 'planned-badge'">
+                                                <template v-if="isPlanned || canConfirmPlanned">
+                                                    <!-- Viewers who can confirm an overdue plan get the confirm
+                                                         action instead of a "not confirmed" warning — it reads as
+                                                         something to do. Everyone else sees a plain state label. -->
+                                                    <span
+                                                        v-if="!confirmedDate && isPlanned && !(isPastPlan && canConfirmPlanned)"
+                                                        :class="isPastPlan ? 'unconfirmed-badge' : 'planned-badge'"
+                                                    >
                                                         {{ isPastPlan ? $t('dates.not_confirmed') : $t('dates.planned') }}
                                                         <template v-if="markedPlannedDate">({{ markedPlannedDate }})</template>
                                                     </span>
@@ -146,25 +152,20 @@
                                                         <IconCheck />
                                                         {{ $t('dates.confirm') }}
                                                     </button>
-                                                    <span
-                                                        v-else-if="confirmedDate"
-                                                        class="confirm-badge confirm-badge--done"
-                                                        :title="$t('dates.confirmed_title')"
-                                                    >
-                                                        <IconCheck />
-                                                        {{ $t('dates.confirmed_on') }} {{ confirmedDate }}
-                                                    </span>
                                                 </template>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
                                         </div>
 
-                                        <div v-if="object.record_created || object.record_updated || object.owner" class="result-meta mt-1">
+                                        <div v-if="object.record_created || object.record_updated || confirmedDate || object.owner" class="result-meta mt-1">
                                             <span v-if="object.record_created" class="result-meta-row">
                                                 {{ $t('Created') }}: {{ object.record_created }}
                                             </span>
                                             <span v-if="object.record_updated" class="result-meta-row">
                                                 {{ $t('Updated') }}: {{ object.record_updated }}
+                                            </span>
+                                            <span v-if="confirmedDate" class="result-meta-row">
+                                                {{ $t('Confirmed') }}: {{ confirmedDate }}
                                             </span>
                                             <span v-if="object.owner" class="result-meta-row">
                                                 {{ $t('Owner') }}:
@@ -1275,11 +1276,6 @@ watch(() => object.value, (newObject) => {
 }
 .confirm-badge:hover {
     background: #157347;
-}
-.confirm-badge--done {
-    background: #198754;
-    opacity: 0.85;
-    cursor: default;
 }
 .link-actions {
     margin-top: 8px;
