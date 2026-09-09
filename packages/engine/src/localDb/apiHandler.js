@@ -821,27 +821,49 @@ async function enrichLinks(links, currentThingId) {
         // Mirror the server LinkResource contract: `name` is the name of
         // other_thing_id, `one_name` the name of one_thing_id — the UI picks
         // the one matching the target endpoint.
-        const target = byId[link.other_thing_id];
+        const other = byId[link.other_thing_id];
         const source = byId[link.one_thing_id];
         const linkType = byId[link.link_type_id];
 
+        // `target` is the endpoint on the OTHER side of the current object.
+        // For an incoming link (other_thing_id === currentThingId) that is
+        // one_thing_id — resolving the wrong endpoint here makes incoming
+        // relations look like self-links and they get pruned by enrichNested,
+        // so the object page and graph silently lose every such link.
+        const counterpartId = link.other_thing_id === currentThingId
+            ? link.one_thing_id
+            : link.other_thing_id;
+        const counterpart = byId[counterpartId];
+
         return {
             ...link,
-            name: target?.name ?? link.name ?? null,
+            name: other?.name ?? link.name ?? null,
             one_name: source?.name ?? link.one_name ?? null,
             link_name: linkType?.name ?? link.link_name ?? null,
             link_name_translations: linkType?.name_translations ?? link.link_name_translations ?? null,
-            type: target?.type ?? link.type,
-            target_public: target?.public ?? link.target_public,
-            // Resolved other endpoint, mirroring the server's `link.target`.
-            target: target ? {
-                thing_id: target.thing_id,
-                name: target.name ?? null,
-                name_translations: target.name_translations ?? null,
-                type: target.type ?? null,
+            type: counterpart?.type ?? link.type,
+            target_public: counterpart?.public ?? link.target_public,
+            // Convenience: the counterpart object's own flexible date. Event and
+            // involvement dates are independent (a link may carry its own
+            // link_start/link_end), so the object's date lives here for the UI
+            // to fall back on when the link itself is undated.
+            start: counterpart?.start ?? null,
+            end: counterpart?.end ?? null,
+            start_meta: counterpart?.start_meta ?? null,
+            end_meta: counterpart?.end_meta ?? null,
+            // Resolved opposite endpoint, mirroring the server's `link.target`.
+            target: counterpart ? {
+                thing_id: counterpart.thing_id,
+                name: counterpart.name ?? null,
+                name_translations: counterpart.name_translations ?? null,
+                type: counterpart.type ?? null,
                 class: null,
-                public: target.public ?? null,
-                description: target.description ?? null,
+                public: counterpart.public ?? null,
+                description: counterpart.description ?? null,
+                start: counterpart.start ?? null,
+                end: counterpart.end ?? null,
+                start_meta: counterpart.start_meta ?? null,
+                end_meta: counterpart.end_meta ?? null,
             } : undefined,
         };
     });

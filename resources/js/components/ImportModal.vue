@@ -42,7 +42,6 @@
                                     <li v-for="(err, i) in importResult.errors" :key="i">{{ err }}</li>
                                 </ul>
                             </div>
-                            <button class="btn btn-primary" @click="importResult = null">{{ $t('Import Another') }}</button>
                         </div>
 
                         <div v-else-if="!importing">
@@ -87,18 +86,28 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" :disabled="importing" @click="close">
-                            {{ $t('Cancel') }}
-                        </button>
-                        <button
-                            v-if="!importResult"
-                            type="button"
-                            class="btn btn-primary"
-                            @click="importData"
-                            :disabled="!selectedFile || importing"
-                        >
-                            {{ importing ? $t('Importing...') : $t('Import') }}
-                        </button>
+                        <!-- Finished: further importing or closing the dialog are both explicit and safe -->
+                        <template v-if="importResult">
+                            <button type="button" class="btn btn-secondary" @click="importResult = null">
+                                {{ $t('Import Another') }}
+                            </button>
+                            <button type="button" class="btn btn-primary" @click="close">
+                                {{ $t('Finish') }}
+                            </button>
+                        </template>
+                        <template v-else>
+                            <button type="button" class="btn btn-secondary" :disabled="importing" @click="close">
+                                {{ $t('Cancel') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary"
+                                @click="importData"
+                                :disabled="!selectedFile || importing"
+                            >
+                                {{ importing ? $t('Importing...') : $t('Import') }}
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>
