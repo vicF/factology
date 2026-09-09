@@ -140,6 +140,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         return handleDeviceThumb(method, id, data);
     }
 
+    // /object/{id}/graph — the Graph tab (mirrors ApiController::graph).
+    if (method === 'get' && parts[1] === 'graph') {
+        return handleLocalGraph(id, depth, context);
+    }
+
     // Everything else must be exactly /object/{id} — never let an extra
     // segment (e.g. a server-mode thumb request) silently fall through to
     // handleUpdate/handleGet with the wrong payload.
@@ -565,6 +570,150 @@ async function handleGet(id, depth = 1, context = {}) {
             },
             success: true,
         },
+        status: 200,
+    };
+}
+
+const GRAPH_DEPTH_CAP = 6;
+const GRAPH_BREADTH = 8;
+
+/**
+ * Offline mirror of ApiController::graph / RelatedObjectsResolver::forGraph:
+ * BFS out from the root over the local links table and return the server's
+ * shape { root_id, nodes:[...], edges:[...] } so the Graph tab works in the
+ * standalone (Dexie) app without a backend.
+ *
+ * Rules mirror the server resolver: the top level is uncapped, deeper levels
+ * are breadth-capped per parent, a node is shown at its lowest level only,
+ * class-membership (LINK_TO_CLASS) rows are not relations, and edges are every
+ * link between two displayed nodes.
+ */
+async function handleLocalGraph(id, depth = 1, context = {}) {
+    const db = getDb();
+    const root = await getObject(id);
+    if (!root) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+    const visibleOwners = context.visibleOwners ?? null;
+    if (!isRowVisible(root, visibleOwners)) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+    depth = Number.isFinite(depth)
+        ? Math.min(Math.max(Math.trunc(depth), 1), GRAPH_DEPTH_CAP)
+        : 1;
+
+    const nodeIds = [id];
+    const visited = new Set([id]);
+    let frontier = [id];
+
+    for (let level = 1; level <= depth && frontier.length > 0; level++) {
+        const [byOne, byOther] = await Promise.all([
+            db.links.where('one_thing_id').anyOf(frontier).toArray(),
+            db.links.where('other_thing_id').anyOf(frontier).toArray(),
+        ]);
+
+        const frontierSet = new Set(frontier);
+        const seen = new Set();
+        const perParent = new Map();
+        for (const link of [...byOne, ...byOther]) {
+            if (link.deleted) continue;
+            if (link.link_type_id === UUID.LINK_TO_CLASS) continue;
+            if (seen.has(link.link_id)) continue;
+            seen.add(link.link_id);
+
+            const oneIn = frontierSet.has(link.one_thing_id);
+            const otherIn = frontierSet.has(link.other_thing_id);
+            if (oneIn === otherIn) continue; // self-link or both endpoints in the frontier
+            const parent = oneIn ? link.one_thing_id : link.other_thing_id;
+            const child = oneIn ? link.other_thing_id : link.one_thing_id;
+            if (level > 1 && visited.has(child)) continue; // lowest level wins
+            if (!perParent.has(parent)) perParent.set(parent, []);
+            perParent.get(parent).push({ link, child });
+        }
+
+        const next = [];
+        for (const items of perParent.values()) {
+            // Deterministic order: dated links first (desc), then by child id.
+            items.sort((a, b) => {
+                const la = a.link.link_start ?? null;
+                const lb = b.link.link_start ?? null;
+                if (la != null && lb == null) return -1;
+                if (lb != null && la == null) return 1;
+                if (la != null && lb != null) return String(lb).localeCompare(String(la));
+                return String(a.child).localeCompare(String(b.child));
+            });
+            // Top level is uncapped; deeper levels are breadth-capped per parent.
+            const limit = level === 1 ? Infinity : GRAPH_BREADTH;
+            let kept = 0;
+            for (const { child } of items) {
+                if (kept >= limit) break;
+                if (visited.has(child)) continue;
+                visited.add(child);
+                nodeIds.push(child);
+                next.push(child);
+                kept++;
+            }
+        }
+        frontier = next;
+    }
+
+    // ── Nodes (metadata the graph needs) ──────────────────────────────
+    const rows = await db.objects.bulkGet(nodeIds);
+    const byId = new Map();
+    for (const o of rows) {
+        if (o && !o.deleted && isRowVisible(o, visibleOwners)) byId.set(o.thing_id, o);
+    }
+    const keptIds = [...byId.keys()];
+    const classes = await resolveClassesInfoFor(keptIds);
+    const nodes = keptIds.map((thingId) => {
+        const o = byId.get(thingId);
+        const cls = classes.get(thingId) || [];
+        return {
+            thing_id: thingId,
+            name: o.name ?? null,
+            name_translations: o.name_translations ?? null,
+            type: o.type != null ? Number(o.type) : null,
+            start: o.start != null ? String(o.start) : null,
+            end: o.end != null ? String(o.end) : null,
+            classes: cls,
+            class: cls[0] ?? null,
+        };
+    });
+
+    // ── Edges between displayed nodes (undirected, incl. cross-links) ──
+    const keptSet = new Set(keptIds);
+    const [eByOne, eByOther] = await Promise.all([
+        db.links.where('one_thing_id').anyOf(keptIds).toArray(),
+        db.links.where('other_thing_id').anyOf(keptIds).toArray(),
+    ]);
+    const edgeRows = [];
+    const edgeSeen = new Set();
+    for (const link of [...eByOne, ...eByOther]) {
+        if (link.deleted) continue;
+        if (link.link_type_id === UUID.LINK_TO_CLASS) continue;
+        if (edgeSeen.has(link.link_id)) continue;
+        edgeSeen.add(link.link_id);
+        if (link.one_thing_id === link.other_thing_id) continue;
+        if (!keptSet.has(link.one_thing_id) || !keptSet.has(link.other_thing_id)) continue;
+        edgeRows.push(link);
+    }
+    const typeRows = await db.objects.bulkGet([...new Set(edgeRows.map((l) => l.link_type_id))]);
+    const typeById = new Map();
+    for (const t of typeRows) if (t) typeById.set(t.thing_id, t);
+    const edges = edgeRows.map((link) => {
+        const type = typeById.get(link.link_type_id);
+        return {
+            link_id: link.link_id,
+            one_thing_id: link.one_thing_id,
+            other_thing_id: link.other_thing_id,
+            link_type_id: link.link_type_id,
+            link_name: type?.name ?? null,
+            link_name_translations: type?.name_translations ?? null,
+        };
+    });
+
+    return {
+        data: { root_id: id, nodes, edges },
         status: 200,
     };
 }
