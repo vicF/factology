@@ -966,6 +966,16 @@ async function enrichLinks(links, currentThingId) {
         if (o) byId[o.thing_id] = o;
     }
 
+    // Class membership of the counterpart objects, so the object-page
+    // class/link-type filter can judge each row: link.target carries the
+    // classes here, exactly like the server's nested resolver. Without it a
+    // checked class (the panel starts all-checked) would never match a target
+    // with empty `classes` and the whole related list would vanish.
+    const counterpartIds = [...new Set(links.map((link) =>
+        (link.other_thing_id === currentThingId ? link.one_thing_id : link.other_thing_id),
+    ))].filter(Boolean);
+    const classesMap = await resolveClassesInfoFor(counterpartIds);
+
     return links.map(link => {
         // Mirror the server LinkResource contract: `name` is the name of
         // other_thing_id, `one_name` the name of one_thing_id — the UI picks
@@ -983,6 +993,7 @@ async function enrichLinks(links, currentThingId) {
             ? link.one_thing_id
             : link.other_thing_id;
         const counterpart = byId[counterpartId];
+        const cls = counterpartId ? (classesMap.get(counterpartId) || []) : [];
 
         return {
             ...link,
@@ -1006,7 +1017,8 @@ async function enrichLinks(links, currentThingId) {
                 name: counterpart.name ?? null,
                 name_translations: counterpart.name_translations ?? null,
                 type: counterpart.type ?? null,
-                class: null,
+                classes: cls,
+                class: cls[0] ?? null,
                 public: counterpart.public ?? null,
                 description: counterpart.description ?? null,
                 start: counterpart.start ?? null,
