@@ -34,6 +34,12 @@ dist-capacitor/
 /android/
 .env.capacitor
 
+# Local dev-runner state (run-android.sh / emu.sh)
+.vite-capacitor.log
+.vite-capacitor.pid
+.vite-capacitor.mode
+.emu-devtools.pid
+
 # Electron desktop app source (committed); its own .gitignore keeps the
 # regenerated SPA copy (app/), node_modules and builder output out of git.
 # Output of build-android.sh / build-electron.sh (keep .gitkeep)
