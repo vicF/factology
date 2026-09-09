@@ -3366,7 +3366,128 @@
                 "abstract": false,
                 "start_meta": null,
                 "end_meta": null
+            },
+            {
+                "thing_id": "5e849170-8421-4ab4-8f4f-357f81390d31",
+                "name": "Song",
+                "type": 2,
+                "description": "A song — musical composition (for practice and performance)",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-09 10:00:00",
+                "record_updated": "2026-09-09 10:00:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "Песня",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
+            },
+            {
+                "thing_id": "303667f6-297f-496d-84b6-71dec1ef0d34",
+                "name": "Part",
+                "type": 2,
+                "description": "A named section/excerpt of a song (intro, solo, bridge)",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-09 10:00:00",
+                "record_updated": "2026-09-09 10:00:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "Часть",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
+            },
+            {
+                "thing_id": "fceb25e2-5faf-4f87-8b92-cbafdb3d6072",
+                "name": "Setlist",
+                "type": 2,
+                "description": "A performance setlist (ordered songs for a gig)",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-09 10:00:00",
+                "record_updated": "2026-09-09 10:00:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "Сет-лист",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
+            },
+            {
+                "thing_id": "fc9962c2-7ee0-4028-ad12-469d66aaa322",
+                "name": "Practice list",
+                "type": 2,
+                "description": "A list of parts/songs for practice",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-09 10:00:00",
+                "record_updated": "2026-09-09 10:00:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "Список для практики",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
+            },
+            {
+                "thing_id": "8ac90c98-de0a-4525-a16f-31ba305e98b5",
+                "name": "Repertoire",
+                "type": 2,
+                "description": "A selection of songs a performer keeps in shape",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-09 10:00:00",
+                "record_updated": "2026-09-09 10:00:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "Репертуар",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "en"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
             }
+
         ],
         "links": [
             {
@@ -5149,7 +5270,73 @@
                 "link_start_meta": null,
                 "link_end_meta": null,
                 "description": "System → System event"
+            },
+            {
+                "one_thing_id": "4fdcbd06-3233-4dcc-8259-fd6150cce007",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "5e849170-8421-4ab4-8f4f-357f81390d31",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "4efdfc03-5c62-4e80-af89-c3b2bcde2f6d",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
+            },
+            {
+                "one_thing_id": "4fdcbd06-3233-4dcc-8259-fd6150cce007",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "303667f6-297f-496d-84b6-71dec1ef0d34",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "417cc6a8-0f6b-48d5-86f4-50eed37d3ba0",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
+            },
+            {
+                "one_thing_id": "4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "fceb25e2-5faf-4f87-8b92-cbafdb3d6072",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "72726ea8-c419-4589-987e-5d16c6782e04",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
+            },
+            {
+                "one_thing_id": "4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "fc9962c2-7ee0-4028-ad12-469d66aaa322",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "39adfbd5-9aee-4fbf-a7a1-f3eb53d8dc9a",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
+            },
+            {
+                "one_thing_id": "4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "8ac90c98-de0a-4525-a16f-31ba305e98b5",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "a0e78217-286c-4136-aa7a-18341deed089",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
             }
+
         ],
         "classes": [
             {

@@ -109,6 +109,17 @@ class UUID
     public const CHRISTENING_CLASS = '2e3e8252-47c6-44e0-8804-6083ec506a92';
     public const ADDRESS_CLASS = '42a2e356-8ad1-406a-b78e-db13febf0415';
 
+    // ── SetTempo music classes (universal taxonomy) ──
+    public const SONG_CLASS = '5e849170-8421-4ab4-8f4f-357f81390d31';
+    public const PART_CLASS = '303667f6-297f-496d-84b6-71dec1ef0d34';
+    public const SETLIST_CLASS = 'fceb25e2-5faf-4f87-8b92-cbafdb3d6072';
+    public const PRACTICE_LIST_CLASS = 'fc9962c2-7ee0-4028-ad12-469d66aaa322';
+    public const REPERTOIRE_CLASS = '8ac90c98-de0a-4525-a16f-31ba305e98b5';
+
+    // ── Canonical music catalog owner (MusicBrainz) ──
+    // Canonical public catalog rows are owned by this id (thing_id = MBID).
+    public const MUSICBRAINZ_OWNER = '8e6442a7-d450-424e-8a83-c833ce2cd33f';
+
     // ── Archive chain classes (ISAD-G): Archive → Fonds → Series → File ──
     public const ARCHIVE_CLASS = 'c2c2c2c2-0001-4000-8000-000000000001';
     public const FONDS_CLASS = 'c2c2c2c2-0002-4000-8000-000000000001';

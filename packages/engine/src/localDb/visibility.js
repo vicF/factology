@@ -24,6 +24,12 @@ import { UUID } from '../constants/uuid.js';
 /** Owners treated as shared system rows — visible to everyone. */
 export const SYSTEM_SHARED_OWNERS = new Set([UUID.SYSTEM_OWNER]);
 
+/** Canonical catalog owners (e.g. the MusicBrainz owner): public, read-only
+ * catalog rows that every user — guests included — may read, but nobody owns
+ * or edits through normal identity rules. Rows owned by these ids mirror the
+ * SYSTEM_OWNER shared-row semantics in the offline app. */
+export const CATALOG_SHARED_OWNERS = new Set([UUID.MUSICBRAINZ_OWNER]);
+
 /**
  * Whether a row may be surfaced to the current UI session.
  *
@@ -36,6 +42,7 @@ export function isRowVisible(obj, visibleOwners) {
     if (visibleOwners === null) return true;
     if (!obj || obj.owner == null) return true; // legacy unowned rows
     if (SYSTEM_SHARED_OWNERS.has(obj.owner)) return true;
+    if (CATALOG_SHARED_OWNERS.has(obj.owner)) return true; // canonical catalog rows
     return visibleOwners.has(obj.owner);
 }
 
