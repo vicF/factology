@@ -222,7 +222,7 @@
                                          here, so the per-link date row below is omitted. -->
                                     <div v-if="linkDateDividers[linkIndex]" class="date-group-header">
                                         <span class="date-group-date">
-                                            📅 {{ $flexibleDateFormatShort(link.start, link.end, link.start_meta, link.end_meta) }}
+                                            📅 {{ $flexibleDateFormatShort(linkRowDate(link).start, linkRowDate(link).end, linkRowDate(link).startMeta, linkRowDate(link).endMeta) }}
                                         </span>
                                         <span class="date-group-line"></span>
                                         <template v-if="linkDateDividers[linkIndex].center">
@@ -257,10 +257,11 @@
                                                 <span>{{ $truncateText(link.description, 300) }}</span>
                                             </div>
 
-                                            <div v-if="link.link_start || link.link_end" class="result-meta">
+                                            <!-- The group-leading row already shows its date on the divider line. -->
+                                            <div v-if="!linkDateDividers[linkIndex] && (linkRowDate(link).start || linkRowDate(link).end)" class="result-meta">
                                                 <span class="result-meta-row">
                                                     <span class="date-badge">
-                                                        📅 {{ $flexibleDateFormat(link.link_start, link.link_end, link.link_start_meta, link.link_end_meta) }}
+                                                        📅 {{ $flexibleDateFormat(linkRowDate(link).start, linkRowDate(link).end, linkRowDate(link).startMeta, linkRowDate(link).endMeta) }}
                                                     </span>
                                                 </span>
                                             </div>
@@ -808,6 +809,27 @@ const getLinkTargetName = (link) => {
     return name;
 };
 
+// A related-object row is dated by the relationship (link) when it carries its
+// own dates (an involvement may start later than the event), otherwise by the
+// linked object's own date. Event and link dates are independent — see docs —
+// so neither is ever derived from the other here.
+const linkRowDate = (link) => {
+    if (link && (link.link_start || link.link_end)) {
+        return {
+            start: link.link_start ?? null,
+            end: link.link_end ?? null,
+            startMeta: link.link_start_meta ?? null,
+            endMeta: link.link_end_meta ?? null,
+        };
+    }
+    return {
+        start: link?.start ?? null,
+        end: link?.end ?? null,
+        startMeta: link?.start_meta ?? null,
+        endMeta: link?.end_meta ?? null,
+    };
+};
+
 const getObject = async () => {
     try {
         loadPropertyDefinitions(); // names for the Details-tab property rows (cached)
@@ -1018,7 +1040,7 @@ const linkDateDividers = computed(() => {
     let lastBucket = null;
     let lastCoarse = null;
     links.forEach((link, i) => {
-        const bucket = dateBucket(link.start);
+        const bucket = dateBucket(linkRowDate(link).start);
         if (!bucket) return;
         const newBucket = bucket.key !== lastBucket;
         const firstOfMonth = bucket.coarse !== lastCoarse;

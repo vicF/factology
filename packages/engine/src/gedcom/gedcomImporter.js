@@ -480,12 +480,12 @@ async function importPersonEvent(ctx, eventNode, personId, personName, gedcomTag
         one_thing_id: thingId, link_type_id: UUID.LINK_TO_CLASS, other_thing_id: classId,
     });
 
-    // PRESENT (person → PRESENT → event), carrying the event's bounds.
+    // PRESENT (person → PRESENT → event). Event and involvement dates are
+    // independent — the event carries its own bounds above and the link stays
+    // undated unless the user later records when the involvement itself started.
     const presentLink = {
         one_thing_id: personId, link_type_id: UUID.PRESENT, other_thing_id: thingId,
     };
-    if (start != null) { presentLink.link_start = start; presentLink.link_start_meta = startMeta; }
-    if (end != null) { presentLink.link_end = end; presentLink.link_end_meta = endMeta; }
     await putLinkGuard(ctx, presentLink);
 
     await ensureImportLink(ctx, thingId, eventExternalId);
@@ -592,13 +592,12 @@ async function importMarriageEvent(ctx, marrNode, husbandId, wifeId, familyGedco
         one_thing_id: thingId, link_type_id: UUID.LINK_TO_CLASS, other_thing_id: UUID.MARRIAGE_CLASS,
     });
 
-    // PRESENT for BOTH spouses, with link dates.
+    // PRESENT for BOTH spouses — undated; the marriage event itself carries the
+    // date (event and involvement dates are independent).
     for (const spouseId of [husbandId, wifeId]) {
         const presentLink = {
             one_thing_id: spouseId, link_type_id: UUID.PRESENT, other_thing_id: thingId,
         };
-        if (start != null) { presentLink.link_start = start; presentLink.link_start_meta = startMeta; }
-        if (end != null) { presentLink.link_end = end; presentLink.link_end_meta = endMeta; }
         await putLinkGuard(ctx, presentLink);
     }
 

@@ -79,7 +79,7 @@ describe('GEDCOM importer — person + family mapping', () => {
         expect(await classOfThing(res.source_thing_id)).toBe(UUID.GEDCOM_CLASS);
     });
 
-    it('builds BIRT → BIRTH_CLASS events with PRESENT links that carry the date bounds', async () => {
+    it('builds BIRT → BIRTH_CLASS events; the event carries the date and the PRESENT link stays undated', async () => {
         await importGedcom({ content: SIMPLE_FAMILY_GEDCOM, ownerId: OWNER, store, fileKey: TEST_FILE });
 
         const births = await thingsOfClass(UUID.BIRTH_CLASS);
@@ -91,13 +91,15 @@ describe('GEDCOM importer — person + family mapping', () => {
         expect(johnBirth.name_translations).toBeTruthy();
         expect(johnBirth.data.properties.event_type).toBe('birth');
 
-        // PRESENT link person → event carries link_start/link_start_meta.
+        // PRESENT link person → event exists but stays undated: event and
+        // involvement dates are independent (an involvement may start later).
         const presentLinks = await linksOfType(UUID.PRESENT);
         const toJohnBirth = presentLinks.filter((l) => l.other_thing_id === johnBirth.thing_id);
         expect(toJohnBirth.length).toBe(1);
         expect(toJohnBirth[0].one_thing_id).toBe((await humanByName('John Smith')).thing_id);
-        expect(toJohnBirth[0].link_start).toBeTruthy();
-        expect(toJohnBirth[0].link_start_meta).toBeTruthy();
+        expect(toJohnBirth[0].link_start).toBeFalsy();
+        expect(toJohnBirth[0].link_start_meta).toBeFalsy();
+        expect(toJohnBirth[0].link_end).toBeFalsy();
     });
 
     it('creates MARRIED_TO / FATHER / MOTHER family edges and the marriage event', async () => {

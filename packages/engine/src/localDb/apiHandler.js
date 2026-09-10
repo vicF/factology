@@ -140,6 +140,11 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         return handleDeviceThumb(method, id, data);
     }
 
+    // /object/{id}/graph — the Graph tab (mirrors ApiController::graph).
+    if (method === 'get' && parts[1] === 'graph') {
+        return handleLocalGraph(id, depth, context);
+    }
+
     // Everything else must be exactly /object/{id} — never let an extra
     // segment (e.g. a server-mode thumb request) silently fall through to
     // handleUpdate/handleGet with the wrong payload.
@@ -569,6 +574,153 @@ async function handleGet(id, depth = 1, context = {}) {
     };
 }
 
+const GRAPH_DEPTH_CAP = 6;
+const GRAPH_BREADTH = 8;
+
+/**
+ * Offline mirror of ApiController::graph / RelatedObjectsResolver::forGraph:
+ * BFS out from the root over the local links table and return the server's
+ * shape { root_id, nodes:[...], edges:[...] } so the Graph tab works in the
+ * standalone (Dexie) app without a backend.
+ *
+ * Rules mirror the server resolver: the top level is uncapped, deeper levels
+ * are breadth-capped per parent, a node is shown at its lowest level only,
+ * class-membership (LINK_TO_CLASS) rows are not relations, and edges are every
+ * link between two displayed nodes.
+ */
+async function handleLocalGraph(id, depth = 1, context = {}) {
+    const db = getDb();
+    const root = await getObject(id);
+    if (!root) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+    const visibleOwners = context.visibleOwners ?? null;
+    if (!isRowVisible(root, visibleOwners)) {
+        throw { response: { status: 404, data: { message: 'Not found' } } };
+    }
+    depth = Number.isFinite(depth)
+        ? Math.min(Math.max(Math.trunc(depth), 1), GRAPH_DEPTH_CAP)
+        : 1;
+
+    const nodeIds = [id];
+    const visited = new Set([id]);
+    let frontier = [id];
+
+    for (let level = 1; level <= depth && frontier.length > 0; level++) {
+        const [byOne, byOther] = await Promise.all([
+            db.links.where('one_thing_id').anyOf(frontier).toArray(),
+            db.links.where('other_thing_id').anyOf(frontier).toArray(),
+        ]);
+
+        const frontierSet = new Set(frontier);
+        const seen = new Set();
+        const perParent = new Map();
+        for (const link of [...byOne, ...byOther]) {
+            if (link.deleted) continue;
+            if (link.link_type_id === UUID.LINK_TO_CLASS) continue;
+            if (seen.has(link.link_id)) continue;
+            seen.add(link.link_id);
+
+            const oneIn = frontierSet.has(link.one_thing_id);
+            const otherIn = frontierSet.has(link.other_thing_id);
+            if (oneIn === otherIn) continue; // self-link or both endpoints in the frontier
+            const parent = oneIn ? link.one_thing_id : link.other_thing_id;
+            const child = oneIn ? link.other_thing_id : link.one_thing_id;
+            if (level > 1 && visited.has(child)) continue; // lowest level wins
+            if (!perParent.has(parent)) perParent.set(parent, []);
+            perParent.get(parent).push({ link, child });
+        }
+
+        const next = [];
+        for (const items of perParent.values()) {
+            // Deterministic order: dated links first (desc), then by child id.
+            items.sort((a, b) => {
+                const la = a.link.link_start ?? null;
+                const lb = b.link.link_start ?? null;
+                if (la != null && lb == null) return -1;
+                if (lb != null && la == null) return 1;
+                if (la != null && lb != null) return String(lb).localeCompare(String(la));
+                return String(a.child).localeCompare(String(b.child));
+            });
+            // Top level is uncapped; deeper levels are breadth-capped per parent.
+            const limit = level === 1 ? Infinity : GRAPH_BREADTH;
+            let kept = 0;
+            for (const { child } of items) {
+                if (kept >= limit) break;
+                if (visited.has(child)) continue;
+                visited.add(child);
+                nodeIds.push(child);
+                next.push(child);
+                kept++;
+            }
+        }
+        frontier = next;
+    }
+
+    // ── Nodes (metadata the graph needs) ──────────────────────────────
+    const rows = await db.objects.bulkGet(nodeIds);
+    const byId = new Map();
+    for (const o of rows) {
+        if (o && !o.deleted && isRowVisible(o, visibleOwners)) byId.set(o.thing_id, o);
+    }
+    const keptIds = [...byId.keys()];
+    const classes = await resolveClassesInfoFor(keptIds);
+    const nodes = keptIds.map((thingId) => {
+        const o = byId.get(thingId);
+        const cls = classes.get(thingId) || [];
+        return {
+            thing_id: thingId,
+            name: o.name ?? null,
+            name_translations: o.name_translations ?? null,
+            type: o.type != null ? Number(o.type) : null,
+            start: o.start != null ? String(o.start) : null,
+            end: o.end != null ? String(o.end) : null,
+            classes: cls,
+            class: cls[0] ?? null,
+        };
+    });
+
+    // ── Edges between displayed nodes (undirected, incl. cross-links) ──
+    const keptSet = new Set(keptIds);
+    const [eByOne, eByOther] = await Promise.all([
+        db.links.where('one_thing_id').anyOf(keptIds).toArray(),
+        db.links.where('other_thing_id').anyOf(keptIds).toArray(),
+    ]);
+    const edgeRows = [];
+    const edgeSeen = new Set();
+    for (const link of [...eByOne, ...eByOther]) {
+        if (link.deleted) continue;
+        if (link.link_type_id === UUID.LINK_TO_CLASS) continue;
+        if (edgeSeen.has(link.link_id)) continue;
+        edgeSeen.add(link.link_id);
+        if (link.one_thing_id === link.other_thing_id) continue;
+        if (!keptSet.has(link.one_thing_id) || !keptSet.has(link.other_thing_id)) continue;
+        edgeRows.push(link);
+    }
+    const typeRows = await db.objects.bulkGet([...new Set(edgeRows.map((l) => l.link_type_id))]);
+    const typeById = new Map();
+    for (const t of typeRows) if (t) typeById.set(t.thing_id, t);
+    const edges = edgeRows.map((link) => {
+        const type = typeById.get(link.link_type_id);
+        return {
+            link_id: link.link_id,
+            one_thing_id: link.one_thing_id,
+            other_thing_id: link.other_thing_id,
+            link_type_id: link.link_type_id,
+            link_name: type?.name ?? null,
+            link_name_translations: type?.name_translations ?? null,
+        };
+    });
+
+    return {
+        // Same envelope as the other endpoints (Laravel's `data` wrapper):
+        // Graph.vue reads `response.data.data`, so a single-level payload
+        // would leave graphObject null and the canvas completely empty.
+        data: { data: { root_id: id, nodes, edges } },
+        status: 200,
+    };
+}
+
 /** Link-related payload keys — processed separately, never stored on the object row. */
 const LINK_PAYLOAD_KEYS = [
     'class', 'classes', 'parent', 'links_to_add', 'links_to_update', 'links_to_delete', 'external_links',
@@ -817,31 +969,65 @@ async function enrichLinks(links, currentThingId) {
         if (o) byId[o.thing_id] = o;
     }
 
+    // Class membership of the counterpart objects, so the object-page
+    // class/link-type filter can judge each row: link.target carries the
+    // classes here, exactly like the server's nested resolver. Without it a
+    // checked class (the panel starts all-checked) would never match a target
+    // with empty `classes` and the whole related list would vanish.
+    const counterpartIds = [...new Set(links.map((link) =>
+        (link.other_thing_id === currentThingId ? link.one_thing_id : link.other_thing_id),
+    ))].filter(Boolean);
+    const classesMap = await resolveClassesInfoFor(counterpartIds);
+
     return links.map(link => {
         // Mirror the server LinkResource contract: `name` is the name of
         // other_thing_id, `one_name` the name of one_thing_id — the UI picks
         // the one matching the target endpoint.
-        const target = byId[link.other_thing_id];
+        const other = byId[link.other_thing_id];
         const source = byId[link.one_thing_id];
         const linkType = byId[link.link_type_id];
 
+        // `target` is the endpoint on the OTHER side of the current object.
+        // For an incoming link (other_thing_id === currentThingId) that is
+        // one_thing_id — resolving the wrong endpoint here makes incoming
+        // relations look like self-links and they get pruned by enrichNested,
+        // so the object page and graph silently lose every such link.
+        const counterpartId = link.other_thing_id === currentThingId
+            ? link.one_thing_id
+            : link.other_thing_id;
+        const counterpart = byId[counterpartId];
+        const cls = counterpartId ? (classesMap.get(counterpartId) || []) : [];
+
         return {
             ...link,
-            name: target?.name ?? link.name ?? null,
+            name: other?.name ?? link.name ?? null,
             one_name: source?.name ?? link.one_name ?? null,
             link_name: linkType?.name ?? link.link_name ?? null,
             link_name_translations: linkType?.name_translations ?? link.link_name_translations ?? null,
-            type: target?.type ?? link.type,
-            target_public: target?.public ?? link.target_public,
-            // Resolved other endpoint, mirroring the server's `link.target`.
-            target: target ? {
-                thing_id: target.thing_id,
-                name: target.name ?? null,
-                name_translations: target.name_translations ?? null,
-                type: target.type ?? null,
-                class: null,
-                public: target.public ?? null,
-                description: target.description ?? null,
+            type: counterpart?.type ?? link.type,
+            target_public: counterpart?.public ?? link.target_public,
+            // Convenience: the counterpart object's own flexible date. Event and
+            // involvement dates are independent (a link may carry its own
+            // link_start/link_end), so the object's date lives here for the UI
+            // to fall back on when the link itself is undated.
+            start: counterpart?.start ?? null,
+            end: counterpart?.end ?? null,
+            start_meta: counterpart?.start_meta ?? null,
+            end_meta: counterpart?.end_meta ?? null,
+            // Resolved opposite endpoint, mirroring the server's `link.target`.
+            target: counterpart ? {
+                thing_id: counterpart.thing_id,
+                name: counterpart.name ?? null,
+                name_translations: counterpart.name_translations ?? null,
+                type: counterpart.type ?? null,
+                classes: cls,
+                class: cls[0] ?? null,
+                public: counterpart.public ?? null,
+                description: counterpart.description ?? null,
+                start: counterpart.start ?? null,
+                end: counterpart.end ?? null,
+                start_meta: counterpart.start_meta ?? null,
+                end_meta: counterpart.end_meta ?? null,
             } : undefined,
         };
     });
