@@ -115,6 +115,10 @@ async function createWindow() {
         },
         show: false,
         title: 'Factology',
+        // App-specific window/taskbar icon (assets live in this repo's
+        // electron/assets/). Without this every Factology-family app shows the
+        // default Electron logo and is indistinguishable in the taskbar.
+        icon: path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'appIcon.ico' : 'appIcon.png'),
     });
 
     // Show window when ready to avoid flash (registered BEFORE loadURL —
