@@ -63,6 +63,10 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 5174,
+        // run-android.sh relies on this fixed port (adb reverse + baked server.url).
+        // Without strictPort, Vite silently moves to 5175 when the port is busy and
+        // the device/app can never find the server.
+        strictPort: true,
         cors: true,
     },
 });

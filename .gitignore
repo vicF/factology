@@ -39,6 +39,7 @@ dist-capacitor/
 .vite-capacitor.pid
 .vite-capacitor.mode
 .emu-devtools.pid
+.emulator.log
 
 # Electron desktop app source (committed); its own .gitignore keeps the
 # regenerated SPA copy (app/), node_modules and builder output out of git.

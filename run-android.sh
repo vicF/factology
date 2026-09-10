@@ -12,6 +12,7 @@
 #   ./run-android.sh --static       # classic one-shot: build APK + install (no dev server)
 #   ./run-android.sh --emulator     # force the Android emulator (AVD below)
 #   ./run-android.sh --target <id>  # use a specific adb device/emulator serial
+#   ./run-android.sh --no-tail      # launch & exit (don't follow the dev server log)
 #   ./run-android.sh --stop         # stop a dev server left running
 #
 # Requires: Node, Android SDK (ANDROID_HOME), JDK (JAVA_HOME) — same as build-android.sh.
@@ -29,6 +30,7 @@ LIVE_ENTRY="$VITE_URL/index.capacitor.html"
 VITE_LOG="$SCRIPT_DIR/.vite-capacitor.log"
 VITE_PID_FILE="$SCRIPT_DIR/.vite-capacitor.pid"
 VITE_MARKER_FILE="$SCRIPT_DIR/.vite-capacitor.mode"
+EMU_LOG="$SCRIPT_DIR/.emulator.log"
 LIVE_APK="$SCRIPT_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
 BAKE_JSON="$SCRIPT_DIR/android/app/src/main/assets/capacitor.config.json"
 
@@ -36,6 +38,7 @@ MODE="api"           # api = VITE_API_URL from .env.capacitor ; local = standalo
 RUN_TYPE="live"
 TARGET=""
 TARGET_EMU=0
+NO_TAIL=0
 export MSYS2_ARG_CONV_EXCL="*"
 
 # ─── tiny helpers ---------------------------------------------------------------
@@ -79,6 +82,19 @@ detect_sdk() {
 
 # ─── adb / device helpers ----------------------------------------------------------
 list_devices() { "$ADB" devices 2>/dev/null | awk 'NR>1 && $2=="device" {print $1}'; }
+# Serial of an emulator even while it is still booting ('offline').
+emulator_serial() { "$ADB" devices 2>/dev/null | awk 'NR>1 && $1 ~ /^emulator-/ {print $1; exit}'; }
+
+# wait_for_boot <serial> — polls until sys.boot_completed=1 (or ~3 min elapses).
+wait_for_boot() {
+    local i boot
+    for i in $(seq 1 60); do
+        sleep 3
+        boot="$("$ADB" -s "$1" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')"
+        [ "$boot" = "1" ] && return 0
+    done
+    return 1
+}
 
 select_device() {
     if [ -n "$TARGET" ]; then
@@ -87,89 +103,186 @@ select_device() {
         fi
         return 0
     fi
+    # Prefer a fully-online device; fall back to any emulator, even mid-boot.
     TARGET="$(list_devices | head -1)"
     if [ -z "$TARGET" ]; then
-        TARGET="$(list_devices | grep '^emulator-' | head -1 || true)"
+        TARGET="$(emulator_serial)"
     fi
-    if [ -n "$TARGET" ]; then return 0; fi
+    if [ -n "$TARGET" ]; then
+        if [ "$("$ADB" -s "$TARGET" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ]; then
+            ok "Using $TARGET."
+            return 0
+        fi
+        info "Emulator $TARGET still booting — waiting for boot to finish..."
+        wait_for_boot "$TARGET" && { ok "Emulator booted."; return 0; }
+        err "Emulator boot timed out — tail of $EMU_LOG:"
+        tail -n 15 "$EMU_LOG" 2>/dev/null || true
+        return 1
+    fi
 
     # No device at all — boot the emulator when one is available.
     local emu="${ANDROID_HOME//\\//}/emulator/emulator.exe"
     if [ ! -x "$emu" ]; then
         err "No device connected and no emulator found at $emu"
         err "  - Connect a phone via USB (USB debugging on), or"
-        err "  - Start the emulator manually:  $emu -avd $AVD_NAME"
+        err "  - Start the emulator manually:  $emu -avd $AVD_NAME -skin 1080x2400"
         return 1
     fi
     if [ "$TARGET_EMU" = "0" ]; then
         warn "No device connected — starting the emulator ($AVD_NAME)."
     fi
     echo "==> Booting emulator $AVD_NAME (window opens, ~1-2 min)..."
-    "$emu" -avd "$AVD_NAME" -no-snapshot-load -gpu auto >/dev/null 2>&1 &
+    # -skin 1080x2400: the installed emulator doesn't know the AVD's 'pixel_6'
+    # skin and dies at startup ("unknown skin name") — the size override avoids
+    # it (same flag emu.sh uses). Output goes to a log so a crash is diagnosable.
+    "$emu" -avd "$AVD_NAME" -skin 1080x2400 -gpu auto >"$EMU_LOG" 2>&1 &
     local i
-    for i in $(seq 1 60); do
+    for i in $(seq 1 30); do
         sleep 3
-        TARGET="$(list_devices | grep '^emulator-' | head -1 || true)"
+        TARGET="$(emulator_serial)"
         [ -n "$TARGET" ] && break
     done
-    if [ -z "$TARGET" ]; then err "Emulator did not appear on adb."; return 1; fi
+    if [ -z "$TARGET" ]; then
+        err "Emulator did not appear on adb — tail of $EMU_LOG:"
+        tail -n 15 "$EMU_LOG" 2>/dev/null || true
+        return 1
+    fi
     info "Emulator serial: $TARGET — waiting for boot to finish..."
-    for i in $(seq 1 60); do
-        sleep 3
-        local boot; boot="$("$ADB" -s "$TARGET" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')"
-        [ "$boot" = "1" ] && { ok "Emulator booted."; return 0; }
-    done
-    err "Emulator boot timed out."; return 1
+    wait_for_boot "$TARGET" && { ok "Emulator booted."; return 0; }
+    err "Emulator boot timed out — tail of $EMU_LOG:"
+    tail -n 15 "$EMU_LOG" 2>/dev/null || true
+    return 1
 }
 
 # ─── vite dev server ----------------------------------------------------------------
 vite_listener_pid() {
-    netstat -ano 2>/dev/null | awk -v p="$VITE_PORT" 'index($0,"LISTENING") && $2 ~ (":" p "$") {print $NF}' | sort -u | head -1
+    local pid
+    pid="$(netstat -ano 2>/dev/null | awk -v p="$VITE_PORT" 'index($0,"LISTENING") && $2 ~ (":" p "$") {print $NF}' | sort -u | head -1)"
+    if [ -z "$pid" ]; then
+        pid="$(powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort $VITE_PORT -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess" 2>/dev/null | tr -d '\\r')"
+    fi
+    echo "$pid"
 }
-devserver_up() { curl -s -o /dev/null --connect-timeout 2 "$VITE_URL/" 2>/dev/null; }
+# Probe 127.0.0.1, NOT 'localhost': on Windows 'localhost' can resolve to ::1
+# while Vite binds IPv4 only, which made readiness checks fail against a healthy
+# server (and the script then killed it). adb reverse targets the host's IPv4
+# loopback too, so 127.0.0.1 is the address that actually matters.
+devserver_up() { curl -s -o /dev/null --max-time 3 "http://127.0.0.1:$VITE_PORT/" 2>/dev/null; }
+
+# Wait until nothing is bound to $VITE_PORT (after a kill), up to ~10 s.
+wait_port_free() {
+    local i
+    for i in $(seq 1 10); do
+        [ -z "$(vite_listener_pid || true)" ] && return 0
+        sleep 1
+    done
+    return 1
+}
 
 stop_devserver() {
+    local pid lp i
     if [ -f "$VITE_PID_FILE" ]; then
-        local pid; pid="$(cat "$VITE_PID_FILE" 2>/dev/null || true)"
+        pid="$(cat "$VITE_PID_FILE" 2>/dev/null || true)"
         [ -n "$pid" ] && { taskkill //F //T //PID "$pid" >/dev/null 2>&1 || kill "$pid" >/dev/null 2>&1 || true; }
         rm -f "$VITE_PID_FILE"
     fi
-    local lp; lp="$(vite_listener_pid || true)"
-    [ -n "$lp" ] && taskkill //F //T //PID "$lp" >/dev/null 2>&1 || true
+    # Keep killing whatever holds our port until it actually frees. Some
+    # reparented Vite orphans survive taskkill, so also Stop-Process them.
+    for i in 1 2 3 4 5 6; do
+        lp="$(vite_listener_pid || true)"
+        [ -z "$lp" ] && break
+        taskkill //F //T //PID "$lp" >/dev/null 2>&1 || true
+        powershell -NoProfile -Command "Stop-Process -Id $lp -Force -ErrorAction SilentlyContinue" >/dev/null 2>&1 || true
+        sleep 1
+    done
     rm -f "$VITE_MARKER_FILE" 2>/dev/null || true
     echo "Dev server stopped."
 }
 
 start_devserver() {
-    if devserver_up; then
+    # A fresh Vite can take a few seconds to answer its first request (dependency
+    # re-optimization) while the socket is already bound — give it time before
+    # concluding the port is held by something dead.
+    local up=0 i
+    if devserver_up; then up=1; else
+        for i in 1 2 3 4 5 6; do
+            devserver_up && { up=1; break; }
+            sleep 2
+        done
+    fi
+
+    if [ "$up" = "1" ]; then
         local old; old="$(cat "$VITE_MARKER_FILE" 2>/dev/null || true)"
-        if [ "$old" = "$MODE" ]; then
+        if [ -z "$old" ]; then
+            # An unmanaged server (started manually or by a crashed run). Adopt it
+            # rather than killing a healthy process; warn if the API mode may differ.
+            warn "Reusing an existing Vite dev server on :$VITE_PORT (not started by this script)."
+            if [ "$MODE" = "api" ]; then
+                warn "If it serves a different API url than .env.capacitor, stop it first: ./run-android.sh --stop"
+            fi
+        elif [ "$old" != "$MODE" ]; then
+            warn "Dev server on :$VITE_PORT was started in $old mode — restarting for $MODE mode."
+            stop_devserver
+            wait_port_free || true
+            sleep 1
+        else
             ok "Vite dev server already running on :$VITE_PORT ($MODE mode)"
+            write_marker_and_pid
             return 0
         fi
-        warn "Dev server on :$VITE_PORT was started in a different mode — restarting it."
+    else
+        # Nothing answers HTTP. If a socket is bound it's a stale leftover — free it.
+        if [ -n "$(vite_listener_pid || true)" ]; then
+            local op; op="$(vite_listener_pid)"
+            warn "Port $VITE_PORT is held by PID $op but not serving HTTP — stopping it."
+            stop_devserver
+            wait_port_free || warn "Port did not free within 10 s — starting anyway."
+        fi
+    fi
+
+    local attempt i
+    for attempt in 1 2; do
+        # Always start from a clean dep cache. A half-written node_modules/.vite
+        # (left by a force-killed Vite) makes the next start spin forever in the
+        # dependency scanner and never answer HTTP. A clean cold start takes ~3 s.
+        rm -rf "$SCRIPT_DIR/node_modules/.vite"
+        echo "==> Starting Vite dev server (port $VITE_PORT, attempt $attempt/2)..."
+        (
+            cd "$SCRIPT_DIR"
+            export VITE_API_URL
+            nohup npm run dev:capacitor >"$VITE_LOG" 2>&1 &
+            echo $! > "$VITE_PID_FILE"
+        )
+        echo "    log: $VITE_LOG"
+        for i in $(seq 1 60); do
+            sleep 1
+            devserver_up && break
+            # Vite exits quickly on fatal errors (strictPort: busy port, bad config).
+            if [ -f "$VITE_PID_FILE" ] && ! kill -0 "$(cat "$VITE_PID_FILE")" 2>/dev/null; then
+                break
+            fi
+        done
+        if devserver_up; then
+            write_marker_and_pid
+            ok "Dev server ready: $VITE_URL/"
+            return 0
+        fi
+        # If this still failed, the port may be held by a zombie that stop_devserver
+        # could not reach; kill by listener pid explicitly, then retry once.
+        warn "Dev server not ready on attempt $attempt — retrying..."
         stop_devserver
         sleep 1
-    fi
-    echo "==> Starting Vite dev server (port $VITE_PORT)..."
-    export VITE_API_URL
-    (cd "$SCRIPT_DIR" && nohup npm run dev:capacitor >"$VITE_LOG" 2>&1 &)
-    echo "    log: $VITE_LOG"
-    local i
-    for i in $(seq 1 30); do
-        sleep 1
-        devserver_up && break
     done
-    if devserver_up; then
-        echo "$MODE" > "$VITE_MARKER_FILE"
-        local lp; lp="$(vite_listener_pid || true)"
-        [ -n "$lp" ] && echo "$lp" > "$VITE_PID_FILE"
-        ok "Dev server ready: $VITE_URL/"
-    else
-        err "Dev server failed to start — tail of $VITE_LOG:"
-        tail -n 25 "$VITE_LOG" 2>/dev/null || true
-        exit 1
-    fi
+    err "Dev server failed to start — tail of $VITE_LOG:"
+    tail -n 25 "$VITE_LOG" 2>/dev/null || true
+    rm -f "$VITE_PID_FILE" 2>/dev/null || true
+    exit 1
+}
+
+write_marker_and_pid() {
+    echo "$MODE" > "$VITE_MARKER_FILE"
+    local lp; lp="$(vite_listener_pid || true)"
+    [ -n "$lp" ] && echo "$lp" > "$VITE_PID_FILE"
 }
 
 # ─── build / install ----------------------------------------------------------------
@@ -233,6 +346,7 @@ for arg in "$@"; do
         --static)  RUN_TYPE="static" ;;
         --emulator) TARGET_EMU=1 ;;
         --target=*) TARGET="${arg#--target=}" ;;
+        --no-tail) NO_TAIL=1 ;;
         --stop)    stop_devserver; exit 0 ;;
         --help|-h) usage; exit 0 ;;
         *) err "Unknown arg: $arg (see --help)"; exit 1 ;;
@@ -304,6 +418,11 @@ echo "  Dev server log: $VITE_LOG"
 echo "  Stop the server later: ./run-android.sh --stop"
 echo "  (Ctrl+C here only detaches — HMR keeps working.)"
 echo "=============================================="
+if [ "$NO_TAIL" = "1" ]; then
+    echo ""
+    echo "==> Dev server keeps running in the background. Stop it with: ./run-android.sh --stop"
+    exit 0
+fi
 echo ""
 echo "==> Following dev server log (Ctrl+C to detach)..."
 tail -n 5 -f "$VITE_LOG"

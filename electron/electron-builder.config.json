@@ -6,11 +6,12 @@
     },
     "files": [
         "app/**/*",
-        "src/**/*"
+        "src/**/*",
+        "assets/**/*"
     ],
     "win": {
         "target": "nsis",
-        "icon": null
+        "icon": "assets/appIcon.ico"
     },
     "nsis": {
         "oneClick": false,
