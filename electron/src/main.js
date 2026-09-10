@@ -135,8 +135,9 @@ async function createWindow() {
         }
     });
 
-    // Load the Capacitor-built SPA from the local HTTP server
-    await mainWindow.loadURL(`${serverUrl}/`);
+    // DEV mode loads the Vite dev server (HMR); otherwise the Capacitor-built
+    // SPA is loaded from our local static server.
+    await mainWindow.loadURL(DEV_URL || `${serverUrl}/`);
 
     // Debug: forward renderer console + load status to the terminal. The
     // 'console-message' event changed shape across Electron versions (older:
@@ -156,9 +157,19 @@ async function createWindow() {
     });
 }
 
+// DEV mode (run-electron.sh): load the Vite dev server for HMR instead of the
+// built copy. run-electron.sh points Vite at this app's own port (47321), so
+// the web origin — and therefore IndexedDB/localStorage — is identical to the
+// packaged app and the live session sees the same local database.
+const DEV_URL = process.env.FACTOLOGY_DEV_URL || null;
+
 let server;
 app.whenReady().then(async () => {
-    server = await startStaticServer();
+    if (DEV_URL) {
+        console.log(`[main] DEV mode (HMR) — loading ${DEV_URL}`);
+    } else {
+        server = await startStaticServer();
+    }
     await createWindow();
 
     // F12 / Ctrl+Shift+I → open DevTools for debugging
