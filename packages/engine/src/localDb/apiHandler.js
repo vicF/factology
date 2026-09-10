@@ -713,7 +713,10 @@ async function handleLocalGraph(id, depth = 1, context = {}) {
     });
 
     return {
-        data: { root_id: id, nodes, edges },
+        // Same envelope as the other endpoints (Laravel's `data` wrapper):
+        // Graph.vue reads `response.data.data`, so a single-level payload
+        // would leave graphObject null and the canvas completely empty.
+        data: { data: { root_id: id, nodes, edges } },
         status: 200,
     };
 }
