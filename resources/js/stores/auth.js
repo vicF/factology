@@ -126,6 +126,14 @@ export const useAuthStore = defineStore('auth', () => {
             return;
         }
 
+        // Identity-based tokens (identity-{thingId}) are local session markers,
+        // not server-issued tokens. Skip server validation — the identity store
+        // manages their lifecycle (refreshSession / lock / lockAll).
+        if (typeof token.value === 'string' && token.value.startsWith('identity-')) {
+            console.log('Identity-based session — skipping server auth check');
+            return;
+        }
+
         try {
             const response = await axios.get('/user', {
                 headers: {

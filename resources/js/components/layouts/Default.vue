@@ -560,6 +560,13 @@ const onTouchEnd = (e) => {
 
 const checkAuth = async () => {
     try {
+        // Identity-based sessions use local auth — server validation would
+        // reject the fabricated token. Let the auth store handle its own
+        // check (which skips identity tokens).
+        if (authStore.token && typeof authStore.token === 'string' && authStore.token.startsWith('identity-')) {
+            console.log('Identity-based session — skipping server auth check')
+            return
+        }
         const response = await axios.get('user', { noAuthRedirect: true })
         if (response.data && !authStore.authenticated && authStore.token) {
             authStore.login(response.data, authStore.token)
