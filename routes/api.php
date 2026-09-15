@@ -4,6 +4,7 @@ use App\Http\Controllers\ApiController;
 use App\Http\Controllers\Auth\IdentityController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ExportImportController;
 use App\Http\Controllers\ImportController;
@@ -38,6 +39,14 @@ Route::prefix('v1')->group(function () {
     // bound to an account via the auth-protected /identity/bind routes below.
     Route::post('/identity/challenge', [IdentityController::class, 'challenge']);
     Route::post('/identity/login',     [IdentityController::class, 'login']);
+
+    // Identity-file registration (anonymous, no personal data).
+    Route::post('/identity/register',           [IdentityController::class, 'initiateRegistration']);
+    Route::post('/identity/register-complete',  [IdentityController::class, 'completeRegistration']);
+
+    // Invitation claim (public). Admin creation is under auth:sanctum below.
+    Route::post('/invitations/claim-challenge', [InvitationController::class, 'claimChallenge']);
+    Route::post('/invitations/claim-complete',  [InvitationController::class, 'completeClaim']);
 
     // Get current authenticated user (explicitly expose is_admin)
     Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
@@ -100,6 +109,10 @@ Route::prefix('v1')->group(function () {
         // Binding requires proof of key possession (challenge + signature).
         Route::post('/identity/bind-challenge', [IdentityController::class, 'bindChallenge']);
         Route::post('/identity/bind',           [IdentityController::class, 'bind']);
+
+        // Invitations: admin creates and lists them.
+        Route::post('/invitations',           [InvitationController::class, 'create']);
+        Route::get('/invitations',            [InvitationController::class, 'index']);
 
         Route::post('/object/{id}',           [ApiController::class, 'store']);     // create
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update

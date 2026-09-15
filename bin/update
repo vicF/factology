@@ -27,7 +27,19 @@ step "Rebuilding and restarting containers"
 docker compose up -d --build
 ok "Containers started"
 
-# ── 3. Show status ──────────────────────────────────────────────────────────────
+# ── 3. Run migrations ───────────────────────────────────────────────────────────
+step "Running database migrations"
+
+docker compose exec factology php artisan migrate --force
+ok "Migrations complete"
+
+# ── 4. Seed system objects ──────────────────────────────────────────────────────
+step "Seeding new system objects"
+
+docker compose exec factology php artisan db:seed --class=DatabaseSeeder --force
+ok "System objects up to date"
+
+# ── 5. Show status ──────────────────────────────────────────────────────────────
 step "Status"
 docker compose ps
 

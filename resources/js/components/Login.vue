@@ -159,7 +159,7 @@ const loginWithIdentity = async () => {
         }
         const file = JSON.parse(await selectedIdentityFile.value.text());
         const opened = await openIdentityFile(file, identityPassphrase.value);
-        const publicKey = opened.file.public_key;
+        const publicKey = opened.file.public_key.replace(/=+$/, '');
 
         const { data: challengeData } = await axios.post('/identity/challenge', { public_key: publicKey });
         const signature = signBytes(challengeData.challenge, opened.secretKey);

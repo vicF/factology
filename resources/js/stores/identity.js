@@ -127,18 +127,80 @@ export const useIdentityStore = defineStore('identity', () => {
      * Point the auth session at the current unlocked primary so the whole UI
      * (edit mode, profile, new-object owner) treats that identity as the user.
      * When nothing is unlocked, drop any identity-based session (guest).
+     *
+     * In standalone mode (Capacitor, no API_URL) uses an `identity-` prefixed
+     * local token — no server to validate against.
+     *
+     * In server mode (web or Capacitor with API_URL) tries silent challenge-
+     * response auth to get a real Sanctum token. If that fails the identity is
+     * not registered on the server — the auth store stays unauthenticated so
+     * the UI shows the login gate rather than misleading edit buttons.
      */
     async function refreshSession() {
+        const IS_STANDALONE = import.meta.env.VITE_TARGET === 'capacitor'
+            && !import.meta.env.VITE_API_URL;
+
         try {
             const active = primary.value;
             if (active) {
                 const { useAuthStore } = await import('../stores/auth');
                 const authStore = useAuthStore();
-                if (authStore.user?.thing_id !== active.thingId) {
-                    await authStore.login(
-                        { id: active.thingId, thing_id: active.thingId, name: active.name, is_admin: false },
-                        `identity-${active.thingId}`,
-                    );
+
+                if (IS_STANDALONE) {
+                    // ── Standalone: use identity- local token ──────────
+                    if (authStore.user?.thing_id !== active.thingId) {
+                        await authStore.login(
+                            { id: active.thingId, thing_id: active.thingId, name: active.name, is_admin: false },
+                            `identity-${active.thingId}`,
+                        );
+                    }
+                } else {
+                    // ── Server mode: silently authenticate ────────────
+                    if (authStore.authenticated
+                        && authStore.user?.thing_id === active.thingId
+                        && !authStore.token?.startsWith('identity-')) {
+                        return; // already has a valid session for this identity
+                    }
+
+                    // If the token is a stale identity- marker, clear it first
+                    if (typeof authStore.token === 'string' && authStore.token.startsWith('identity-')) {
+                        authStore.authenticated = false;
+                        authStore.user = null;
+                        authStore.token = null;
+                        await storage.remove('user');
+                        await storage.remove('auth_token');
+                    }
+
+                    try {
+                        // We need the base64url-encoded public key (string form)
+                        const publicKey = active.file?.public_key?.replace(/=+$/, '');
+                        if (!publicKey) return;
+
+                        const { signBytes } = await import('@factology/engine/identity/identity.js');
+                        const axios = (await import('axios')).default;
+
+                        const challengeResp = await axios.post('/identity/challenge', { public_key: publicKey });
+                        const { challenge } = challengeResp.data;
+
+                        const signature = signBytes(challenge, active.secretKey);
+
+                        const loginResp = await axios.post('/identity/login', {
+                            public_key: publicKey,
+                            challenge,
+                            signature,
+                        });
+
+                        if (loginResp.data?.token) {
+                            await authStore.login(loginResp.data.user, loginResp.data.token);
+                        }
+                    } catch (authErr) {
+                        // Silent auth failed — identity not registered on server.
+                        // Don't set any token; stay unauthenticated so the login
+                        // gate shows instead of misleading edit buttons.
+                        if (authErr?.response?.status !== 401 && authErr?.response?.status !== 422) {
+                            console.warn('identity: silent server auth error', authErr?.message || authErr);
+                        }
+                    }
                 }
             } else {
                 const { useAuthStore } = await import('../stores/auth');

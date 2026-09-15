@@ -8,6 +8,7 @@ const history = import.meta.env.VITE_TARGET === 'capacitor'
 /* Guest Component */
 const Login = () => import('@/components/Login.vue')
 const Register = () => import('@/components/Register.vue')
+const InviteClaim = () => import('@/components/InviteClaim.vue')
 /* Guest Component */
 
 /* Layouts */
@@ -58,6 +59,14 @@ const routes = [
                 component: Register,
                 meta: {
                     title: `Register`
+                }
+            },
+            {
+                name: "invite",
+                path: "/invite/:token",
+                component: InviteClaim,
+                meta: {
+                    title: `Claim Invitation`
                 }
             },
             {

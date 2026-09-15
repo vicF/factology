@@ -59,3 +59,7 @@ storage/logs/
 bash.exe.stackdump
 dist-pawlo/
 dist-pawlo-apk/pawlo-debug.apk
+
+# Release signing keystore and passwords (generate once, keep safe)
+*.keystore
+*.password

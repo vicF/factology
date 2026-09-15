@@ -127,10 +127,25 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         // Identity-based tokens (identity-{thingId}) are local session markers,
-        // not server-issued tokens. Skip server validation — the identity store
-        // manages their lifecycle (refreshSession / lock / lockAll).
+        // not server-issued tokens. Try to upgrade via silent challenge-response
+        // auth. If no unlocked identity is available, clear the stale marker.
         if (typeof token.value === 'string' && token.value.startsWith('identity-')) {
-            console.log('Identity-based session — skipping server auth check');
+            // Clear stale state first so refreshSession can proceed
+            authenticated.value = false;
+            user.value = null;
+            token.value = null;
+            await storage.remove('user');
+            await storage.remove('auth_token');
+
+            const identityStore = (await import('../stores/identity')).useIdentityStore();
+            await identityStore.restore();
+            const active = identityStore.primary;
+            const isUnlocked = active && identityStore.unlockedMap.has(active.thingId);
+            if (active && isUnlocked && active.file?.public_key) {
+                // refreshSession will try silent auth and call authStore.login on success.
+                // If it fails (identity not on server), the stale state stays cleared.
+                await identityStore.refreshSession();
+            }
             return;
         }
 

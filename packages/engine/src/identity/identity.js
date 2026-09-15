@@ -30,8 +30,16 @@ const PBKDF2_ITERATIONS = 210000;
 const MIN_PASSPHRASE_LENGTH = 8;
 
 const te = new TextEncoder();
-const b64e = (bytes) => base64url.encode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
-const b64d = (str) => base64url.decode(str);
+const b64e = (bytes) => {
+    const encoded = base64url.encode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    return encoded.replace(/=+$/, '');
+};
+const b64d = (str) => {
+    // @scure/base's decode requires padding; PHP's sodium (no-padding variant)
+    // rejects it.  Strip on encode / auto-restore on decode so both sides agree.
+    const padLen = (4 - str.length % 4) % 4;
+    return base64url.decode(padLen ? str + '='.repeat(padLen) : str);
+};
 const asBytes = (value) => (value instanceof Uint8Array ? value : te.encode(value));
 
 // ─── Mnemonic ────────────────────────────────────────────────────────────
@@ -154,7 +162,9 @@ export async function openIdentityFile(file, passphrase) {
         throw new Error('Wrong passphrase or corrupt file.');
     }
     const publicKey = getPublicKey(secretKey);
-    if (b64e(publicKey) !== file.public_key) {
+    // Normalise both sides to no-padding for comparison (identity files
+    // created before the padding-fix may have trailing = in public_key).
+    if (b64e(publicKey) !== file.public_key.replace(/=+$/, '')) {
         throw new Error('Identity file is corrupt: keys do not match.');
     }
     return { secretKey, publicKey, thingId: file.thing_id, name: file.name, file };
@@ -210,7 +220,7 @@ export async function openIdentityFileWithToken(file, token) {
         throw new Error('Auto-open token does not match the identity file.');
     }
     const publicKey = getPublicKey(secretKeyBytes);
-    if (b64e(publicKey) !== file.public_key) {
+    if (b64e(publicKey) !== file.public_key.replace(/=+$/, '')) {
         throw new Error('Auto-open token does not match the identity file.');
     }
     return { secretKey: secretKeyBytes, publicKey, thingId: file.thing_id, name: file.name, file };

@@ -633,7 +633,7 @@ async function connectIdentityToAccount() {
     bindingIdentity.value = true;
     identityConnected.value = false;
     try {
-        const publicKey = identity.file.public_key;
+        const publicKey = identity.file.public_key.replace(/=+$/, '');
         const { data: challengeData } = await axios.post('/identity/bind-challenge', { public_key: publicKey });
         const signature = signBytes(challengeData.challenge, identity.secretKey);
         await axios.post('/identity/bind', {
