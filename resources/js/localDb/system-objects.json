@@ -156,6 +156,30 @@
                 "end_meta": null
             },
             {
+                "thing_id": "0dc6915e-b92c-4834-b9a3-091273d0d335",
+                "name": "is a copy of",
+                "type": 4,
+                "description": "Указывает, что этот объект является копией другого, созданной с помощью функции клонирования",
+                "start": null,
+                "end": null,
+                "record_created": "2026-09-18 05:30:00",
+                "record_updated": "2026-09-18 05:30:00",
+                "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
+                "public": true,
+                "deleted": false,
+                "data": null,
+                "name_translations": {
+                    "ru": "скопировано с",
+                    "lang": "en"
+                },
+                "description_translations": {
+                    "lang": "ru"
+                },
+                "abstract": false,
+                "start_meta": null,
+                "end_meta": null
+            },
+            {
                 "thing_id": "0eed3b56-bdd6-47f0-9413-d9640a9dcafc",
                 "name": "Event",
                 "type": 2,
@@ -1561,7 +1585,7 @@
                 "record_created": "2026-05-06 20:30:18",
                 "record_updated": "2026-05-06 20:30:18",
                 "owner": "aaaaaaaa-0000-4000-a000-00000000000a",
-                "public": false,
+                "public": true,
                 "deleted": false,
                 "data": null,
                 "name_translations": {
@@ -5331,6 +5355,19 @@
                 "link_start": null,
                 "link_end": null,
                 "link_uuid": "a0e78217-286c-4136-aa7a-18341deed089",
+                "deleted": false,
+                "link_start_meta": null,
+                "link_end_meta": null,
+                "description": null
+            },
+            {
+                "one_thing_id": "16414472-da4b-427d-8886-b7c75d133750",
+                "link_type_id": "361c19af-c011-4051-9329-49c75d1ca0fb",
+                "other_thing_id": "0dc6915e-b92c-4834-b9a3-091273d0d335",
+                "public": true,
+                "link_start": null,
+                "link_end": null,
+                "link_uuid": "200abe21-1002-44ba-b094-e40721191f88",
                 "deleted": false,
                 "link_start_meta": null,
                 "link_end_meta": null,

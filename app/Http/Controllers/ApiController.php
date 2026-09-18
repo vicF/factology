@@ -606,6 +606,121 @@ class ApiController extends BaseController
     }
 
     /**
+     * Clone an object: create a copy with a new UUID, copying all fields
+     * (name, description, dates, type, data, public, owner) and all links
+     * (including class membership, external links).
+     * A DUPLICATE_OF link points from the clone to the original.
+     *
+     * @param string  $id Source object UUID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cloneObject(string $id): \Illuminate\Http\JsonResponse
+    {
+        $source = DB::table('things')->where('thing_id', $id)->first();
+        if (!$source) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+
+        $newId = (string) \Illuminate\Support\Str::uuid();
+
+        DB::transaction(function () use ($source, $newId) {
+            // Insert the cloned thing with a new UUID — fresh lifecycle timestamps
+            $data = (array) $source;
+            $data['thing_id'] = $newId;
+            $data['record_created'] = now();
+            $data['record_updated'] = now();
+            unset($data['created_at'], $data['updated_at'], $data['name_search_text'], $data['description_search_text']);
+
+            // Reset lifecycle metadata inherited from the original
+            if (isset($data['data']) && is_string($data['data'])) {
+                $decoded = json_decode($data['data'], true) ?: [];
+                unset($decoded['planned'], $decoded['confirmed']);
+                $data['data'] = !empty($decoded) ? json_encode($decoded) : null;
+            }
+
+            // Auto-plan future events (same logic as store())
+            if (!empty($data['start'])) {
+                $nowCanonical = now()->format('YmdHis');
+                if (bccomp($data['start'], $nowCanonical) > 0) {
+                    $currentData = $data['data'] ? (json_decode($data['data'], true) ?: []) : [];
+                    $currentData['planned'] = now()->format('Y-m-d');
+                    $data['data'] = json_encode($currentData);
+                }
+            }
+
+            DB::table('things')->insert($data);
+
+            // Copy all links where the source is either endpoint
+            $links = DB::table('links')
+                ->where(function ($q) use ($source) {
+                    $q->where('one_thing_id', $source->thing_id)
+                      ->orWhere('other_thing_id', $source->thing_id);
+                })
+                ->where('deleted', false)
+                ->get();
+
+            foreach ($links as $link) {
+                $newLink = (array) $link;
+                unset($newLink['link_id'], $newLink['record_updated']);
+                $newLink['link_uuid'] = (string) \Illuminate\Support\Str::uuid();
+
+                // Remap the endpoint that was the source to the new object
+                if ($newLink['one_thing_id'] === $source->thing_id) {
+                    $newLink['one_thing_id'] = $newId;
+                }
+                if ($newLink['other_thing_id'] === $source->thing_id) {
+                    $newLink['other_thing_id'] = $newId;
+                }
+
+                DB::table('links')->insert($newLink);
+            }
+
+            // Add a DUPLICATE_OF link from clone to original
+            DB::table('links')->insert([
+                'link_uuid'      => (string) \Illuminate\Support\Str::uuid(),
+                'one_thing_id'   => $newId,
+                'link_type_id'   => UUID::CLONED_FROM,
+                'other_thing_id' => $source->thing_id,
+                'description'    => '',
+                'public'         => 0,
+                'deleted'        => false,
+            ]);
+
+            // Copy external links
+            $extLinks = DB::table('external_links')
+                ->where('thing_id', $source->thing_id)
+                ->get();
+            foreach ($extLinks as $el) {
+                DB::table('external_links')->insert([
+                    'id'         => (string) \Illuminate\Support\Str::uuid(),
+                    'thing_id'   => $newId,
+                    'url'        => $el->url,
+                    'url_type_id' => $el->url_type_id ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Copy thumb if it exists
+            try {
+                $thumbPath = \App\Models\Classes\Everything::getThumbPathById($source->thing_id, true);
+                if ($thumbPath && file_exists($thumbPath)) {
+                    \App\Services\ThumbStore::put($newId, file_get_contents($thumbPath), 'small');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not copy thumb during clone: ' . $e->getMessage());
+            }
+        });
+
+        // Return the new object with full data
+        $data = Everything::getDataById($newId, 1);
+        return response()->json([
+            'data'    => $data,
+            'success' => true,
+        ]);
+    }
+
+    /**
      * Normalize a raw date digit string to its canonical padded form
      * ('2026081112' → '20260811120000'). Canonical values (length ≥ 11:
      * variable year + exactly 10-digit MMDDHHMMSS tail) pass through, so the

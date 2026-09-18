@@ -82,6 +82,7 @@ class UUID
     // ── Identity equivalence link types ──
     public const DUPLICATE_OF = '0dc6915e-b92c-4834-b9a3-091273d0d334';
     public const ALSO_KNOWN_AS = '0a1a2fe7-d4f7-4a85-8514-680cfd518bdb';
+    public const CLONED_FROM = '0dc6915e-b92c-4834-b9a3-091273d0d335';
 
     // ── Localization system objects (Property/Language classes, languages) ──
     public const PROPERTY_CLASS = 'b1b1b1b1-0001-4000-8000-000000000001';
