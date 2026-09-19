@@ -680,6 +680,10 @@ onUnmounted(() => {
     font-size: 0.75rem;
 }
 
+.result-title:hover .clone-icon-btn {
+    opacity: 1;
+}
+
 .clone-icon-btn:hover {
     background: rgba(13, 110, 253, 0.1);
     color: #0d6efd;

@@ -773,7 +773,7 @@ const wasFutureDatedAtCreation = computed(() => {
 // the date passes, isPlanned goes false but the owner should still be able
 // to confirm.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && !confirmedDate.value && (isPlanned.value || wasFutureDatedAtCreation.value)
+    canEdit.value && !confirmedDate.value && !hasFutureStart.value && (isPlanned.value || wasFutureDatedAtCreation.value)
 );
 
 const confirmPlanned = async () => {
