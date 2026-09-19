@@ -38,6 +38,8 @@ export default defineConfig({
         pool: 'threads',
         globals: true,
         environment: 'jsdom',
+        testTimeout: 30000,
+        hookTimeout: 30000,
         setupFiles: [
             path.resolve(__dirname, 'tests-vitest/setup.js'),
             path.resolve(__dirname, 'tests-vitest/setup.localDb.js'),

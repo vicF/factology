@@ -272,7 +272,7 @@ describe('Object view — planned/confirm button', () => {
         expect(confirmButton(wrapper).exists()).toBe(true)
     })
 
-    it('shows the confirm button on a future-dated object', async () => {
+    it('hides the confirm button on a future-dated object (cannot confirm before the date arrives)', async () => {
         axios.get.mockResolvedValue({
             data: {
                 data: objectWith({
@@ -285,7 +285,7 @@ describe('Object view — planned/confirm button', () => {
         const wrapper = mountObject()
         await flushPromises()
 
-        expect(confirmButton(wrapper).exists()).toBe(true)
+        expect(confirmButton(wrapper).exists()).toBe(false)
     })
 
     it('hides the confirm button once the object is confirmed', async () => {
