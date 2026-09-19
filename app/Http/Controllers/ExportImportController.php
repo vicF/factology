@@ -13,6 +13,35 @@ use Illuminate\Support\Str;
 class ExportImportController extends BaseController
 {
     /**
+     * jsonb columns of `things` / `links`. A raw query-builder select returns
+     * them as Postgres jsonb TEXT (e.g. '{"lang": "en", "ru": "Человек"}'), so
+     * they must be decoded before json_encode — otherwise the export nests a
+     * JSON string where an object belongs and every importer (the offline app,
+     * another server) stores a string the localization helpers cannot resolve.
+     */
+    private const THING_JSON_COLUMNS = [
+        'name_translations', 'description_translations', 'start_meta', 'end_meta', 'data',
+    ];
+
+    private const LINK_JSON_COLUMNS = [
+        'link_start_meta', 'link_end_meta', 'data',
+    ];
+
+    /** Decode the jsonb columns of a row in place so json_encode emits objects. */
+    private function decodeJsonColumns(object $row, array $columns): void
+    {
+        foreach ($columns as $column) {
+            if (!isset($row->$column) || !is_string($row->$column)) {
+                continue;
+            }
+            $decoded = json_decode($row->$column);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $row->$column = $decoded;
+            }
+        }
+    }
+
+    /**
      * Export things and links as JSON.
      * Admins export everything; regular users export everything they can see —
      * their own objects plus public ones (and links whose both endpoints — and
@@ -80,10 +109,8 @@ class ExportImportController extends BaseController
                     }
                     $first = false;
 
-                    // Decode JSON data column to prevent double-encoding
-                    if (isset($thing->data) && is_string($thing->data)) {
-                        $thing->data = json_decode($thing->data);
-                    }
+                    // Decode JSON columns to prevent double-encoding
+                    $this->decodeJsonColumns($thing, self::THING_JSON_COLUMNS);
 
                     echo json_encode($thing, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 }
@@ -99,6 +126,8 @@ class ExportImportController extends BaseController
                         echo ',';
                     }
                     $first = false;
+
+                    $this->decodeJsonColumns($link, self::LINK_JSON_COLUMNS);
 
                     echo json_encode($link, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 }

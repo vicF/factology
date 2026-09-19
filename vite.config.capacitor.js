@@ -43,8 +43,9 @@ export default defineConfig({
         outDir: 'dist-capacitor',
         emptyOutDir: true,
         sourcemap: false,
-        // The SPA uses top-level await (localDb/standaloneBootstrap.js) and runs
-        // inside a modern Chromium WebView, so target the latest browsers.
+        // The SPA uses top-level await (main.capacitor.js awaits the local-DB
+        // bootstrap before loading the app) and runs inside a modern Chromium
+        // WebView, so target the latest browsers.
         target: 'esnext',
         rollupOptions: {
             input: path.resolve(__dirname, 'index.capacitor.html'),

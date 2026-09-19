@@ -48,7 +48,11 @@ export async function bootstrapStandalone() {
         }
         await identityStore.restore();
 
-        const url = config.url?.split('?')[0] || '';
+        // Keep the full URL: the local handlers parse `?depth=N` themselves
+        // (GET /object/{id}?depth=N, GET /object/{id}/graph?depth=N). Only the
+        // exact-path comparisons below use the query-less part.
+        const url = config.url || '';
+        const path = url.split('?')[0];
         const method = config.method?.toLowerCase() || 'get';
         const data = config.data;
 
@@ -65,9 +69,9 @@ export async function bootstrapStandalone() {
 
         // Guest (no unlocked identity) is read-only: creating/editing/deleting
         // objects and links requires an identity so the new data has an owner.
-        const isObjectWrite = url.startsWith('/object') && ['post', 'put', 'delete'].includes(method)
-            && !/^\/object\/?$/.test(url); // bare POST /object is a search, not a write
-        const isLinkWrite = url.startsWith('/link') && ['post', 'put', 'delete'].includes(method);
+        const isObjectWrite = path.startsWith('/object') && ['post', 'put', 'delete'].includes(method)
+            && !/^\/object\/?$/.test(path); // bare POST /object is a search, not a write
+        const isLinkWrite = path.startsWith('/link') && ['post', 'put', 'delete'].includes(method);
         if (!context.userThingId && (isObjectWrite || isLinkWrite)) {
             throw {
                 response: {
@@ -78,9 +82,15 @@ export async function bootstrapStandalone() {
         }
 
         let result;
-        if (url === '/user' || url === 'user') {
-            result = await handleLocalUserCall();
-        } else if (url === '/register' || url === 'register' || url === '/login' || url === 'login') {
+        if (path === '/user' || path === 'user') {
+            // The unlocked identity is the session user — /user must report IT,
+            // not a stand-in, or boot-time checkAuth() overwrites the identity
+            // session and edit/delete lose owner match.
+            result = await handleLocalUserCall({
+                userThingId: identityStore.primary?.thingId || null,
+                userName: identityStore.primary?.name || null,
+            });
+        } else if (path === '/register' || path === 'register' || path === '/login' || path === 'login') {
             // Simulate register/login in offline mode
             const body = typeof data === 'string' ? JSON.parse(data) : (data || {});
             const userData = {
@@ -93,10 +103,12 @@ export async function bootstrapStandalone() {
                 data: { user: userData, token: `local-token-${Date.now()}` },
                 status: 200,
             };
-        } else if (url.startsWith('/logout')) {
+        } else if (path.startsWith('/logout')) {
             result = { data: { success: true }, status: 200 };
-        } else if (url.startsWith('/link')) {
-            result = await handleLocalLinkCall(method, url, data);
+        } else if (path.startsWith('/link')) {
+            // Link routes carry their id in the path; strip any query so it is
+            // never parsed as part of the link id.
+            result = await handleLocalLinkCall(method, path, data);
         } else {
             result = await handleLocalApiCall(method, url, data, context);
         }
@@ -111,5 +123,7 @@ export async function bootstrapStandalone() {
     };
 }
 
-// Run immediately (awaited so the import() waits for adapter setup)
-await bootstrapStandalone();
+// No self-run: main.capacitor.js awaits bootstrapStandalone() before it
+// evaluates ./app, so every request goes through the adapter from the first
+// call. (When this module ran itself, the imports of app.js and this file were
+// siblings and app.js's initial API calls raced the adapter setup.)

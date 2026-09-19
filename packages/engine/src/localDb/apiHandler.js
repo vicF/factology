@@ -61,9 +61,33 @@ const BREADTH_CAP = 8;
 
 /**
  * Handle /user endpoint (auth check).
- * In offline mode, returns a local anonymous user.
+ *
+ * Offline there is no server account: the session user IS the unlocked PRIMARY
+ * identity (it owns everything the app creates and is what object.owner is
+ * compared against for edit/delete rights). Returning a hardcoded anonymous
+ * user here used to overwrite the identity session at boot, leaving every
+ * object owned by the identity uneditable.
+ *
+ * @param {object} [context]
+ * @param {string} [context.userThingId] - the unlocked primary identity's id
+ * @param {string} [context.userName]
  */
-export async function handleLocalUserCall() {
+export async function handleLocalUserCall(context = {}) {
+    const thingId = context.userThingId || null;
+    if (thingId) {
+        return {
+            data: {
+                id: thingId,
+                name: context.userName || 'Offline User',
+                email: 'offline@local',
+                thing_id: thingId,
+                is_admin: false,
+            },
+            status: 200,
+        };
+    }
+    // No identity unlocked (guest / pre-identity install): keep the anonymous
+    // stand-in so read-only browsing of shared data still works.
     return {
         data: {
             id: 1,

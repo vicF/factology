@@ -416,11 +416,9 @@ const truncateText = (text, maxLength) => {
 const cloneSearchResult = async (thing) => {
     try {
         const response = await axios.post(`/object/${thing.thing_id}/clone`);
-        const newData = response.data?.data;
-        if (!newData || !newData.thing_id) {
-            console.error('Clone API returned invalid data', response.data);
-            return;
-        }
+
+        const newData = response.data;
+
         router.push({ name: 'object', params: { uid: newData.thing_id }, query: { edit: '1' } });
     } catch (error) {
         console.error('Failed to clone object:', error);
@@ -681,11 +679,12 @@ onUnmounted(() => {
     vertical-align: middle;
     font-size: 0.75rem;
 }
-.result-title:hover .clone-icon-btn {
-    opacity: 1;
-}
+
 .clone-icon-btn:hover {
     background: rgba(13, 110, 253, 0.1);
     color: #0d6efd;
 }
+
+
+
 </style>

@@ -10,7 +10,7 @@ import { getDb, clearAll } from '@factology/engine/localDb/index.js';
 import { seedLocalDb } from '@factology/engine/localDb/seeder.js';
 import { saveLink } from '@factology/engine/localDb/links.js';
 import { UUID } from '@factology/engine/constants/uuid.js';
-import { handleLocalApiCall, handleLocalLinkCall } from '@factology/engine/localDb/apiHandler.js';
+import { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall } from '@factology/engine/localDb/apiHandler.js';
 
 // Current user, injected by the standalone adapter on create/update.
 const CURRENT_USER = UUID.VICTOR_FOKIN;
@@ -341,6 +341,26 @@ describe('Local API link creation (POST /link)', () => {
     });
 });
 
+describe('Local API /user (offline session mirror)', () => {
+    it('reports the unlocked identity as the session user', async () => {
+        const res = await handleLocalUserCall({
+            userThingId: 'identity-aaa',
+            userName: 'Виктор',
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.data.thing_id).toBe('identity-aaa');
+        expect(res.data.id).toBe('identity-aaa'); // checkAuth() requires `id`
+        expect(res.data.name).toBe('Виктор');
+    });
+
+    it('falls back to the anonymous stand-in when no identity is unlocked', async () => {
+        const res = await handleLocalUserCall();
+
+        expect(res.data.thing_id).toBe('local-user-thing');
+    });
+});
+
 describe('Local API multilevel related (mirrors server depth)', () => {
     const A = 'aaaaaaaa-0000-4000-a000-0000000000a1';
     const B = 'aaaaaaaa-0000-4000-a000-0000000000a2';
@@ -398,6 +418,19 @@ describe('Local API multilevel related (mirrors server depth)', () => {
         // so B (a recursed node) carries an empty target.links.
         const bLink = obj.links.find(l => l.target?.thing_id === B);
         expect(bLink.target.links).toEqual([]);
+    });
+
+    it('GET /object/{id}/graph?depth=N walks N levels of the offline graph', async () => {
+        const depth1 = await handleLocalApiCall('get', `/object/${A}/graph?depth=1`);
+        const ids1 = depth1.data.data.nodes.map(n => n.thing_id).sort();
+        expect(ids1).toEqual([A, B].sort()); // one hop only
+
+        const depth2 = await handleLocalApiCall('get', `/object/${A}/graph?depth=2`);
+        const ids2 = depth2.data.data.nodes.map(n => n.thing_id).sort();
+        expect(ids2).toEqual([A, B, C].sort()); // A → B → C
+
+        expect(depth2.data.data.root_id).toBe(A);
+        expect(depth2.data.data.edges.map(e => e.link_id).sort()).toEqual(['lnk-ab', 'lnk-bc']);
     });
 
     it('search with depth in the body attaches related links', async () => {

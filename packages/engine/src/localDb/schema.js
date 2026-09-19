@@ -1,9 +1,10 @@
 // packages/engine/src/localDb/schema.js
 
 import Dexie from 'dexie';
+import { upgradeJsonColumns } from './jsonColumns.js';
 
 export const DB_NAME = 'factology_local';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 /**
  * Define the local IndexedDB schema via Dexie.
@@ -122,6 +123,12 @@ export function createDatabase() {
 
     // v3: external_links store (see STORE_V3). No data migration required.
     db.version(3).stores(STORE_V3);
+
+    // v4: decode jsonb columns that were imported as raw Postgres text.
+    // Exports (and therefore imports) carried `name_translations` & friends as
+    // JSON strings, so an install that imported such a file shows untranslated
+    // (English) class/object names even after switching the UI language.
+    db.version(4).stores(STORE_V3).upgrade(upgradeJsonColumns);
 
     return db;
 }
