@@ -959,6 +959,88 @@ class ApiController extends BaseController
         ]);
     }
 
+    public function cloneObject(string $id): \Illuminate\Http\JsonResponse
+    {
+        $source = DB::table('things')->where('thing_id', $id)->first();
+        if (!$source) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+
+        $newId = (string) \Illuminate\Support\Str::uuid();
+
+        DB::transaction(function () use ($source, $newId) {
+            $data = (array) $source;
+            $data['thing_id'] = $newId;
+            $data['record_created'] = now();
+            $data['record_updated'] = now();
+            unset($data['created_at'], $data['updated_at'], $data['name_search_text'], $data['description_search_text']);
+            DB::table('things')->insert($data);
+
+            $links = DB::table('links')
+                ->where(function ($q) use ($source) {
+                    $q->where('one_thing_id', $source->thing_id)
+                      ->orWhere('other_thing_id', $source->thing_id);
+                })
+                ->where('deleted', false)
+                ->get();
+
+            foreach ($links as $link) {
+                $newLink = (array) $link;
+                unset($newLink['link_id'], $newLink['record_updated']);
+
+                if ($newLink['one_thing_id'] === $source->thing_id) {
+                    $newLink['one_thing_id'] = $newId;
+                }
+                if ($newLink['other_thing_id'] === $source->thing_id) {
+                    $newLink['other_thing_id'] = $newId;
+                }
+
+                try {
+                    DB::table('links')->insert($newLink);
+                } catch (\Throwable $e) {
+                    Log::warning('Could not copy link during clone: ' . $e->getMessage());
+                }
+            }
+
+            DB::table('links')->insert([
+                'one_thing_id'   => $newId,
+                'link_type_id'   => UUID::DUPLICATE_OF,
+                'other_thing_id' => $source->thing_id,
+                'description'    => '',
+                'public'         => 0,
+                'deleted'        => false,
+            ]);
+
+            $extLinks = DB::table('external_links')
+                ->where('thing_id', $source->thing_id)
+                ->where('deleted', false)
+                ->get();
+            foreach ($extLinks as $el) {
+                DB::table('external_links')->insert([
+                    'id'       => (string) \Illuminate\Support\Str::uuid(),
+                    'thing_id' => $newId,
+                    'url'      => $el->url,
+                    'deleted'  => false,
+                ]);
+            }
+
+            try {
+                $thumbPath = \App\Models\Classes\Everything::getThumbPathById($source->thing_id, true);
+                if ($thumbPath && file_exists($thumbPath)) {
+                    \App\Services\ThumbStore::put($newId, file_get_contents($thumbPath), 'small');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not copy thumb during clone: ' . $e->getMessage());
+            }
+        });
+
+        $data = Everything::getDataById($newId, 1);
+        return response()->json([
+            'data'    => $data,
+            'success' => true,
+        ]);
+    }
+
     /**
      * Delete object
      *

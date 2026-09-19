@@ -17,6 +17,7 @@ import { getDb } from './index.js';
 import { SYNC_STATUS } from '../constants/syncStatus.js';
 import { newLinkId } from './links.js';
 import { postImportProgress } from '../utils/importProgress.js';
+import { LINK_JSON_COLUMNS, THING_JSON_COLUMNS, normalizeJsonColumns } from './jsonColumns.js';
 
 const CHUNK = 500;
 const TRIPLET = (l) => `${l.one_thing_id}|${l.link_type_id}|${l.other_thing_id}`;
@@ -122,7 +123,12 @@ export async function importExportData(file, ownerThingId) {
             continue;
         }
 
-        thingWrites.push({ ...thing, ...localFields() });
+        // Export files carry jsonb columns as raw Postgres text (see
+        // jsonColumns.js) — decode them so translations resolve in the UI.
+        thingWrites.push({
+            ...normalizeJsonColumns({ ...thing }, THING_JSON_COLUMNS),
+            ...localFields(),
+        });
         report.imported++;
         importedThingIds.add(thing.thing_id);
     }
@@ -191,7 +197,7 @@ export async function importExportData(file, ownerThingId) {
         if (!oneOk || !otherOk) continue;
 
         linkWrites.push({
-            ...link,
+            ...normalizeJsonColumns({ ...link }, LINK_JSON_COLUMNS),
             link_id: newLinkId(),
             ...localFields(),
         });

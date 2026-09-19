@@ -58,6 +58,14 @@
                                                 <RouterLink :to="{ name: 'object', params: { uid: thing.thing_id } }" class="title-link">
                                                     {{ $objectName(thing) }}
                                                 </RouterLink>
+                                                <button
+                                                    v-if="authStore?.authenticated && thing.type === 3"
+                                                    class="clone-icon-btn"
+                                                    :title="$t('Clone')"
+                                                    @click="cloneSearchResult(thing)"
+                                                >
+                                                    <i class="bi bi-copy"></i>
+                                                </button>
                                             </div>
                                         </div>
 
@@ -153,7 +161,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { eventBus } from "@factology/engine/eventBus.js";
@@ -221,6 +229,7 @@ const props = defineProps({
 defineOptions({ name: "Search" });
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 const searchStore = useSearchStore();
 const authStore = useAuthStore();
@@ -402,6 +411,16 @@ const truncateText = (text, maxLength) => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+};
+
+const cloneSearchResult = async (thing) => {
+    try {
+        const response = await axios.post(`/object/${thing.thing_id}/clone`);
+        const newData = response.data;
+        router.push({ name: 'object', params: { uid: newData.thing_id }, query: { edit: '1' } });
+    } catch (error) {
+        console.error('Failed to clone object:', error);
+    }
 };
 
 // Monotonic request sequence: only the latest search request may apply its
@@ -641,4 +660,31 @@ onUnmounted(() => {
     letter-spacing: 0.3px;
     vertical-align: middle;
 }
+
+.clone-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: #6c757d;
+    padding: 2px 4px;
+    margin-left: 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background-color 0.15s;
+    vertical-align: middle;
+    font-size: 0.75rem;
+}
+
+.result-title:hover .clone-icon-btn {
+    opacity: 1;
+}
+
+.clone-icon-btn:hover {
+    background: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
 </style>

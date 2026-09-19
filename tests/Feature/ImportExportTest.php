@@ -87,6 +87,51 @@ class ImportExportTest extends TestCase
         $this->assertStringNotContainsString($hiddenThing, $content);
     }
 
+    /**
+     * jsonb columns must be decoded before they are encoded into the export.
+     * A raw query-builder select hands back Postgres jsonb TEXT, so skipping
+     * the decode nests a JSON string where an object belongs — every importer
+     * then stores a string, and localized names silently fall back to English.
+     *
+     * @test
+     */
+    public function export_decodes_jsonb_columns()
+    {
+        $user = $this->createTestUser()->getUser();
+        $user->thing_id = $this->createUserThing($user);
+        $user->save();
+        Sanctum::actingAs($user, ['*']);
+
+        $serverUuid = DB::table('settings')->where('key', 'server_uuid')->value('value');
+        $thingId = uuid_create();
+        DB::table('things')->insert([
+            'thing_id'           => $thingId,
+            'name'               => 'Human',
+            'type'               => UUID::G_THING,
+            'public'             => true,
+            'owner'              => $user->thing_id,
+            'server_uuid'        => $serverUuid,
+            'name_translations'  => json_encode(['ru' => 'Человек', 'lang' => 'en']),
+            'start_meta'         => json_encode(['era' => 'ce']),
+        ]);
+
+        $response = $this->get(self::API_PREFIX . '/export');
+        $response->assertStatus(200);
+
+        ob_start();
+        $response->baseResponse->sendContent();
+        $content = ob_get_clean();
+
+        $data = json_decode($content, true);
+        $exported = collect($data['data']['things'])->firstWhere('thing_id', $thingId);
+
+        $this->assertNotNull($exported, 'Exported thing missing from the export.');
+        $this->assertIsArray($exported['name_translations']);
+        $this->assertSame('Человек', $exported['name_translations']['ru']);
+        $this->assertIsArray($exported['start_meta']);
+        $this->assertSame('ce', $exported['start_meta']['era']);
+    }
+
     /** @test */
     public function admin_can_access_export()
     {

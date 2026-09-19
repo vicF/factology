@@ -53,6 +53,7 @@
                             <div v-if="authenticated && editMode" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
                                 <button class="btn btn-primary" @click="openEditModal" :disabled="!canEdit" :title="canEdit ? $t('Edit this object') : $t('Only the owner can edit this object')">{{ $t('Edit') }}</button>
+                                <button class="btn btn-info" @click="cloneCurrentObject" :title="$t('Create a copy of this object')"><i class="bi bi-copy"></i> {{ $t('Clone') }}</button>
                                 <button class="btn btn-success" @click="openCreateLinkModal" :title="$t('Link this object to another')">{{ $t('Link') }}</button>
                                 <button class="btn btn-danger" @click="deleteObject" :disabled="!canDelete" :title="canDelete ? $t('Delete this object') : $t('Only the owner can delete this object')">{{ $t('Delete') }}</button>
                             </div>
@@ -926,6 +927,23 @@ const deleteObject = async () => {
     }
 };
 
+// ── Clone ──────────────────────────────────────────────────────────────────
+const cloneCurrentObject = async () => {
+    if (!object.value?.thing_id) return;
+    try {
+        const response = await axios.post(`/object/${object.value.thing_id}/clone`);
+        const newData = response.data?.data;
+        if (!newData || !newData.thing_id) {
+            alert(t('Clone failed'));
+            return;
+        }
+        router.push({ name: 'object', params: { uid: newData.thing_id }, query: { edit: '1' } });
+    } catch (error) {
+        console.error('Clone error:', error.response || error);
+        alert(error.response?.data?.message || error.message || t('Failed to clone object'));
+    }
+};
+
 const deleteLink = async (link_id) => {
     if (!link_id) return;
     if (!confirm(t('Are you sure you want to delete this link?'))) return;
@@ -1137,6 +1155,14 @@ watch(() => object.value, (newObject) => {
     }
     if (mapInitialized.value && mapComponentRef.value && newObject) {
         mapComponentRef.value.updateData(newObject);
+    }
+    // Auto-open edit modal when ?edit=1 is in the URL
+    if (newObject && route.query?.edit === '1') {
+        // Use nextTick to let the watcher settle, then clear the query param
+        nextTick(() => {
+            openEditModal();
+            router.replace({ query: {} });
+        });
     }
 }, { deep: true });
 </script>

@@ -530,6 +530,15 @@
                                 </div>
                                 <div class="modal-footer border-0 p-0 m-0">
                                     <button
+                                        v-if="isEditMode"
+                                        type="button"
+                                        class="btn btn-info"
+                                        @click="cloneObject"
+                                        :title="$t('Create a copy of this object')"
+                                    >
+                                        <i class="bi bi-copy me-1"></i>{{ $t('Clone') }}
+                                    </button>
+                                    <button
                                         type="button"
                                         class="btn btn-secondary"
                                         data-bs-dismiss="modal"
@@ -1853,6 +1862,38 @@ const submitForm = async () => {
         errorDetails.value = resp.errors || '';
         showError.value = true;
         isSubmitting = false;
+    }
+};
+
+// ── Clone ──────────────────────────────────────────────────────────────────
+const cloning = ref(false);
+const cloneObject = async () => {
+    if (cloning.value || !isEditMode.value || !props.object?.thing_id) return;
+    try {
+        cloning.value = true;
+        const response = await axios.post(`/object/${props.object.thing_id}/clone`);
+        const newData = response.data?.data;
+        if (!newData || !newData.thing_id) {
+            throw new Error(t('Clone failed'));
+        }
+
+        // Navigate to the new object in edit mode
+        const modalElement = document.getElementById(modalId);
+        if (modalElement) modalElement.removeEventListener('hide.bs.modal', handleHideModal);
+        if (modalInstance) modalInstance.hide();
+        emit('close');
+        // Small delay to let the modal close before navigation
+        setTimeout(() => {
+            router.push({ name: 'object', params: { uid: newData.thing_id }, query: { edit: '1' } });
+        }, 150);
+    } catch (error) {
+        console.error('Clone error:', error.response || error);
+        const resp = error.response?.data || {};
+        errorMessage.value = resp.message || error.message || t('Failed to clone object');
+        errorDetails.value = resp.errors || '';
+        showError.value = true;
+    } finally {
+        cloning.value = false;
     }
 };
 
