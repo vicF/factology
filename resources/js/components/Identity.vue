@@ -391,7 +391,11 @@ const dataImportPct = computed(() => {
     const { things, links } = dataProg.value;
     const total = things.total + links.total;
     if (!total) return 0;
-    return Math.round(((things.done + links.done) / total) * 100);
+    // Don't round to 100 until both phases are factually complete — the last
+    // item's progress is deferred until after the DB write (importData.js), so
+    // the combined percentage can be just under 100 while chunkedPut runs.
+    if (things.done >= things.total && links.done >= links.total) return 100;
+    return Math.floor(((things.done + links.done) / total) * 100);
 });
 const importIdentityId = ref(null);
 const unlockTarget = ref(null);
