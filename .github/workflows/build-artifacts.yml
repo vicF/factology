@@ -122,6 +122,12 @@ jobs:
           name: desktop-electron
           path: desktop-electron
 
+      - name: Delete existing release (if any)
+        run: |
+          gh release delete "${{ github.ref_name }}" --yes --repo "${{ github.repository }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
