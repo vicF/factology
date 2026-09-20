@@ -4,6 +4,13 @@
 // Includes the standard app AND the local DB adapter.
 // This separate entry ensures the adapter code cannot be tree-shaken.
 
+function dbg(msg) {
+    const el = document.getElementById('debug-log');
+    if (el) el.textContent += msg + '\n';
+}
+
+dbg('STEP 0: main.capacitor.js evaluating');
+
 import { bootstrapStandalone } from './localDb/standaloneBootstrap';
 
 // ORDER MATTERS: app.js starts its initial API calls (auth, public settings)
@@ -17,5 +24,13 @@ import { bootstrapStandalone } from './localDb/standaloneBootstrap';
 // server (no backend) every one of them 404'd, which left the class tree empty
 // behind a blocking "Error loading class tree" alert.
 
+dbg('STEP 1: awaiting bootstrapStandalone()');
 await bootstrapStandalone();
-await import('./app');
+dbg('STEP 2: bootstrapStandalone resolved, importing app');
+try {
+    await import('./app');
+    dbg('STEP 3: app imported successfully');
+} catch (e) {
+    dbg('STEP 3 ERROR: ' + (e.message || String(e)));
+    throw e;
+}

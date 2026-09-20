@@ -1,0 +1,33 @@
+
+> dev:capacitor
+> vite --config vite.config.capacitor.js --mode capacitor --host 127.0.0.1 --port 47321 --strictPort
+
+
+  [32m[1mVITE[22m v6.4.3[39m  [42m [1mcapacitor[22m [49m  [2mready in [0m[1m995[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m47321[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m12:33:53 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/backend/sqliteAdapter.js[22m
+[2m12:34:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/backend/sqliteAdapter.js[22m
+[2m12:56:43 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.capacitor.html[22m
+[2m12:56:43 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m1:52:27 PM[22m [36m[1m[vite][22m[39m [32mvite.config.capacitor.js changed, restarting server...[39m
+[2m1:52:30 PM[22m [36m[1m[vite][22m[39m server restarted.
+[2m1:53:28 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mresources/js/main.capacitor.js[22m
+[2m1:53:43 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mindex.capacitor.html[22m
+[2m1:54:20 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mresources/js/localDb/standaloneBootstrap.js[22m
+[2m1:54:58 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.capacitor.html[22m
+[2m1:54:58 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m1:54:58 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.capacitor.html[22m
+[2m1:54:58 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/src/main/assets/public/index.html[22m
+[2m1:55:09 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/build/intermediates/assets/debug/mergeDebugAssets/public/index.capacitor.html[22m
+[2m1:55:09 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mandroid/app/build/intermediates/assets/debug/mergeDebugAssets/public/index.html[22m
+[2m3:35:40 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/schema.js[22m
+[2m3:36:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/schema.js[22m
+[2m3:37:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/schema.js[22m
+[2m3:37:41 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m
+[2m3:39:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m
+[2m3:40:57 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m
+[2m3:40:57 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m
+[2m3:40:57 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m
+[2m3:40:57 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mpackages/engine/src/localDb/apiHandler.js[22m

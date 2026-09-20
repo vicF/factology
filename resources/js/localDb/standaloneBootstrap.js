@@ -12,31 +12,40 @@ import axios from 'axios';
 import { createDatabase } from '@factology/engine/localDb/schema.js';
 
 // Initialize the database schema immediately
+window.dbg && window.dbg('BS: createDatabase() start');
 createDatabase();
+window.dbg && window.dbg('BS: createDatabase() done');
 
 /**
  * Set up the local Dexie adapter on axios.
- * Replaces the default HTTP adapter with one that routes all
- * requests to the local IndexedDB database.
  */
 export async function bootstrapStandalone() {
+    window.dbg && window.dbg('BS: bootstrapStandalone() start');
+
     const { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall, seedDemoData } =
         await import('@factology/engine/localDb/apiHandler.js');
+    window.dbg && window.dbg('BS: apiHandler imported');
 
     // Seed demo data on first run
+    window.dbg && window.dbg('BS: seedDemoData() start');
     await seedDemoData();
+    window.dbg && window.dbg('BS: seedDemoData() done');
 
     // Resolve the on-device images folder so thumb URLs are stable from the
     // first render (offline native builds).
     try {
+        window.dbg && window.dbg('BS: initDeviceThumbs() start');
         const { initDeviceThumbs } = await import('@factology/engine/media/deviceImages.js');
         await initDeviceThumbs();
+        window.dbg && window.dbg('BS: initDeviceThumbs() done');
     } catch (e) {
-        // web/browser fallback — no device folder available
+        window.dbg && window.dbg('BS: initDeviceThumbs() failed: ' + (e?.message || String(e)));
     }
 
+    window.dbg && window.dbg('BS: importing stores');
     const { useAuthStore } = await import('../stores/auth');
     const { useIdentityStore } = await import('../stores/identity');
+    window.dbg && window.dbg('BS: stores imported, registering adapter');
 
     // Register the custom adapter
     axios.defaults.adapter = async (config) => {

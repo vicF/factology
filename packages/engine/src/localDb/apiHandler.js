@@ -380,9 +380,8 @@ async function handleSearch(body, context = {}) {
         // text) would otherwise read every object of that type from IndexedDB.
         const classIds = new Set(params.classes);
         const classLinks = await getDb().links
-            .where('other_thing_id')
-            .anyOf([...classIds])
-            .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+            .where('[other_thing_id+link_type_id]')
+            .anyOf([...classIds].map(id => [id, UUID.LINK_TO_CLASS]))
             .toArray();
         const candidateIds = [...new Set(classLinks.map(l => l.one_thing_id))];
         const candidates = candidateIds.length ? await getDb().objects.bulkGet(candidateIds) : [];
@@ -446,8 +445,7 @@ async function handleSearch(body, context = {}) {
         listLinksForThings(page.map(o => o.thing_id)),
     ]);
 
-    const thingsWithLinks = [];
-    for (const obj of page) {
+    const thingsWithLinks = await Promise.all(page.map(async (obj) => {
         // Class membership (LINK_TO_CLASS) is not a relation — exclude it from
         // the related-links enrichment (mirrors the server).
         const relatedLinks = (linksByThing.get(obj.thing_id) || [])
@@ -456,13 +454,13 @@ async function handleSearch(body, context = {}) {
             ? await enrichNested(relatedLinks, obj.thing_id, depth, null, SEARCH_BREADTH, SEARCH_BREADTH, visibleOwners)
             : undefined;
         const classes = classesByThing.get(obj.thing_id) || [];
-        thingsWithLinks.push({
+        return {
             ...obj,
             classes,
             class: classes[0] ?? null,
             links: links && links.length > 0 ? links : undefined,
-        });
-    }
+        };
+    }));
 
     return {
         data: { things: thingsWithLinks },
@@ -482,9 +480,8 @@ async function handleSearch(body, context = {}) {
 async function resolveClassesInfo(thingId) {
     const db = getDb();
     const classLinks = await db.links
-        .where('one_thing_id')
-        .equals(thingId)
-        .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+        .where('[one_thing_id+link_type_id]')
+        .equals([thingId, UUID.LINK_TO_CLASS])
         .toArray();
 
     const classObjs = await Promise.all(
@@ -506,9 +503,8 @@ async function resolveClassesInfoFor(thingIds) {
     if (!thingIds.length) return new Map();
 
     const classLinks = await db.links
-        .where('one_thing_id')
-        .anyOf(thingIds)
-        .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+        .where('[one_thing_id+link_type_id]')
+        .anyOf(thingIds.map(id => [id, UUID.LINK_TO_CLASS]))
         .toArray();
 
     const classIds = [...new Set(classLinks.map(l => l.other_thing_id))];
@@ -846,9 +842,8 @@ async function processLinksForObject(thingId, data) {
             // server's addLink) so re-saving the same class updates instead of
             // inserting a duplicate row.
             const existing = await db.links
-                .where('one_thing_id')
-                .equals(thingId)
-                .and(l => l.link_type_id === UUID.LINK_TO_CLASS && l.other_thing_id === cls.other_thing_id)
+                .where('[one_thing_id+link_type_id+other_thing_id]')
+                .equals([thingId, UUID.LINK_TO_CLASS, cls.other_thing_id])
                 .first();
             await saveLink({
                 link_id: cls.link_id || existing?.link_id || newLinkId(),
@@ -861,9 +856,8 @@ async function processLinksForObject(thingId, data) {
         }
         // Diff: remove class links the caller no longer wants (edit flow).
         const existingClassLinks = await db.links
-            .where('one_thing_id')
-            .equals(thingId)
-            .and(l => l.link_type_id === UUID.LINK_TO_CLASS)
+            .where('[one_thing_id+link_type_id]')
+            .equals([thingId, UUID.LINK_TO_CLASS])
             .toArray();
         for (const link of existingClassLinks) {
             if (!desired.has(link.other_thing_id)) {
