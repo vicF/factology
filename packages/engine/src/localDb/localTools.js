@@ -406,7 +406,7 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
         if (!thing?.thing_id) {
             result.errors.push('Thing missing thing_id, skipping');
             thingsDone++;
-            if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         const id = thing.thing_id;
@@ -416,20 +416,20 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             if (thing.deleted) {
                 result.skipped.things++;
                 thingsDone++;
-                if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+                progress('things', thingsDone, rawThings.length);
                 continue;
             }
             toWrite.push({ ...thing, ...localSyncFields() });
             result.imported.things++;
             thingsDone++;
-            if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
 
         if (conflictMode === 'keep_existing') {
             result.skipped.things++;
             thingsDone++;
-            if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         if (conflictMode === 'latest_wins') {
@@ -438,7 +438,7 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             if (tIm && tEx && (tEx >= tIm)) {
                 result.skipped.things++;
                 thingsDone++;
-                if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+                progress('things', thingsDone, rawThings.length);
                 continue;
             }
         }
@@ -447,13 +447,13 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
             toWrite.push({ ...existing, ...thing, deleted: 1, ...localSyncFields() });
             result.deleted.things++;
             thingsDone++;
-            if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+            progress('things', thingsDone, rawThings.length);
             continue;
         }
         toWrite.push({ ...existing, ...thing, ...localSyncFields() });
         result.imported.things++;
         thingsDone++;
-        if (thingsDone < rawThings.length) progress('things', thingsDone, rawThings.length);
+        progress('things', thingsDone, rawThings.length);
     }
     await bulkPut(db.objects, toWrite);
     progress('things', rawThings.length, rawThings.length);
@@ -480,10 +480,7 @@ export async function localImportJson(input, conflictMode = 'latest_wins') {
 
     const linkWrites = [];
     let linksDone = 0;
-    const progressLink = () => {
-        const nextDone = ++linksDone;
-        if (nextDone < rawLinks.length) progress('links', nextDone, rawLinks.length);
-    };
+    const progressLink = () => progress('links', ++linksDone, rawLinks.length);
     for (const link of rawLinks) {
         if (!link?.one_thing_id || !link?.other_thing_id || !link?.link_type_id) {
             result.skipped.links++;

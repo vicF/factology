@@ -97,7 +97,7 @@ export async function importExportData(file, ownerThingId) {
     let thingsDone = 0;
     for (const thing of thingRows) {
         thingsDone++;
-        if (thingsDone < thingRows.length) progress('things', thingsDone, thingRows.length);
+        progress('things', thingsDone, thingRows.length);
         if (!thing?.thing_id) {
             report.errors.push('Thing row missing thing_id, skipped.');
             continue;
@@ -170,7 +170,7 @@ export async function importExportData(file, ownerThingId) {
     let linksDone = 0;
     for (const link of linkRows) {
         linksDone++;
-        if (linksDone < linkRows.length) progress('links', linksDone, linkRows.length);
+        progress('links', linksDone, linkRows.length);
         if (!link?.one_thing_id || !link?.other_thing_id) continue;
 
         // Dedupe by canonical link_uuid.

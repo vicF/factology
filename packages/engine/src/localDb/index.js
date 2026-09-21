@@ -1,13 +1,51 @@
 // packages/engine/src/localDb/index.js
+//
+// Local database accessor — proxies to a SQLite adapter (Electron, Capacitor)
+// or falls back to Dexie/IndexedDB (browser).
+//
+// Boot sequence:
+//   1. (optional) import and call initDb({ backend: 'sqlite', fileIO: ... })
+//      to prime the SQLite adapter before any other module touches getDb().
+//   2. If initDb was never called, getDb() falls back to Dexie so the browser
+//      path (and existing tests) work without changes.
+//   3. All public CRUD functions (createObject, updateObject, etc.) remain
+//      unchanged — they talk to whichever backend getDb() returned.
 
 import { createDatabase } from './schema.js';
 import { SYNC_STATUS, CHANGE_OP } from '../constants/syncStatus.js';
+import { createBackend } from './backend/index.js';
 
 let _db = null;
+let _initPromise = null;
 
 /**
- * Get or create the singleton Dexie database instance.
- * @returns {Dexie}
+ * Initialise the database backend (SQLite or Dexie). MUST be called before any
+ * getDb() consumer if a non-Dexie backend is desired.
+ *
+ * @param {object} [options]
+ * @param {string} [options.dbName='factology_local']
+ * @param {string} [options.dbPath]  — explicit file path (Node.js only)
+ * @param {object} [options.fileIO]  — custom fileIO adapter (for testing)
+ * @returns {Promise<SQLiteAdapter|Dexie>}
+ */
+export async function initDb(options = {}) {
+    if (_initPromise) return _initPromise;
+    _initPromise = (async () => {
+        const backend = await createBackend(options);
+        _db = backend;
+        return backend;
+    })();
+    return _initPromise;
+}
+
+/**
+ * Get the singleton database instance.
+ *
+ * If initDb() has been called (or this is a platform that auto-detects SQLite),
+ * returns the SQLiteAdapter. Otherwise falls back to a Dexie/IndexedDB instance
+ * so browser contexts work without an explicit init.
+ *
+ * @returns {Dexie|SQLiteAdapter}
  */
 export function getDb() {
     if (!_db) {

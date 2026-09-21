@@ -18,6 +18,17 @@ try {
 export default defineConfig({
     plugins: [
         vue(),
+        // The Capacitor WebViewAssetLoader on Android does not set CORS headers.
+        // Vite's default crossorigin attribute on module scripts causes silent
+        // CORS failures in the WebView — modules load but never execute.
+        {
+            name: 'remove-crossorigin-html',
+            enforce: 'post',
+            transformIndexHtml(html) {
+                // Remove crossorigin from module scripts and modulepreload links
+                return html.replace(/\bcrossorigin\b(="[^"]*")?/g, '');
+            },
+        },
     ],
     css: {
         preprocessorOptions: {

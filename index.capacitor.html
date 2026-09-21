@@ -42,6 +42,8 @@
       <div>Loading...</div>
     </div>
   </div>
+  <pre id="debug-log" style="position:fixed;bottom:0;left:0;right:0;z-index:999;background:rgba(0,0,0,0.85);color:#0f0;font:10px monospace;padding:8px;max-height:200px;overflow-y:auto;margin:0;white-space:pre-wrap;display:none;"></pre>
+  <script>window.dbg = function(msg){ var el=document.getElementById('debug-log'); if(el){ el.textContent += msg + '\n'; el.style.display='block'; } };</script>
   <script type="module" src="/resources/js/main.capacitor.js"></script>
   <script>
     (function(){
