@@ -1,492 +1,564 @@
 // tests-vitest/localDb/sqlite.test.js
 //
-// Tests for the SQLiteAdapter backend (sql.js WASM).
-//
-// These tests create an in-memory SQLite database through a mock fileIO adapter
-// that stores the DB bytes in a Uint8Array — no filesystem access needed.
-//
-// Coverage:
-//   1. CRUD operations (put/get/update/delete/bulkGet/bulkPut)
-//   2. WhereClause queries (equals, anyOf, compound anyOf, first)
-//   3. Collection methods (filter, limit, count, keys, orderBy, reverse, or)
-//   4. Compound index query patterns matching apiHandler.js usage
-//   5. Transaction support
-//   6. Backend detection (createBackend with injected fileIO)
+// Tests for the SQLite adapter (sqliteAdapter.js + backend/index.js).
+// Uses an in-memory buffer for file I/O so no disk writes occur.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import initSqlJs from 'sql.js';
+import { SQLiteAdapter } from '@factology/engine/localDb/backend/sqliteAdapter.js';
+import { createBackend } from '@factology/engine/localDb/backend/index.js';
+import { initDb, getDb, clearAll, SYNC_STATUS } from '@factology/engine/localDb/index.js';
 
-const TABLE_DEFS = {
-    objects: {
-        pk: 'thing_id',
-        columns: [
-            'thing_id TEXT PRIMARY KEY',
-            'type INTEGER',
-            'owner TEXT',
-            'public INTEGER DEFAULT 0',
-            'deleted INTEGER DEFAULT 0',
-            'name TEXT',
-            'data TEXT',
-            '_syncStatus TEXT',
-            '_localRevision INTEGER DEFAULT 0',
-        ],
-    },
-    links: {
-        pk: 'link_id',
-        columns: [
-            'link_id TEXT PRIMARY KEY',
-            'link_uuid TEXT',
-            'one_thing_id TEXT',
-            'link_type_id TEXT',
-            'other_thing_id TEXT',
-            'public INTEGER DEFAULT 0',
-            'data TEXT',
-            '_syncStatus TEXT',
-        ],
-    },
-};
-
-/**
- * Create an in-memory fileIO adapter.
- * Stores the serialised database in a closure variable.
- */
+// ---------------------------------------------------------------------------
+// In-memory fileIO — stores the SQLite binary in a Uint8Array so tests never
+// touch the filesystem.
+// ---------------------------------------------------------------------------
 function createMemoryFileIO() {
-    let buf = null;
+    let buffer = null;
     return {
-        read: async () => {
-            if (!buf) throw new Error('DB file not found');
-            return new Uint8Array(buf);
+        async read() {
+            if (!buffer) throw new Error('DB file not found');
+            return buffer;
         },
-        write: async (data) => {
-            buf = new Uint8Array(data);
+        async write(data) {
+            buffer = new Uint8Array(data);
         },
-        _getBuffer: () => buf,
+        // Expose for introspection
+        getBuffer() { return buffer; },
+        reset() { buffer = null; },
     };
 }
 
-function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
+// ---------------------------------------------------------------------------
+// Helper: create a test SQLiteAdapter with an in-memory fileIO
+// ---------------------------------------------------------------------------
+async function createTestAdapter() {
+    const fileIO = createMemoryFileIO();
+    const adapter = new SQLiteAdapter(fileIO);
+    await adapter.init('test_db');
+    return { adapter, fileIO };
 }
 
-describe('SQLiteAdapter', () => {
-    let SQL;
-    let SQLiteAdapter;
-    let adapter;
-    let fileIO;
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-    beforeAll(async () => {
-        SQL = await initSqlJs();
-        // Dynamic import after sql.js is loaded so the WASM is ready
-        const mod = await import('@factology/engine/localDb/backend/sqliteAdapter.js');
-        SQLiteAdapter = mod.SQLiteAdapter;
-    });
+describe('SQLiteAdapter — table CRUD', () => {
+    let adapter;
 
     beforeEach(async () => {
-        fileIO = createMemoryFileIO();
-        adapter = new SQLiteAdapter(fileIO);
-        await adapter.init('test_factology');
+        const result = await createTestAdapter();
+        adapter = result.adapter;
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+        if (adapter) {
+            adapter.close();
+        }
+    });
+
+    it('initializes and creates all tables', () => {
+        const stmt = adapter._db.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        );
+        const tables = [];
+        while (stmt.step()) {
+            tables.push(stmt.getAsObject().name);
+        }
+        stmt.free();
+        expect(tables).toContain('objects');
+        expect(tables).toContain('links');
+        expect(tables).toContain('media');
+        expect(tables).toContain('pendingChanges');
+        expect(tables).toContain('syncMetadata');
+        expect(tables).toContain('external_links');
+    });
+
+    it('put + get a simple object', async () => {
+        const obj = {
+            thing_id: 't1',
+            name: 'Test Object',
+            type: 3,
+            public: 1,
+            _syncStatus: SYNC_STATUS.LOCAL_ONLY,
+            _localRevision: 1,
+        };
+        await adapter.objects.put(obj);
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved).toBeTruthy();
+        expect(retrieved.name).toBe('Test Object');
+        expect(retrieved.type).toBe(3);
+        expect(retrieved.public).toBe(1);
+        expect(retrieved._syncStatus).toBe(SYNC_STATUS.LOCAL_ONLY);
+    });
+
+    it('put updates an existing record', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'Original', type: 1 });
+        await adapter.objects.put({ thing_id: 't1', name: 'Updated', type: 2 });
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved.name).toBe('Updated');
+        expect(retrieved.type).toBe(2);
+    });
+
+    it('get returns undefined for missing key', async () => {
+        const result = await adapter.objects.get('nonexistent');
+        expect(result).toBeUndefined();
+    });
+
+    it('add throws when key already exists', async () => {
+        await adapter.objects.add({ thing_id: 't1', name: 'First', type: 1 });
+        await expect(
+            adapter.objects.add({ thing_id: 't1', name: 'Second', type: 2 })
+        ).rejects.toThrow(/Key already exists/);
+    });
+
+    it('update modifies specific fields', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'Original', type: 1, public: 0 });
+        await adapter.objects.update('t1', { name: 'Modified', public: 1 });
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved.name).toBe('Modified');
+        expect(retrieved.public).toBe(1);
+        expect(retrieved.type).toBe(1); // unchanged
+    });
+
+    it('delete removes a record', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'To Delete', type: 1 });
+        await adapter.objects.delete('t1');
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved).toBeUndefined();
+    });
+
+    it('bulkDelete removes multiple records', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'A', type: 1 });
+        await adapter.objects.put({ thing_id: 't2', name: 'B', type: 1 });
+        await adapter.objects.put({ thing_id: 't3', name: 'C', type: 1 });
+        await adapter.objects.bulkDelete(['t1', 't3']);
+        expect(await adapter.objects.get('t1')).toBeUndefined();
+        expect(await adapter.objects.get('t2')).toBeTruthy();
+        expect(await adapter.objects.get('t3')).toBeUndefined();
+    });
+
+    it('bulkGet returns records in id order, undefined for missing', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'One', type: 1 });
+        await adapter.objects.put({ thing_id: 't2', name: 'Two', type: 1 });
+        await adapter.objects.put({ thing_id: 't3', name: 'Three', type: 1 });
+        const results = await adapter.objects.bulkGet(['t3', 't1', 'nonexistent', 't2']);
+        expect(results).toHaveLength(4);
+        expect(results[0].thing_id).toBe('t3');
+        expect(results[1].thing_id).toBe('t1');
+        expect(results[2]).toBeUndefined();
+        expect(results[3].thing_id).toBe('t2');
+    });
+
+    it('bulkPut inserts multiple records', async () => {
+        const rows = [
+            { thing_id: 't1', name: 'A', type: 1 },
+            { thing_id: 't2', name: 'B', type: 2 },
+            { thing_id: 't3', name: 'C', type: 3 },
+        ];
+        await adapter.objects.bulkPut(rows);
+        expect(await adapter.objects.get('t1')).toBeTruthy();
+        expect(await adapter.objects.get('t2')).toBeTruthy();
+        expect(await adapter.objects.get('t3')).toBeTruthy();
+    });
+
+    it('clear removes all records from a table', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'A', type: 1 });
+        await adapter.objects.put({ thing_id: 't2', name: 'B', type: 1 });
+        await adapter.objects.clear();
+        const all = await adapter.objects.toArray();
+        expect(all).toHaveLength(0);
+    });
+});
+
+describe('SQLiteAdapter — queries (where/equals, anyOf, or, and, filter)', () => {
+    let adapter;
+
+    beforeEach(async () => {
+        const result = await createTestAdapter();
+        adapter = result.adapter;
+        const objects = [
+            { thing_id: 't1', name: 'Apple', type: 1, owner: 'user1' },
+            { thing_id: 't2', name: 'Banana', type: 2, owner: 'user1' },
+            { thing_id: 't3', name: 'Cherry', type: 1, owner: 'user2' },
+            { thing_id: 't4', name: 'Date', type: 3, owner: 'user1' },
+            { thing_id: 't5', name: 'Elderberry', type: 2, owner: 'user3' },
+        ];
+        await adapter.objects.bulkPut(objects);
+    });
+
+    afterEach(async () => {
         if (adapter) adapter.close();
     });
 
-    // ── CRUD ────────────────────────────────────────────────────────────────
-
-    describe('CRUD', () => {
-        it('put + get a simple object', async () => {
-            const obj = {
-                thing_id: 'obj-1',
-                type: 1,
-                owner: 'owner-1',
-                name: 'Test Object',
-                _syncStatus: 'local',
-            };
-            await adapter.objects.put(obj);
-            const got = await adapter.objects.get('obj-1');
-            expect(got).toBeTruthy();
-            expect(got.thing_id).toBe('obj-1');
-            expect(got.name).toBe('Test Object');
-            expect(got._syncStatus).toBe('local');
-        });
-
-        it('put updates existing row (upsert)', async () => {
-            await adapter.objects.put({ thing_id: 'obj-1', name: 'v1', type: 1 });
-            await adapter.objects.put({ thing_id: 'obj-1', name: 'v2', type: 1 });
-            const got = await adapter.objects.get('obj-1');
-            expect(got.name).toBe('v2');
-        });
-
-        it('bulkGet returns rows in order with undefined for missing keys', async () => {
-            await adapter.objects.put({ thing_id: 'a', name: 'A', type: 1 });
-            await adapter.objects.put({ thing_id: 'b', name: 'B', type: 1 });
-            await adapter.objects.put({ thing_id: 'c', name: 'C', type: 1 });
-            const result = await adapter.objects.bulkGet(['b', 'c', 'nonexistent', 'a']);
-            expect(result).toHaveLength(4);
-            expect(result[0].name).toBe('B');
-            expect(result[1].name).toBe('C');
-            expect(result[2]).toBeUndefined();
-            expect(result[3].name).toBe('A');
-        });
-
-        it('bulkPut inserts multiple rows', async () => {
-            const rows = [
-                { thing_id: 'x', name: 'X', type: 1 },
-                { thing_id: 'y', name: 'Y', type: 1 },
-                { thing_id: 'z', name: 'Z', type: 1 },
-            ];
-            await adapter.objects.bulkPut(rows);
-            const all = await adapter.objects.toArray();
-            expect(all).toHaveLength(3);
-        });
-
-        it('update modifies specific columns', async () => {
-            await adapter.objects.put({ thing_id: 'obj-1', name: 'Original', type: 1, owner: 'me' });
-            await adapter.objects.update('obj-1', { name: 'Updated' });
-            const got = await adapter.objects.get('obj-1');
-            expect(got.name).toBe('Updated');
-            expect(got.owner).toBe('me'); // unchanged
-        });
-
-        it('delete removes row', async () => {
-            await adapter.objects.put({ thing_id: 'obj-1', name: 'Delete me', type: 1 });
-            await adapter.objects.delete('obj-1');
-            const got = await adapter.objects.get('obj-1');
-            expect(got).toBeUndefined();
-        });
-
-        it('clear removes all rows', async () => {
-            await adapter.objects.put({ thing_id: 'a', name: 'A', type: 1 });
-            await adapter.objects.put({ thing_id: 'b', name: 'B', type: 1 });
-            await adapter.objects.clear();
-            const all = await adapter.objects.toArray();
-            expect(all).toHaveLength(0);
-        });
-
-        it('add throws on duplicate key', async () => {
-            await adapter.objects.add({ thing_id: 'dup', name: 'first', type: 1 });
-            await expect(
-                adapter.objects.add({ thing_id: 'dup', name: 'second', type: 1 })
-            ).rejects.toThrow(/Key already exists/);
-        });
-
-        it('stores JSON data as serialised string', async () => {
-            const obj = {
-                thing_id: 'obj-json',
-                type: 1,
-                data: { nested: { value: 42 }, tags: ['a', 'b'] },
-            };
-            await adapter.objects.put(obj);
-            const got = await adapter.objects.get('obj-json');
-            expect(got.data).toEqual({ nested: { value: 42 }, tags: ['a', 'b'] });
-        });
-
-        it('persists and reloads via fileIO', async () => {
-            await adapter.objects.put({ thing_id: 'persist-me', name: 'Persistent', type: 1 });
-            await adapter.save();
-
-            // Close and re-open with the same fileIO
-            adapter.close();
-            const data = fileIO._getBuffer();
-            const reOpenIO = {
-                read: async () => new Uint8Array(data),
-                write: async () => {},
-            };
-            const adapter2 = new SQLiteAdapter(reOpenIO);
-            await adapter2.init('test_factology');
-
-            const got = await adapter2.objects.get('persist-me');
-            expect(got).toBeTruthy();
-            expect(got.name).toBe('Persistent');
-            adapter2.close();
-        });
+    it('where().equals() filters by column', async () => {
+        const results = await adapter.objects.where('type').equals(1).toArray();
+        expect(results).toHaveLength(2);
+        expect(results.map(r => r.thing_id).sort()).toEqual(['t1', 't3']);
     });
 
-    // ── WhereClause ─────────────────────────────────────────────────────────
-
-    describe('WhereClause', () => {
-        beforeEach(async () => {
-            await adapter.objects.put({ thing_id: 'a1', name: 'Alpha', type: 1, owner: 'me' });
-            await adapter.objects.put({ thing_id: 'b1', name: 'Beta', type: 2, owner: 'me' });
-            await adapter.objects.put({ thing_id: 'c1', name: 'Gamma', type: 1, owner: 'you' });
-            await adapter.objects.put({ thing_id: 'd1', name: 'Delta', type: 3, owner: 'me' });
-        });
-
-        it('equals filters by column', async () => {
-            const rows = await adapter.objects.where('type').equals(1).toArray();
-            expect(rows).toHaveLength(2);
-            expect(rows.map(r => r.thing_id).sort()).toEqual(['a1', 'c1']);
-        });
-
-        it('anyOf matches multiple values', async () => {
-            const rows = await adapter.objects.where('type').anyOf([1, 3]).toArray();
-            expect(rows).toHaveLength(3);
-            expect(rows.map(r => r.thing_id).sort()).toEqual(['a1', 'c1', 'd1']);
-        });
-
-        it('anyOf with empty array returns empty', async () => {
-            const rows = await adapter.objects.where('type').anyOf([]).toArray();
-            expect(rows).toHaveLength(0);
-        });
-
-        it('first returns one row or null', async () => {
-            const row = await adapter.objects.where('type').equals(1).first();
-            expect(row).toBeTruthy();
-            expect(row.type).toBe(1);
-
-            const none = await adapter.objects.where('type').equals(999).first();
-            expect(none).toBeNull();
-        });
-
-        it('and() chains a filter function', async () => {
-            const rows = await adapter.objects
-                .where('type').equals(1)
-                .and(r => r.owner === 'me')
-                .toArray();
-            expect(rows).toHaveLength(1);
-            expect(rows[0].thing_id).toBe('a1');
-        });
-
-        it('multiple conditions via .and()', async () => {
-            // Simulate: .where('one_thing_id').equals(id).and(l => l.link_type_id === LINK_TO_CLASS)
-            await adapter.links.put({ link_id: 'l1', one_thing_id: 'a1', link_type_id: 'CLASS', other_thing_id: 'c1' });
-            await adapter.links.put({ link_id: 'l2', one_thing_id: 'a1', link_type_id: 'OTHER', other_thing_id: 'c2' });
-            await adapter.links.put({ link_id: 'l3', one_thing_id: 'b1', link_type_id: 'CLASS', other_thing_id: 'c3' });
-
-            const rows = await adapter.links
-                .where('one_thing_id').equals('a1')
-                .and(l => l.link_type_id === 'CLASS')
-                .toArray();
-            expect(rows).toHaveLength(1);
-            expect(rows[0].link_id).toBe('l1');
-        });
-
-        it('compound anyOf (array of arrays)', async () => {
-            // Simulate: .where('[one_thing_id+link_type_id+other_thing_id]')
-            //          .anyOf([[id1, type, id2], [id3, type, id4]])
-            await adapter.links.put({ link_id: 'l1', one_thing_id: 'a1', link_type_id: 'CLASS', other_thing_id: 'c1' });
-            await adapter.links.put({ link_id: 'l2', one_thing_id: 'a1', link_type_id: 'OTHER', other_thing_id: 'c2' });
-            await adapter.links.put({ link_id: 'l3', one_thing_id: 'b1', link_type_id: 'CLASS', other_thing_id: 'c3' });
-
-            const rows = await adapter.links
-                .where('one_thing_id+link_type_id+other_thing_id')
-                .anyOf([['a1', 'CLASS', 'c1'], ['b1', 'CLASS', 'c3']])
-                .toArray();
-            expect(rows).toHaveLength(2);
-            expect(rows.map(r => r.link_id).sort()).toEqual(['l1', 'l3']);
-        });
+    it('where().equals() with owner', async () => {
+        const results = await adapter.objects.where('owner').equals('user1').toArray();
+        expect(results).toHaveLength(3);
     });
 
-    // ── Collection ──────────────────────────────────────────────────────────
-
-    describe('Collection', () => {
-        beforeEach(async () => {
-            for (let i = 1; i <= 10; i++) {
-                await adapter.objects.put({
-                    thing_id: `obj-${i}`,
-                    name: `Object ${i}`,
-                    type: i <= 5 ? 1 : 2,
-                    _createdAt: i * 1000,
-                });
-            }
-        });
-
-        it('toArray returns all rows', async () => {
-            const all = await adapter.objects.toArray();
-            expect(all).toHaveLength(10);
-        });
-
-        it('count returns row count', async () => {
-            const count = await adapter.objects.count();
-            expect(count).toBe(10);
-        });
-
-        it('filter narrows results', async () => {
-            const rows = await adapter.objects.filter(r => r.type === 1).toArray();
-            expect(rows).toHaveLength(5);
-        });
-
-        it('limit caps results', async () => {
-            const rows = await adapter.objects.limit(3).toArray();
-            expect(rows).toHaveLength(3);
-        });
-
-        it('first returns first row', async () => {
-            const row = await adapter.objects.first();
-            expect(row).toBeTruthy();
-        });
-
-        it('keys returns primary key values', async () => {
-            const keys = await adapter.objects.keys();
-            expect(keys).toHaveLength(10);
-            expect(new Set(keys)).toEqual(
-                new Set(Array.from({ length: 10 }, (_, i) => `obj-${i + 1}`))
-            );
-        });
-
-        it('sortBy + reverse orders results', async () => {
-            const asc = await adapter.objects.sortBy('_createdAt').toArray();
-            expect(asc[0]._createdAt).toBe(1000);
-            expect(asc[asc.length - 1]._createdAt).toBe(10000);
-
-            const desc = await adapter.objects.sortBy('_createdAt').reverse().toArray();
-            expect(desc[0]._createdAt).toBe(10000);
-            expect(desc[desc.length - 1]._createdAt).toBe(1000);
-        });
-
-        it('or() creates OR query', async () => {
-            const rows = await adapter.objects
-                .where('type').equals(1)
-                .or('owner').equals('nonexistent')
-                .toArray();
-            // type 1 rows only (owner never matches)
-            expect(rows).toHaveLength(5);
-        });
+    it('anyOf matches multiple values', async () => {
+        const results = await adapter.objects.where('type').anyOf([1, 3]).toArray();
+        expect(results).toHaveLength(3);
     });
 
-    // ── Compound index query patterns ───────────────────────────────────────
-
-    describe('Compound index patterns (apiHandler.js equivalents)', () => {
-        beforeEach(async () => {
-            // Seed links matching the apiHandler.js query patterns
-            const links = [
-                { link_id: 'l1', one_thing_id: 'obj-1', link_type_id: 'CLASS', other_thing_id: 'cls-1' },
-                { link_id: 'l2', one_thing_id: 'obj-1', link_type_id: 'OTHER', other_thing_id: 'cls-2' },
-                { link_id: 'l3', one_thing_id: 'obj-2', link_type_id: 'CLASS', other_thing_id: 'cls-1' },
-                { link_id: 'l4', one_thing_id: 'obj-3', link_type_id: 'CLASS', other_thing_id: 'cls-2' },
-                { link_id: 'l5', other_thing_id: 'obj-1', link_type_id: 'CLASS', one_thing_id: 'cls-5' },
-                { link_id: 'l6', other_thing_id: 'obj-2', link_type_id: 'CLASS', one_thing_id: 'cls-6' },
-            ];
-            await adapter.links.bulkPut(links);
-        });
-
-        // Equivalent of:
-        //   .where('[other_thing_id+link_type_id]').anyOf(classIds.map(id => [id, LINK_TO_CLASS]))
-        // → .where('other_thing_id').anyOf(classIds).and(l => l.link_type_id === LINK_TO_CLASS)
-        it('Pattern 1: other_thing_id + link_type_id with .and()', async () => {
-            const classIds = ['obj-1', 'obj-2'];
-            const LINK_TO_CLASS = 'CLASS';
-            const rows = await adapter.links
-                .where('other_thing_id').anyOf(classIds)
-                .and(l => l.link_type_id === LINK_TO_CLASS)
-                .toArray();
-            expect(rows).toHaveLength(2);
-            expect(rows.map(r => r.link_id).sort()).toEqual(['l5', 'l6']);
-        });
-
-        // Equivalent of:
-        //   .where('[one_thing_id+link_type_id]').equals([thingId, LINK_TO_CLASS])
-        // → .where('one_thing_id').equals(thingId).and(l => l.link_type_id === LINK_TO_CLASS)
-        it('Pattern 2: one_thing_id + link_type_id .equals tuple via .and()', async () => {
-            const thingId = 'obj-1';
-            const LINK_TO_CLASS = 'CLASS';
-            const rows = await adapter.links
-                .where('one_thing_id').equals(thingId)
-                .and(l => l.link_type_id === LINK_TO_CLASS)
-                .toArray();
-            expect(rows).toHaveLength(1);
-            expect(rows[0].link_id).toBe('l1');
-        });
-
-        // Equivalent of:
-        //   .where('[one_thing_id+link_type_id]').anyOf(thingIds.map(id => [id, LINK_TO_CLASS]))
-        // → .where('one_thing_id').anyOf(thingIds).and(l => l.link_type_id === LINK_TO_CLASS)
-        it('Pattern 3: one_thing_id + link_type_id anyOf via .and()', async () => {
-            const thingIds = ['obj-1', 'obj-2'];
-            const LINK_TO_CLASS = 'CLASS';
-            const rows = await adapter.links
-                .where('one_thing_id').anyOf(thingIds)
-                .and(l => l.link_type_id === LINK_TO_CLASS)
-                .toArray();
-            expect(rows).toHaveLength(2);
-            expect(rows.map(r => r.link_id).sort()).toEqual(['l1', 'l3']);
-        });
-
-        // Equivalent of:
-        //   .where('[one_thing_id+link_type_id+other_thing_id]').equals([thingId, LINK_TO_CLASS, cls])
-        // → .where('one_thing_id').equals(thingId).and(l => ...)
-        it('Pattern 4: triplet .equals via .and()', async () => {
-            const thingId = 'obj-1';
-            const LINK_TO_CLASS = 'CLASS';
-            const cls = 'cls-1';
-            const rows = await adapter.links
-                .where('one_thing_id').equals(thingId)
-                .and(l => l.link_type_id === LINK_TO_CLASS && l.other_thing_id === cls)
-                .toArray();
-            expect(rows).toHaveLength(1);
-            expect(rows[0].link_id).toBe('l1');
-        });
-
-        it('Pattern 5: compound anyOf with tuple array (native SQLiteAdapter support)', async () => {
-            // This is the native Dexie compound index pattern that the SQLiteAdapter
-            // DOES handle via the anyOf(array-of-arrays) path.
-            const rows = await adapter.links
-                .where('one_thing_id+link_type_id+other_thing_id')
-                .anyOf([['obj-1', 'CLASS', 'cls-1'], ['obj-3', 'CLASS', 'cls-2']])
-                .toArray();
-            expect(rows).toHaveLength(2);
-            expect(rows.map(r => r.link_id).sort()).toEqual(['l1', 'l4']);
-        });
+    it('anyOf with empty array matches nothing', async () => {
+        const results = await adapter.objects.where('type').anyOf([]).toArray();
+        expect(results).toHaveLength(0);
     });
 
-    // ── Transaction ─────────────────────────────────────────────────────────
+    it('where().first() returns first match', async () => {
+        const result = await adapter.objects.where('owner').equals('user1').first();
+        expect(result).toBeTruthy();
+        expect(result.owner).toBe('user1');
+    });
 
-    describe('transaction', () => {
-        it('commits successful transaction', async () => {
-            await adapter.transaction('rw', ['objects'], async () => {
-                await adapter.objects.put({ thing_id: 'tx-a', name: 'TX A', type: 1 });
-                await adapter.objects.put({ thing_id: 'tx-b', name: 'TX B', type: 1 });
+    it('where().first() returns null when no match', async () => {
+        const result = await adapter.objects.where('owner').equals('nonexistent').first();
+        expect(result).toBeNull();
+    });
+
+    it('toCollection().filter() applies JS-side filter', async () => {
+        const results = await adapter.objects
+            .filter(obj => obj.name.startsWith('B'))
+            .toArray();
+        expect(results).toHaveLength(1);
+        expect(results[0].name).toBe('Banana');
+    });
+
+    it('and() chains filter after where', async () => {
+        const results = await adapter.objects
+            .where('type').equals(2)
+            .and(obj => obj.owner === 'user1')
+            .toArray();
+        expect(results).toHaveLength(1);
+        expect(results[0].thing_id).toBe('t2');
+    });
+
+    it('or() produces Dexie-compatible OR query', async () => {
+        const results = await adapter.objects
+            .where('type').equals(1)
+            .or('type').equals(3)
+            .toArray();
+        expect(results).toHaveLength(3);
+        const ids = results.map(r => r.thing_id).sort();
+        expect(ids).toEqual(['t1', 't3', 't4']);
+    });
+
+    it('or().equals().or().equals() complex', async () => {
+        const results = await adapter.objects
+            .where('owner').equals('user1')
+            .or('owner').equals('user3')
+            .toArray();
+        expect(results).toHaveLength(4);
+    });
+
+    it('limit restricts result count', async () => {
+        const results = await adapter.objects.where('owner').equals('user1').limit(2).toArray();
+        expect(results).toHaveLength(2);
+    });
+
+    it('count returns count without filters', async () => {
+        const count = await adapter.objects.count();
+        expect(count).toBe(5);
+    });
+
+    it('keys returns primary key values', async () => {
+        const keys = await adapter.objects.where('type').equals(2).keys();
+        expect(keys.sort()).toEqual(['t2', 't5']);
+    });
+
+    it('primaryKeys returns same as keys', async () => {
+        const pks = await adapter.objects.where('type').equals(2).primaryKeys();
+        expect(pks).toHaveLength(2);
+    });
+
+    it('toArray returns all records from a table', async () => {
+        const all = await adapter.objects.toArray();
+        expect(all).toHaveLength(5);
+    });
+
+    it('orderBy sorts results', async () => {
+        const results = await adapter.objects.orderBy('name').toArray();
+        expect(results[0].name).toBe('Apple');
+        expect(results[4].name).toBe('Elderberry');
+    });
+
+    it('reverse flips sort order', async () => {
+        const results = await adapter.objects.orderBy('name').reverse().toArray();
+        expect(results[0].name).toBe('Elderberry');
+        expect(results[4].name).toBe('Apple');
+    });
+});
+
+describe('SQLiteAdapter — compound index anyOf', () => {
+    let adapter;
+
+    beforeEach(async () => {
+        const result = await createTestAdapter();
+        adapter = result.adapter;
+        const links = [
+            { link_id: 'l1', one_thing_id: 'a', link_type_id: 1, other_thing_id: 'b' },
+            { link_id: 'l2', one_thing_id: 'a', link_type_id: 2, other_thing_id: 'c' },
+            { link_id: 'l3', one_thing_id: 'b', link_type_id: 1, other_thing_id: 'c' },
+            { link_id: 'l4', one_thing_id: 'c', link_type_id: 3, other_thing_id: 'd' },
+        ];
+        await adapter.links.bulkPut(links);
+    });
+
+    afterEach(async () => {
+        if (adapter) adapter.close();
+    });
+
+    it('compound anyOf with tuples', async () => {
+        const results = await adapter.links
+            .where('one_thing_id+link_type_id+other_thing_id')
+            .anyOf([['a', 1, 'b'], ['b', 1, 'c']])
+            .toArray();
+        expect(results).toHaveLength(2);
+        const ids = results.map(r => r.link_id).sort();
+        expect(ids).toEqual(['l1', 'l3']);
+    });
+
+    it('compound anyOf with single tuple', async () => {
+        const results = await adapter.links
+            .where('one_thing_id+link_type_id+other_thing_id')
+            .anyOf([['a', 2, 'c']])
+            .toArray();
+        expect(results).toHaveLength(1);
+        expect(results[0].link_id).toBe('l2');
+    });
+
+    it('compound anyOf with no matches returns empty', async () => {
+        const results = await adapter.links
+            .where('one_thing_id+link_type_id+other_thing_id')
+            .anyOf([['x', 9, 'y']])
+            .toArray();
+        expect(results).toHaveLength(0);
+    });
+});
+
+describe('SQLiteAdapter — autoIncrement table (pendingChanges)', () => {
+    let adapter;
+
+    beforeEach(async () => {
+        const result = await createTestAdapter();
+        adapter = result.adapter;
+    });
+
+    afterEach(async () => {
+        if (adapter) adapter.close();
+    });
+
+    it('auto-increments id on put without id', async () => {
+        adapter._run(
+            `INSERT INTO "pendingChanges" ("operation", "table", "recordId", "timestamp") VALUES (?, ?, ?, ?)`,
+            ['INSERT', 'objects', 't1', 1000]
+        );
+        const stmt = adapter._db.prepare('SELECT * FROM "pendingChanges"');
+        stmt.step();
+        const row = stmt.getAsObject();
+        stmt.free();
+        expect(row.id).toBe(1);
+        expect(row.operation).toBe('INSERT');
+    });
+
+    it('pendingChanges.put with explicit id works', async () => {
+        adapter._run(
+            `INSERT INTO "pendingChanges" ("id", "operation", "table", "recordId", "timestamp") VALUES (?, ?, ?, ?, ?)`,
+            [99, 'UPDATE', 'objects', 't1', 2000]
+        );
+        const stmt = adapter._db.prepare('SELECT * FROM pendingChanges WHERE id = 99');
+        stmt.step();
+        const row = stmt.getAsObject();
+        stmt.free();
+        expect(row.recordId).toBe('t1');
+    });
+});
+
+describe('SQLiteAdapter — transaction', () => {
+    let adapter;
+
+    beforeEach(async () => {
+        const result = await createTestAdapter();
+        adapter = result.adapter;
+    });
+
+    afterEach(async () => {
+        if (adapter) adapter.close();
+    });
+
+    it('commits successful transaction', async () => {
+        await adapter.transaction('rw', [adapter.objects], async () => {
+            await adapter.objects.put({ thing_id: 't1', name: 'In Transaction', type: 1 });
+            await adapter.objects.put({ thing_id: 't2', name: 'Also In Tx', type: 2 });
+        });
+        const t1 = await adapter.objects.get('t1');
+        const t2 = await adapter.objects.get('t2');
+        expect(t1.name).toBe('In Transaction');
+        expect(t2.name).toBe('Also In Tx');
+    });
+
+    it('rolls back on error', async () => {
+        await adapter.objects.put({ thing_id: 't1', name: 'Before Rollback', type: 1 });
+        try {
+            await adapter.transaction('rw', [adapter.objects], async () => {
+                await adapter.objects.put({ thing_id: 't2', name: 'Will Fail', type: 2 });
+                throw new Error('Rollback trigger');
             });
-            const count = await adapter.objects.count();
-            expect(count).toBe(2);
-        });
+        } catch (e) {
+            // expected
+        }
+        const t1 = await adapter.objects.get('t1');
+        expect(t1).toBeTruthy();
+        const t2 = await adapter.objects.get('t2');
+        expect(t2).toBeUndefined();
+    });
+});
 
-        it('rolls back on error', async () => {
-            await adapter.objects.put({ thing_id: 'before-tx', name: 'Before', type: 1 });
-            try {
-                await adapter.transaction('rw', ['objects'], async () => {
-                    await adapter.objects.put({ thing_id: 'tx-fail', name: 'Fail', type: 1 });
-                    throw new Error('boom');
-                });
-            } catch (e) {
-                expect(e.message).toBe('boom');
-            }
-            // Row inserted inside the transaction should be gone
-            const failRow = await adapter.objects.get('tx-fail');
-            expect(failRow).toBeUndefined();
-            // Row inserted before the transaction should still be there
-            const before = await adapter.objects.get('before-tx');
-            expect(before).toBeTruthy();
-        });
+describe('SQLiteAdapter — JSON serialization', () => {
+    let adapter;
+
+    beforeEach(async () => {
+        const result = await createTestAdapter();
+        adapter = result.adapter;
     });
 
-    // ── Backend / createBackend ──────────────────────────────────────────────
+    afterEach(async () => {
+        if (adapter) adapter.close();
+    });
 
-    describe('createBackend with injected fileIO', () => {
-        it('creates SQLiteAdapter when fileIO is provided', async () => {
-            const { createBackend } = await import('@factology/engine/localDb/backend/index.js');
-            const io = createMemoryFileIO();
-            const backend = await createBackend({ fileIO: io });
-            expect(backend.constructor.name).toBe('SQLiteAdapter');
-            await backend.objects.put({ thing_id: 'be-test', name: 'Backend test', type: 1 });
-            const got = await backend.objects.get('be-test');
-            expect(got.name).toBe('Backend test');
-            backend.close();
+    it('stores and retrieves data as JSON', async () => {
+        const data = { lat: 51.5, lng: -0.12, zoom: 10 };
+        await adapter.objects.put({
+            thing_id: 't1',
+            name: 'Geo Object',
+            type: 1,
+            data: data,
+        });
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved.data).toEqual(data);
+    });
+
+    it('stores and retrieves tags array as JSON', async () => {
+        const tags = ['tag1', 'tag2', 'tag3'];
+        await adapter.objects.put({
+            thing_id: 't1',
+            name: 'Tagged Object',
+            type: 1,
+            tags: tags,
+        });
+        const retrieved = await adapter.objects.get('t1');
+        expect(retrieved.tags).toEqual(tags);
+    });
+
+    it('stores and retrieves links.data as JSON', async () => {
+        const linkData = { start: '2024-01-01', end: '2024-12-31' };
+        await adapter.links.put({
+            link_id: 'l1',
+            one_thing_id: 'a',
+            link_type_id: 1,
+            other_thing_id: 'b',
+            data: linkData,
+        });
+        const retrieved = await adapter.links.get('l1');
+        expect(retrieved.data).toEqual(linkData);
+    });
+});
+
+describe('SQLiteAdapter — save/load persistence', () => {
+    it('persists data across close and reload', async () => {
+        const fileIO = createMemoryFileIO();
+        const adapter1 = new SQLiteAdapter(fileIO);
+        await adapter1.init('persist_test');
+        await adapter1.objects.put({ thing_id: 't1', name: 'Persisted', type: 1 });
+        await adapter1.objects.put({ thing_id: 't2', name: 'Also Persisted', type: 2 });
+        await adapter1.save();
+        adapter1.close();
+
+        const adapter2 = new SQLiteAdapter(fileIO);
+        await adapter2.init('persist_test');
+        const t1 = await adapter2.objects.get('t1');
+        const t2 = await adapter2.objects.get('t2');
+        expect(t1.name).toBe('Persisted');
+        expect(t2.name).toBe('Also Persisted');
+        adapter2.close();
+    });
+
+    it('initializes empty when no file exists', async () => {
+        const fileIO = {
+            async read() { throw new Error('DB file not found'); },
+            async write(data) {},
+        };
+        const adapter = new SQLiteAdapter(fileIO);
+        await adapter.init('empty_test');
+        const count = await adapter.objects.count();
+        expect(count).toBe(0);
+        adapter.close();
+    });
+});
+
+describe('createBackend — backend selection', () => {
+    it('uses SQLiteAdapter when fileIO is provided', async () => {
+        const fileIO = createMemoryFileIO();
+        const backend = await createBackend({ fileIO, dbName: 'test_select' });
+        expect(backend.constructor.name).toBe('SQLiteAdapter');
+        expect(backend._ready).toBe(true);
+        backend.close();
+    });
+});
+
+describe('initDb/getDb integration', () => {
+    it('initDb with fileIO primes the adapter for getDb', async () => {
+        const fileIO = createMemoryFileIO();
+        const backend = await initDb({ fileIO, dbName: 'test_integration' });
+        expect(backend.constructor.name).toBe('SQLiteAdapter');
+
+        const db = getDb();
+        expect(db).toBe(backend);
+
+        await db.objects.put({ thing_id: 't1', name: 'Integration Test', type: 1 });
+        const obj = await db.objects.get('t1');
+        expect(obj.name).toBe('Integration Test');
+
+        await clearAll();
+    });
+
+    it('enqueueChange and popPendingChanges work via SQLite backend', async () => {
+        const fileIO = createMemoryFileIO();
+        await initDb({ fileIO, dbName: 'test_changes' });
+        const db = getDb();
+
+        await db.pendingChanges.add({
+            operation: 'INSERT',
+            table: 'objects',
+            recordId: 't1',
+            payload: { name: 'test' },
+            serverId: null,
+            timestamp: Date.now(),
         });
 
-        it('falls through to Dexie when no Node.js or fileIO available', async () => {
-            // In jsdom with no fileIO, no electron, no Capacitor, it should
-            // fall back to Dexie. But we need to be careful: Vitest has process.env.VITEST,
-            // so createBackend will pick Node.js path. This test verifies the
-            // fallback logic by checking that the function doesn't crash.
-            const { createBackend } = await import('@factology/engine/localDb/backend/index.js');
-            // With no fileIO we'll either get a SQLiteAdapter (test env) or Dexie (browser)
-            // Either is fine as long as it returns a functioning db
-            const backend = await createBackend({});
-            expect(backend).toBeTruthy();
-            if (backend.constructor.name === 'SQLiteAdapter') {
-                backend.close();
-            }
+        const count = await db.pendingChanges.count();
+        expect(count).toBe(1);
+
+        await db.pendingChanges.add({
+            operation: 'UPDATE',
+            table: 'objects',
+            recordId: 't2',
+            payload: { name: 'updated' },
+            serverId: 'server1',
+            timestamp: Date.now(),
         });
+
+        const all = await db.pendingChanges.toArray();
+        expect(all).toHaveLength(2);
+
+        await clearAll();
+        const afterClear = await db.pendingChanges.count();
+        expect(afterClear).toBe(0);
     });
 });

@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 import { upgradeJsonColumns } from './jsonColumns.js';
 
 export const DB_NAME = 'factology_local';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 /**
  * Define the local IndexedDB schema via Dexie.
@@ -108,6 +108,27 @@ const STORE_V3 = {
     `,
 };
 
+// v5: compound indexes for the most common query patterns on links:
+//   [one_thing_id+link_type_id]  — resolveClassesInfoFor, processLinksForObject
+//   [other_thing_id+link_type_id] — handleSearch class-filtered path
+// These avoid in-memory .and() filters over hundreds of rows.
+const STORE_V5 = {
+    ...STORE_V3,
+    links: `
+        &link_id,
+        link_uuid,
+        one_thing_id,
+        link_type_id,
+        other_thing_id,
+        public,
+        [one_thing_id+link_type_id],
+        [other_thing_id+link_type_id],
+        [one_thing_id+link_type_id+other_thing_id],
+        _syncStatus,
+        _serverId
+    `,
+};
+
 export function createDatabase() {
     const db = new Dexie(DB_NAME);
 
@@ -129,6 +150,12 @@ export function createDatabase() {
     // JSON strings, so an install that imported such a file shows untranslated
     // (English) class/object names even after switching the UI language.
     db.version(4).stores(STORE_V3).upgrade(upgradeJsonColumns);
+
+    // v5: compound indexes [one_thing_id+link_type_id] and
+    // [other_thing_id+link_type_id] on links to avoid in-memory .and() filters
+    // in handleSearch / resolveClassesInfoFor / processLinksForObject.
+    // No data migration needed — Dexie auto-populates new indexes on open.
+    db.version(5).stores(STORE_V5);
 
     return db;
 }

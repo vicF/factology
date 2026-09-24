@@ -135,6 +135,7 @@ class WhereClause {
         this._orderByCol = null;
         this._orderDir = 'ASC';
         this._limitVal = null;
+        this._offsetVal = null;
         this._filterFn = null;
     }
 
@@ -190,6 +191,7 @@ class WhereClause {
         col._orderByCol = this._orderByCol;
         col._orderDir = this._orderDir;
         col._limitVal = this._limitVal;
+        col._offsetVal = this._offsetVal;
         col._filterFn = this._filterFn;
         return col;
     }
@@ -205,6 +207,7 @@ class Collection {
         this._orderByCol = null;
         this._orderDir = 'ASC';
         this._limitVal = null;
+        this._offsetVal = null;
         this._filterFn = null;
     }
 
@@ -221,6 +224,11 @@ class Collection {
 
     limit(n) {
         this._limitVal = n;
+        return this;
+    }
+
+    offset(n) {
+        this._offsetVal = n;
         return this;
     }
 
@@ -268,6 +276,7 @@ class Collection {
         wc._orderByCol = this._orderByCol;
         wc._orderDir = this._orderDir;
         wc._limitVal = this._limitVal;
+        wc._offsetVal = this._offsetVal;
         wc._filterFn = this._filterFn;
         return wc;
     }
@@ -305,12 +314,15 @@ class Collection {
         if (this._limitVal !== null) {
             sql += ` LIMIT ${this._limitVal}`;
         }
+        if (this._offsetVal) {
+            sql += ` OFFSET ${this._offsetVal}`;
+        }
 
         let rows;
         try {
             const stmt = this._db._execPrepared(sql, params);
             rows = this._db._stmtToObjects(stmt, this._tableName);
-            stmt.free();
+            // Don't free — cached by _execPrepared for reuse
         } catch (e) {
             rows = [];
         }
@@ -345,29 +357,20 @@ class Table {
             const sql = `INSERT INTO ${quoteColumn(this.name)} (${colNames}) VALUES (${placeholders})`;
             const vals = cols.map(c => serializeValue(obj[c]));
             this._db._run(sql, vals);
-            const id = this._db._getLastInsertId();
-            return id;
+            this._db._markDirty();
+            return this._db._getLastInsertId();
         }
 
-        const existing = await this.get(obj[this._pk]);
-        if (existing) {
-            // UPDATE
-            const cols = Object.keys(obj);
-            const setClauses = cols.map(c => `${quoteColumn(c)} = ?`).join(', ');
-            const sql = `UPDATE ${quoteColumn(this.name)} SET ${setClauses} WHERE ${quoteColumn(this._pk)} = ?`;
-            const vals = cols.map(c => serializeValue(obj[c]));
-            vals.push(obj[this._pk]);
-            this._db._run(sql, vals);
-        } else {
-            // INSERT
-            const cols = Object.keys(obj);
-            const placeholders = cols.map(() => '?').join(',');
-            const colNames = cols.map(quoteColumn).join(',');
-            const sql = `INSERT INTO ${quoteColumn(this.name)} (${colNames}) VALUES (${placeholders})`;
-            const vals = cols.map(c => serializeValue(obj[c]));
-            this._db._run(sql, vals);
-        }
-
+        // INSERT OR REPLACE with all table columns (same pattern as bulkPut).
+        // Eliminates the preliminary SELECT (this.get()) that doubled SQL ops.
+        const def = this._def;
+        const allCols = def.columns.map(c => c.split(' ')[0].replace(/"/g, ''));
+        const colNames = allCols.map(c => `"${c}"`).join(',');
+        const placeholders = allCols.map(() => '?').join(',');
+        const sql = `INSERT OR REPLACE INTO "${this.name}" (${colNames}) VALUES (${placeholders})`;
+        const vals = allCols.map(c => serializeValue(c in obj ? obj[c] : null));
+        this._db._run(sql, vals);
+        this._db._markDirty();
         return obj[this._pk];
     }
 
@@ -375,7 +378,7 @@ class Table {
         const sql = `SELECT * FROM ${quoteColumn(this.name)} WHERE ${quoteColumn(this._pk)} = ?`;
         const stmt = this._db._execPrepared(sql, [id]);
         const rows = this._db._stmtToObjects(stmt, this.name);
-        stmt.free();
+        // Don't free — cached by _execPrepared for reuse
         return rows.length > 0 ? rows[0] : undefined;
     }
 
@@ -387,15 +390,18 @@ class Table {
         vals.push(id);
         const sql = `UPDATE ${quoteColumn(this.name)} SET ${setClauses} WHERE ${quoteColumn(this._pk)} = ?`;
         this._db._run(sql, vals);
+        this._db._markDirty();
     }
 
     async delete(id) {
         const sql = `DELETE FROM ${quoteColumn(this.name)} WHERE ${quoteColumn(this._pk)} = ?`;
         this._db._run(sql, [id]);
+        this._db._markDirty();
     }
 
     async clear() {
         this._db._run(`DELETE FROM ${quoteColumn(this.name)}`);
+        this._db._markDirty();
     }
 
     async bulkDelete(ids) {
@@ -403,6 +409,7 @@ class Table {
         const placeholders = ids.map(() => '?').join(',');
         const sql = `DELETE FROM ${quoteColumn(this.name)} WHERE ${quoteColumn(this._pk)} IN (${placeholders})`;
         this._db._run(sql, ids);
+        this._db._markDirty();
     }
 
     async add(obj) {
@@ -416,24 +423,48 @@ class Table {
 
     async bulkGet(ids) {
         if (!ids || ids.length === 0) return [];
-        const placeholders = ids.map(() => '?').join(',');
-        const sql = `SELECT * FROM ${quoteColumn(this.name)} WHERE ${quoteColumn(this._pk)} IN (${placeholders})`;
-        const stmt = this._db._execPrepared(sql, ids);
-        const rows = this._db._stmtToObjects(stmt, this.name);
-        stmt.free();
+        const CHUNK_SIZE = 999; // sql.js default SQLITE_MAX_VARIABLE_NUMBER
+        const allRows = [];
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+            const chunk = ids.slice(i, i + CHUNK_SIZE);
+            const placeholders = chunk.map(() => '?').join(',');
+            const sql = `SELECT * FROM ${quoteColumn(this.name)} WHERE ${quoteColumn(this._pk)} IN (${placeholders})`;
+            const stmt = this._db._execPrepared(sql, chunk);
+            const rows = this._db._stmtToObjects(stmt, this.name);
+            // Don't free — cached by _execPrepared for reuse
+            allRows.push(...rows);
+        }
 
         // Dexie bulkGet returns results in the same order as ids, with
         // undefined for missing keys.
         const byId = {};
-        for (const row of rows) {
+        for (const row of allRows) {
             byId[row[this._pk]] = row;
         }
         return ids.map(id => byId[id] !== undefined ? byId[id] : undefined);
     }
 
     async bulkPut(rows) {
-        for (const row of rows) {
-            await this.put(row);
+        if (rows.length === 0) return;
+
+        const def = this._def;
+        const allCols = def.columns.map(c => c.split(' ')[0].replace(/"/g, ''));
+        const colNames = allCols.map(c => `"${c}"`).join(',');
+        const placeholders = allCols.map(() => '?').join(',');
+        const sql = `INSERT OR REPLACE INTO "${this.name}" (${colNames}) VALUES (${placeholders})`;
+
+        this._db._run('BEGIN');
+        try {
+            for (const row of rows) {
+                const stmt = this._db._execPrepared(sql);
+                stmt.bind(allCols.map(c => serializeValue(c in row ? row[c] : null)));
+                stmt.step();
+            }
+            this._db._run('COMMIT');
+            this._db._markDirty();
+        } catch (e) {
+            this._db._run('ROLLBACK');
+            throw e;
         }
     }
 
@@ -460,7 +491,7 @@ class Table {
         return col;
     }
 
-    // Dexie-compatible shortcuts that delegate to Collection
+// Dexie-compatible shortcuts that delegate to Collection
     limit(n) {
         return this.toCollection().limit(n);
     }
@@ -495,12 +526,19 @@ class Table {
 // ---------------------------------------------------------------------------
 
 export class SQLiteAdapter {
-    constructor(fileIO) {
+    constructor(fileIO, initSqlJsOptions = {}) {
         this._fileIO = fileIO; // { read(): Promise<Uint8Array>, write(Uint8Array): Promise<void> }
+        this._initSqlJsOptions = initSqlJsOptions; // passed to initSqlJs() for locateFile etc.
         this._db = null;
         this._SQL = null;
         this._tables = {};
         this._ready = false;
+        this._prepCache = new Map();     // LRU: prepared statements keyed by SQL
+        this._colNames = {};             // tableName → array of column name strings
+        this._saveTimer = null;
+        this._savePromise = null;
+        this._dirty = false;        // true when in-memory data diverges from disk
+        this._autoSaveTimer = null; // setInterval handle for periodic flushing
     }
 
     async init(dbName = 'factology_local') {
@@ -508,7 +546,7 @@ export class SQLiteAdapter {
 
         // Load sql.js WASM (lazy — only when SQLite adapter is actually used)
         const initSqlJs = (await import('sql.js')).default;
-        this._SQL = await initSqlJs();
+        this._SQL = await initSqlJs(this._initSqlJsOptions);
 
         // Try to load existing database file
         let buffer;
@@ -533,6 +571,21 @@ export class SQLiteAdapter {
         this._ensureTables();
 
         this._ready = true;
+
+        // Auto-save: persist dirty data to disk every 2 seconds so user data
+        // is never more than a couple seconds away from a stable file. The
+        // interval is coarse enough that bulk operations (import, seed) only
+        // trigger 1-2 writes, but frequent enough that crash resilience is
+        // reasonable. close() flushes immediately.
+        this._startAutoSave();
+
+        // New database — persist the empty schema to disk immediately so the
+        // file and directory exist (visible in About page, confirmed on disk).
+        if (buffer === null) {
+            const data = this._db.export();
+            await this._fileIO.write(data);
+        }
+
         return this;
     }
 
@@ -601,7 +654,11 @@ export class SQLiteAdapter {
     }
 
     _execPrepared(sql, params = []) {
-        const stmt = this._db.prepare(sql);
+        if (!this._prepCache.has(sql)) {
+            this._prepCache.set(sql, this._db.prepare(sql));
+        }
+        const stmt = this._prepCache.get(sql);
+        stmt.reset();
         if (params.length > 0) {
             stmt.bind(params);
         }
@@ -610,11 +667,13 @@ export class SQLiteAdapter {
 
     _stmtToObjects(stmt, tableName) {
         const rows = [];
-        const def = TABLE_DEFS[tableName];
-        const columnNames = def.columns.map(c => c.split(' ')[0].replace(/"/g, ''));
+        if (!this._colNames[tableName]) {
+            const def = TABLE_DEFS[tableName];
+            this._colNames[tableName] = def.columns.map(c => c.split(' ')[0].replace(/"/g, ''));
+        }
+        const columnNames = this._colNames[tableName];
         while (stmt.step()) {
             const raw = stmt.getAsObject();
-            // Deserialize JSON fields stored as strings
             const obj = {};
             for (const key of Object.keys(raw)) {
                 obj[key] = deserializeValue(raw[key]);
@@ -625,22 +684,71 @@ export class SQLiteAdapter {
     }
 
     _getLastInsertId() {
-        const stmt = this._db.prepare('SELECT last_insert_rowid() as id');
+        const stmt = this._execPrepared('SELECT last_insert_rowid() as id');
         stmt.step();
         const row = stmt.getAsObject();
-        stmt.free();
         return row.id;
     }
 
-    // Persist the database to disk
+    // Mark the database as dirty (in-memory data diverged from disk).
+    // The auto-save timer picks this up within ~2 seconds.
+    _markDirty() {
+        this._dirty = true;
+    }
+
+    // Start the periodic auto-save timer (2-second interval). Persists
+    // dirty data to disk so the SQLite file stays reasonably current.
+    //
+    // NOTE: sql.js's export() finalizes ALL prepared statements and
+    // reopens the database. We must clear the statement cache after
+    // every export so the next query re-prepares from the new handle.
+    _startAutoSave() {
+        if (this._autoSaveTimer) return;
+        this._autoSaveTimer = setInterval(() => {
+            if (!this._dirty || !this._fileIO) return;
+            this._dirty = false;
+            try {
+                const data = this._db.export();
+                // export() freed all statements — clear cache so stale
+                // Statement objects aren't reused (throws "Statement closed")
+                this._prepCache.clear();
+                this._fileIO.write(data).catch(() => { this._dirty = true; });
+            } catch (e) {
+                this._dirty = true;
+            }
+        }, 2000);
+        // Don't prevent Node.js/vitest from exiting
+        if (this._autoSaveTimer.unref) {
+            this._autoSaveTimer.unref();
+        }
+    }
+
+    // Persist the database to disk immediately.
+    // Note: sql.js's export() finalizes all prepared statements, so the
+    // statement cache must be cleared.
     async save() {
         if (!this._fileIO) return;
+        this._dirty = false;
         const data = this._db.export();
+        this._prepCache.clear();
         await this._fileIO.write(data);
     }
 
-    // Close the database
-    close() {
+    // Close the database (flush pending writes, free cached statements)
+    async close() {
+        if (this._autoSaveTimer) {
+            clearInterval(this._autoSaveTimer);
+            this._autoSaveTimer = null;
+        }
+        if (this._fileIO) {
+            const data = this._db.export();
+            await this._fileIO.write(data);
+        }
+        this._dirty = false;
+        for (const stmt of this._prepCache.values()) {
+            stmt.free();
+        }
+        this._prepCache.clear();
         if (this._db) {
             this._db.close();
             this._db = null;

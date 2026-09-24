@@ -9,43 +9,67 @@
 // only loads in standalone mode.
 
 import axios from 'axios';
-import { createDatabase } from '@factology/engine/localDb/schema.js';
+import { initDb, getDb } from '@factology/engine/localDb/index.js';
 
 const dbg = typeof window !== 'undefined' && window.dbg ? window.dbg : () => {};
 
-// Initialize the database schema immediately
-dbg('boot: schema createDatabase...');
-createDatabase();
-dbg('boot: schema done');
-
 /**
  * Set up the local Dexie adapter on axios.
- * Replaces the default HTTP adapter with one that routes all
- * requests to the local IndexedDB database.
  */
 export async function bootstrapStandalone() {
-    dbg('boot: importing apiHandler...');
+    dbg('BS: bootstrapStandalone() start');
+
+    // Initialize SQLite with shared storage (cross-app shared database).
+    // Provide locateFile so sql.js's initSqlJs knows where to fetch
+    // sql-wasm.wasm — Vite dev mode serves it from node_modules, and
+    // the assetsInclude: ['**/*.wasm'] config ensures the correct MIME
+    // type (application/wasm).
+    dbg('BS: initDb start');
+    await initDb({
+        sharedStorage: true,
+        initSqlJsOptions: {
+            locateFile: (file) => `/node_modules/sql.js/dist/${file}`,
+        },
+    });
+    dbg('BS: initDb done');
+
+    // Persist to disk immediately: the init creates an in-memory DB and saves
+    // the empty schema, but the actual file-creation export happens async.  We
+    // force a sync here so the directory exists by the time the user opens
+    // the About page (no "[directory doesn't exist]").
+    await getDb().save();
+    dbg('BS: save done');
     const { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall, seedDemoData } =
         await import('@factology/engine/localDb/apiHandler.js');
+    dbg('BS: apiHandler imported');
 
-    dbg('boot: seedDemoData...');
+    // Seed demo data on first run
+    dbg('BS: seedDemoData() start');
     await seedDemoData();
-    dbg('boot: seed done');
+    dbg('BS: seedDemoData() done');
+
+    // Persist all seeded/migrated data to disk.  Without this call the database
+    // lives entirely in memory — the SQLite file on disk would never be created
+    // (or would stay empty), and data from the Dexie→SQLite migration would be
+    // lost on restart.
+    await getDb().save();
+    dbg('BS: save after seed done');
 
     // Resolve the on-device images folder so thumb URLs are stable from the
     // first render (offline native builds).
     try {
-        dbg('boot: initDeviceThumbs...');
+        dbg('BS: initDeviceThumbs() start');
         const { initDeviceThumbs } = await import('@factology/engine/media/deviceImages.js');
         await initDeviceThumbs();
-        dbg('boot: thumbs done');
+        dbg('BS: initDeviceThumbs() done');
     } catch (e) {
-        // web/browser fallback — no device folder available
+        dbg('BS: initDeviceThumbs() failed: ' + (e?.message || String(e)));
     }
 
-    dbg('boot: importing stores...');
+    dbg('BS: importing stores');
     const { useAuthStore } = await import('../stores/auth');
     const { useIdentityStore } = await import('../stores/identity');
+    dbg('BS: stores imported, registering adapter');
 
     // Register the custom adapter
     axios.defaults.adapter = async (config) => {

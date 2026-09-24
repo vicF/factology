@@ -9,6 +9,7 @@ function dbg(msg) {
     if (el) el.textContent += msg + '\n';
 }
 
+dbg('STEP 0: main.capacitor.js evaluating');
 import { bootstrapStandalone } from './localDb/standaloneBootstrap';
 
 // ORDER MATTERS: app.js starts its initial API calls (auth, public settings)
@@ -22,13 +23,13 @@ import { bootstrapStandalone } from './localDb/standaloneBootstrap';
 // server (no backend) every one of them 404'd, which left the class tree empty
 // behind a blocking "Error loading class tree" alert.
 
-dbg('STEP 1: Starting bootstrapStandalone...');
+dbg('STEP 1: awaiting bootstrapStandalone()');
 await bootstrapStandalone();
-dbg('STEP 2: bootstrapStandalone complete, importing app...');
+dbg('STEP 2: bootstrapStandalone resolved, importing app');
 try {
     await import('./app');
     dbg('STEP 3: app imported successfully');
 } catch (e) {
-    dbg('STEP 3 ERROR: ' + (e.message || e));
+dbg('STEP 3 ERROR: ' + (e.message || String(e)));
     throw e;
 }
