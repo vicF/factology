@@ -433,7 +433,10 @@ const openDropdown = async () => {
     isOpen.value = true
     searchText.value = ''
     error.value = null
-    // Load suggestions asynchronously
+    // Clear stale loading state from any prior in-flight loadSuggestions() call
+    // that may not have resolved yet (e.g. dropdown closed and reopened before
+    // the async chain completed).
+    suggestionsLoading.value = false
     suggestionsLoaded.value = false
     loadSuggestions()
     await nextTick()
@@ -550,6 +553,13 @@ async function loadObjectByUuid(uuid) {
 }
 
 async function loadSuggestions() {
+    // Safety timeout: force clear the loading spinner even if the async chain
+    // somehow stalls (e.g. sql.js WASM init deadlock, adapter loop on huge DB,
+    // or a promise that never settles).  The real try/catch/finally below is the
+    // normal path; this ensures the UI never shows an infinite spinner edge-case.
+    const safetyTimer = setTimeout(() => {
+        suggestionsLoading.value = false
+    }, 10_000)
     // For filter-scoped searches (owner/server), pre-fill with the real
     // owners/servers that actually have objects assigned.
     if (props.filterType) {
@@ -605,6 +615,7 @@ async function loadSuggestions() {
     } finally {
         suggestionsLoading.value = false
         suggestionsLoaded.value = true
+        clearTimeout(safetyTimer)
     }
 }
 

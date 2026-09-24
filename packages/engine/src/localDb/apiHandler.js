@@ -407,6 +407,25 @@ async function handleSearch(body, context = {}) {
     const searchTerm = (params.search || '').trim().toLowerCase();
     const hasSearch = searchTerm.length > 0;
 
+    // ── Favorites-only query ────────────────────────────────────────────
+    // The UI requests favorites via `{favorites: true, type: [], classes: []}`.
+    // Without special handling this falls through to a full-table scan of every
+    // non-deleted object.  Route it to the MY_FAVORITE links table instead.
+    if (params.favorites === true) {
+        const userThingId = context.userThingId;
+        if (!userThingId) return { data: { things: [] }, status: 200 };
+        const localDb = getDb();
+        const MY_FAVORITE = 'f0f0f0f0-0001-4000-a000-000000000001';
+        const favLinks = await localDb.links
+            .where('[one_thing_id+link_type_id]')
+            .equals([userThingId, MY_FAVORITE])
+            .toArray();
+        const favIds = [...new Set(favLinks.map(l => l.other_thing_id).filter(Boolean))];
+        const favObjs = favIds.length ? await localDb.objects.bulkGet(favIds) : [];
+        const things = favObjs.filter(o => o && !o.deleted).slice(0, 100);
+        return { data: { things }, status: 200 };
+    }
+
     // Sort configuration (mirrors server ApiController::search):
     //   default sort_by=start → start, default order desc
     const sortMap = {
@@ -433,9 +452,12 @@ async function handleSearch(body, context = {}) {
     // into JS just to sort and slice them.
     async function fetchSqlSorted(collectionFn, want = 100) {
         const BATCH = 500;
+        const MAX_ITERATIONS = 200; // safety cap: at most 200×500 = 100K rows scanned
         const out = [];
         let offset = 0;
-        while (out.length < want) {
+        let iterations = 0;
+        while (out.length < want && iterations < MAX_ITERATIONS) {
+            iterations++;
             let col = collectionFn();
             col = col.sortBy(sortKey);
             if (sortDirDesc) col = col.reverse();
@@ -449,6 +471,9 @@ async function handleSearch(body, context = {}) {
             out.push(...filtered);
             if (chunk.length < BATCH) break;
             offset += BATCH;
+        }
+        if (iterations >= MAX_ITERATIONS) {
+            console.warn(`[handleSearch] fetchSqlSorted hit max iterations (${MAX_ITERATIONS}), got ${out.length}/${want} results`);
         }
         return out.slice(0, want);
     }
