@@ -4,6 +4,8 @@
 # Usage:
 #   ./build-android.sh                          # debug APK (remote mode)
 #   ./build-android.sh --local                  # debug APK, standalone offline mode
+#   ./build-android.sh --test                   # debug APK, test mode (ephemeral DB)
+#   ./build-android.sh --local --test           # debug APK, standalone + test mode
 #   ./build-android.sh --release                # signed release AAB (for store upload)
 #   ./build-android.sh --release --local        # signed release AAB, standalone mode
 #   ./build-android.sh --suffix=NAME            # optional versionName suffix
@@ -16,14 +18,16 @@ SCRIPT_DIR="$(pwd)"
 BUILD_MODE="remote"
 APK_SUFFIX=""
 BUILD_RELEASE=""
+BUILD_TEST=""
 
 # --- parse args ---------------------------------------------------------------
 for arg in "$@"; do
     case "$arg" in
         --local) BUILD_MODE="local" ;;
+        --test) BUILD_TEST="1" ;;
         --release) BUILD_RELEASE="1" ;;
         --suffix=*) APK_SUFFIX="${arg#--suffix=}" ;;
-        *) echo "Unknown arg: $arg (use --local, --release, and/or --suffix=NAME)"; exit 1 ;;
+        *) echo "Unknown arg: $arg (use --local, --test, --release, and/or --suffix=NAME)"; exit 1 ;;
     esac
 done
 
@@ -44,6 +48,11 @@ elif [ -f .env.capacitor ]; then
 else
     export VITE_API_URL=""
     echo "==> No .env.capacitor and no --local — building standalone."
+fi
+
+if [ -n "$BUILD_TEST" ]; then
+    export VITE_FACTOLOGY_TEST_MODE="true"
+    echo "==> Building in TEST mode — SQLite goes to Directory.Cache"
 fi
 
 npm run build:capacitor
@@ -150,9 +159,16 @@ else
     echo "==> Gradle assembleDebug complete"
 
     APK_SRC="$SCRIPT_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
-    OUT_APK="$SCRIPT_DIR/dist-android/factology-debug.apk"
+    if [ -n "$BUILD_TEST" ]; then
+	        OUT_APK="$SCRIPT_DIR/dist-android/factology-debug-test.apk"
+	    else
+	        OUT_APK="$SCRIPT_DIR/dist-android/factology-debug.apk"
+	    fi
     cp "$APK_SRC" "$OUT_APK"
     echo ""
     echo "==> APK ready: $OUT_APK"
+    if [ -n "$BUILD_TEST" ]; then
+        echo "    (test mode: database goes to Directory.Cache — ephemeral)"
+    fi
     echo "    Install with: adb install -r \"$OUT_APK\""
 fi

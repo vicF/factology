@@ -649,7 +649,7 @@ export async function localFindDuplicates(ownerIds = null) {
                     one_thing_id: a.thing_id,
                     link_type_id: UUID.DUPLICATE_OF,
                     other_thing_id: b.thing_id,
-                    public: false,
+                    public: 0,
                     deleted: 0,
                     ...localSyncFields(),
                 });

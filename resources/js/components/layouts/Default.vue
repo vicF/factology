@@ -150,6 +150,10 @@
                                     <i class="bi bi-journal-text icon-sm me-2"></i>
                                     {{ $t('Logs') }}
                                 </router-link></li>
+                                <li><router-link class="dropdown-item" to="/about" data-testid="about-link">
+                                    <i class="bi bi-info-circle icon-sm me-2"></i>
+                                    {{ $t('About') }}
+                                </router-link></li>
                                 <li><hr class="dropdown-divider" /></li>
                                 <li class="dropdown-header text-muted small" style="font-size: 10px; padding: 4px 12px;">
                                     build {{ buildId }} <span style="cursor:pointer" @click.stop="onBuildIdTap">⚠️</span>
@@ -263,8 +267,8 @@
             </div>
         </div>
 
-        <!-- Floating diagnostic button (always visible) -->
-        <div class="diag-fab" @click="onDiagnostic" title="Show diagnostic info">🔍</div>
+        <!-- Floating diagnostic button (hidden by default in production builds) -->
+        <div v-if="showDebugFab" class="diag-fab" @click="onDiagnostic" title="Show diagnostic info">🔍</div>
 
         <!-- Diagnostic modal -->
         <div v-if="showDiagnostic" class="diag-overlay" @click="showDiagnostic = false">
@@ -335,6 +339,24 @@ const isDevelopment = import.meta.env.DEV
 // Debug: diagnostic button (always visible, outside dropdown)
 const showDiagnostic = ref(false)
 const diagnosticInfo = ref('')
+
+// Show diagnostic FAB: on by default in DEV, off in production; user can toggle via Tools.
+const DEBUG_FAB_KEY = 'factology_debug_fab_visible';
+const showDebugFab = ref(
+    localStorage.getItem(DEBUG_FAB_KEY) !== null
+        ? localStorage.getItem(DEBUG_FAB_KEY) === 'true'
+        : import.meta.env.DEV
+);
+
+// Expose setter so Tools.vue can toggle it
+const setDebugFabVisible = (val) => {
+    showDebugFab.value = val;
+    localStorage.setItem(DEBUG_FAB_KEY, String(val));
+};
+// Provide for child components to use
+provide('setDebugFabVisible', setDebugFabVisible);
+provide('showDebugFab', showDebugFab);
+
 const onDiagnostic = async () => {
   const auth = authStore
   let treeInfo = ''

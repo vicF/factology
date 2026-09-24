@@ -31,6 +31,12 @@ process.env.TEMP = process.env.TEMP || 'D:/tmp';
 // to create IndexedDB on a full disk, leaving the app stuck on the spinner.
 process.env.FACTOLOGY_USER_DATA = process.env.FACTOLOGY_USER_DATA || 'D:/tmp/factology-test-userdata';
 
+// Redirect the SQLite database to a temp file so the real app database
+// (~/.factology/factology_local.sqlite) is never touched or corrupted.
+const TEST_DB_DIR = 'D:/tmp/factology-test';
+const TEST_DB_PATH = path.join(TEST_DB_DIR, 'factology_test.sqlite');
+process.env.FACTOLOGY_DB_PATH = TEST_DB_PATH;
+
 const results = [];
 function check(name, ok, detail = '') {
     results.push({ name, ok, detail });
@@ -54,10 +60,12 @@ async function main() {
         process.exit(1);
     }
 
-    console.log('Launching Electron app...');
+    // Ensure temp directories exist and are clean
     const userDataDir = 'D:/tmp/electron-test-profile';
     fs.rmSync(userDataDir, { recursive: true, force: true });
     fs.mkdirSync(userDataDir, { recursive: true });
+    fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
+    fs.mkdirSync(TEST_DB_DIR, { recursive: true });
     const app = await _electron.launch({
         executablePath: ELECTRON_EXE,
         args: ['.'],
@@ -124,6 +132,11 @@ async function main() {
     }
 
     await app.close();
+
+    // Clean up the temporary test database
+    try {
+        fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
+    } catch { /* best-effort */ }
 
     const failed = results.filter(r => !r.ok);
     console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

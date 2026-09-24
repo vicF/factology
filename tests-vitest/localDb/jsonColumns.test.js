@@ -114,10 +114,10 @@ describe('Dexie v4 upgrade heals already-imported rows', () => {
         healed.close();
     });
 
-    it('keeps the production schema at version 4', async () => {
+    it('keeps the production schema at version 5', async () => {
         const db = createDatabase();
         await db.open();
-        expect(db.verno).toBe(4);
+        expect(db.verno).toBe(5);
         db.close();
     });
 });

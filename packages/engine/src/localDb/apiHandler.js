@@ -139,6 +139,14 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         return localTool;
     }
 
+    // GET /properties → property definitions (mirrors ApiController::properties).
+    // Returns all things linked to the Property class with thing_id, name,
+    // name_translations so the Details tab resolves property UUIDs to display
+    // names in standalone/offline mode.
+    if (method === 'get' && pathPart === 'properties') {
+        return handleProperties();
+    }
+
     // The local mirror only knows /object (and /user, /link, /client-error,
     // handled before reaching here). A write to any other path is a
     // server-only endpoint (e.g. /import/gedcom, /search/options); sending it
@@ -348,6 +356,32 @@ async function handleDeviceThumb(method, thingId, body) {
     throw new Error(`Unhandled local thumb API: ${method} /object/${thingId}/thumb`);
 }
 
+/**
+ * GET /properties handler: list all things linked to the Property class as
+ * property definitions (thing_id, name, name_translations). Mirrors the server's
+ * ApiController::properties().
+ */
+async function handleProperties() {
+    const db = getDb();
+    // Property membership is a link whose `other_thing_id` is the Property
+    // class. Match on the class endpoint (mirrors the server's
+    // ApiController::properties which joins on the class id) without assuming
+    // a single link-type id — the standalone seed links properties to the
+    // class via a "superclass of" link rather than LINK_TO_CLASS.
+    const propLinks = db.links.where('other_thing_id').equals(UUID.PROPERTY_CLASS).toArray();
+    const propIds = [...new Set((await propLinks).map(l => l.one_thing_id))];
+    const propObjs = propIds.length ? await db.objects.bulkGet(propIds) : [];
+    const properties = propObjs
+        .filter(Boolean)
+        .filter(o => !o.deleted)
+        .map(o => ({
+            thing_id: o.thing_id,
+            name: o.name ?? null,
+            name_translations: o.name_translations ?? null,
+        }));
+    return { data: { data: properties, success: true }, status: 200 };
+}
+
 async function handleSearch(body, context = {}) {
     const params = typeof body === 'string' ? JSON.parse(body) : (body || {});
 
@@ -371,34 +405,9 @@ async function handleSearch(body, context = {}) {
 
     const typeFilter = Array.isArray(params.type) ? params.type : (params.type ? [params.type] : []);
     const searchTerm = (params.search || '').trim().toLowerCase();
+    const hasSearch = searchTerm.length > 0;
 
-    let results;
-    if (params.classes && params.classes.length > 0) {
-        // Mirror the server plan: with a class filter, start from the class
-        // links (like the server's links join) rather than scanning the whole
-        // `type` column. The default search view (a whole subtree checked, no
-        // text) would otherwise read every object of that type from IndexedDB.
-        const classIds = new Set(params.classes);
-        const classLinks = await getDb().links
-            .where('[other_thing_id+link_type_id]')
-            .anyOf([...classIds].map(id => [id, UUID.LINK_TO_CLASS]))
-            .toArray();
-        const candidateIds = [...new Set(classLinks.map(l => l.one_thing_id))];
-        const candidates = candidateIds.length ? await getDb().objects.bulkGet(candidateIds) : [];
-        results = candidates.filter(obj => obj && !obj.deleted);
-        if (typeFilter.length > 0) results = results.filter(o => typeFilter.includes(o.type));
-        if (searchTerm) results = results.filter(o => matchesSearchText(o, searchTerm));
-    } else {
-        // Search through the Dexie `type` index when a type filter is present —
-        // a full collection scan per keystroke is the dominant cost on large
-        // local DBs.
-        results = await searchObjects(params.search || '', {
-            includeDeleted: false,
-            type: typeFilter,
-        });
-    }
-
-    // Apply sorting (mirror server ApiController::search):
+    // Sort configuration (mirrors server ApiController::search):
     //   default sort_by=start → start, default order desc
     const sortMap = {
         updated: '_updatedAt',
@@ -407,19 +416,120 @@ async function handleSearch(body, context = {}) {
         name: 'name',
     };
     const sortBy = params.sort_by || 'start';
-    const sortDir = (params.sort_order || 'desc') === 'asc' ? 1 : -1;
+    const sortDirDesc = (params.sort_order || 'desc') !== 'asc';
     const sortKey = sortMap[sortBy] || 'start';
-    results.sort((a, b) => {
-        const va = a[sortKey];
-        const vb = b[sortKey];
-        if (va == null && vb == null) return 0;
-        if (va == null) return 1;
-        if (vb == null) return -1;
-        if (typeof va === 'number' && typeof vb === 'number') {
-            return (va - vb) * sortDir;
+
+    // Detect backend: SQLiteAdapter supports SQL-level ORDER BY + LIMIT
+    // (fluent Collection.sortBy()), while Dexie's Collection.sortBy() is
+    // terminal (returns Promise<Array>).
+    const db = getDb();
+    const canSqlSort = typeof db._execPrepared === 'function';
+    console.log(`[handleSearch] backend: ${canSqlSort ? 'SQLiteAdapter' : 'Dexie/IndexedDB'} (db._execPrepared=${typeof db._execPrepared}, db.constructor.name=${db.constructor?.name})`);
+
+    // ── SQL-level fetch (SQLiteAdapter only) ──────────────────────────────
+    // Fetch items sorted by SQL ORDER BY + LIMIT, apply JS-only filters
+    // (deleted, search term) on the result, and re-fetch with OFFSET if the
+    // first batch didn't yield enough. This avoids loading all 173K objects
+    // into JS just to sort and slice them.
+    async function fetchSqlSorted(collectionFn, want = 100) {
+        const BATCH = 500;
+        const out = [];
+        let offset = 0;
+        while (out.length < want) {
+            let col = collectionFn();
+            col = col.sortBy(sortKey);
+            if (sortDirDesc) col = col.reverse();
+            const chunk = await col.limit(BATCH).offset(offset).toArray();
+            if (chunk.length === 0) break;
+            const filtered = chunk.filter(o => {
+                if (o.deleted) return false;
+                if (hasSearch && !matchesSearchText(o, searchTerm)) return false;
+                return true;
+            });
+            out.push(...filtered);
+            if (chunk.length < BATCH) break;
+            offset += BATCH;
         }
-        return String(va).localeCompare(String(vb)) * sortDir;
-    });
+        return out.slice(0, want);
+    }
+
+    let results;
+    if (params.classes && params.classes.length > 0) {
+        // Class-filtered path: start from class links, then use SQL-level
+        // sort+limit per chunk of candidate IDs (SQLiteAdapter), or fall
+        // back to the original bulkGet approach (Dexie).
+        const classIds = new Set(params.classes);
+        const classLinks = await db.links
+            .where('[other_thing_id+link_type_id]')
+            .anyOf([...classIds].map(id => [id, UUID.LINK_TO_CLASS]))
+            .toArray();
+        const candidateIds = [...new Set(classLinks.map(l => l.one_thing_id))];
+
+        if (canSqlSort && candidateIds.length > 0) {
+            // Chunk candidates to stay under sql.js 999-param limit; each
+            // chunk fetches its top 100 (or more if searching) via SQL ORDER
+            // BY + LIMIT. Merge/re-sort the small combined set.
+            const CHUNK_SIZE = 999;
+            const merge = [];
+            for (let i = 0; i < candidateIds.length && merge.length < 200; i += CHUNK_SIZE) {
+                const chunk = candidateIds.slice(i, i + CHUNK_SIZE);
+                const top = await fetchSqlSorted(
+                    () => db.objects.where('thing_id').anyOf(chunk),
+                    hasSearch ? 200 : 100,
+                );
+                merge.push(...top);
+            }
+            // Re-sort the merged set (at most a few hundred items) in JS.
+            const dir = sortDirDesc ? -1 : 1;
+            merge.sort((a, b) => {
+                const va = a[sortKey];
+                const vb = b[sortKey];
+                if (va == null && vb == null) return 0;
+                if (va == null) return 1;
+                if (vb == null) return -1;
+                if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+                return String(va).localeCompare(String(vb)) * dir;
+            });
+            results = merge;
+            if (typeFilter.length > 0) results = results.filter(o => typeFilter.includes(o.type));
+        } else {
+            // Dexie fallback: original bulkGet + JS filter + JS sort approach
+            const candidates = candidateIds.length ? await db.objects.bulkGet(candidateIds) : [];
+            results = candidates.filter(obj => obj && !obj.deleted);
+            if (typeFilter.length > 0) results = results.filter(o => typeFilter.includes(o.type));
+            if (hasSearch) results = results.filter(o => matchesSearchText(o, searchTerm));
+        }
+    } else if (canSqlSort) {
+        // No class filter, SQLiteAdapter: SQL-level ORDER BY + LIMIT on the
+        // type index (or full table) — reads at most 500 rows instead of 173K.
+        const t0 = performance.now();
+        results = await fetchSqlSorted(() => {
+            return typeFilter.length > 0
+                ? db.objects.where('type').anyOf(typeFilter)
+                : db.objects.toCollection();
+        });
+        console.log(`[handleSearch] fetchSqlSorted took ${(performance.now() - t0).toFixed(0)}ms, got ${results.length} results`);
+    } else {
+        // No class filter, Dexie fallback: original searchObjects approach.
+        results = await searchObjects(params.search || '', {
+            includeDeleted: false,
+            type: typeFilter,
+        });
+    }
+
+    // Dexie fallback: JS sort (SQLiteAdapter results are already sorted by SQL)
+    if (!canSqlSort) {
+        const dir = sortDirDesc ? -1 : 1;
+        results.sort((a, b) => {
+            const va = a[sortKey];
+            const vb = b[sortKey];
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+            return String(va).localeCompare(String(vb)) * dir;
+        });
+    }
 
     // Drop rows owned by identities that are locked/not active BEFORE the cap,
     // so hidden rows never consume UI slots.
@@ -1228,7 +1338,7 @@ async function buildClassTree(classObjects) {
             level,
             description: obj.description || null,
             type: obj.type,
-            public: obj.public || 0,
+            public: Number(obj.public) || 0,
             nodes: children,
             parent_id: parentId,
         };

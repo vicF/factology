@@ -8,6 +8,7 @@
 
 import { UUID } from '../constants/uuid.js';
 import { getDb, SYNC_STATUS } from './index.js';
+import { migrateFromDexie } from './migrateFromDexie.js';
 import {
     BOOTSTRAP_THINGS,
     BOOTSTRAP_LINKS,
@@ -176,6 +177,10 @@ async function removeLegacySeedData(db) {
  */
 export async function seedLocalDb() {
     const db = getDb();
+
+    // One-time migration from old Dexie/IndexedDB → SQLite (if applicable).
+    // Must run before normalization so migrated rows get owner-healing too.
+    await migrateFromDexie();
 
     // Always run normalization (heals existing installs on every boot).
     await normalizeSeedData(db);

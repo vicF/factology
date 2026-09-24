@@ -29,7 +29,28 @@ export default defineConfig({
                 return html.replace(/\bcrossorigin\b(="[^"]*")?/g, '');
             },
         },
+        // Ensure sql.js WASM binary is served with application/wasm MIME type.
+        // Vite's dev server does not always map .wasm → application/wasm for
+        // node_modules paths, causing WebAssembly instantiation to fail with
+        // "Incorrect response MIME type".
+        {
+            name: 'wasm-mime',
+            enforce: 'post',
+            configureServer(server) {
+                server.middlewares.use((req, res, next) => {
+                    if (req.url && typeof req.url === 'string' && req.url.endsWith('.wasm')) {
+                        res.setHeader('Content-Type', 'application/wasm');
+                    }
+                    next();
+                });
+            },
+        },
     ],
+    // sql.js is dynamically imported at runtime (import('sql.js').default) and
+    // fetches its WASM binary via locateFile. Marking .wasm as an asset ensures
+    // Vite serves it with the correct application/wasm MIME type both in dev
+    // mode and during the production build.
+    assetsInclude: ['**/*.wasm'],
     css: {
         preprocessorOptions: {
             scss: {

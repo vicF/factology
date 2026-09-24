@@ -230,11 +230,43 @@
                 </div>
             </div>
         </section>
+
+        <!-- ── Diagnostics ─────────────────────────────────────────────── -->
+        <section class="card mb-4" data-testid="diagnostics-section">
+            <div class="card-header">
+                <h5 class="mb-0">{{ $t('Diagnostics') }}</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    {{ $t('The debug button (🔍) shows current route, build info, and internal state.') }}
+                </p>
+                <div class="form-check form-switch">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="debugFabToggle"
+                        :checked="showDebugFab"
+                        @change="toggleDebugFab"
+                        data-testid="debug-fab-toggle"
+                    />
+                    <label class="form-check-label" for="debugFabToggle">
+                        {{ $t('Show debug button') }}
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <router-link to="/about" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-info-circle me-1"></i>
+                        {{ $t('About') }}
+                    </router-link>
+                </div>
+            </div>
+        </section>
     </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, inject } from 'vue';
 import axios from 'axios';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
@@ -246,6 +278,13 @@ defineOptions({ name: 'Tools' });
 
 const { t } = useI18n();
 const authStore = useAuthStore();
+
+// ── Debug FAB toggle (injected from Default layout) ──
+const showDebugFab = inject('showDebugFab', false);
+const setDebugFabVisible = inject('setDebugFabVisible', () => {});
+const toggleDebugFab = (e) => {
+    setDebugFabVisible(e.target.checked);
+};
 
 // ── Export / Import state ──
 const exporting = ref(false);

@@ -25,6 +25,7 @@ const WelcomeGate = () => import('@/components/WelcomeGate.vue')
 
 const Tools = () => import('@/components/Tools.vue')
 const Logs = () => import('@/components/Logs.vue')
+const About = () => import('@/components/About.vue')
 
 
 const routes = [
@@ -109,6 +110,14 @@ const routes = [
                 component: Logs,
                 meta: {
                     title: `Logs`
+                }
+            },
+            {
+                name: "about",
+                path: "/about",
+                component: About,
+                meta: {
+                    title: `About`
                 }
             }
         ]

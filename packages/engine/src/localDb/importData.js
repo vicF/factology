@@ -29,9 +29,17 @@ async function chunkedPut(table, rows) {
 }
 
 async function chunkedAnyOf(table, index, keys) {
+    // sql.js default SQLITE_MAX_VARIABLE_NUMBER is 999.
+    // For compound keys (e.g. [one_thing_id, link_type_id, other_thing_id]),
+    // each entry uses N params, so we must shrink the chunk accordingly.
+    const PARAMS_MAX = 999;
+    const paramsPerEntry = keys.length > 0 && Array.isArray(keys[0])
+        ? keys[0].length
+        : 1;
+    const chunkSize = Math.max(1, Math.floor(PARAMS_MAX / paramsPerEntry));
     const out = [];
-    for (let i = 0; i < keys.length; i += 1000) {
-        const slice = keys.slice(i, i + 1000);
+    for (let i = 0; i < keys.length; i += chunkSize) {
+        const slice = keys.slice(i, i + chunkSize);
         out.push(...await table.where(index).anyOf(slice).toArray());
     }
     return out;

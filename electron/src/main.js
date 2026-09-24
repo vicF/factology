@@ -112,6 +112,14 @@ async function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            // Sandboxed preloads (Electron ≥20 default) only expose a polyfilled
+            // subset of Node modules — `fs`/`path`/`os` are absent, so the
+            // preload crashes with "module not found: fs" and the SQLiteAdapter
+            // never gets its fileIO, silently falling back to Dexie/IndexedDB.
+            // Disabling the sandbox while keeping contextIsolation allows the
+            // preload to require('fs') without opening Node to the page itself.
+            sandbox: false,
+            preload: path.join(__dirname, 'preload.js'),
         },
         show: false,
         title: 'Factology',
