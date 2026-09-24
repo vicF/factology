@@ -931,6 +931,9 @@ i18n.global.tc = function(key, contextId) {
 };
 
 export function setLanguage(lang) {
+    const prev = i18n.global.locale?.value || i18n.global.locale;
+    console.log('[i18n] setLanguage', lang, 'previous:', prev);
+
     // i18n.global.locale is a ref (WritableComputedRef) — set `.value`.
     // Assigning `i18n.global.locale = lang` would replace the ref with a plain
     // string (or throw on a frozen composer), breaking currentLocale()/locale.value.
@@ -940,6 +943,11 @@ export function setLanguage(lang) {
         i18n.global.locale = lang;
     }
     localStorage.setItem("locale", lang);
+
+    // Verify: log the value after the set for comparison
+    const now = i18n.global.locale?.value || i18n.global.locale || '(empty)';
+    console.log('[i18n] locale after set:', now, '| t(test):', i18n.global.t('test') || '(no t)');
+
     // Deliberately no window.location.reload(): the locale ref is reactive, so
     // every template/computed that reads it ($t, t(), currentLocale()) re-renders
     // on its own. Components that render through non-Vue libraries or module

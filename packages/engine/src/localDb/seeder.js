@@ -142,7 +142,7 @@ async function normalizeSeedData(db) {
     // Only fill when the field is null/empty — never overwrite user edits.
     for (const [id, nt] of Object.entries(SEED_TRANSLATIONS)) {
         const existing = await db.objects.get(id);
-        if (existing && !existing.name_translations) {
+        if (existing && (!existing.name_translations || Object.keys(existing.name_translations).length === 0)) {
             existing.name_translations = nt;
             await db.objects.put(existing);
         }

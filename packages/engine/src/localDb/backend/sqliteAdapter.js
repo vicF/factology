@@ -55,6 +55,8 @@ const TABLE_DEFS = {
         indexes: ['link_uuid', 'one_thing_id', 'link_type_id', 'other_thing_id',
             'public', '_syncStatus', '_serverId',
             { name: 'idx_links_compound', cols: ['one_thing_id', 'link_type_id', 'other_thing_id'] },
+            { name: 'idx_links_one_type', cols: ['one_thing_id', 'link_type_id'] },
+            { name: 'idx_links_other_type', cols: ['other_thing_id', 'link_type_id'] },
         ],
     },
     media: {
@@ -141,7 +143,14 @@ class WhereClause {
 
     equals(val) {
         const target = this._mode === 'or' ? this._orConditions : this._conditions;
-        target.push({ column: this._column, op: '= ?', params: [val] });
+        // Compound index with array value: expand across columns (e.g. [a+b] → a = ? AND b = ?)
+        const cols = getIndexColumns(this._column);
+        if (cols.length > 1 && Array.isArray(val)) {
+            const parts = cols.map((c, i) => `${quoteColumn(c)} = ?`);
+            target.push({ column: parts.join(' AND '), op: '', params: val, isRaw: true });
+        } else {
+            target.push({ column: this._column, op: '= ?', params: [val] });
+        }
         return this._buildCollection();
     }
 
@@ -157,8 +166,8 @@ class WhereClause {
         // anyOf([[id1, type1, id2], [id3, type3, id4]])).
         // Dexie matches the tuple across the compound index columns.
         if (Array.isArray(values[0])) {
+            const cols = getIndexColumns(this._column);
             const orClauses = values.map(tuple => {
-                const cols = this._column.split('+');
                 const parts = cols.map((c, i) => `${quoteColumn(c)} = ?`);
                 return parts.join(' AND ');
             });
@@ -761,13 +770,23 @@ export class SQLiteAdapter {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function stripDexieIndexBrackets(name) {
+    return name.replace(/^\[|\]$/g, '');
+}
+
+function getIndexColumns(name) {
+    const cleaned = stripDexieIndexBrackets(name);
+    return cleaned.includes('+') ? cleaned.split('+') : [cleaned];
+}
+
 function quoteColumn(name) {
-    // Map Dexie compound index names like 'one_thing_id+link_type_id+other_thing_id'
-    // to their first column for SQL (compound indexes are pre-created)
-    if (name.includes('+')) {
-        return `"${name.split('+')[0]}"`;
+    const clean = stripDexieIndexBrackets(name);
+    // Map Dexie compound index names like '[one_thing_id+link_type_id+other_thing_id]'
+    // to their first column for SQL (compound indexes span real columns)
+    if (clean.includes('+')) {
+        return `"${clean.split('+')[0]}"`;
     }
-    return `"${name}"`;
+    return `"${clean}"`;
 }
 
 function mapDexieIndexToColumn(index) {
