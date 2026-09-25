@@ -131,6 +131,26 @@ export const BOOTSTRAP_THINGS = [
     },
 ];
 
+// ── Property definitions seeded in offline mode ──────────────────────
+// Mirrors database/seeders/ListDividersSeeder.php.
+export const PROPERTY_THINGS = [
+    {
+        thing_id: UUID.DIVIDER_PROPERTY,
+        name: 'Dividers',
+        description: 'List dividers or time breaks that live with the list object (not as separate entries). Dividers mark positions within an ordered list — for example, setbreak markers in a performance setlist.',
+        type: UUID.G_THING,
+        public: 1,
+        data: { inherited: true },
+    },
+];
+
+// Property membership + association links (use explicit link_type_id,
+// unlike BOOTSTRAP_LINKS / CLASS_LINKS which all use LINK_TO_PARENT).
+export const PROPERTY_LINKS = [
+    { one: UUID.DIVIDER_PROPERTY, link_type_id: UUID.LINK_TO_CLASS,      other: UUID.PROPERTY_CLASS,  description: 'Dividers is a member of Property class' },
+    { one: UUID.DIVIDER_PROPERTY, link_type_id: UUID.PROPERTY_APPLIES_TO, other: UUID.LIST_CLASS,      description: 'Dividers property applies to List class' },
+];
+
 // ── Bootstrap links (top-level class hierarchy edges) ─────────────────
 export const BOOTSTRAP_LINKS = [
     { one: UUID.EVERYTHING, other: UUID.SOMETHING,      description: '"Something" is subclass of "Everything"' },

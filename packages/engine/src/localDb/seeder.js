@@ -14,6 +14,8 @@ import {
     BOOTSTRAP_LINKS,
     CLASSES,
     CLASS_LINKS,
+    PROPERTY_THINGS,
+    PROPERTY_LINKS,
 } from './seedData.js';
 import { SEED_TRANSLATIONS } from './seedTranslations.js';
 
@@ -30,7 +32,7 @@ const makeObject = (t) => ({
     // System seed rows belong to SYSTEM_OWNER (shared), never to an ordinary
     // user. UUID.VICTOR_FOKIN is a real identity, not a system owner.
     owner: t.owner ?? UUID.SYSTEM_OWNER,
-    data: null,
+    data: t.data ?? null,
     _syncStatus: SYNC_STATUS.SYNCED,
     _localRevision: 0,
     _serverRevision: 0,
@@ -40,10 +42,10 @@ const makeObject = (t) => ({
 });
 
 const makeLink = (l) => ({
-    link_id: `seed-${l.one}-${l.other}`,
+    link_id: `seed-${l.one}-${l.other}${l.link_type_id ? '-' + l.link_type_id.slice(0, 8) : ''}`,
     description: l.description || null,
     one_thing_id: l.one,
-    link_type_id: UUID.LINK_TO_PARENT,
+    link_type_id: l.link_type_id || UUID.LINK_TO_PARENT,
     other_thing_id: l.other,
     public: 1,
     _syncStatus: SYNC_STATUS.SYNCED,
@@ -58,7 +60,7 @@ const CITY_CLASS_ID = '14cd9c8b-84a4-4fd2-82a8-97477ff2d5ee';
 // Known seed/system thing ids. The Victor Fokin person row is excluded — he is
 // an ordinary identity, not a system owner, so his row keeps its own owner.
 const SYSTEM_SEED_IDS = new Set(
-    [...BOOTSTRAP_THINGS.map(t => t.thing_id), ...CLASSES.map(c => c.thing_id)]
+    [...BOOTSTRAP_THINGS.map(t => t.thing_id), ...CLASSES.map(c => c.thing_id), ...PROPERTY_THINGS.map(t => t.thing_id)]
         .filter(id => id !== UUID.VICTOR_FOKIN),
 );
 
@@ -192,7 +194,7 @@ export async function seedLocalDb() {
     // The count check matters: installs seeded by an older APK keep their old
     // link set (adb install -r preserves app data), so if the hierarchy grew
     // since then the tree would be permanently incomplete.
-    const expectedLinks = BOOTSTRAP_LINKS.length + CLASS_LINKS.length;
+    const expectedLinks = BOOTSTRAP_LINKS.length + CLASS_LINKS.length + PROPERTY_LINKS.length;
     const seedLinkCount = await db.links
         .filter(l => l.link_id?.startsWith('seed-'))
         .count();
@@ -202,10 +204,10 @@ export async function seedLocalDb() {
 
     await removeLegacySeedData(db);
 
-    const allLinks = [...BOOTSTRAP_LINKS, ...CLASS_LINKS];
+    const allLinks = [...BOOTSTRAP_LINKS, ...CLASS_LINKS, ...PROPERTY_LINKS];
 
     if (!everything) {
-        // Fresh install: bootstrap things + classes + hierarchy links
+        // Fresh install: bootstrap things + hierarchy links
         for (const t of BOOTSTRAP_THINGS) {
             await db.objects.put(makeObject(t));
         }
@@ -221,10 +223,14 @@ export async function seedLocalDb() {
     for (const c of CLASSES) {
         await db.objects.put(makeObject(c));
     }
+    for (const t of PROPERTY_THINGS) {
+        await db.objects.put(makeObject(t));
+    }
     for (const l of allLinks) {
         await db.links.put(makeLink(l));
     }
 
     console.log('[Seeder] Seeded:', BOOTSTRAP_THINGS.length, 'bootstrap things,',
-        CLASSES.length, 'classes,', allLinks.length, 'links');
+        CLASSES.length, 'classes,', PROPERTY_THINGS.length, 'property definitions,',
+        allLinks.length, 'links');
 }
