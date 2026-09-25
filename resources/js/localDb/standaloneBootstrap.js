@@ -21,14 +21,20 @@ export async function bootstrapStandalone() {
 
     // Initialize SQLite with shared storage (cross-app shared database).
     // Provide locateFile so sql.js's initSqlJs knows where to fetch
-    // sql-wasm.wasm — Vite dev mode serves it from node_modules, and
-    // the assetsInclude: ['**/*.wasm'] config ensures the correct MIME
-    // type (application/wasm).
+    // sql-wasm.wasm:
+    //  - Node.js (vitest, Electron main): filesystem path relative to cwd
+    //  - Browser (Vite dev, Capacitor):  URL served from /node_modules/
+    //    (assetsInclude: ['**/*.wasm'] config ensures the correct MIME type)
     dbg('BS: initDb start');
     await initDb({
         sharedStorage: true,
         initSqlJsOptions: {
-            locateFile: (file) => `/node_modules/sql.js/dist/${file}`,
+            locateFile: (file) => {
+                if (typeof process !== 'undefined' && process.versions?.node) {
+                    return `${process.cwd()}/node_modules/sql.js/dist/${file}`;
+                }
+                return `/node_modules/sql.js/dist/${file}`;
+            },
         },
     });
     dbg('BS: initDb done');
@@ -37,7 +43,11 @@ export async function bootstrapStandalone() {
     // the empty schema, but the actual file-creation export happens async.  We
     // force a sync here so the directory exists by the time the user opens
     // the About page (no "[directory doesn't exist]").
-    await getDb().save();
+    // Guard: Dexie (IndexedDB) auto-persists and has no save() — only
+    // SQLiteAdapter needs explicit file writes.
+    if (typeof getDb().save === 'function') {
+        await getDb().save();
+    }
     dbg('BS: save done');
     const { handleLocalApiCall, handleLocalLinkCall, handleLocalUserCall, seedDemoData } =
         await import('@factology/engine/localDb/apiHandler.js');
@@ -52,7 +62,10 @@ export async function bootstrapStandalone() {
     // lives entirely in memory — the SQLite file on disk would never be created
     // (or would stay empty), and data from the Dexie→SQLite migration would be
     // lost on restart.
-    await getDb().save();
+    // Guard: Dexie (IndexedDB) auto-persists and has no save().
+    if (typeof getDb().save === 'function') {
+        await getDb().save();
+    }
     dbg('BS: save after seed done');
 
     // Resolve the on-device images folder so thumb URLs are stable from the

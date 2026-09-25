@@ -95,6 +95,10 @@ class UUID
     public const PLACE_CLASS = 'dc006cda-047a-4862-acf7-e215355b6890';
     public const COORDINATES_PROPERTY = 'c1c1c1c1-0002-4000-8000-000000000001';
 
+    // ── List divider property (list breaks / setlist dividers, linked to List class) ──
+    public const LIST_CLASS = '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8';
+    public const DIVIDER_PROPERTY = 'd1d1d1d1-0001-4000-8000-000000000001';
+
     // ── GEDCOM import system objects ──
     public const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
     public const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';

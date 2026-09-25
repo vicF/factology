@@ -109,6 +109,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed geo system objects (Coordinates property linked to the Place class)
         $this->call(GeoCoordinatesSeeder::class);
+
+        // Seed list divider system objects (Dividers property linked to the List class)
+        $this->call(ListDividersSeeder::class);
     }
 
     /**

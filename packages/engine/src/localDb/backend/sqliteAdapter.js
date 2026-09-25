@@ -659,7 +659,9 @@ export class SQLiteAdapter {
     // -----------------------------------------------------------------------
 
     _run(sql, params = []) {
-        this._db.run(sql, params);
+        // Sanitize: ensure no undefined values reach sql.js bind()
+        const safe = params.map((p) => (p === undefined ? null : p));
+        this._db.run(sql, safe);
     }
 
     _execPrepared(sql, params = []) {
@@ -669,7 +671,9 @@ export class SQLiteAdapter {
         const stmt = this._prepCache.get(sql);
         stmt.reset();
         if (params.length > 0) {
-            stmt.bind(params);
+            // Sanitize: ensure no undefined values reach sql.js bind()
+            const safe = params.map((p) => (p === undefined ? null : p));
+            stmt.bind(safe);
         }
         return stmt;
     }
