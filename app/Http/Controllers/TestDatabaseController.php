@@ -223,6 +223,25 @@ class TestDatabaseController extends Controller
                 'other_thing_id' => $testClassId,
             ]);
 
+            // 3. Create a test object under Event class so it is visible in the
+            //    default search filter (Event subtree is auto-selected). This
+            //    way "Open an object detail view @all" works without requiring
+            //    authenticated object creation.
+            $eventObjectId = \Illuminate\Support\Str::uuid()->toString();
+            DB::table('things')->insert([
+                'thing_id'    => $eventObjectId,
+                'name'        => 'Event Test Object',
+                'description' => 'Test object under Event class',
+                'type'        => \Fokin\Facts\Data\UUID::G_THING,
+                'public'      => true,
+                'server_uuid' => $serverUuid,
+            ]);
+            DB::table('links')->insert([
+                'one_thing_id'   => $eventObjectId,
+                'link_type_id'   => \Fokin\Facts\Data\UUID::LINK_TO_CLASS,
+                'other_thing_id' => \Fokin\Facts\Data\UUID::EVENT,
+            ]);
+
             return response()->json([
                 'success' => true,
                 'data' => [
