@@ -496,7 +496,7 @@ async function handleSearch(body, context = {}) {
             // BY + LIMIT. Merge/re-sort the small combined set.
             const CHUNK_SIZE = 999;
             const merge = [];
-            for (let i = 0; i < candidateIds.length && merge.length < 200; i += CHUNK_SIZE) {
+            for (let i = 0; i < candidateIds.length; i += CHUNK_SIZE) {
                 const chunk = candidateIds.slice(i, i + CHUNK_SIZE);
                 const top = await fetchSqlSorted(
                     () => db.objects.where('thing_id').anyOf(chunk),
