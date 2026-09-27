@@ -142,13 +142,17 @@ async function normalizeSeedData(db) {
 
     // ── 2. Backfill missing name_translations on seed objects ────────────
     // Only fill when the field is null/empty — never overwrite user edits.
+    let backfillCount = 0;
     for (const [id, nt] of Object.entries(SEED_TRANSLATIONS)) {
         const existing = await db.objects.get(id);
         if (existing && (!existing.name_translations || Object.keys(existing.name_translations).length === 0)) {
+            console.log('[Seeder] Backfill name_translations for', id, 'was:', JSON.stringify(existing.name_translations), '→ setting to:', JSON.stringify(nt));
             existing.name_translations = nt;
             await db.objects.put(existing);
+            backfillCount++;
         }
     }
+    console.log('[Seeder] Backfilled name_translations for', backfillCount, 'objects');
 }
 
 // Legacy pre-parity demo objects (from the old standalone seeder).

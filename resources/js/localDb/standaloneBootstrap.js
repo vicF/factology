@@ -21,19 +21,29 @@ export async function bootstrapStandalone() {
 
     // Initialize SQLite with shared storage (cross-app shared database).
     // Provide locateFile so sql.js's initSqlJs knows where to fetch
-    // sql-wasm.wasm:
-    //  - Node.js (vitest, Electron main): filesystem path relative to cwd
-    //  - Browser (Vite dev, Capacitor):  URL served from /node_modules/
-    //    (assetsInclude: ['**/*.wasm'] config ensures the correct MIME type)
-    dbg('BS: initDb start');
+    // the WASM binary:
+    //  - Node.js (vitest):              filesystem path relative to cwd
+    //  - Vite dev server (HMR):         /node_modules/sql.js/dist/  (Vite
+    //    assetsInclude handles .wasm)
+    //  - Electron static (--prod):      server root / (wasm copied into
+    //    electron/app/  by the build script)
+    //  - Capacitor (Android):           relative to app root (./)
+    const isElectron = typeof navigator !== 'undefined'
+        && navigator.userAgent?.includes('Electron');
+    dbg('BS: isElectron=' + isElectron);
     await initDb({
         sharedStorage: true,
         initSqlJsOptions: {
             locateFile: (file) => {
-                if (typeof process !== 'undefined' && process.versions?.node) {
+                if (typeof process !== 'undefined' && process.versions?.node && !isElectron) {
                     return `${process.cwd()}/node_modules/sql.js/dist/${file}`;
                 }
-                return `/node_modules/sql.js/dist/${file}`;
+                if (isElectron) {
+                    // Electron static server root — WASM was copied to electron/app/
+                    return `/${file}`;
+                }
+                // Vite dev server or Capacitor — WASM is at relative path
+                return `./${file}`;
             },
         },
     });

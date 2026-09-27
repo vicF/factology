@@ -1356,7 +1356,7 @@ async function buildClassTree(classObjects) {
             }
         }
 
-        return {
+        const node = {
             id: thingId,
             name: obj.name,
             name_translations: obj.name_translations ?? null,
@@ -1367,6 +1367,10 @@ async function buildClassTree(classObjects) {
             nodes: children,
             parent_id: parentId,
         };
+        if (thingId === UUID.EVERYTHING || thingId === UUID.SYSTEM) {
+            console.log('[buildClassTree]', node.id, 'name:', node.name, 'name_translations:', JSON.stringify(node.name_translations));
+        }
+        return node;
     }
 
     // Single root: Everything (mirrors the server's `WHERE c.thing_id = ?`)
