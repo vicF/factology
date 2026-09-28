@@ -142,6 +142,14 @@ export const PROPERTY_THINGS = [
         public: 1,
         data: { inherited: true },
     },
+    {
+        thing_id: UUID.COMMON_PUBLIC,
+        name: 'Common public',
+        description: 'Marks an object as intended to be compared against public databases (MusicBrainz, OSM, etc.). When a canonical public record exists, the local object is replaced by the canonical one.',
+        type: UUID.G_THING,
+        public: 1,
+        data: { inherited: true },
+    },
 ];
 
 // Property membership + association links (use explicit link_type_id,
@@ -149,6 +157,8 @@ export const PROPERTY_THINGS = [
 export const PROPERTY_LINKS = [
     { one: UUID.DIVIDER_PROPERTY, link_type_id: UUID.LINK_TO_CLASS,      other: UUID.PROPERTY_CLASS,  description: 'Dividers is a member of Property class' },
     { one: UUID.DIVIDER_PROPERTY, link_type_id: UUID.PROPERTY_APPLIES_TO, other: UUID.LIST_CLASS,      description: 'Dividers property applies to List class' },
+    { one: UUID.COMMON_PUBLIC,    link_type_id: UUID.LINK_TO_CLASS,      other: UUID.PROPERTY_CLASS,  description: 'Common public is a member of Property class' },
+    { one: UUID.COMMON_PUBLIC,    link_type_id: UUID.PROPERTY_APPLIES_TO, other: UUID.EVERYTHING,      description: 'Common public property applies to Everything' },
 ];
 
 // ── Bootstrap links (top-level class hierarchy edges) ─────────────────

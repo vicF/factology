@@ -112,6 +112,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed list divider system objects (Dividers property linked to the List class)
         $this->call(ListDividersSeeder::class);
+
+        // Seed MusicBrainz matching system objects (Common public property)
+        $this->call(MusicBrainzSeeder::class);
     }
 
     /**

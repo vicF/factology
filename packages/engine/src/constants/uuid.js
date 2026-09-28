@@ -110,6 +110,10 @@ export const UUID = {
     LIST_CLASS:          '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8',
     DIVIDER_PROPERTY:    'd1d1d1d1-0001-4000-8000-000000000001',
 
+    // ── External object matching system objects ──
+    LINK_EXTERNAL_REF:   'd1d1d1d1-0002-4000-8000-000000000001',
+    COMMON_PUBLIC:       'd1d1d1d1-0003-4000-8000-000000000001',
+
     // ── GEDCOM event classes (children of Event) + Address (child of Place) ──
     // ids mirror database/migrations/2026_08_31_000001_gedcom_event_classes.php
     BIRTH_CLASS:       'a565fc22-6dae-4b7a-bd9e-30df8bc8acca',

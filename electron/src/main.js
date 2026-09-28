@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut } = require('electron');
+const { app, BrowserWindow, globalShortcut, net } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');

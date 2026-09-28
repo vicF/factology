@@ -99,6 +99,10 @@ class UUID
     public const LIST_CLASS = '4ed8a123-eceb-4c30-a8d6-c5694ce3d2f8';
     public const DIVIDER_PROPERTY = 'd1d1d1d1-0001-4000-8000-000000000001';
 
+    // ── External object matching system objects ──
+    public const LINK_EXTERNAL_REF = 'd1d1d1d1-0002-4000-8000-000000000001';
+    public const COMMON_PUBLIC = 'd1d1d1d1-0003-4000-8000-000000000001';
+
     // ── GEDCOM import system objects ──
     public const GEDCOM_CLASS = '10b04205-aecb-406d-befc-c6362f7ac9fb';
     public const IMPORTED_FROM = '7e58df61-3f99-4a82-9f0d-555a56abfb69';
