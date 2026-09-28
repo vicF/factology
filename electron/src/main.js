@@ -46,9 +46,13 @@ function startStaticServer() {
             let pathname = decodeURIComponent((req.url || '/').split('?')[0]);
             if (pathname === '/') pathname = '/index.html';
 
-            // Prevent path traversal outside APP_DIR
-            const filePath = path.join(APP_DIR, path.normalize(pathname));
+            // Strip leading / or \ to prevent path.normalize producing a
+            // root-relative path on Windows (e.g. \sql-wasm-browser.wasm)
+            // which makes path.join drop APP_DIR entirely.
+            const relativePath = pathname.replace(/^[/\\]+/, '');
+            const filePath = path.join(APP_DIR, path.normalize(relativePath));
             if (!filePath.startsWith(APP_DIR)) {
+                console.error(`[main] SECURITY: blocked path traversal attempt: ${pathname} -> ${filePath}`);
                 res.writeHead(403);
                 res.end('Forbidden');
                 return;
@@ -56,12 +60,20 @@ function startStaticServer() {
 
             fs.readFile(filePath, (err, data) => {
                 if (err) {
+                    console.error(`[main] 404: ${filePath} (req: ${pathname})`);
                     res.writeHead(404);
                     res.end('Not found');
                     return;
                 }
+                console.log(`[main] 200: ${filePath} (req: ${pathname})`);
+                // Prevent Chromium from caching old JS chunks between builds.
+                // Without this, a rebuilt SPA with new chunk hashes still serves
+                // stale app-B[...].js from cache, whose dynamic imports reference
+                // old chunk names that no longer exist → "Failed to fetch
+                // dynamically imported module".
                 res.writeHead(200, {
                     'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
                 });
                 res.end(data);
             });

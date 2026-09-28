@@ -111,4 +111,9 @@ export const SEED_TRANSLATIONS = {
     'fceb25e2-5faf-4f87-8b92-cbafdb3d6072': {"ru":"Сет-лист","lang":"en"},
     'fc9962c2-7ee0-4028-ad12-469d66aaa322': {"ru":"Список для практики","lang":"en"},
     '8ac90c98-de0a-4525-a16f-31ba305e98b5': {"ru":"Репертуар","lang":"en"},
+    // ── Abstract link type bases (type G_LINK = 4) — mirror PHP migrations ──
+    '733112a1-9e87-47ee-8a86-81cc38e77a41': {"ru":"Иерархия","lang":"en"},
+    '79762fd7-e52d-4401-8010-fda9a7e81aa0': {"ru":"Включение","lang":"en"},
+    '16414472-da4b-427d-8886-b7c75d133750': {"ru":"Эквивалентность","lang":"en"},
+    'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde': {"ru":"Родственные отношения","lang":"en"},
 };

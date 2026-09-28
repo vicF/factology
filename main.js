@@ -1,0 +1,210 @@
+const { app, BrowserWindow, globalShortcut } = require('electron');
+const path = require('path');
+const http = require('http');
+const fs = require('fs');
+
+// Default the user-data directory (IndexedDB/Dexie lives there) to the D:
+// drive when present — the default %APPDATA%/factology-desktop sits on C:,
+// and Chromium fails to create a fresh IndexedDB store on a full disk
+// ("UnknownError: Internal error"), leaving the app stuck on the spinner.
+// FACTOLOGY_USER_DATA always wins; without a D: drive we fall back to the
+// OS default location.
+const userDataOverride = process.env.FACTOLOGY_USER_DATA;
+if (userDataOverride) {
+    app.setPath('userData', userDataOverride);
+} else if (process.platform === 'win32' && fs.existsSync('D:\\')) {
+    app.setPath('userData', 'D:/factology-desktop-data');
+}
+
+// The SPA is served over a local HTTP server (not file://) because Chromium's
+// IndexedDB is unreliable on the file:// protocol — Dexie fails to open with
+// "UnknownError: Internal error", leaving the app stuck on the loading screen.
+// http://localhost gives a proper origin that IndexedDB handles reliably.
+const APP_DIR = path.join(__dirname, '..', 'app');
+let serverUrl = null;
+
+const MIME_TYPES = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.mjs': 'application/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.ico': 'image/x-icon',
+    '.wasm': 'application/wasm',
+    '.map': 'application/json',
+};
+
+function startStaticServer() {
+    return new Promise((resolve) => {
+        const server = http.createServer((req, res) => {
+            let pathname = decodeURIComponent((req.url || '/').split('?')[0]);
+            if (pathname === '/') pathname = '/index.html';
+
+            // Prevent path traversal outside APP_DIR
+            const filePath = path.join(APP_DIR, path.normalize(pathname));
+            if (!filePath.startsWith(APP_DIR)) {
+                res.writeHead(403);
+                res.end('Forbidden');
+                return;
+            }
+
+            fs.readFile(filePath, (err, data) => {
+                if (err) {
+                    res.writeHead(404);
+                    res.end('Not found');
+                    return;
+                }
+                res.writeHead(200, {
+                    'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+                });
+                res.end(data);
+            });
+        });
+
+        // Serve on a FIXED port so the web origin (http://127.0.0.1:<port>) stays
+        // the same between launches. Chromium keeps localStorage AND IndexedDB
+        // per origin, so an ephemeral port made every session start on a brand
+        // new origin — the identity registry and local data "disappeared" and
+        // the app landed back on the Welcome gate each time. FACTOLOGY_PORT
+        // overrides; if the port is taken we walk a small list before falling
+        // back to an ephemeral one (logged, last resort).
+        const preferred = [
+            ...(process.env.FACTOLOGY_PORT ? [Number(process.env.FACTOLOGY_PORT)] : []),
+            47321, 47322, 47323,
+        ];
+        let attempt = 0;
+        const listen = () => {
+            const port = attempt < preferred.length ? preferred[attempt] : 0;
+            server.once('error', (err) => {
+                if (err.code === 'EADDRINUSE' && attempt < preferred.length) {
+                    attempt++;
+                    listen();
+                    return;
+                }
+                console.error(`[main] failed to listen on ${port}:`, err);
+                resolve(server);
+            });
+            server.listen(port, '127.0.0.1', () => {
+                serverUrl = `http://127.0.0.1:${server.address().port}`;
+                if (server.address().port !== preferred[0]) {
+                    console.log(`[main] WARNING: using ${serverUrl} (requested ${preferred[0]} busy) — data will NOT persist between sessions on this run`);
+                } else {
+                    console.log(`[main] Serving SPA at ${serverUrl}`);
+                }
+                resolve(server);
+            });
+        };
+        listen();
+    });
+}
+
+async function createWindow() {
+    const mainWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        minWidth: 800,
+        minHeight: 600,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            // Sandboxed preloads (Electron ≥20 default) only expose a polyfilled
+            // subset of Node modules — `fs`/`path`/`os` are absent, so the
+            // preload crashes with "module not found: fs" and the SQLiteAdapter
+            // never gets its fileIO, silently falling back to Dexie/IndexedDB.
+            // Disabling the sandbox while keeping contextIsolation allows the
+            // preload to require('fs') without opening Node to the page itself.
+            sandbox: false,
+            preload: path.join(__dirname, 'preload.js'),
+        },
+        show: false,
+        title: 'Factology',
+        // App-specific window/taskbar icon (assets live in this repo's
+        // electron/assets/). Without this every Factology-family app shows the
+        // default Electron logo and is indistinguishable in the taskbar.
+        icon: path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'appIcon.ico' : 'appIcon.png'),
+    });
+
+    // Show window when ready to avoid flash (registered BEFORE loadURL —
+    // ready-to-show fires while the page renders, and attaching it after an
+    // awaited loadURL would miss it, leaving the window never shown).
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+    });
+
+    // Reliable DevTools shortcut inside the window (the global F12 hotkey can
+    // be stolen by the OS / other apps; this cannot).
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        const ctrlShiftI = input.control && input.shift && input.key.toLowerCase() === 'i';
+        if (input.key === 'F12' || ctrlShiftI) {
+            event.preventDefault();
+            mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
+    });
+
+    // DEV mode loads the Vite dev server (HMR); otherwise the Capacitor-built
+    // SPA is loaded from our local static server.
+    await mainWindow.loadURL(DEV_URL || `${serverUrl}/`);
+
+    // Debug: forward renderer console + load status to the terminal. The
+    // 'console-message' event changed shape across Electron versions (older:
+    // positional (event, level, message, line, sourceId); newer: level/message
+    // live on the event object) — read whichever form this Electron uses.
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        const hasFields = event && typeof event === 'object' && 'message' in event;
+        const lvl = hasFields ? event.level : level;
+        const msg = hasFields ? event.message : message;
+        console.log(`[renderer:${lvl}] ${msg}`);
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
+        console.error(`[renderer] did-fail-load ${code} ${desc} ${url}`);
+    });
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('[renderer] did-finish-load');
+    });
+}
+
+// DEV mode (run-electron.sh): load the Vite dev server for HMR instead of the
+// built copy. run-electron.sh points Vite at this app's own port (47321), so
+// the web origin — and therefore IndexedDB/localStorage — is identical to the
+// packaged app and the live session sees the same local database.
+const DEV_URL = process.env.FACTOLOGY_DEV_URL || null;
+
+let server;
+app.whenReady().then(async () => {
+    if (DEV_URL) {
+        console.log(`[main] DEV mode (HMR) — loading ${DEV_URL}`);
+    } else {
+        server = await startStaticServer();
+    }
+    await createWindow();
+
+    // F12 / Ctrl+Shift+I → open DevTools for debugging
+    globalShortcut.register('F12', () => {
+        BrowserWindow.getFocusedWindow()?.webContents.openDevTools({ mode: 'detach' });
+    });
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+        BrowserWindow.getFocusedWindow()?.webContents.openDevTools({ mode: 'detach' });
+    });
+});
+
+app.on('window-all-closed', () => {
+    app.quit();
+});
+
+app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+    if (server) server.close();
+});
+
+app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        await createWindow();
+    }
+});

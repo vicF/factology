@@ -165,6 +165,11 @@ export const BOOTSTRAP_LINKS = [
     { one: UUID.LINK,       other: UUID.EVIDENCE,       description: '"Is evidenced by" is subclass of "Link"' },
     { one: UUID.LINK,       other: UUID.FATHER,         description: '"Father" is subclass of "Link"' },
     { one: UUID.LINK,       other: UUID.MOTHER,         description: '"Mother" is subclass of "Link"' },
+    // Abstract link type bases under the Link root (mirror PHP migrations).
+    { one: UUID.LINK,       other: '733112a1-9e87-47ee-8a86-81cc38e77a41', description: '"Hierarchy" is subclass of "Link"' },
+    { one: UUID.LINK,       other: '79762fd7-e52d-4401-8010-fda9a7e81aa0', description: '"Containment" is subclass of "Link"' },
+    { one: UUID.LINK,       other: '16414472-da4b-427d-8886-b7c75d133750', description: '"Equivalence" is subclass of "Link"' },
+    { one: UUID.LINK,       other: 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde', description: '"Kinship" is subclass of "Link"' },
 ];
 
 // ── Classes (public G_CLASS things) — mirrors DatabaseSeeder.php ──────
@@ -258,6 +263,12 @@ export const CLASSES = [
     { thing_id: UUID.SETLIST_CLASS,       name: 'Setlist',       description: 'A performance setlist (ordered songs for a gig)',                                             type: UUID.G_CLASS, public: true },
     { thing_id: UUID.PRACTICE_LIST_CLASS, name: 'Practice list', description: 'A list of parts/songs for practice',                                                          type: UUID.G_CLASS, public: true },
     { thing_id: UUID.REPERTOIRE_CLASS,    name: 'Repertoire',    description: 'A selection of songs a performer keeps in shape',                                            type: UUID.G_CLASS, public: true },
+    // ── Abstract link type bases (type G_LINK = 4) — mirror PHP migrations ──
+    // These group other link types into categories shown in the picker.
+    { thing_id: '733112a1-9e87-47ee-8a86-81cc38e77a41', name: 'Hierarchy',    description: 'Отношения иерархии и классификации (надкласс-подкласс, экземпляр-класс)',     type: UUID.G_LINK, public: true },
+    { thing_id: '79762fd7-e52d-4401-8010-fda9a7e81aa0', name: 'Containment',  description: 'Отношения часть-целое и пространственное включение',                             type: UUID.G_LINK, public: true },
+    { thing_id: '16414472-da4b-427d-8886-b7c75d133750', name: 'Equivalence',  description: 'Тождество, синонимия и дубликаты',                                              type: UUID.G_LINK, public: true },
+    { thing_id: 'b04d6a70-fb73-4ccf-badc-a7b1a9ff3dde', name: 'Kinship',     description: 'Семейные и родственные связи (родители, дети, супруги, родственники)',           type: UUID.G_LINK, public: true },
 ];
 
 // ── Class hierarchy links (LINK_TO_PARENT edges) — mirrors DatabaseSeeder.php ──

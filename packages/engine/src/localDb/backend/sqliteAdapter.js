@@ -22,9 +22,14 @@ const TABLE_DEFS = {
             'start TEXT',
             '"end" TEXT',
             'name TEXT',
+            'name_translations TEXT',  // JSON: {"ru":"...", "lang":"en"}
             'description TEXT',
+            'description_translations TEXT',  // JSON
             'data TEXT',            // JSON blob
             'tags TEXT',            // JSON array (Dexie multi-value emulated)
+            'start_meta TEXT',      // JSON: flexible-date qualifiers/era
+            '"end_meta" TEXT',      // JSON: flexible-date qualifiers/era
+            'abstract TEXT',        // abstract/notes text
             '_syncStatus TEXT',
             '_localRevision INTEGER DEFAULT 0',
             '_serverRevision INTEGER DEFAULT 0',
@@ -579,6 +584,12 @@ export class SQLiteAdapter {
         // Create tables
         this._ensureTables();
 
+        // Migrate existing tables: add any columns that were added to TABLE_DEFS
+        // after the table was first created (e.g. name_translations, abstract).
+        // SQLite supports ALTER TABLE ADD COLUMN but not DROP/ALTER, so we only
+        // add missing columns — never remove them.
+        this._migrateSchema();
+
         this._ready = true;
 
         // Auto-save: persist dirty data to disk every 2 seconds so user data
@@ -619,6 +630,44 @@ export class SQLiteAdapter {
                     const cols = idx.cols.map(quoteColumn).join(', ');
                     const idxSql = `CREATE INDEX IF NOT EXISTS ${idx.name} ON ${quoteColumn(name)} (${cols})`;
                     try { this._db.run(idxSql); } catch (e) { /* index may already exist */ }
+                }
+            }
+        }
+    }
+
+    /**
+     * Migrate existing tables by adding columns that were added to TABLE_DEFS
+     * since the table was first created. Uses PRAGMA table_info to detect
+     * which columns already exist, then ALTER TABLE ADD COLUMN for the rest.
+     */
+    _migrateSchema() {
+        for (const [name, def] of Object.entries(TABLE_DEFS)) {
+            // Get existing columns via PRAGMA
+            const existingCols = new Set();
+            try {
+                const stmt = this._db.prepare(`PRAGMA table_info('${name}')`);
+                while (stmt.step()) {
+                    const row = stmt.getAsObject();
+                    existingCols.add(row.name);
+                }
+                stmt.free();
+            } catch (e) {
+                // Table may not exist yet (fresh DB) — skip
+                continue;
+            }
+
+            // Compare with TABLE_DEFS columns
+            for (const colDef of def.columns) {
+                const colName = colDef.trim().split(/\s+/)[0].replace(/^"|"$/g, '');
+                if (!existingCols.has(colName)) {
+                    // Build the column definition (type + constraints after the name)
+                    const rest = colDef.trim().split(/\s+/).slice(1).join(' ');
+                    const sql = `ALTER TABLE "${name}" ADD COLUMN "${colName}" ${rest}`;
+                    try {
+                        this._db.run(sql);
+                    } catch (e) {
+                        // Ignore if column already exists (race / already migrated)
+                    }
                 }
             }
         }
