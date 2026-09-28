@@ -2,7 +2,7 @@
 //
 // Guards that the local (standalone/mobile) seeder inserts the SAME default
 // objects as the web application's DatabaseSeeder.php: every bootstrap thing,
-// every class, and every class-hierarchy link declared in seedData.js.
+// every class, and every class-hierarchy link declared in seedClasses.js.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getDb, clearAll, SYNC_STATUS } from '@factology/engine/localDb/index.js';
@@ -12,9 +12,8 @@ import { SEED_TRANSLATIONS } from '@factology/engine/localDb/seedTranslations.js
 import {
     BOOTSTRAP_THINGS,
     BOOTSTRAP_LINKS,
-    CLASSES,
-    CLASS_LINKS,
 } from '@factology/engine/localDb/seedData.js';
+import { CLASSES, CLASS_LINKS } from '@factology/engine/localDb/seedClasses.js';
 
 describe('Seeder parity with web DatabaseSeeder', () => {
     beforeEach(async () => {

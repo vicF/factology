@@ -6,7 +6,8 @@
 // owner-visibility filter.
 
 import { getDb } from '@factology/engine/localDb/index.js';
-import { BOOTSTRAP_THINGS, CLASSES } from '@factology/engine/localDb/seedData.js';
+import { BOOTSTRAP_THINGS } from '@factology/engine/localDb/seedData.js';
+import { CLASSES } from '@factology/engine/localDb/seedClasses.js';
 
 // Seed/system thing ids must never be adopted — they are re-owned to
 // SYSTEM_OWNER by seeder.normalizeSystemOwners instead.

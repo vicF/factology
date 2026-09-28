@@ -13,7 +13,9 @@
         "run:android": "bash run-android.sh",
         "run:electron": "bash run-electron.sh",
         "test:vitest": "vitest run --config vitest.config.js",
-        "test:vitest-watch": "vitest --config vitest.config.js"
+        "test:vitest-watch": "vitest --config vitest.config.js",
+        "generate:seed-classes": "node scripts/generate-seed-classes.mjs",
+        "generate:seed-translations": "node scripts/generate-seed-translations.mjs"
     },
     "dependencies": {
         "@capacitor/filesystem": "^8.1.3",

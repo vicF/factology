@@ -49,6 +49,7 @@
                             <h1 class="object-title">
                                 {{ $objectName(object) || $t('Unnamed') }}
                                 <TranslatedBadge :translations="object.name_translations" />
+                                <MatchStatusIcon v-if="authenticated && eligibleForMatch" :state="matchState" @open-dialog="showMatchDialog = true" />
                             </h1>
                             <div v-if="authenticated && editMode" class="object-actions">
                                 <button class="btn btn-success" @click="openCreateLinkedModal" :title="$t('Create new object linked to this one')">{{ $t('Create') }}</button>
@@ -437,6 +438,13 @@
             @confirm="handleConfirm"
             @cancel="showConfirmModal = false"
         />
+        <MatchDialog
+            :show="showMatchDialog"
+            :object="object"
+            :candidates="matchCandidates"
+            @close="showMatchDialog = false"
+            @match-confirmed="handleMatchConfirmed"
+        />
     </div>
 </template>
 
@@ -466,8 +474,11 @@ import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import IconCheck from './icons/IconCheck.vue';
 import ConfirmModal from './ConfirmModal.vue';
+import MatchStatusIcon from './MatchStatusIcon.vue';
+import MatchDialog from './MatchDialog.vue';
 import { buildPropertyEntries } from '../utils/properties.js';
 import { UUID } from '@factology/engine/constants/uuid.js';
+import { useMatchingStore } from '../stores/matching';
 import { buildMapFeatures } from '../utils/geo.js';
 
 const Graph = defineAsyncComponent(() => import('./Graph.vue'));
@@ -485,6 +496,15 @@ const cacheStore = useObjectCacheStore();
 const objectsStore = useObjectsStore();
 const uiStore = useUiStore();
 const editMode = computed(() => uiStore.editMode);
+
+const matchingStore = useMatchingStore();
+const showMatchDialog = ref(false);
+const matchState = computed(() => object.value ? matchingStore.matchState(object.value).state : 'none');
+const eligibleForMatch = computed(() => object.value ? matchingStore.isEligible(object.value) : false);
+const matchCandidates = computed(() => object.value ? matchingStore.getCached(object.value.thing_id) || [] : []);
+function handleMatchConfirmed() {
+    showMatchDialog.value = false;
+}
 
 const object = ref(null);
 const loaded = ref(false);
@@ -845,6 +865,8 @@ const getObject = async () => {
             // The left panel lists classes/link types of the neighborhood; let
             // it refresh after a reload caused by an edit.
             eventBus.emit('object-details-changed', object.value.thing_id);
+            // Trigger auto-match for MusicBrainz-eligible classes
+            matchingStore.autoMatch(object.value);
         }
     } catch (error) {
         console.error('Get object error:', error);
@@ -1019,6 +1041,8 @@ const createLink = async (linkData) => {
 const handleObjectCreated = (newObject) => {
     showTreeModal.value = false;
     if (newObject?.data?.thing_id) {
+        // Trigger auto-match for MusicBrainz-eligible classes
+        matchingStore.autoMatch(newObject.data);
         router.push({ name: 'object', params: { uid: newObject.data.thing_id } });
     }
 };
@@ -1026,6 +1050,8 @@ const handleObjectCreated = (newObject) => {
 const handleObjectUpdated = async () => {
     showEditModal.value = false;
     await getObject();
+    // Trigger auto-match for MusicBrainz-eligible classes
+    matchingStore.autoMatch(object.value);
 };
 
 const handleLinkedObjectCreated = async () => {

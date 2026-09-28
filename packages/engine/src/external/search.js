@@ -1,0 +1,49 @@
+// packages/engine/src/external/search.js
+//
+// Unified search across registered external providers.
+
+import { getProvidersForClasses } from './registry.js';
+
+/**
+ * @typedef {import('./types').Candidate} Candidate
+ */
+
+/**
+ * Search all registered providers that match the given class IDs.
+ * @param {string[]} classIds  — class IDs of the object being matched
+ * @param {string} query       — user-facing search string (e.g. object name)
+ * @param {object} [ctx]       — additional context (artist name, year, etc.)
+ * @returns {Promise<Candidate[]>}
+ */
+export async function searchProvider(classIds, query, ctx = {}) {
+    const providers = getProvidersForClasses(classIds);
+    const results = [];
+
+    for (const provider of providers) {
+        try {
+            const candidates = await provider.search(query, ctx);
+            for (const c of candidates) {
+                results.push(c);
+            }
+        } catch (err) {
+            console.error(`[search] provider ${provider.key} failed:`, err);
+        }
+    }
+
+    // Sort by match quality descending
+    results.sort((a, b) => (b.matchQuality || 0) - (a.matchQuality || 0));
+    return results;
+}
+
+/**
+ * Fetch a single external record by its external ID (e.g. MBID).
+ * @param {string} providerKey
+ * @param {string} externalId
+ * @returns {Promise<Candidate|null>}
+ */
+export async function fetchById(providerKey, externalId) {
+    const { getProvider } = await import('./registry.js');
+    const provider = getProvider(providerKey);
+    if (!provider) throw new Error(`Unknown provider: ${providerKey}`);
+    return provider.fetchById(externalId);
+}

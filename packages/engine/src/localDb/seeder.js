@@ -12,11 +12,10 @@ import { migrateFromDexie } from './migrateFromDexie.js';
 import {
     BOOTSTRAP_THINGS,
     BOOTSTRAP_LINKS,
-    CLASSES,
-    CLASS_LINKS,
     PROPERTY_THINGS,
     PROPERTY_LINKS,
 } from './seedData.js';
+import { CLASSES, CLASS_LINKS } from './seedClasses.js';
 import { SEED_TRANSLATIONS } from './seedTranslations.js';
 
 const makeObject = (t) => ({
