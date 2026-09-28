@@ -40,10 +40,54 @@ const MIME_TYPES = {
     '.map': 'application/json',
 };
 
+const MUSICBRAINZ_UA = 'Factology/1.0';
+
+function proxyMusicBrainz(req, res, type) {
+    const target = new URL(`https://musicbrainz.org/ws/2/${type}`);
+    // Copy original query params except fmt
+    const requestUrl = new URL(req.url || '', 'http://127.0.0.1');
+    for (const [k, v] of requestUrl.searchParams) {
+        target.searchParams.append(k, v);
+    }
+    target.searchParams.set('fmt', 'json');
+
+    const mbReq = net.request({
+        method: 'GET',
+        url: target.toString(),
+        headers: { 'User-Agent': MUSICBRAINZ_UA, 'Accept': 'application/json' },
+    });
+
+    mbReq.on('response', (mbRes) => {
+        // Forward status code
+        res.writeHead(mbRes.statusCode, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',  // needed for the renderer process
+        });
+        mbRes.on('data', (chunk) => res.write(chunk));
+        mbRes.on('end', () => res.end());
+    });
+
+    mbReq.on('error', (e) => {
+        res.writeHead(502);
+        res.end(JSON.stringify({ error: 'proxy', message: e.message }));
+    });
+
+    mbReq.end();
+}
+
 function startStaticServer() {
     return new Promise((resolve) => {
         const server = http.createServer((req, res) => {
             let pathname = decodeURIComponent((req.url || '/').split('?')[0]);
+            // /mb/* → proxy to MusicBrainz API
+            // MusicBrainz sends no CORS headers, so the renderer process cannot
+            // call the API directly. The Electron main process proxies through
+            // a same-origin localhost route.
+            const mbMatch = pathname.match(/^\/mb\/(artist|recording|release)(?:\/|$)/);
+            if (mbMatch) {
+                proxyMusicBrainz(req, res, mbMatch[1]);
+                return;
+            }
             if (pathname === '/') pathname = '/index.html';
 
             // Strip leading / or \ to prevent path.normalize producing a
