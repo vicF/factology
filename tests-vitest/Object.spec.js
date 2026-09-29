@@ -71,6 +71,15 @@ vi.mock('@/components/Graph.vue', () => ({
     default: { name: 'Graph', template: '<div />' },
 }))
 
+vi.mock('@/stores/matching', () => ({
+    useMatchingStore: () => ({
+        matchState: () => ({ state: 'none' }),
+        isEligible: () => false,
+        getCached: () => [],
+        autoMatch: vi.fn(),
+    }),
+}))
+
 const OBJECT = {
     thing_id: 'obj-1',
     name: 'Test Object',

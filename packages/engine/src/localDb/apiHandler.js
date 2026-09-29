@@ -1108,8 +1108,11 @@ async function enrichLinks(links, currentThingId) {
     if (!links || links.length === 0) return links;
     const db = getDb();
 
-    // Collect every endpoint UUID we need to resolve
-    const ids = new Set();
+    // Collect every endpoint UUID we need to resolve.
+    // Always include currentThingId — it may be the other_thing_id of a link
+    // (e.g. COMMON_PUBLIC→Everything), and skipping it would make the
+    // resolved `name` (which reads byId[other_thing_id]) null.
+    const ids = new Set([currentThingId]);
     for (const link of links) {
         if (link.one_thing_id !== currentThingId) ids.add(link.one_thing_id);
         if (link.other_thing_id !== currentThingId) ids.add(link.other_thing_id);

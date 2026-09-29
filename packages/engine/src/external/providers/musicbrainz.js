@@ -8,8 +8,8 @@ import { registerProvider } from '../registry.js';
 
 // ── Constants ──
 
-/** In dev/Capacitor, requests go through same-origin /mb proxy; production web falls back to direct */
-const API_BASE = '/mb';
+/** MusicBrainz supports CORS, so the API can be called directly from the browser. */
+const API_BASE = 'https://musicbrainz.org/ws/2';
 
 const MB_MIN_INTERVAL_MS = 1100;
 let lastMbCallAt = 0;
@@ -478,7 +478,9 @@ export function externalUrl(id) {
  * @returns {Promise<import('../types').Candidate[]>}
  */
 export async function search(query, ctx = {}) {
-    const type = ctx?.type || 'artist';
+    // When artist context is provided, it's a song/recording search
+    const artistProvided = !!(ctx.artist || ctx.data?.artist);
+    const type = ctx.type || (artistProvided ? 'song' : 'artist');
     if (type === 'song' || type === 'recording') {
         return searchSongs(query, ctx);
     }

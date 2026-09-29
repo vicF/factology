@@ -100,8 +100,9 @@ describe('Local API class tree (mirrors server searchTree)', () => {
         expect(names).toContain('Vehicle');
         expect(names).toContain('Guitar');
         expect(names).toContain('is a superclass of'); // link type node under Link
-        // Orphans (not reachable from Everything) are excluded, like the server
-        expect(names).not.toContain('Married to');
+        // Orphans (not reachable from Everything) are excluded, like the server.
+        // 'Married to' IS reachable via Everything→Link→Kinship→Married to,
+        // while 'meanwhile' (under Time, which has no LINK_TO_PARENT) is not.
         expect(names).not.toContain('meanwhile');
     });
 

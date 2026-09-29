@@ -7,8 +7,9 @@
 
 import { defineStore } from 'pinia';
 import { useAuthStore } from './auth';
+import axios from 'axios';
 import { searchProvider, fetchById } from '@factology/engine/external/search.js';
-import { confirmMatch, rejectMatch, getMatchState } from '@factology/engine/external/matcher.js';
+import { confirmMatch as engineConfirm, rejectMatch as engineReject, getMatchState } from '@factology/engine/external/matcher.js';
 import { UUID } from '@factology/engine/constants/uuid.js';
 
 /** Class IDs that MusicBrainz can handle */
@@ -43,12 +44,17 @@ export const useMatchingStore = defineStore('matching', {
 
         /**
          * Check if a thing class is eligible for MusicBrainz matching.
+         * Handles both the local Dexie format (thing.classIds) and
+         * the server API format (thing.classes — array of class objects).
          * @param {object} thing
          * @returns {boolean}
          */
         isEligible: () => (thing) => {
-            if (!thing || !thing.classIds) return false;
-            return thing.classIds.some((id) => MB_CLASS_IDS.includes(id));
+            if (!thing) return false;
+            const classIds = thing.classIds
+                || (thing.classes && thing.classes.map(c => c.thing_id || c.id))
+                || [];
+            return classIds.some((id) => MB_CLASS_IDS.includes(id));
         },
 
         /**
@@ -118,45 +124,69 @@ export const useMatchingStore = defineStore('matching', {
          * @returns {Promise<import('@factology/engine/external/types').Candidate[]>}
          */
         async manualSearch(thingId, query, ctx = {}) {
-            try {
-                const candidates = await searchProvider(MB_CLASS_IDS, query, ctx);
-                if (candidates && candidates.length > 0) {
-                    this.resultsCache.set(thingId, candidates);
-                }
-                return candidates || [];
-            } catch (err) {
-                console.error(`[matchingStore] manualSearch failed:`, err);
-                return [];
+            const candidates = await searchProvider(MB_CLASS_IDS, query, ctx);
+            if (candidates && candidates.length > 0) {
+                this.resultsCache.set(thingId, candidates);
             }
+            return candidates || [];
         },
 
         /**
          * Confirm a match and promote the object.
+         * In standalone mode, delegates to the engine matcher with local DB.
+         * In web mode, updates via the server API.
          * @param {string} thingId
          * @param {import('@factology/engine/external/types').Candidate} candidate
          */
         async confirm(thingId, candidate) {
             try {
-                await confirmMatch(thingId, candidate);
-                this.resultsCache.delete(thingId);
+                // Try engine matcher first (standalone/local mode)
+                await engineConfirm(thingId, candidate);
             } catch (err) {
-                console.error(`[matchingStore] confirmMatch failed:`, err);
-                throw err;
+                if (err.message !== 'Matcher not initialized — call initMatcher first') {
+                    throw err;
+                }
+                // Web mode: update via server API
+                const res = await axios.get(`/object/${thingId}`);
+                const obj = res.data.data || res.data;
+                const data = { ...(obj.data || {}) };
+                data.mbMatch = {
+                    state: 'confirmed',
+                    at: Date.now(),
+                    externalId: candidate.externalId,
+                    providerKey: candidate.providerKey,
+                    name: candidate.name,
+                };
+                await axios.put(`/object/${thingId}`, { ...obj, data });
             }
+            this.resultsCache.delete(thingId);
         },
 
         /**
          * Reject all matches (user says no match exists).
+         * In standalone mode, delegates to the engine matcher with local DB.
+         * In web mode, updates via the server API.
          * @param {string} thingId
          */
         async reject(thingId) {
             try {
-                await rejectMatch(thingId);
-                this.resultsCache.delete(thingId);
+                // Try engine matcher first (standalone/local mode)
+                await engineReject(thingId);
             } catch (err) {
-                console.error(`[matchingStore] rejectMatch failed:`, err);
-                throw err;
+                if (err.message !== 'Matcher not initialized — call initMatcher first') {
+                    throw err;
+                }
+                // Web mode: update via server API
+                const res = await axios.get(`/object/${thingId}`);
+                const obj = res.data.data || res.data;
+                const data = { ...(obj.data || {}) };
+                data.mbMatch = {
+                    state: 'rejected',
+                    at: Date.now(),
+                };
+                await axios.put(`/object/${thingId}`, { ...obj, data });
             }
+            this.resultsCache.delete(thingId);
         },
     },
 });

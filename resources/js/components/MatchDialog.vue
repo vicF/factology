@@ -42,6 +42,8 @@
                             <div class="candidate-meta">
                                 <span v-if="bestCandidate.disambiguation" class="text-muted small">{{ bestCandidate.disambiguation }}</span>
                                 <span v-if="bestCandidate.type" class="badge bg-secondary ms-2">{{ bestCandidate.type }}</span>
+                                <span v-if="bestCandidate.payload?.artist && bestCandidate.payload?.artist !== bestCandidate.name" class="text-muted small ms-1">{{ bestCandidate.payload.artist }}</span>
+                                <span v-if="bestCandidate.payload?.album" class="text-muted small ms-1">{{ bestCandidate.payload.album }}<template v-if="bestCandidate.payload?.albumYear"> ({{ bestCandidate.payload.albumYear }})</template></span>
                                 <span v-if="bestCandidate.year" class="badge bg-info ms-2">{{ bestCandidate.year }}</span>
                                 <span class="candidate-quality ms-2">
                                     {{ Math.round((bestCandidate.matchQuality || 0) * 100) }}%
@@ -62,6 +64,8 @@
                                 <div class="candidate-meta">
                                     <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
                                     <span v-if="c.type" class="badge bg-secondary ms-2">{{ c.type }}</span>
+                                    <span v-if="c.payload?.artist && c.payload?.artist !== c.name" class="text-muted small ms-1">{{ c.payload.artist }}</span>
+                                    <span v-if="c.payload?.album" class="text-muted small ms-1">{{ c.payload.album }}<template v-if="c.payload?.albumYear"> ({{ c.payload.albumYear }})</template></span>
                                     <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
                                     <span class="candidate-quality ms-2">
                                         {{ Math.round((c.matchQuality || 0) * 100) }}%
@@ -83,8 +87,12 @@
                         </div>
                     </div>
 
-                    <!-- Search form (for unmatched, or after clicking "search again") -->
-                    <div v-if="viewState === 'unmatched' || showSearchForm" class="mb-3">
+                    <!-- Search form (for unmatched / none / or search-again) -->
+                    <div v-if="viewState === 'unmatched' || viewState === 'none' || showSearchForm" class="mb-3">
+                        <div v-if="searching" class="d-flex align-items-center gap-2 mb-2 text-muted">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            <small>{{ $t('Searching MusicBrainz...') }}</small>
+                        </div>
                         <div class="mb-2">
                             <label class="form-label small">{{ $t('Name') }}</label>
                             <input v-model="searchQuery" type="text" class="form-control form-control-sm" :placeholder="object?.name || ''" />
@@ -116,6 +124,8 @@
                                 <div class="candidate-meta">
                                     <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
                                     <span v-if="c.type" class="badge bg-secondary ms-2">{{ c.type }}</span>
+                                    <span v-if="c.payload?.artist && c.payload?.artist !== c.name" class="text-muted small ms-1">{{ c.payload.artist }}</span>
+                                    <span v-if="c.payload?.album" class="text-muted small ms-1">{{ c.payload.album }}<template v-if="c.payload?.albumYear"> ({{ c.payload.albumYear }})</template></span>
                                     <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
                                     <span class="candidate-quality ms-2">
                                         {{ Math.round((c.matchQuality || 0) * 100) }}%

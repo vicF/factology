@@ -7,6 +7,7 @@ import { createPinia } from 'pinia';
 import { useAuthStore } from './stores/auth';
 import { useObjectHistoryStore } from './stores/objectHistory';
 import { dateFromDb } from '@factology/engine/utils/dateUtils.js';
+import { registerMusicBrainzProvider } from '@factology/engine/external/providers/musicbrainz.js';
 const pinia = createPinia();
 
 import App from './components/App.vue';
@@ -171,6 +172,10 @@ flexibleDate.setFlexibleDateLocaleProvider(() => localized.currentLocale());
     await authStore.checkAuth();
     // Fetch public settings (registration status, etc.)
     await authStore.fetchSettings();
+
+    // Register MusicBrainz provider so the matching system can search
+    // artists and songs against the MusicBrainz API.
+    registerMusicBrainzProvider();
 
     app.mount('#app');
 
