@@ -207,6 +207,8 @@ const messages = {
         Private: "Private",
         Properties: "Properties",
         Public: "Public",
+        "Global": "Global",
+        Group: "Group",
         "Record created": "Record created",
         "Record updated": "Record updated",
         Register: "Register",
@@ -285,6 +287,7 @@ const messages = {
         Updated: "Updated",
         "View mode is on — click to switch to edit mode": "View mode is on — click to switch to edit mode",
         Visibility: "Visibility",
+        "If you are in Russia, MusicBrainz is blocked without a VPN.": "If you are in Russia, MusicBrainz is blocked without a VPN.",
         "You are editing an object that belongs to {owner}.": "You are editing an object that belongs to {owner}.",
         "You are going to delete the object that belongs to {owner}.": "You are going to delete the object that belongs to {owner}.",
         "You have unsaved changes. Are you sure you want to close?": "You have unsaved changes. Are you sure you want to close?",
@@ -648,6 +651,8 @@ const messages = {
         Private: "Приватный",
         Properties: "Свойства",
         Public: "Публичный",
+        "Global": "Глобальный",
+        Group: "Группа",
         "Record created": "Запись создана",
         "Record updated": "Последнее изменение",
         "View mode is on — click to switch to edit mode": "Режим просмотра включен — нажмите, чтобы переключиться в режим редактирования",
@@ -783,6 +788,7 @@ const messages = {
         Updated: "Обновлён",
         "View mode is on — click to switch to edit mode": "Режим просмотра включен — нажмите, чтобы переключиться в режим редактирования",
         Visibility: "Видимость",
+        "If you are in Russia, MusicBrainz is blocked without a VPN.": "MusicBrainz заблокирован в России. Пожалуйста, включите VPN.",
         "You are editing an object that belongs to {owner}.": "Вы редактируете объект, принадлежащий «{owner}».",
         "You are going to delete the object that belongs to {owner}.": "Вы собираетесь удалить объект, принадлежащий «{owner}».",
         "You have unsaved changes. Are you sure you want to close?": "У вас есть несохранённые изменения. Вы уверены, что хотите закрыть?",
@@ -883,6 +889,28 @@ const messages = {
         "Shares and threshold must satisfy 2 ≤ threshold ≤ total ≤ 255.": "Число частей и порог должны удовлетворять условию 2 ≤ порог ≤ всего ≤ 255.",
         "Backup phrase split into {total} shares — any {threshold} of them rebuild it. Give exactly one share to each of your trusted people/places. Never send two shares together.": "Резервная фраза разделена на {total} частей — любые {threshold} из них восстановят её. Дайте ровно по одной части каждому доверенному человеку или месту. Никогда не отправляйте две части вместе.",
         "Backup phrase recovered. Use it to restore the identity in the tab above.": "Резервная фраза восстановлена. Используйте её, чтобы восстановить идентичность во вкладке выше.",
+
+        // ── MatchDialog ──
+        "MusicBrainz Match": "Сопоставление с MusicBrainz",
+        "Artist": "Исполнитель",
+        "Search MusicBrainz": "Поиск в MusicBrainz",
+        "No match exists": "Нет подходящего",
+        "Best match": "Лучшее совпадение",
+        "Other results": "Другие результаты",
+        "Confirm": "Подтвердить",
+        "Search again": "Искать снова",
+        "Searching MusicBrainz...": "Поиск в MusicBrainz...",
+        "Songs": "Песни",
+        "Artists": "Исполнители",
+        "Albums": "Альбомы",
+        "Confirm Song": "Подтвердить песню",
+        "Confirm Artist": "Подтвердить исполнителя",
+        "Confirm Album": "Подтвердить альбом",
+        "No matches found on MusicBrainz.": "Совпадений в MusicBrainz не найдено.",
+
+        // ── ObjectViewSidebar ──
+        "Related objects": "Связанные объекты",
+        "Levels": "Уровни",
     }
 };
 

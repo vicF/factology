@@ -1,6 +1,6 @@
 <template>
     <div class="modal fade" tabindex="-1" data-bs-backdrop="static" ref="modalRef">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">{{ $t('MusicBrainz Match') }}</h5>
@@ -8,136 +8,154 @@
                 </div>
 
                 <div class="modal-body">
-                    <!-- Error state -->
-                    <div v-if="viewState === 'error'" class="mb-3">
-                        <div class="alert alert-warning">
-                            <strong>{{ $t('Error') }}:</strong> {{ errorMessage || $t('An unexpected error occurred.') }}
+
+                    <!-- Error banner -->
+                    <div v-if="errorMessage" class="alert alert-warning alert-dismissible fade show mb-3">
+                        <strong>{{ $t('Error') }}:</strong> {{ errorMessage }}
+                        <p v-if="isMusicBrainzError" class="mt-2 mb-0 small">
+                            {{ $t('If you are in Russia, MusicBrainz is blocked without a VPN.') }}
+                        </p>
+                        <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+                    </div>
+
+                    <!-- Info banner (success messages) -->
+                    <div v-if="infoMessage" class="alert alert-success alert-dismissible fade show mb-3">
+                        {{ infoMessage }}
+                        <button type="button" class="btn-close" @click="infoMessage = ''"></button>
+                    </div>
+
+                    <!-- Search form -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">{{ $t('Name') }}</label>
+                            <input v-model="searchQuery" type="text" class="form-control form-control-sm"
+                                :placeholder="object?.name || ''" @keyup.enter="doSearch" />
                         </div>
-                        <button type="button" class="btn btn-warning" @click="retrySearch" :disabled="searching">
-                            {{ searching ? $t('Searching...') : $t('Retry') }}
+                        <div class="col-md-4">
+                            <label class="form-label small">{{ $t('Artist') }}</label>
+                            <input v-model="searchArtist" type="text" class="form-control form-control-sm"
+                                :placeholder="object?.data?.artistName || object?.data?.artist || ''"
+                                @keyup.enter="doSearch" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="button" class="btn btn-primary w-100" @click="doSearch" :disabled="searching">
+                                <span v-if="searching" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                {{ searching ? $t('Searching...') : $t('Search MusicBrainz') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-2 flex-wrap">
+                        <button v-if="rejected" type="button" class="btn btn-outline-primary" @click="resetSearch">
+                            {{ $t('Search again') }}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="rejectAll">
+                            {{ $t("No match exists") }}
                         </button>
                     </div>
 
-                    <!-- Rejected state -->
-                    <div v-if="viewState === 'rejected'" class="mb-3">
-                        <p>{{ $t('You rejected all MusicBrainz matches for this object.') }}</p>
-                        <p>{{ $t('Would you like to search again?') }}</p>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-primary" @click="resetSearchForm">
-                                {{ $t('Search again') }}
-                            </button>
-                            <button type="button" class="btn btn-secondary" @click="close">
-                                {{ $t('Close') }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Pending / auto-found state -->
-                    <div v-if="viewState === 'pending'" class="mb-3">
-                        <p v-if="bestCandidate" class="mb-2">
-                            <strong>{{ $t('Best match') }}:</strong>
-                        </p>
-                        <div v-if="bestCandidate" class="candidate-card selected mb-3" @click="selectedCandidate = bestCandidate">
-                            <div class="candidate-name">{{ bestCandidate.name }}</div>
+                    <!-- ════════════════════ SONG SECTION ════════════════════ -->
+                    <div v-if="songResults.length" class="mb-3">
+                        <h6 class="mb-1 section-heading">
+                            <IconSearch class="section-icon" />
+                            {{ $t('Songs') }}
+                            <span class="badge bg-secondary ms-1">{{ songResults.length }}</span>
+                        </h6>
+                        <div
+                            v-for="(c, idx) in songResults"
+                            :key="c.externalId + '-song-' + idx"
+                            class="candidate-card"
+                            :class="{ selected: selectedSong?.externalId === c.externalId }"
+                            @click="selectedSong = c"
+                        >
+                            <div class="candidate-name">{{ c.name }}</div>
                             <div class="candidate-meta">
-                                <span v-if="bestCandidate.disambiguation" class="text-muted small">{{ bestCandidate.disambiguation }}</span>
-                                <span v-if="bestCandidate.type" class="badge bg-secondary ms-2">{{ bestCandidate.type }}</span>
-                                <span v-if="bestCandidate.payload?.artist && bestCandidate.payload?.artist !== bestCandidate.name" class="text-muted small ms-1">{{ bestCandidate.payload.artist }}</span>
-                                <span v-if="bestCandidate.payload?.album" class="text-muted small ms-1">{{ bestCandidate.payload.album }}<template v-if="bestCandidate.payload?.albumYear"> ({{ bestCandidate.payload.albumYear }})</template></span>
-                                <span v-if="bestCandidate.year" class="badge bg-info ms-2">{{ bestCandidate.year }}</span>
-                                <span class="candidate-quality ms-2">
-                                    {{ Math.round((bestCandidate.matchQuality || 0) * 100) }}%
+                                <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
+                                <span class="badge bg-secondary ms-2">{{ c.type }}</span>
+                                <span v-if="c.payload?.artist" class="text-muted small ms-1">{{ c.payload.artist }}</span>
+                                <span v-if="c.payload?.album" class="text-muted small ms-1">
+                                    {{ c.payload.album }}<template v-if="c.payload?.albumYear"> ({{ c.payload.albumYear }})</template>
                                 </span>
+                                <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
+                                <span class="candidate-quality ms-2">{{ Math.round((c.matchQuality || 0) * 100) }}%</span>
                             </div>
                         </div>
-
-                        <div v-if="otherCandidates.length" class="mt-3">
-                            <p class="mb-2"><strong>{{ $t('Other results') }}:</strong></p>
-                            <div
-                                v-for="(c, idx) in otherCandidates"
-                                :key="c.externalId + idx"
-                                class="candidate-card"
-                                :class="{ selected: selectedCandidate?.externalId === c.externalId }"
-                                @click="selectedCandidate = c"
-                            >
-                                <div class="candidate-name">{{ c.name }}</div>
-                                <div class="candidate-meta">
-                                    <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
-                                    <span v-if="c.type" class="badge bg-secondary ms-2">{{ c.type }}</span>
-                                    <span v-if="c.payload?.artist && c.payload?.artist !== c.name" class="text-muted small ms-1">{{ c.payload.artist }}</span>
-                                    <span v-if="c.payload?.album" class="text-muted small ms-1">{{ c.payload.album }}<template v-if="c.payload?.albumYear"> ({{ c.payload.albumYear }})</template></span>
-                                    <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
-                                    <span class="candidate-quality ms-2">
-                                        {{ Math.round((c.matchQuality || 0) * 100) }}%
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="d-flex gap-2 mt-3 flex-wrap">
-                            <button type="button" class="btn btn-success" @click="confirmSelection" :disabled="!selectedCandidate || confirming">
-                                {{ confirming ? $t('Confirming...') : ($t('Confirm') + ' — ' + (selectedCandidate?.name || '')) }}
-                            </button>
-                            <button type="button" class="btn btn-outline-primary" @click="resetSearchForm">
-                                {{ $t('Search again') }}
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" @click="rejectAll">
-                                {{ $t("No match exists") }}
+                        <div class="d-flex mt-1">
+                            <button type="button" class="btn btn-sm btn-success"
+                                @click="confirmSong" :disabled="!selectedSong || confirming">
+                                <span v-if="confirming" class="spinner-border spinner-border-sm me-1"></span>
+                                {{ $t('Confirm Song') }}
                             </button>
                         </div>
                     </div>
 
-                    <!-- Search form (for unmatched / none / or search-again) -->
-                    <div v-if="viewState === 'unmatched' || viewState === 'none' || showSearchForm" class="mb-3">
-                        <div v-if="searching" class="d-flex align-items-center gap-2 mb-2 text-muted">
-                            <span class="spinner-border spinner-border-sm" role="status"></span>
-                            <small>{{ $t('Searching MusicBrainz...') }}</small>
+                    <!-- ════════════════════ ARTIST SECTION ════════════════════ -->
+                    <div v-if="artistResults.length" class="mb-3">
+                        <h6 class="mb-1 section-heading">
+                            <IconUser class="section-icon" />
+                            {{ $t('Artists') }}
+                            <span class="badge bg-secondary ms-1">{{ artistResults.length }}</span>
+                        </h6>
+                        <div
+                            v-for="(c, idx) in artistResults"
+                            :key="c.externalId + '-artist-' + idx"
+                            class="candidate-card"
+                            :class="{ selected: selectedArtist?.externalId === c.externalId }"
+                            @click="selectedArtist = c"
+                        >
+                            <div class="candidate-name">{{ c.name }}</div>
+                            <div class="candidate-meta">
+                                <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
+                                <span class="badge bg-secondary ms-2">{{ c.type }}</span>
+                                <span v-if="c.payload?.country" class="text-muted small ms-1">{{ c.payload.country }}</span>
+                                <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
+                                <span class="candidate-quality ms-2">{{ Math.round((c.matchQuality || 0) * 100) }}%</span>
+                            </div>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label small">{{ $t('Name') }}</label>
-                            <input v-model="searchQuery" type="text" class="form-control form-control-sm" :placeholder="object?.name || ''" />
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">{{ $t('Artist') }}</label>
-                            <input v-model="searchArtist" type="text" class="form-control form-control-sm" :placeholder="object?.data?.artist || ''" />
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-primary" @click="retrySearch" :disabled="searching">
-                                {{ searching ? $t('Searching...') : $t('Search MusicBrainz') }}
+                        <div class="d-flex mt-1">
+                            <button type="button" class="btn btn-sm btn-success"
+                                @click="confirmArtist" :disabled="!selectedArtist || confirming">
+                                <span v-if="confirming" class="spinner-border spinner-border-sm me-1"></span>
+                                {{ $t('Confirm Artist') }}
                             </button>
-                            <button v-if="viewState !== 'pending'" type="button" class="btn btn-outline-secondary" @click="rejectAll">
-                                {{ $t("No match exists") }}
-                            </button>
                         </div>
+                    </div>
 
-                        <!-- Search results in search mode -->
-                        <div v-if="searchResults.length" class="mt-3">
-                            <p class="mb-2"><strong>{{ $t('Results') }}:</strong></p>
-                            <div
-                                v-for="(c, idx) in searchResults"
-                                :key="c.externalId + idx"
-                                class="candidate-card"
-                                :class="{ selected: selectedCandidate?.externalId === c.externalId }"
-                                @click="selectedCandidate = c"
-                            >
-                                <div class="candidate-name">{{ c.name }}</div>
-                                <div class="candidate-meta">
-                                    <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
-                                    <span v-if="c.type" class="badge bg-secondary ms-2">{{ c.type }}</span>
-                                    <span v-if="c.payload?.artist && c.payload?.artist !== c.name" class="text-muted small ms-1">{{ c.payload.artist }}</span>
-                                    <span v-if="c.payload?.album" class="text-muted small ms-1">{{ c.payload.album }}<template v-if="c.payload?.albumYear"> ({{ c.payload.albumYear }})</template></span>
-                                    <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
-                                    <span class="candidate-quality ms-2">
-                                        {{ Math.round((c.matchQuality || 0) * 100) }}%
-                                    </span>
-                                </div>
-                            </div>
-                            <div v-if="selectedCandidate" class="d-flex gap-2 mt-3">
-                                <button type="button" class="btn btn-success" @click="confirmSelection" :disabled="confirming">
-                                    {{ confirming ? $t('Confirming...') : ($t('Confirm') + ' — ' + selectedCandidate.name) }}
-                                </button>
+                    <!-- ════════════════════ ALBUM SECTION ════════════════════ -->
+                    <div v-if="albumResults.length" class="mb-3">
+                        <h6 class="mb-1 section-heading">
+                            <IconPublic class="section-icon" />
+                            {{ $t('Albums') }}
+                            <span class="badge bg-secondary ms-1">{{ albumResults.length }}</span>
+                        </h6>
+                        <div
+                            v-for="(c, idx) in albumResults"
+                            :key="c.externalId + '-album-' + idx"
+                            class="candidate-card"
+                            :class="{ selected: selectedAlbum?.externalId === c.externalId }"
+                            @click="selectedAlbum = c"
+                        >
+                            <div class="candidate-name">{{ c.name }}</div>
+                            <div class="candidate-meta">
+                                <span v-if="c.disambiguation" class="text-muted small">{{ c.disambiguation }}</span>
+                                <span class="badge bg-secondary ms-2">{{ c.type }}</span>
+                                <span v-if="c.payload?.artist" class="text-muted small ms-1">{{ c.payload.artist }}</span>
+                                <span v-if="c.year" class="badge bg-info ms-2">{{ c.year }}</span>
+                                <span class="candidate-quality ms-2">{{ Math.round((c.matchQuality || 0) * 100) }}%</span>
                             </div>
                         </div>
+                        <div class="d-flex mt-1">
+                            <button type="button" class="btn btn-sm btn-success"
+                                @click="confirmAlbum" :disabled="!selectedAlbum || confirming">
+                                <span v-if="confirming" class="spinner-border spinner-border-sm me-1"></span>
+                                {{ $t('Confirm Album') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- No results message -->
+                    <div v-if="searched && !songResults.length && !artistResults.length && !albumResults.length && !searching" class="text-muted small mb-2">
+                        {{ $t('No matches found on MusicBrainz.') }}
                     </div>
                 </div>
 
@@ -150,13 +168,14 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch } from 'vue';
+import { computed, ref, nextTick, watch } from 'vue';
 import { useMatchingStore } from '../stores/matching';
+import { IconSearch, IconUser, IconPublic } from './icons';
 
 const props = defineProps({
     object: { type: Object, default: null },
     show: { type: Boolean, default: false },
-    /** Pre-fetched candidates from auto-match cache */
+    /** Pre-fetched candidates from auto-match cache (kept for backward compat) */
     candidates: { type: Array, default: () => [] },
 });
 
@@ -167,40 +186,34 @@ const matchingStore = useMatchingStore();
 const modalRef = ref(null);
 let bsModal = null;
 
-const viewState = ref('unmatched'); // error | rejected | pending | unmatched
 const errorMessage = ref('');
+const infoMessage = ref('');
 const searching = ref(false);
 const confirming = ref(false);
-const showSearchForm = ref(false);
+const searched = ref(false);
+
+// Track rejection state
+const rejected = ref(false);
+
+// Search form
 const searchQuery = ref('');
 const searchArtist = ref('');
-const searchResults = ref([]);
-const selectedCandidate = ref(null);
 
-// Derived view state from props
-watch([() => props.object, () => props.candidates], async ([obj, cands]) => {
-    if (!obj) return;
-    selectedCandidate.value = null;
-    searchResults.value = [];
-    showSearchForm.value = false;
+// Categorized results
+const songResults = ref([]);
+const artistResults = ref([]);
+const albumResults = ref([]);
+const selectedSong = ref(null);
+const selectedArtist = ref(null);
+const selectedAlbum = ref(null);
 
-    const state = matchingStore.matchState(obj).state;
-    viewState.value = state;
+// Track what the user already confirmed so we don't re-show it
+const artistConfirmed = ref(false);
+const albumConfirmed = ref(false);
 
-    if (state === 'pending' && cands.length) {
-        const sorted = [...cands].sort((a, b) => (b.matchQuality || 0) - (a.matchQuality || 0));
-        selectedCandidate.value = sorted[0] || null;
-    }
-}, { immediate: true });
-
-const bestCandidate = computed(() => {
-    const sorted = [...props.candidates].sort((a, b) => (b.matchQuality || 0) - (a.matchQuality || 0));
-    return sorted[0] || null;
-});
-
-const otherCandidates = computed(() => {
-    const best = bestCandidate.value;
-    return best ? props.candidates.filter((c) => c.externalId !== best.externalId) : [];
+/** Detect MusicBrainz connectivity errors to show a localized VPN hint */
+const isMusicBrainzError = computed(() => {
+    return errorMessage.value?.includes('Could not reach MusicBrainz') ?? false;
 });
 
 watch(() => props.show, async (val) => {
@@ -208,6 +221,27 @@ watch(() => props.show, async (val) => {
         await nextTick();
         const Modal = (await import('bootstrap/js/dist/modal')).default;
         bsModal = new Modal(modalRef.value);
+        // Initialize search fields from object
+        searchQuery.value = props.object?.name || '';
+        searchArtist.value = props.object?.data?.artistName || props.object?.data?.artist || '';
+        searched.value = false;
+        songResults.value = [];
+        artistResults.value = [];
+        albumResults.value = [];
+        selectedSong.value = null;
+        selectedArtist.value = null;
+        selectedAlbum.value = null;
+        artistConfirmed.value = false;
+        albumConfirmed.value = false;
+        errorMessage.value = '';
+        infoMessage.value = '';
+
+        // Pre-populate with cached candidates as song results
+        if (props.candidates && props.candidates.length) {
+            songResults.value = [...props.candidates];
+            selectedSong.value = songResults.value[0];
+        }
+
         bsModal.show();
     }
 });
@@ -220,16 +254,91 @@ function close() {
     emit('close');
 }
 
-async function confirmSelection() {
-    if (!selectedCandidate.value || !props.object) return;
-    confirming.value = true;
+function resetSearch() {
+    searched.value = false;
+    rejected.value = false;
+    songResults.value = [];
+    artistResults.value = [];
+    albumResults.value = [];
+    selectedSong.value = null;
+    selectedArtist.value = null;
+    selectedAlbum.value = null;
+    errorMessage.value = '';
+    infoMessage.value = '';
+}
+
+async function doSearch() {
+    if (!props.object) return;
+    searching.value = true;
+    errorMessage.value = '';
+    infoMessage.value = '';
+    searched.value = false;
+
     try {
-        await matchingStore.confirm(props.object.thing_id, selectedCandidate.value);
-        emit('match-confirmed');
-        close();
+        const q = searchQuery.value || props.object.name;
+        const ctx = { artist: searchArtist.value || props.object?.data?.artistName || props.object?.data?.artist || '' };
+
+        const { songs, artists, albums } = await matchingStore.manualSearchAll(q, ctx);
+
+        songResults.value = songs;
+        artistResults.value = artists;
+        albumResults.value = albums;
+        searched.value = true;
+
+        if (songs.length) selectedSong.value = songs[0];
+        if (artists.length) selectedArtist.value = artists[0];
+        if (albums.length) selectedAlbum.value = albums[0];
     } catch (err) {
         errorMessage.value = err.message;
-        viewState.value = 'error';
+    } finally {
+        searching.value = false;
+    }
+}
+
+async function confirmSong() {
+    if (!selectedSong.value || !props.object || confirming.value) return;
+    confirming.value = true;
+    try {
+        await matchingStore.confirm(props.object.thing_id, selectedSong.value);
+        infoMessage.value = `Song matched to "${selectedSong.value.name}".`;
+        selectedSong.value = null;
+        emit('match-confirmed');
+    } catch (err) {
+        errorMessage.value = err.message;
+    } finally {
+        confirming.value = false;
+    }
+}
+
+async function confirmArtist() {
+    if (!selectedArtist.value || !props.object || confirming.value) return;
+    confirming.value = true;
+    try {
+        await matchingStore.confirmArtist(props.object.thing_id, selectedArtist.value);
+        infoMessage.value = `Artist "${selectedArtist.value.name}" saved and linked to this song.`;
+        artistConfirmed.value = true;
+        selectedArtist.value = null;
+        artistResults.value = [];
+        emit('match-confirmed');
+    } catch (err) {
+        errorMessage.value = err.message;
+    } finally {
+        confirming.value = false;
+    }
+}
+
+async function confirmAlbum() {
+    if (!selectedAlbum.value || !props.object || confirming.value) return;
+    confirming.value = true;
+    try {
+        await matchingStore.confirmAlbum(props.object.thing_id, selectedAlbum.value);
+        infoMessage.value = `Album "${selectedAlbum.value.name}" saved and linked to this song.`;
+        albumConfirmed.value = true;
+        selectedAlbum.value = null;
+        albumResults.value = [];
+        emit('match-confirmed');
+    } catch (err) {
+        errorMessage.value = err.message;
     } finally {
         confirming.value = false;
     }
@@ -239,42 +348,12 @@ async function rejectAll() {
     if (!props.object) return;
     try {
         await matchingStore.reject(props.object.thing_id);
-        viewState.value = 'rejected';
+        rejected.value = true;
+        songResults.value = [];
+        artistResults.value = [];
+        albumResults.value = [];
     } catch (err) {
         errorMessage.value = err.message;
-        viewState.value = 'error';
-    }
-}
-
-function resetSearchForm() {
-    showSearchForm.value = true;
-    searchQuery.value = props.object?.name || '';
-    searchArtist.value = props.object?.data?.artist || '';
-    viewState.value = 'unmatched';
-    selectedCandidate.value = null;
-    searchResults.value = [];
-}
-
-async function retrySearch() {
-    if (!props.object) return;
-    searching.value = true;
-    errorMessage.value = '';
-    try {
-        const q = searchQuery.value || props.object.name;
-        const ctx = { artist: searchArtist.value || props.object?.data?.artist || '' };
-        const results = await matchingStore.manualSearch(props.object.thing_id, q, ctx);
-        searchResults.value = results;
-        if (results.length) {
-            selectedCandidate.value = results[0];
-            viewState.value = 'pending';
-        } else {
-            viewState.value = 'unmatched';
-        }
-    } catch (err) {
-        errorMessage.value = err.message;
-        viewState.value = 'error';
-    } finally {
-        searching.value = false;
     }
 }
 </script>
@@ -309,5 +388,20 @@ async function retrySearch() {
 .candidate-quality {
     color: #6b7280;
     font-size: 0.75rem;
+}
+.section-heading {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+.section-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 0.7;
 }
 </style>

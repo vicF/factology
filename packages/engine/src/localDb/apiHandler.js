@@ -177,6 +177,12 @@ export async function handleLocalApiCall(method, url, data = null, context = {})
         return handleLocalGraph(id, depth, context);
     }
 
+    // /object/{id}/visibility — PATCH visibility level (mirrors
+    // ApiController::toggleVisibility). Accepts { visibility: 0|1|2|3 }.
+    if (method === 'patch' && parts[1] === 'visibility') {
+        return handlePatchVisibility(id, data);
+    }
+
     // Everything else must be exactly /object/{id} — never let an extra
     // segment (e.g. a server-mode thumb request) silently fall through to
     // handleUpdate/handleGet with the wrong payload.
@@ -1058,6 +1064,30 @@ async function handleDelete(id) {
     await deleteObject(id, { skipChangeLog: true });
     return {
         data: { success: true },
+        status: 200,
+    };
+}
+
+/**
+ * PATCH /object/{id}/visibility — update visibility level (0-3).
+ * Mirrors ApiController::toggleVisibility for the offline app.
+ */
+async function handlePatchVisibility(id, body) {
+    const visibility = body?.visibility;
+    if (visibility === undefined || ![0, 1, 2, 3].includes(visibility)) {
+        throw new Error('Invalid visibility value; must be 0, 1, 2, or 3');
+    }
+
+    // Derive public from visibility (same rule as server)
+    const publicFlag = (visibility === 1 || visibility === 2) ? 1 : 0;
+
+    await updateObject(id, {
+        visibility,
+        public: publicFlag,
+    }, { skipChangeLog: true });
+
+    return {
+        data: { success: true, data: { public: !!publicFlag, visibility } },
         status: 200,
     };
 }

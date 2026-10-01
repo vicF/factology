@@ -414,10 +414,16 @@ class ApiController extends BaseController
             'end_meta.comment' => ['nullable', 'string', 'max:500'],
 
             /**
-             * Public flag (0 or 1)
+             * Public flag (0 or 1). Derived from visibility when both are provided.
              * @example 1
              */
-            'public' => ['required', 'integer', 'in:0,1'],
+            'public' => ['sometimes', 'integer', 'in:0,1'],
+
+            /**
+             * Visibility level: 0=private, 1=public, 2=global, 3=group (reserved)
+             * @example 1
+             */
+            'visibility' => ['sometimes', 'integer', 'in:0,1,2,3'],
 
             /**
              * Owner (thing UUID) — admins only. Lets an admin mark an object as
@@ -1253,15 +1259,28 @@ class ApiController extends BaseController
     public function toggleVisibility(Request $request, string $id): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validate([
-            'public' => ['required', 'integer', 'in:0,1'],
+            'visibility' => ['sometimes', 'integer', 'in:0,1,2,3'],
+            'public'     => ['sometimes', 'integer', 'in:0,1'],
         ]);
+
+        // Accept either visibility (preferred) or legacy public field.
+        if (isset($validated['visibility'])) {
+            $visibility = (int) $validated['visibility'];
+        } else {
+            // Legacy: public=1 → visibility=1, public=0 → visibility=0
+            $visibility = (int) ($validated['public'] ?? 0);
+        }
+
+        // Derive public from visibility: 1 and 2 are publicly visible
+        $public = in_array($visibility, [1, 2], true) ? 1 : 0;
 
         $query = DB::table('things')->where('thing_id', $id);
         if (!auth()->user()->is_admin) {
             $query->where('owner', auth()->user()->thing_id);
         }
         $updated = $query->update([
-            'public'         => $validated['public'],
+            'public'         => $public,
+            'visibility'     => $visibility,
             'record_updated' => now(),
         ]);
 
@@ -1274,7 +1293,10 @@ class ApiController extends BaseController
 
         return response()->json([
             'success' => true,
-            'data'    => ['public' => (bool) $validated['public']],
+            'data'    => [
+                'public'     => (bool) $public,
+                'visibility' => (int) $visibility,
+            ],
         ]);
     }
 
@@ -1700,6 +1722,8 @@ class ApiController extends BaseController
         if (!empty($requestBody['visibility']) && $requestBody['visibility'] !== 'all') {
             if ($requestBody['visibility'] === 'public') {
                 $query->where('public', 1);
+            } elseif ($requestBody['visibility'] === 'global') {
+                $query->where('visibility', 2);
             } elseif ($requestBody['visibility'] === 'private') {
                 $query->where('public', 0);
             } elseif ($requestBody['visibility'] === 'group' && Auth::check()) {

@@ -28,6 +28,7 @@ const makeObject = (t) => ({
     start: null,
     end: null,
     public: t.public ? 1 : 0,
+    visibility: t.visibility ?? (t.public ? 1 : 0),
     // System seed rows belong to SYSTEM_OWNER (shared), never to an ordinary
     // user. UUID.VICTOR_FOKIN is a real identity, not a system owner.
     owner: t.owner ?? UUID.SYSTEM_OWNER,

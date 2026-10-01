@@ -57,8 +57,9 @@ async function get(endpoint, params = {}) {
     url.searchParams.set('fmt', 'json');
 
     const transient = new Set([429, 500, 502, 503, 504]);
+    // User-Agent is a forbidden header in browser fetch();
+    // the browser supplies its own UA, which MusicBrainz accepts.
     const headers = {
-        'User-Agent': 'Factology/1.0',
         Accept: 'application/json',
     };
 
@@ -78,7 +79,7 @@ async function get(endpoint, params = {}) {
                 await sleep(700 * (attempt + 1));
                 continue;
             }
-            throw new Error(`Could not reach MusicBrainz (${e?.message || e}). Check your connection.`);
+            throw new Error(`Could not reach MusicBrainz. Check your connection or enable a VPN if MusicBrainz is blocked in your region.`);
         }
         if (res.ok) {
             blockedUntilMs = 0;
@@ -291,6 +292,53 @@ export function earliestOfficialAlbums(rows) {
         .sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
 }
 
+// ── Release-group (Album) helpers ──
+
+function normalizeReleaseGroup(rg) {
+    const artist = (rg['artist-credit'] || [])
+        .filter((c) => c.artist)
+        .map((c) => c.name || c.artist?.name)
+        .join('');
+    return {
+        mbid: rg.id,
+        name: rg.title || '',
+        artist,
+        type: rg['primary-type'] || rg['secondary-type'] || '',
+        disambiguation: rg.disambiguation || '',
+        firstReleaseDate: rg['first-release-date'] || '',
+        year: rg['first-release-date'] ? rg['first-release-date'].slice(0, 4) : '',
+        matchQuality: rg.score ? rg.score / 100 : 0.5,
+    };
+}
+
+/**
+ * Search for release-groups (albums) matching the query.
+ * @param {string} query
+ * @param {object} [ctx]
+ * @param {string} [ctx.artist]
+ * @returns {Promise<import('../types').Candidate[]>}
+ */
+export async function searchAlbums(query, ctx = {}) {
+    const parts = [`release:${safeTerm(query)}`];
+    if (ctx.artist) parts.push(`artist:${safeTerm(ctx.artist)}`);
+    const data = await get('release-group', {
+        query: parts.join(' AND '),
+        limit: 15,
+    });
+    const groups = (data['release-groups'] || []).map(normalizeReleaseGroup);
+    // Deduplicate by name+artist
+    const seen = new Set();
+    const deduped = [];
+    for (const g of groups) {
+        const key = [g.name, g.artist, g.type].join('|');
+        if (!seen.has(key)) {
+            seen.add(key);
+            deduped.push(g);
+        }
+    }
+    return deduped.map((g) => normalizeToCandidate(g, 'Album', 0.1));
+}
+
 // ── Public API (Candidate interface) ──
 
 /**
@@ -358,15 +406,52 @@ export async function searchSongs(query, ctx = {}) {
                 const all = await browseReleases(best.id);
                 const albums = earliestOfficialAlbums(all);
                 const q = normText(title);
-                for (const album of albums) {
+                const supplementRecording = async (album) => {
                     const tracks = await albumTracks(album);
                     const matching = tracks.filter((r) => normText(r.title) === q);
                     if (matching.length) {
                         const existingMbids = new Set(rows.map((r) => r.mbid));
                         for (const t of matching) {
-                            if (!existingMbids.has(t.mbid)) rows.push(t);
+                            if (!existingMbids.has(t.mbid)) {
+                                rows.push(t);
+                            } else {
+                                // MBID already in Lucene results, but with a
+                                // weaker/compilation album — overwrite with the
+                                // canonical album info from the official release
+                                const idx = rows.findIndex((r) => r.mbid === t.mbid);
+                                if (idx >= 0) {
+                                    rows[idx].album = t.album;
+                                    rows[idx].albumDate = t.albumDate;
+                                    rows[idx].albumYear = t.albumYear;
+                                    rows[idx].matchQuality = Math.max(rows[idx].matchQuality, t.matchQuality);
+                                }
+                            }
                         }
+                        return true;
+                    }
+                    return false;
+                };
+                let found = false;
+                for (const album of albums) {
+                    if (await supplementRecording(album)) {
+                        found = true;
                         break;
+                    }
+                }
+                // Fallback: browseReleases(limit=50, newest-first) may not include
+                // the canonical album (e.g. 1971 "Imagine" under hundreds of
+                // compilations). Search for a release matching the song title.
+                if (!found) {
+                    const releaseData = await get('release', {
+                        query: `release:${safeTerm(title)} AND artist:${safeTerm(artist)}`,
+                        limit: 5,
+                        inc: 'release-groups',
+                    }).catch(() => null);
+                    if (releaseData?.releases?.length) {
+                        const candidates = releaseData.releases.map(normalizeRelease);
+                        const official = earliestOfficialAlbums(candidates);
+                        const album = official[0] || candidates[0];
+                        if (album) await supplementRecording(album);
                     }
                 }
             }
@@ -478,9 +563,11 @@ export function externalUrl(id) {
  * @returns {Promise<import('../types').Candidate[]>}
  */
 export async function search(query, ctx = {}) {
-    // When artist context is provided, it's a song/recording search
     const artistProvided = !!(ctx.artist || ctx.data?.artist);
     const type = ctx.type || (artistProvided ? 'song' : 'artist');
+    if (type === 'album' || type === 'release-group') {
+        return searchAlbums(query, ctx);
+    }
     if (type === 'song' || type === 'recording') {
         return searchSongs(query, ctx);
     }
@@ -514,6 +601,7 @@ export function registerMusicBrainzProvider() {
         search,
         searchArtists,
         searchSongs,
+        searchAlbums,
         fetchById,
         externalUrl,
     });

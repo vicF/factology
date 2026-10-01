@@ -309,21 +309,51 @@
                                 />
                             </div>
 
-                            <!-- Public checkbox -->
-                            <div class="mb-3 form-check">
-                                <input
-                                    type="checkbox"
-                                    class="form-check-input"
-                                    id="publicCheckbox"
-                                    v-model="formData.public"
-                                    :true-value="1"
-                                    :false-value="0"
-                                />
-                                <label class="form-check-label" for="publicCheckbox">
-                                    {{ $t('Public') }}
-                                </label>
-                                <small class="form-text text-muted d-block">
-                                    {{ $t('Make this object visible to everyone') }}
+                            <!-- Visibility selection -->
+                            <div class="mb-3">
+                                <label class="form-label">{{ $t('Visibility') }}</label>
+                                <div class="d-flex gap-3 flex-wrap">
+                                    <div class="form-check">
+                                        <input
+                                            type="radio"
+                                            class="form-check-input"
+                                            id="visibilityPrivate"
+                                            v-model="formData.visibility"
+                                            :value="0"
+                                        />
+                                        <label class="form-check-label" for="visibilityPrivate">
+                                            {{ $t('Private') }}
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input
+                                            type="radio"
+                                            class="form-check-input"
+                                            id="visibilityPublic"
+                                            v-model="formData.visibility"
+                                            :value="1"
+                                        />
+                                        <label class="form-check-label" for="visibilityPublic">
+                                            {{ $t('Public') }}
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input
+                                            type="radio"
+                                            class="form-check-input"
+                                            id="visibilityCommonPublic"
+                                            v-model="formData.visibility"
+                                            :value="2"
+                                        />
+                                        <label class="form-check-label" for="visibilityCommonPublic">
+                                            {{ $t('Global') }}
+                                        </label>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted d-block mt-1">
+                                    <template v-if="formData.visibility === 0">{{ $t('Only the owner can see this object') }}</template>
+                                    <template v-else-if="formData.visibility === 1">{{ $t('Make this object visible to everyone') }}</template>
+                                    <template v-else-if="formData.visibility === 2">{{ $t('Global — shared catalog row, to be replaced by system canonical object') }}</template>
                                 </small>
                             </div>
 
@@ -670,6 +700,7 @@ const formData = ref({
     start_meta: isEditMode.value ? (props.object.start_meta || null) : null,
     end_meta: isEditMode.value ? (props.object.end_meta || null) : null,
     public: isEditMode.value ? (props.object.public ? 1 : 0) : 0,
+    visibility: isEditMode.value ? (props.object.visibility ?? (props.object.public ? 1 : 0)) : 0,
     type: props.params.type || 3,
     owner: isEditMode.value ? (props.object.owner || '') : '',
     data: isEditMode.value && props.object.data && typeof props.object.data === 'object'
@@ -1744,6 +1775,7 @@ const submitForm = async () => {
             start_meta: formData.value.start_meta || null,
             end_meta: formData.value.end_meta || null,
             public: formData.value.public,
+            visibility: formData.value.visibility,
             type: formData.value.type,
             data: formData.value.data,
         };

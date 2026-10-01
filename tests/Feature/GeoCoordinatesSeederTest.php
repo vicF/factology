@@ -67,8 +67,15 @@ class GeoCoordinatesSeederTest extends TestCase
         $res->assertStatus(200);
 
         $properties = $res->json('data');
-        $this->assertCount(1, $properties);
-        $this->assertEquals(UUID::COORDINATES_PROPERTY, $properties[0]['thing_id']);
-        $this->assertTrue($properties[0]['inherited']);
+        // Mountain (→ Place → … → Everything ) also inherits Common public
+        // (from Everything). Check Coordinates is present and inherited.
+        $propIds = array_map(function($p) { return $p['thing_id']; }, $properties);
+        $this->assertContains(UUID::COORDINATES_PROPERTY, $propIds);
+        // Verify Coordinates is marked inherited.
+        foreach ($properties as $coord) {
+            if ($coord['thing_id'] === UUID::COORDINATES_PROPERTY) {
+                $this->assertTrue($coord['inherited']);
+            }
+        }
     }
 }

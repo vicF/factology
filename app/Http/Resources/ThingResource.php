@@ -21,7 +21,8 @@ class ThingResource extends JsonResource
             'end_meta'                => $this->decodeJson($this->end_meta ?? null),
             'record_created'          => $this->record_created,
             'record_updated'          => $this->record_updated,
-            'public'                  => (bool) $this->public,
+            'public'                  => (int) $this->public,
+            'visibility'              => (int) ($this->visibility ?? ($this->public ? 1 : 0)),
             'deleted'                 => (bool) $this->deleted,
             'data'                    => $this->decodeJson($this->data ?? null),
         ];

@@ -132,6 +132,36 @@ export const useMatchingStore = defineStore('matching', {
         },
 
         /**
+         * Manual search for all 3 categories (songs, artists, albums).
+         * Calls each search type directly instead of going through the provider
+         * search() dispatcher, so we get separate categorized results.
+         * @param {string} query
+         * @param {object} [ctx]
+         * @returns {Promise<{ songs: Candidate[], artists: Candidate[], albums: Candidate[] }>}
+         */
+        async manualSearchAll(query, ctx = {}) {
+            const { searchSongs, searchArtists, searchAlbums } =
+                await import('@factology/engine/external/providers/musicbrainz.js');
+
+            const [songs, artists, albums] = await Promise.all([
+                searchSongs(query, ctx).catch((e) => {
+                    console.error('[matchingStore] song search failed:', e);
+                    return [];
+                }),
+                searchArtists(query, ctx).catch((e) => {
+                    console.error('[matchingStore] artist search failed:', e);
+                    return [];
+                }),
+                searchAlbums(query, ctx).catch((e) => {
+                    console.error('[matchingStore] album search failed:', e);
+                    return [];
+                }),
+            ]);
+
+            return { songs, artists, albums };
+        },
+
+        /**
          * Confirm a match and promote the object.
          * In standalone mode, delegates to the engine matcher with local DB.
          * In web mode, updates via the server API.
@@ -160,6 +190,111 @@ export const useMatchingStore = defineStore('matching', {
                 await axios.put(`/object/${thingId}`, { ...obj, data });
             }
             this.resultsCache.delete(thingId);
+        },
+
+        /**
+         * Confirm an artist match: creates a MusicBrainz-owned artist thing
+         * and stamps the reference on the current song.
+         * @param {string} songThingId
+         * @param {import('@factology/engine/external/types').Candidate} candidate
+         * @returns {Promise<string>} — the created artist's thing_id
+         */
+        async confirmArtist(songThingId, candidate) {
+            const res = await axios.get(`/object/${songThingId}`);
+            const song = res.data.data || res.data;
+
+            // Determine class: MusicBand if type is "Group", else Musician
+            const classId = candidate.type === 'Group'
+                ? UUID.MUSIC_BAND
+                : UUID.MUSICIAN;
+
+            // Generate a version-4 UUID for the new artist thing if none provided
+            const artistId = candidate.externalId;
+
+            // Create the MusicBrainz-owned artist thing
+            const artistPayload = {
+                thing_id: artistId,
+                name: candidate.name,
+                type: UUID.G_THING,
+                owner: UUID.MUSICBRAINZ_OWNER,
+                data: {
+                    mbid: candidate.externalId,
+                    source: 'musicbrainz',
+                    disambiguation: candidate.disambiguation || '',
+                },
+                classes: [{
+                    one_thing_id: artistId,
+                    link_type_id: UUID.LINK_TO_CLASS,
+                    other_thing_id: classId,
+                }],
+            };
+
+            await axios.post('/object', artistPayload);
+
+            // Update the song with the artist reference
+            const songData = { ...(song.data || {}) };
+            songData.artistThingId = artistId;
+            songData.artistName = candidate.name;
+            songData.mbMatch = {
+                state: 'confirmed',
+                at: Date.now(),
+                externalId: candidate.externalId,
+                providerKey: 'musicbrainz',
+                name: candidate.name,
+                type: 'artist',
+            };
+            await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+
+            return artistId;
+        },
+
+        /**
+         * Confirm an album match: creates a MusicBrainz-owned album thing
+         * and stamps the reference on the current song.
+         * @param {string} songThingId
+         * @param {import('@factology/engine/external/types').Candidate} candidate
+         * @returns {Promise<string>} — the created album's thing_id
+         */
+        async confirmAlbum(songThingId, candidate) {
+            const res = await axios.get(`/object/${songThingId}`);
+            const song = res.data.data || res.data;
+
+            const albumId = candidate.externalId;
+
+            // Create a MusicBrainz-owned album thing (type=G_THING, class=SongClass
+            // since we don't have a dedicated Album class — it's essentially a container)
+            const albumPayload = {
+                thing_id: albumId,
+                name: candidate.name,
+                type: UUID.G_THING,
+                owner: UUID.MUSICBRAINZ_OWNER,
+                data: {
+                    mbid: candidate.externalId,
+                    source: 'musicbrainz',
+                    disambiguation: candidate.disambiguation || '',
+                    albumArtist: candidate.artist || '',
+                    albumYear: candidate.year || '',
+                },
+            };
+
+            await axios.post('/object', albumPayload);
+
+            // Update the song with album reference
+            const songData = { ...(song.data || {}) };
+            songData.albumThingId = albumId;
+            songData.albumName = candidate.name;
+            songData.albumYear = candidate.year || '';
+            songData.mbMatch = {
+                state: 'confirmed',
+                at: Date.now(),
+                externalId: candidate.externalId,
+                providerKey: 'musicbrainz',
+                name: candidate.name,
+                type: 'album',
+            };
+            await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+
+            return albumId;
         },
 
         /**

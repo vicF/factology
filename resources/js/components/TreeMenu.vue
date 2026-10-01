@@ -20,8 +20,9 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ displayName }}</router-link>
-                    <span v-if="authenticated && editMode && !nodePublic" class="private-icon" :title="$t('Private')" @click.stop="toggleVisibility(true)"><IconPrivate /></span>
-                    <span v-if="authenticated && editMode && nodePublic && showIcons" class="public-icon" :title="$t('Public')" @click.stop="toggleVisibility(false)"><IconPublic /></span>
+                    <span v-if="authenticated && editMode" class="visibility-toggle" @click.stop="cycleVisibility">
+                        <VisibilityBadge :visibility="nodeVisibility" />
+                    </span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && editMode && showIcons }">
                     <span class="add-subclass" @click="openCreateSubclassModal" :title="$t('Add child class below {name}', { name: displayName })">+</span>
@@ -49,6 +50,7 @@
                 :depth="depth + 1"
                 :checked-items="checkedItems"
                 :public="node.public"
+                :visibility="node.visibility"
                 :type="node.type"
                 @update-checked="handleCheckedUpdate"
             ></tree-menu>
@@ -71,6 +73,7 @@ import { collectSubtreeIds, nodeSelectionState } from '../utils/classTree';
 import { useTreeState } from "../composables/useTreeState";
 import Image from "./Image.vue";
 import {IconPrivate, IconPublic} from "./icons";
+import VisibilityBadge from './VisibilityBadge.vue';
 import ConfirmModal from './ConfirmModal.vue';
 
 const authStore = useAuthStore();
@@ -104,6 +107,10 @@ const props = defineProps({
     public: {
         type: Number,
         default: 1          // 1 = public, 0 = private
+    },
+    visibility: {
+        type: Number,
+        default: null       // null = derive from public (backward compat)
     },
     translations: {
         type: Object,
@@ -141,16 +148,21 @@ const confirmButtonText = ref('');
 const confirmVariant = ref('primary');
 let pendingToggle = null;
 
-// Local copy of public state for toggle UI feedback
-const nodePublic = ref(!!props.public);
-watch(() => props.public, (val) => { nodePublic.value = !!val; });
+// Compute visibility from prop (with backward compat from public)
+const nodeVisibility = computed(() => {
+    if (props.visibility !== null && props.visibility !== undefined) return props.visibility;
+    return props.public ? 1 : 0;
+});
 
-const toggleVisibility = (makePublic) => {
+const cycleVisibility = () => {
+    const current = nodeVisibility.value;
+    // 0→1, 1→0, 2→1, 3→1
+    const next = (current === 0 || current === 3) ? 1 : 0;
     if (quickMode) {
-        executeToggle(makePublic);
+        executeVisibilityToggle(next);
         return;
     }
-    if (makePublic) {
+    if (next === 1) {
         confirmTitle.value = t('Make Public');
         confirmMessage.value = t('Make this class visible to everyone?');
         confirmButtonText.value = t('Make Public');
@@ -161,23 +173,23 @@ const toggleVisibility = (makePublic) => {
         confirmButtonText.value = t('Make Private');
         confirmVariant.value = 'danger';
     }
-    pendingToggle = makePublic;
+    pendingToggle = next;
     showConfirmModal.value = true;
 };
 
 const handleToggleConfirm = () => {
     showConfirmModal.value = false;
     if (pendingToggle === null) return;
-    const makePublic = pendingToggle;
+    const next = pendingToggle;
     pendingToggle = null;
     quickMode = true;
-    executeToggle(makePublic);
+    executeVisibilityToggle(next);
 };
 
-const executeToggle = async (makePublic) => {
+const executeVisibilityToggle = async (nextVisibility) => {
     try {
-        await axios.patch(`/object/${props.id}/visibility`, { public: makePublic ? 1 : 0 });
-        nodePublic.value = makePublic;
+        await axios.patch(`/object/${props.id}/visibility`, { visibility: nextVisibility });
+        // Update local state via prop change — parent re-renders with new data
     } catch (error) {
         console.error('Failed to toggle visibility:', error);
     }

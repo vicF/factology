@@ -18,6 +18,7 @@ import { getProvidersForClasses } from './registry.js';
 export async function searchProvider(classIds, query, ctx = {}) {
     const providers = getProvidersForClasses(classIds);
     const results = [];
+    const errors = [];
 
     for (const provider of providers) {
         try {
@@ -27,11 +28,19 @@ export async function searchProvider(classIds, query, ctx = {}) {
             }
         } catch (err) {
             console.error(`[search] provider ${provider.key} failed:`, err);
+            errors.push(err);
         }
     }
 
     // Sort by match quality descending
     results.sort((a, b) => (b.matchQuality || 0) - (a.matchQuality || 0));
+
+    // If no provider returned results and some errored, propagate the error
+    // to the UI so the user sees what went wrong (blocked, rate-limited, etc.)
+    if (results.length === 0 && errors.length > 0) {
+        throw errors[0];
+    }
+
     return results;
 }
 

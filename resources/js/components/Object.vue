@@ -113,13 +113,14 @@
                                     </div>
 
                                     <div class="result-info-section">
-                                        <div v-if="canEdit && editMode" class="visibility-badge"
-                                            :class="object.public ? 'is-public' : 'is-private'"
-                                            @click="toggleObjectVisibility(object.public ? false : true)"
-                                            :title="$t('Toggle visibility')">
-                                            <IconPublic v-if="object.public" class="visibility-icon" />
-                                            <IconPrivate v-else class="visibility-icon" />
-                                            <span>{{ object.public ? $t('Public') : $t('Private') }}</span>
+                                        <div v-if="canEdit && editMode" class="visibility-badge-wrapper">
+                                            <VisibilityBadge
+                                                :visibility="objectVisibility"
+                                                @toggle="cycleVisibility"
+                                            />
+                                            <span class="ms-1 visibility-label">
+                                                {{ visibilityLabel }}
+                                            </span>
                                         </div>
 
                                         <div v-for="cls in $getClassesList(object)" :key="cls.thing_id" class="class-badge">
@@ -473,6 +474,7 @@ import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externa
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import IconCheck from './icons/IconCheck.vue';
+import VisibilityBadge from './VisibilityBadge.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import MatchStatusIcon from './MatchStatusIcon.vue';
 import MatchDialog from './MatchDialog.vue';
@@ -598,7 +600,7 @@ const propertyEntries = computed(() =>
     buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
 );
 
-// ─── Quick visibility toggle state ─────────────────────────────────
+// ─── Visibility display & quick toggle ──────────────────────────────
 const hoveredLink = ref(null);
 let quickMode = false;
 const showConfirmModal = ref(false);
@@ -608,24 +610,36 @@ const confirmButtonText = ref('');
 const confirmVariant = ref('primary');
 let pendingToggle = null;
 
-const toggleObjectVisibility = (makePublic) => {
+const objectVisibility = computed(() => {
+    if (!object.value) return 0;
+    return object.value.visibility ?? (object.value.public ? 1 : 0);
+});
+
+const visibilityLabel = computed(() => {
+    const labels = { 0: t('Private'), 1: t('Public'), 2: t('Global'), 3: t('Group') };
+    return labels[objectVisibility.value] ?? t('Private');
+});
+
+// Cycle visibility 0↔1 (quick toggle; global/group require EditObject)
+const cycleVisibility = () => {
     if (!object.value) return;
-    doToggle(object.value.thing_id, makePublic, () => {
-        object.value.public = makePublic ? 1 : 0;
-    });
+    const current = objectVisibility.value;
+    // 0→1, 1→0, 2→1 (bump to public), 3→1
+    const next = (current === 0 || current === 3) ? 1 : 0;
+    doToggleVisibility(object.value.thing_id, next);
 };
 
 const toggleLinkVisibility = (link, makePublic) => {
     if (!link) return;
     const linkId = getLinkTargetId(link);
-    doToggle(linkId, makePublic, () => {
+    doToggleLink(linkId, makePublic, () => {
         link.target_public = makePublic ? 1 : 0;
     });
 };
 
-const doToggle = (thingId, makePublic, onSuccess) => {
+const doToggleLink = (thingId, makePublic, onSuccess) => {
     if (quickMode) {
-        executeToggle(thingId, makePublic, onSuccess);
+        executeLinkToggle(thingId, makePublic, onSuccess);
         return;
     }
     if (makePublic) {
@@ -646,16 +660,52 @@ const doToggle = (thingId, makePublic, onSuccess) => {
 const handleConfirm = () => {
     showConfirmModal.value = false;
     if (!pendingToggle) return;
-    const { thingId, makePublic, onSuccess } = pendingToggle;
+    const p = pendingToggle;
     pendingToggle = null;
     quickMode = true;
-    executeToggle(thingId, makePublic, onSuccess);
+    if ('nextVisibility' in p) {
+        executeVisibilityToggle(p.thingId, p.nextVisibility);
+    } else {
+        executeLinkToggle(p.thingId, p.makePublic, p.onSuccess);
+    }
 };
 
-const executeToggle = async (thingId, makePublic, onSuccess) => {
+const executeLinkToggle = async (thingId, makePublic, onSuccess) => {
     try {
         await axios.patch(`/object/${thingId}/visibility`, { public: makePublic ? 1 : 0 });
         if (onSuccess) onSuccess();
+    } catch (error) {
+        console.error('Failed to toggle link visibility:', error);
+    }
+};
+
+const doToggleVisibility = (thingId, nextVisibility) => {
+    if (quickMode) {
+        executeVisibilityToggle(thingId, nextVisibility);
+        return;
+    }
+    if (nextVisibility === 1) {
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
+        confirmVariant.value = 'danger';
+    }
+    pendingToggle = { thingId, nextVisibility };
+    showConfirmModal.value = true;
+};
+
+const executeVisibilityToggle = async (thingId, nextVisibility) => {
+    try {
+        await axios.patch(`/object/${thingId}/visibility`, { visibility: nextVisibility });
+        if (object.value && object.value.thing_id === thingId) {
+            object.value.visibility = nextVisibility;
+            object.value.public = (nextVisibility === 1 || nextVisibility === 2) ? 1 : 0;
+        }
     } catch (error) {
         console.error('Failed to toggle visibility:', error);
     }

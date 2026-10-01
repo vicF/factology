@@ -21,6 +21,7 @@
                         :nodes="child.nodes || []"
                         :depth="0"
                         :public="child.public"
+                        :visibility="child.visibility"
                         :type="child.type"
                     />
                 </template>
@@ -33,6 +34,7 @@
                     :nodes="root.nodes || []"
                     :depth="0"
                     :public="root.public"
+                    :visibility="root.visibility"
                     :type="root.type"
                 />
             </template>

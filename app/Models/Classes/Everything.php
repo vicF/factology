@@ -97,6 +97,7 @@ class Everything
         'name',
         'name_translations',
         'public',
+        'visibility',
         'start',
         'start_meta',
         'thing_id',
@@ -742,6 +743,15 @@ class Everything
         //$this->_eloquentModel = new Thing($this->_data); // @TODO Do we need eloquent here???
         $data = array_intersect_key($this->_data, array_flip($this->_tableFields));
 
+        // Normalize visibility/public consistency.
+        // visibility takes precedence when both are present; when only public is
+        // provided (backward-compat callers), derive visibility from it.
+        if (array_key_exists('visibility', $data)) {
+            $data['public'] = in_array($data['visibility'], [1, 2], true) ? 1 : 0;
+        } elseif (array_key_exists('public', $data)) {
+            $data['visibility'] = $data['public'] ? 1 : 0;
+        }
+
         // Localization JSON columns (json/jsonb): encode arrays/objects into JSON strings,
         // storing null for empty structures so the column stays `null` rather than `[]`.
         // Guard: if a client sends translations without a `lang` key, default it from
@@ -779,6 +789,7 @@ class Everything
                 'name'           => $data['name'] ?? null,
                 'description'    => $data['description'] ?? null,
                 'public'         => $data['public'] ?? 0,
+                'visibility'     => $data['visibility'] ?? 0,
                 'start'          => $data['start'] ?? null,
                 'end'            => $data['end'] ?? null,
                 'type'           => $data['type'],

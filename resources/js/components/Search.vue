@@ -146,24 +146,14 @@
                 </div>
             </div>
         </div>
-
-        <ConfirmModal
-            :show="showConfirmModal"
-            :title="confirmTitle"
-            :message="confirmMessage"
-            :confirm-text="confirmButtonText"
-            :variant="confirmVariant"
-            @confirm="handleToggleConfirm"
-            @cancel="showConfirmModal = false"
-        />
     </div>
-</template>
+
+    </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
 import { eventBus } from "@factology/engine/eventBus.js";
 import { useSearchStore } from '../stores/search';
 import { useAuthStore } from '../stores/auth';
@@ -171,7 +161,6 @@ import { currentLocale } from '../utils/localized.js';
 import { FlexibleDate } from '@factology/engine/utils/flexibleDate.js';
 import { dateBucket } from '../utils/dateGroupings.js';
 import Image from "./Image.vue";
-import ConfirmModal from './ConfirmModal.vue';
 import RelatedList from "./RelatedList.vue";
 import LinkDescription from "./LinkDescription.vue";
 import { useRelatedExpansion } from "../composables/useRelatedExpansion";
@@ -339,54 +328,6 @@ const dateDividers = computed(() => {
 // When date-sorted, each object's date lives on its group divider, so the
 // cards stop repeating it.
 const dateDividersActive = computed(() => searchStore.sortBy === 'start');
-
-// ─── Quick visibility toggle state ─────────────────────────────────
-let quickMode = false;
-const showConfirmModal = ref(false);
-const confirmTitle = ref('');
-const confirmMessage = ref('');
-const confirmButtonText = ref('');
-const confirmVariant = ref('primary');
-let pendingToggle = null;
-
-const handleToggleVisibility = (thingId, thingIndex) => {
-    const thing = objects.value[thingIndex];
-    if (!thing) return;
-    const makePublic = !thing.public;
-    const doToggle = () => {
-        axios.patch(`/object/${thingId}/visibility`, { public: makePublic ? 1 : 0 }).then(() => {
-            thing.public = makePublic ? 1 : 0;
-        }).catch((error) => {
-            console.error('Failed to toggle visibility:', error);
-        });
-    };
-    if (quickMode) {
-        doToggle();
-        return;
-    }
-    if (makePublic) {
-        confirmTitle.value = t('Make Public');
-        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
-        confirmButtonText.value = t('Make Public');
-        confirmVariant.value = 'success';
-    } else {
-        confirmTitle.value = t('Make Private');
-        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
-        confirmButtonText.value = t('Make Private');
-        confirmVariant.value = 'danger';
-    }
-    pendingToggle = doToggle;
-    showConfirmModal.value = true;
-};
-
-const handleToggleConfirm = () => {
-    showConfirmModal.value = false;
-    if (!pendingToggle) return;
-    const fn = pendingToggle;
-    pendingToggle = null;
-    quickMode = true;
-    fn();
-};
 
 if (props.typeThing !== undefined && props.typeThing !== null) {
     searchStore.setTypeThing(props.typeThing === 'true' || props.typeThing === true);

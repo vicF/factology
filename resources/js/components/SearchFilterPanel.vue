@@ -26,6 +26,7 @@
                     <select class="form-select form-select-sm" :value="searchStore.visibility" @change="updateFilter('visibility', $event.target.value)">
                         <option value="all">{{ $t('All') }}</option>
                         <option value="public">{{ $t('Public') }}</option>
+                        <option value="global">{{ $t('Global') }}</option>
                         <option value="private">{{ $t('Private') }}</option>
                         <option value="group">{{ $t('Group') }}</option>
                     </select>
