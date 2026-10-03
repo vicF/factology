@@ -903,6 +903,7 @@ const messages = {
         "Songs": "Песни",
         "Artists": "Исполнители",
         "Albums": "Альбомы",
+		"Browse albums": "Альбомы исполнителя",
         "Confirm Song": "Подтвердить песню",
         "Confirm Artist": "Подтвердить исполнителя",
         "Confirm Album": "Подтвердить альбом",

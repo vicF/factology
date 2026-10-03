@@ -45,6 +45,26 @@ export default defineConfig({
                 });
             },
         },
+        // Set Content-Security-Policy on the Vite dev server so the Electron
+        // Security Warning about missing/unsafe-eval CSP doesn't appear during
+        // HMR development (./run-electron.sh). Must match the policy in
+        // electron/src/main.js.
+        {
+            name: 'csp-headers',
+            enforce: 'post',
+            configureServer(server) {
+                const CSP = "default-src 'self'; "
+                    + "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                    + "img-src 'self' https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://www.google.com; "
+                    + "connect-src 'self' https://nominatim.openstreetmap.org; "
+                    + "style-src 'self' 'unsafe-inline'; "
+                    + "font-src 'self'";
+                server.middlewares.use((_req, res, next) => {
+                    res.setHeader('Content-Security-Policy', CSP);
+                    next();
+                });
+            },
+        },
     ],
     // sql.js is dynamically imported at runtime (import('sql.js').default) and
     // fetches its WASM binary via locateFile. Marking .wasm as an asset ensures

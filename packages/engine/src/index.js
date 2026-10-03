@@ -22,6 +22,11 @@ export {
 export { promoteObject, remapReferences } from './external/promoter.js';
 export { searchProvider, fetchById as externalFetchById } from './external/search.js';
 
+// ── Shared matching workflow (create/ensure MB objects, local search) ──
+export {
+    ensureMbArtist, ensureMbSong, createLocalArtist, searchLocalByClasses,
+} from './external/matching.js';
+
 // ── MusicBrainz provider (most commonly used) ──
 export {
     registerMusicBrainzProvider,

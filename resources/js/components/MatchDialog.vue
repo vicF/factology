@@ -25,25 +25,52 @@
                     </div>
 
                     <!-- Search form -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label small">{{ $t('Name') }}</label>
-                            <input v-model="searchQuery" type="text" class="form-control form-control-sm"
-                                :placeholder="object?.name || ''" @keyup.enter="doSearch" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">{{ $t('Artist') }}</label>
-                            <input v-model="searchArtist" type="text" class="form-control form-control-sm"
+                    <div class="mb-2">
+                        <label class="form-label small">{{ $t('Name') }}</label>
+                        <input v-model="searchQuery" type="text" class="form-control form-control-sm"
+                            :placeholder="object?.name || ''" @keyup.enter="doSearch" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">{{ $t('Artist') }}</label>
+                        <div class="d-flex gap-1 align-items-center">
+                            <input v-model="searchArtist" type="text" class="form-control form-control-sm flex-fill"
+                                list="match-artist-list"
                                 :placeholder="object?.data?.artistName || object?.data?.artist || ''"
-                                @keyup.enter="doSearch" />
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button type="button" class="btn btn-primary w-100" @click="doSearch" :disabled="searching">
-                                <span v-if="searching" class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                {{ searching ? $t('Searching...') : $t('Search MusicBrainz') }}
+                                @keyup.enter="doSearch" @input="onArtistInput" />
+                            <button type="button" class="btn btn-outline-primary btn-sm"
+                                :disabled="albumsLoading || !searchArtist.trim()"
+                                @click="loadAlbums" :title="$t('Load albums for this artist')">
+                                <span v-if="albumsLoading" class="spinner-border spinner-border-sm"></span>
+                                <span v-else>{{ $t('Albums') }}</span>
                             </button>
+                            <span v-if="artistConfirmed" class="badge bg-success p-1" :title="$t('Artist matched on MusicBrainz')">✓</span>
+                            <span v-else-if="selectedArtist?.externalId" class="badge bg-info p-1" :title="$t('Artist candidate selected')">?</span>
                         </div>
                     </div>
+                    <div class="mb-2">
+                        <label class="form-label small">{{ $t('Album') }}</label>
+                        <div class="d-flex gap-1 align-items-center">
+                            <input v-model="searchAlbum" type="text" class="form-control form-control-sm flex-fill"
+                                list="match-album-list"
+                                :placeholder="albumsLoaded ? $t('Select album to narrow search') : $t('Click Albums to load')"
+                                @keyup.enter="doSearch" />
+                            <span v-if="albumsCount > 0" class="badge bg-secondary" :title="$t('Albums loaded')">
+                                {{ albumsCount }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <button type="button" class="btn btn-primary w-100 btn-sm" @click="doSearch" :disabled="searching">
+                            <span v-if="searching" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            {{ searching ? $t('Searching...') : $t('Search MusicBrainz') }}
+                        </button>
+                    </div>
+                    <datalist id="match-artist-list">
+                        <option v-for="a in localArtists" :key="a.thing_id" :value="a.name" />
+                    </datalist>
+                    <datalist id="match-album-list">
+                        <option v-for="a in albums" :key="a.mbid" :value="a.title" />
+                    </datalist>
 
                     <div class="d-flex gap-2 mb-2 flex-wrap">
                         <button v-if="rejected" type="button" class="btn btn-outline-primary" @click="resetSearch">
@@ -190,6 +217,7 @@ const errorMessage = ref('');
 const infoMessage = ref('');
 const searching = ref(false);
 const confirming = ref(false);
+const browsing = ref(false);
 const searched = ref(false);
 
 // Track rejection state
@@ -198,6 +226,19 @@ const rejected = ref(false);
 // Search form
 const searchQuery = ref('');
 const searchArtist = ref('');
+const searchAlbum = ref('');
+
+// Album browser
+const albums = ref([]);
+const albumsLoading = ref(false);
+const albumsLoaded = ref(false);
+const albumsCount = computed(() => albums.value.length);
+
+// Local artist suggestions for datalist
+const localArtists = ref([]);
+
+// Timeout handle for debounced artist search
+let localArtistsTimeout = null;
 
 // Categorized results
 const songResults = ref([]);
@@ -207,9 +248,69 @@ const selectedSong = ref(null);
 const selectedArtist = ref(null);
 const selectedAlbum = ref(null);
 
+// Auto-load albums when artist is selected from results
+watch(selectedArtist, (val) => {
+    if (val?.externalId && !artistConfirmed.value) {
+        browseArtistAlbums();
+    }
+});
+
 // Track what the user already confirmed so we don't re-show it
 const artistConfirmed = ref(false);
 const albumConfirmed = ref(false);
+
+async function browseArtistAlbums() {
+    if (!selectedArtist.value?.externalId || browsing.value) return;
+    browsing.value = true;
+    try {
+        const albums = await matchingStore.browseArtistAlbums(selectedArtist.value.externalId);
+        if (albums && albums.length) {
+            albumResults.value = albums;
+            selectedAlbum.value = albums[0];
+        } else {
+            errorMessage.value = 'No albums found for this artist.';
+        }
+    } catch (err) {
+        errorMessage.value = err.message;
+    } finally {
+        browsing.value = false;
+    }
+}
+
+/** Load albums for the typed artist from MusicBrainz into the album datalist */
+async function loadAlbums() {
+    const name = searchArtist.value.trim();
+    if (!name) return;
+    albumsLoading.value = true;
+    albumsLoaded.value = false;
+    albums.value = [];
+    try {
+        const albumsList = await matchingStore.searchArtistAlbums(name);
+        if (albumsList && albumsList.length) {
+            albums.value = albumsList;
+            albumsLoaded.value = true;
+        } else {
+            errorMessage.value = 'No albums found for this artist on MusicBrainz.';
+        }
+    } catch (err) {
+        errorMessage.value = err.message;
+    } finally {
+        albumsLoading.value = false;
+    }
+}
+
+/** Load local artists for the datalist */
+async function loadLocalArtists() {
+    try {
+        localArtists.value = await matchingStore.searchLocalArtists(searchArtist.value || '');
+    } catch { /* non-critical */ }
+}
+
+/** Called on artist input — debounce-reload local artist suggestions */
+function onArtistInput() {
+    if (localArtistsTimeout) clearTimeout(localArtistsTimeout);
+    localArtistsTimeout = setTimeout(() => loadLocalArtists(), 300);
+}
 
 /** Detect MusicBrainz connectivity errors to show a localized VPN hint */
 const isMusicBrainzError = computed(() => {
@@ -224,6 +325,7 @@ watch(() => props.show, async (val) => {
         // Initialize search fields from object
         searchQuery.value = props.object?.name || '';
         searchArtist.value = props.object?.data?.artistName || props.object?.data?.artist || '';
+        searchAlbum.value = '';
         searched.value = false;
         songResults.value = [];
         artistResults.value = [];
@@ -235,12 +337,17 @@ watch(() => props.show, async (val) => {
         albumConfirmed.value = false;
         errorMessage.value = '';
         infoMessage.value = '';
+        albums.value = [];
+        albumsLoaded.value = false;
 
         // Pre-populate with cached candidates as song results
         if (props.candidates && props.candidates.length) {
             songResults.value = [...props.candidates];
             selectedSong.value = songResults.value[0];
         }
+
+        // Load local artists for the datalist
+        loadLocalArtists();
 
         bsModal.show();
     }
@@ -276,7 +383,15 @@ async function doSearch() {
 
     try {
         const q = searchQuery.value || props.object.name;
-        const ctx = { artist: searchArtist.value || props.object?.data?.artistName || props.object?.data?.artist || '' };
+        const ctx = {
+            artist: searchArtist.value || props.object?.data?.artistName || props.object?.data?.artist || '',
+        };
+        // Pass release (album) context when user has selected one — this
+        // triggers the release-browse path in searchSongs which finds
+        // canonical album recordings instead of Lucene search
+        if (searchAlbum.value.trim()) {
+            ctx.release = searchAlbum.value.trim();
+        }
 
         const { songs, artists, albums } = await matchingStore.manualSearchAll(q, ctx);
 

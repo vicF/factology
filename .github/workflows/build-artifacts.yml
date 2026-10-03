@@ -2,6 +2,7 @@ name: Alpha build artifacts
 
 # Builds the Android APK and the Windows Electron installer so alpha testers
 # can download ready-made binaries instead of building locally.
+# iOS is disabled (no Apple Developer account yet).
 #
 #   - push to develop        -> APK + installer are stored as run artifacts
 #                               (downloadable from the Actions run page)
@@ -58,6 +59,37 @@ jobs:
           name: android-apk
           path: dist-android/factology-debug.apk
           if-no-files-found: error
+
+  # ios:
+  #   name: iOS Simulator app
+  #   runs-on: macos-latest
+  #   timeout-minutes: 60
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #
+  #     - name: Setup Node
+  #       uses: actions/setup-node@v7
+  #       with:
+  #         node-version: '24'
+  #
+  #     - name: Install dependencies
+  #       run: npm ci --no-audit --no-fund
+  #
+  #     - name: Build iOS Simulator .app
+  #       # No Apple Developer account needed — builds for iOS Simulator only.
+  #       # xcodebuild is pre-installed on macOS runners.
+  #       run: bash build-ios.sh
+  #
+  #     - name: Zip .app bundle
+  #       working-directory: dist-ios
+  #       run: zip -r Factology-iOS-Simulator.zip App.app
+  #
+  #     - name: Upload iOS Simulator app
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: ios-simulator
+  #         path: dist-ios/Factology-iOS-Simulator.zip
+  #         if-no-files-found: error
 
   desktop:
     name: Electron installer (Windows)

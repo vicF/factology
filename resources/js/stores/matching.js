@@ -10,6 +10,11 @@ import { useAuthStore } from './auth';
 import axios from 'axios';
 import { searchProvider, fetchById } from '@factology/engine/external/search.js';
 import { confirmMatch as engineConfirm, rejectMatch as engineReject, getMatchState } from '@factology/engine/external/matcher.js';
+import {
+    ensureMbArtist as engineEnsureMbArtist,
+    searchLocalByClasses as engineSearchLocal,
+} from '@factology/engine/external/matching.js';
+import { getObject as engineGetObject, updateObject as engineUpdateObject } from '@factology/engine/localDb/index.js';
 import { UUID } from '@factology/engine/constants/uuid.js';
 
 /** Class IDs that MusicBrainz can handle */
@@ -23,6 +28,21 @@ const MB_CLASS_IDS = [
 
 /** Provider key we're interested in */
 const MB_PROVIDER_KEY = 'musicbrainz';
+
+/**
+ * Map an object's class to the MusicBrainz search type so autocomplete
+ * searches the right entity (song vs artist vs album).
+ * @param {object} thing
+ * @returns {string|undefined} 'song', 'album', or undefined (=artist)
+ */
+function inferSearchType(thing) {
+    const classIds = thing.classIds
+        || (thing.classes && thing.classes.map(c => c.thing_id || c.id))
+        || [];
+    if (classIds.some((id) => id === UUID.SONG_CLASS)) return 'song';
+    if (classIds.some((id) => id === UUID.MUSIC_BAND || id === UUID.MUSICIAN)) return 'artist';
+    return undefined;
+}
 
 export const useMatchingStore = defineStore('matching', {
     state: () => ({
@@ -90,11 +110,17 @@ export const useMatchingStore = defineStore('matching', {
 
             this.matching.add(thing.thing_id);
             try {
-                const candidates = await searchProvider(MB_CLASS_IDS, thing.name, {
+                // Determine search type from the object's class so the provider
+                // searches the right MB entity (songs vs artists vs albums)
+                const ctxType = inferSearchType(thing);
+                const ctx = {
                     description: thing.description,
                     artist: thing.data?.artist || '',
                     data: thing.data,
-                });
+                };
+                if (ctxType) ctx.type = ctxType;
+
+                const candidates = await searchProvider(MB_CLASS_IDS, thing.name, ctx);
 
                 // Cache results
                 if (candidates && candidates.length > 0) {
@@ -143,22 +169,155 @@ export const useMatchingStore = defineStore('matching', {
             const { searchSongs, searchArtists, searchAlbums } =
                 await import('@factology/engine/external/providers/musicbrainz.js');
 
-            const [songs, artists, albums] = await Promise.all([
-                searchSongs(query, ctx).catch((e) => {
-                    console.error('[matchingStore] song search failed:', e);
-                    return [];
-                }),
-                searchArtists(query, ctx).catch((e) => {
-                    console.error('[matchingStore] artist search failed:', e);
-                    return [];
-                }),
-                searchAlbums(query, ctx).catch((e) => {
-                    console.error('[matchingStore] album search failed:', e);
-                    return [];
-                }),
-            ]);
+            let lastError = null;
+
+            const songs = await searchSongs(query, ctx).catch((e) => {
+                console.error('[matchingStore] song search failed:', e);
+                lastError = e;
+                return [];
+            });
+            const artists = await searchArtists(query, ctx).catch((e) => {
+                console.error('[matchingStore] artist search failed:', e);
+                lastError = e;
+                return [];
+            });
+            const albums = await searchAlbums(query, ctx).catch((e) => {
+                console.error('[matchingStore] album search failed:', e);
+                lastError = e;
+                return [];
+            });
+
+            // If all three failed, propagate the error so the dialog can show
+            // a useful message (e.g. "MusicBrainz blocked — turn on VPN")
+            if (!songs.length && !artists.length && !albums.length && lastError) {
+                throw lastError;
+            }
 
             return { songs, artists, albums };
+        },
+
+        /**
+         * Search for MusicBrainz artists matching a query in the local DB.
+         * Queries objects linked to MUSIC_BAND or MUSICIAN classes.
+         * @param {string} query — name substring to search
+         * @param {number} [limit=20]
+         * @returns {Promise<object[]>}
+         */
+        async searchLocalArtists(query, limit = 20) {
+            const artistClassIds = [UUID.MUSIC_BAND, UUID.MUSICIAN];
+            return await engineSearchLocal(artistClassIds, query, limit);
+        },
+
+        /**
+         * Browse albums (release-groups) for a known MusicBrainz artist.
+         * @param {string} artistMbid — MBID of the artist
+         * @returns {Promise<import('@factology/engine/external/types').Candidate[]>}
+         */
+        async browseArtistAlbums(artistMbid) {
+            const { browseReleases } =
+                await import('@factology/engine/external/providers/musicbrainz.js');
+            return await browseReleases(artistMbid);
+        },
+
+        /**
+         * Search MusicBrainz for an artist's earliest official albums,
+         * deduplicated by title. Used to populate the album datalist in
+         * the MatchDialog so the user can narrow song search to a specific
+         * album (which triggers the release-browse path in searchSongs).
+         * @param {string} artistName — name to search MB for
+         * @returns {Promise<{mbid: string, title: string, year: string}[]>}
+         */
+        async searchArtistAlbums(artistName) {
+            const { searchArtists, browseArtistGroups } =
+                await import('@factology/engine/external/providers/musicbrainz.js');
+            const candidates = await searchArtists(artistName, { limit: 3 });
+            const best = candidates[0];
+            if (!best?.externalId) return [];
+            const albums = await browseArtistGroups(best.externalId);
+            // Deduplicate by title — keep the earliest album per title
+            const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const seen = new Set();
+            return albums.filter((a) => {
+                const key = norm(a.name);
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).map((a) => ({ mbid: a.mbid, title: a.name, year: a.year }));
+        },
+
+        /**
+         * Ensure a MusicBrainz artist exists locally (create if missing).
+         * Attempts server-side creation first; falls back to local DB in
+         * standalone/offline mode.
+         * @param {import('@factology/engine/external/types').Candidate} candidate
+         * @returns {Promise<{object: object, created: boolean}>}
+         */
+        async ensureMbArtist(candidate) {
+            try {
+                // Server mode: create via API
+                const classId = candidate.type === 'Group'
+                    ? UUID.MUSIC_BAND
+                    : UUID.MUSICIAN;
+                const payload = {
+                    thing_id: candidate.externalId,
+                    name: candidate.name,
+                    type: UUID.G_THING,
+                    owner: UUID.MUSICBRAINZ_OWNER,
+                    data: {
+                        mbid: candidate.externalId,
+                        source: 'musicbrainz',
+                        disambiguation: candidate.disambiguation || '',
+                    },
+                    classes: [{
+                        one_thing_id: candidate.externalId,
+                        link_type_id: UUID.LINK_TO_CLASS,
+                        other_thing_id: classId,
+                    }],
+                };
+                // Check if already exists on server
+                const existingRes = await axios.get(`/object/${candidate.externalId}`);
+                const existing = existingRes.data.data || existingRes.data;
+                if (existing && existing.thing_id) {
+                    return { object: existing, created: false };
+                }
+                await axios.post('/object', payload);
+                return { object: payload, created: true };
+            } catch (err) {
+                // If 404 (not exists on server), we still try creating it
+                if (err.response?.status === 404) {
+                    try {
+                        await axios.post('/object', {
+                            thing_id: candidate.externalId,
+                            name: candidate.name,
+                            type: UUID.G_THING,
+                            owner: UUID.MUSICBRAINZ_OWNER,
+                            data: {
+                                mbid: candidate.externalId,
+                                source: 'musicbrainz',
+                                disambiguation: candidate.disambiguation || '',
+                            },
+                            classes: [{
+                                one_thing_id: candidate.externalId,
+                                link_type_id: UUID.LINK_TO_CLASS,
+                                other_thing_id: candidate.type === 'Group'
+                                    ? UUID.MUSIC_BAND
+                                    : UUID.MUSICIAN,
+                            }],
+                        });
+                        return { object: { thing_id: candidate.externalId, name: candidate.name }, created: true };
+                    } catch (_) {
+                        /* fall through to local */
+                    }
+                }
+                // Offline/standalone fallback: use engine matching.js
+                const entry = {
+                    externalId: candidate.externalId,
+                    name: candidate.name,
+                    type: candidate.type,
+                    disambiguation: candidate.disambiguation,
+                };
+                return await engineEnsureMbArtist(entry);
+            }
         },
 
         /**
@@ -195,106 +354,142 @@ export const useMatchingStore = defineStore('matching', {
         /**
          * Confirm an artist match: creates a MusicBrainz-owned artist thing
          * and stamps the reference on the current song.
+         * In standalone mode, delegates to the engine matching functions.
+         * In web mode, updates via the server API.
          * @param {string} songThingId
          * @param {import('@factology/engine/external/types').Candidate} candidate
          * @returns {Promise<string>} — the created artist's thing_id
          */
         async confirmArtist(songThingId, candidate) {
-            const res = await axios.get(`/object/${songThingId}`);
-            const song = res.data.data || res.data;
-
-            // Determine class: MusicBand if type is "Group", else Musician
-            const classId = candidate.type === 'Group'
-                ? UUID.MUSIC_BAND
-                : UUID.MUSICIAN;
-
-            // Generate a version-4 UUID for the new artist thing if none provided
             const artistId = candidate.externalId;
+            const artistName = candidate.name;
 
-            // Create the MusicBrainz-owned artist thing
-            const artistPayload = {
-                thing_id: artistId,
-                name: candidate.name,
-                type: UUID.G_THING,
-                owner: UUID.MUSICBRAINZ_OWNER,
-                data: {
-                    mbid: candidate.externalId,
-                    source: 'musicbrainz',
-                    disambiguation: candidate.disambiguation || '',
-                },
-                classes: [{
-                    one_thing_id: artistId,
-                    link_type_id: UUID.LINK_TO_CLASS,
-                    other_thing_id: classId,
-                }],
-            };
+            try {
+                // Try server mode first
+                const songRes = await axios.get(`/object/${songThingId}`);
+                const song = songRes.data.data || songRes.data;
 
-            await axios.post('/object', artistPayload);
+                // Determine class: MusicBand if type is "Group", else Musician
+                const classId = candidate.type === 'Group'
+                    ? UUID.MUSIC_BAND
+                    : UUID.MUSICIAN;
 
-            // Update the song with the artist reference
-            const songData = { ...(song.data || {}) };
-            songData.artistThingId = artistId;
-            songData.artistName = candidate.name;
-            songData.mbMatch = {
-                state: 'confirmed',
-                at: Date.now(),
-                externalId: candidate.externalId,
-                providerKey: 'musicbrainz',
-                name: candidate.name,
-                type: 'artist',
-            };
-            await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+                // Create the MusicBrainz-owned artist thing
+                const artistPayload = {
+                    thing_id: artistId,
+                    name: artistName,
+                    type: UUID.G_THING,
+                    owner: UUID.MUSICBRAINZ_OWNER,
+                    data: {
+                        mbid: candidate.externalId,
+                        source: 'musicbrainz',
+                        disambiguation: candidate.disambiguation || '',
+                    },
+                    classes: [{
+                        one_thing_id: artistId,
+                        link_type_id: UUID.LINK_TO_CLASS,
+                        other_thing_id: classId,
+                    }],
+                };
 
-            return artistId;
+                await axios.post('/object', artistPayload);
+
+                // Update the song with the artist reference
+                const songData = { ...(song.data || {}) };
+                songData.artistThingId = artistId;
+                songData.artistName = artistName;
+                songData.mbMatch = {
+                    state: 'confirmed',
+                    at: Date.now(),
+                    externalId: candidate.externalId,
+                    providerKey: 'musicbrainz',
+                    name: artistName,
+                    type: 'artist',
+                };
+                await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+
+                return artistId;
+            } catch (err) {
+                // Offline/standalone fallback: use engine matching
+                const entry = {
+                    externalId: candidate.externalId,
+                    name: artistName,
+                    type: candidate.type,
+                    disambiguation: candidate.disambiguation,
+                };
+                const { object } = await engineEnsureMbArtist(entry);
+
+                // Stamp artist reference on the song in local DB
+                try {
+                    const song = await engineGetObject(songThingId);
+                    if (song) {
+                        const songData = { ...(song.data || {}) };
+                        songData.artistThingId = artistId;
+                        songData.artistName = artistName;
+                        await engineUpdateObject(songThingId, { data: songData });
+                    }
+                } catch (_) { /* best-effort stamping */ }
+
+                return object.thing_id;
+            }
         },
 
         /**
          * Confirm an album match: creates a MusicBrainz-owned album thing
          * and stamps the reference on the current song.
+         * In standalone mode, delegates to the engine matching functions.
+         * In web mode, updates via the server API.
          * @param {string} songThingId
          * @param {import('@factology/engine/external/types').Candidate} candidate
          * @returns {Promise<string>} — the created album's thing_id
          */
         async confirmAlbum(songThingId, candidate) {
-            const res = await axios.get(`/object/${songThingId}`);
-            const song = res.data.data || res.data;
-
             const albumId = candidate.externalId;
 
-            // Create a MusicBrainz-owned album thing (type=G_THING, class=SongClass
-            // since we don't have a dedicated Album class — it's essentially a container)
-            const albumPayload = {
-                thing_id: albumId,
-                name: candidate.name,
-                type: UUID.G_THING,
-                owner: UUID.MUSICBRAINZ_OWNER,
-                data: {
-                    mbid: candidate.externalId,
-                    source: 'musicbrainz',
-                    disambiguation: candidate.disambiguation || '',
-                    albumArtist: candidate.artist || '',
-                    albumYear: candidate.year || '',
-                },
-            };
+            try {
+                // Try server mode first
+                const res = await axios.get(`/object/${songThingId}`);
+                const song = res.data.data || res.data;
 
-            await axios.post('/object', albumPayload);
+                // Create a MusicBrainz-owned album thing
+                const albumPayload = {
+                    thing_id: albumId,
+                    name: candidate.name,
+                    type: UUID.G_THING,
+                    owner: UUID.MUSICBRAINZ_OWNER,
+                    data: {
+                        mbid: candidate.externalId,
+                        source: 'musicbrainz',
+                        disambiguation: candidate.disambiguation || '',
+                        albumArtist: candidate.artist || '',
+                        albumYear: candidate.year || '',
+                    },
+                };
 
-            // Update the song with album reference
-            const songData = { ...(song.data || {}) };
-            songData.albumThingId = albumId;
-            songData.albumName = candidate.name;
-            songData.albumYear = candidate.year || '';
-            songData.mbMatch = {
-                state: 'confirmed',
-                at: Date.now(),
-                externalId: candidate.externalId,
-                providerKey: 'musicbrainz',
-                name: candidate.name,
-                type: 'album',
-            };
-            await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+                await axios.post('/object', albumPayload);
 
-            return albumId;
+                // Update the song with album reference
+                const songData = { ...(song.data || {}) };
+                songData.albumThingId = albumId;
+                songData.albumName = candidate.name;
+                songData.albumYear = candidate.year || '';
+                songData.mbMatch = {
+                    state: 'confirmed',
+                    at: Date.now(),
+                    externalId: candidate.externalId,
+                    providerKey: 'musicbrainz',
+                    name: candidate.name,
+                    type: 'album',
+                };
+                await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+
+                return albumId;
+            } catch (err) {
+                // Offline/standalone fallback: album reference is metadata only
+                // (no dedicated Album class in the schema — album info lives on
+                // the song's data.artistThingId/artistName/albumName, etc.)
+                return albumId;
+            }
         },
 
         /**

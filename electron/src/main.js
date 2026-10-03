@@ -40,6 +40,13 @@ const MIME_TYPES = {
     '.map': 'application/json',
 };
 
+const CSP = "default-src 'self'; "
+    + "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+    + "img-src 'self' https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://www.google.com; "
+    + "connect-src 'self' https://nominatim.openstreetmap.org; "
+    + "style-src 'self' 'unsafe-inline'; "
+    + "font-src 'self'";
+
 const MUSICBRAINZ_UA = 'Factology/1.0';
 
 function proxyMusicBrainz(req, res, type) {
@@ -118,6 +125,7 @@ function startStaticServer() {
                 res.writeHead(200, {
                     'Content-Type': MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
                     'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Content-Security-Policy': CSP,
                 });
                 res.end(data);
             });
@@ -186,11 +194,26 @@ async function createWindow() {
         icon: path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'appIcon.ico' : 'appIcon.png'),
     });
 
-    // Show window when ready to avoid flash (registered BEFORE loadURL —
-    // ready-to-show fires while the page renders, and attaching it after an
-    // awaited loadURL would miss it, leaving the window never shown).
+    // Register ALL event handlers BEFORE loadURL — otherwise failures or
+    // early messages are silently swallowed and the app appears to hang.
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
+        console.error(`[renderer] did-fail-load ${code} ${desc} ${url}`);
+    });
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('[renderer] did-finish-load');
+    });
+    // The 'console-message' event changed shape across Electron versions
+    // (older: positional (event, level, message, line, sourceId); newer:
+    // level/message live on the event object) — read whichever form this
+    // Electron uses.
+    mainWindow.webContents.on('console-message', (event, level, message) => {
+        const hasFields = event && typeof event === 'object' && 'message' in event;
+        const lvl = hasFields ? event.level : level;
+        const msg = hasFields ? event.message : message;
+        console.log(`[renderer:${lvl}] ${msg}`);
     });
 
     // Reliable DevTools shortcut inside the window (the global F12 hotkey can
@@ -204,26 +227,33 @@ async function createWindow() {
         }
     });
 
-    // DEV mode loads the Vite dev server (HMR); otherwise the Capacitor-built
-    // SPA is loaded from our local static server.
-    await mainWindow.loadURL(DEV_URL || `${serverUrl}/`);
-
-    // Debug: forward renderer console + load status to the terminal. The
-    // 'console-message' event changed shape across Electron versions (older:
-    // positional (event, level, message, line, sourceId); newer: level/message
-    // live on the event object) — read whichever form this Electron uses.
-    mainWindow.webContents.on('console-message', (event, level, message) => {
-        const hasFields = event && typeof event === 'object' && 'message' in event;
-        const lvl = hasFields ? event.level : level;
-        const msg = hasFields ? event.message : message;
-        console.log(`[renderer:${lvl}] ${msg}`);
+    // Timeout to prevent silent hang — Chromium can stall on certain
+    // redirects or resource loads. On timeout, dump renderer diagnostics
+    // so the cause is visible instead of an unexplained freeze.
+    // First load on Vite's cold dev server can take >60s to compile
+    // the full Vue app; increase for HMR mode.
+    const timeoutMs = DEV_URL ? 120000 : 30000;
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+        console.error(`[renderer] process gone: ${JSON.stringify(details)}`);
     });
-    mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
-        console.error(`[renderer] did-fail-load ${code} ${desc} ${url}`);
+    const url = DEV_URL || `${serverUrl}/`;
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            const wc = mainWindow.webContents;
+            reject(new Error(
+                `loadURL timed out after ${timeoutMs / 1000}s: ${url}\n` +
+                `  renderer URL → ${wc.getURL()}\n` +
+                `  isLoading → ${wc.isLoading()}\n` +
+                `  isCrashed → ${wc.isCrashed()}`
+            ));
+        }, timeoutMs);
     });
-    mainWindow.webContents.on('did-finish-load', () => {
-        console.log('[renderer] did-finish-load');
-    });
+    try {
+        await Promise.race([mainWindow.loadURL(url), timeout]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 // DEV mode (run-electron.sh): load the Vite dev server for HMR instead of the

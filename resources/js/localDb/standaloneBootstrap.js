@@ -39,6 +39,10 @@ export async function bootstrapStandalone() {
                     return `${process.cwd()}/node_modules/sql.js/dist/${file}`;
                 }
                 if (isElectron) {
+                    if (typeof window !== 'undefined' && window.__factology_dev_mode) {
+                        // HMR (Vite dev server) — WASM at the node_modules path
+                        return `/node_modules/sql.js/dist/${file}`;
+                    }
                     // Electron static server root — WASM was copied to electron/app/
                     return `/${file}`;
                 }

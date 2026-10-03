@@ -368,22 +368,53 @@ export async function searchSongs(query, ctx = {}) {
     const title = query;
     const { artist, release } = ctx;
 
+    let releaseBrowseFailed = false;
+
     if (release && release.trim()) {
-        const data = await get('release', {
-            query: [`release:${safeTerm(release)}`, artist ? `artist:${safeTerm(artist)}` : '']
-                .filter(Boolean).join(' AND '),
-            limit: 10,
-            inc: 'release-groups',
-        });
-        const chosen = chooseRelease((data.releases || []).map(normalizeRelease), release);
-        if (chosen) {
-            const rows = await albumTracks(chosen);
-            const q = normText(title);
-            const exact = rows.filter((r) => normText(r.title) === q);
-            if (exact.length) return rankSongs(dedupeRecordings(exact), title)
-                .map((r) => normalizeToCandidate(r, 'Song', 0.2));
-            if (rows.length) return rankSongs(dedupeRecordings(rows), title)
-                .map((r) => normalizeToCandidate(r, 'Song', 0.1));
+        try {
+            // Step 1: resolve artist → MBID for browse endpoint
+            let artistMbid = null;
+            if (artist) {
+                const ad = await get('artist', { query: `artist:${safeTerm(artist)}`, limit: 3 });
+                artistMbid = (ad.artists || [])[0]?.id;
+            }
+            if (artistMbid) {
+                // Step 2: browse ALL release-groups for the artist (up to 100)
+                // This is far more reliable than Lucene text search because:
+                // - Release endpoint returns every format variant (CD/vinyl/digital/territory)
+                // - Lucene rank buries 1971 originals under re-releases
+                const rgData = await get('release-group', {
+                    artist: artistMbid,
+                    limit: 100,
+                });
+                const groups = (rgData['release-groups'] || []).map(normalizeReleaseGroup);
+                // Step 3: filter by album-type, exact name match, earliest year
+                const q = normText(release);
+                const albums = groups.filter((g) => normText(g.name) === q && normText(g.type) === 'album');
+                if (albums.length) {
+                    albums.sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
+                    const bestGroup = albums[0];
+                    // Step 4: get an official release within this group for tracklist browsing
+                    const relData = await get('release', {
+                        'release-group': bestGroup.mbid,
+                        status: 'official',
+                        limit: 1,
+                    }).catch(() => null);
+                    const chosen = relData ? (relData.releases || []).map(normalizeRelease)[0] : null;
+                    if (chosen) {
+                        const rows = await albumTracks(chosen);
+                        const q = normText(title);
+                        const exact = rows.filter((r) => normText(r.title) === q);
+                        if (exact.length) return rankSongs(dedupeRecordings(exact), title)
+                            .map((r) => normalizeToCandidate(r, 'Song', 0.2));
+                        if (rows.length) return rankSongs(dedupeRecordings(rows), title)
+                            .map((r) => normalizeToCandidate(r, 'Song', 0.1));
+                    }
+                }
+            }
+        } catch (e) {
+            releaseBrowseFailed = true;
+            console.warn('[MB] Release-browse path failed:', e?.message || String(e));
         }
     }
 
@@ -397,8 +428,11 @@ export async function searchSongs(query, ctx = {}) {
     });
     let rows = (data.recordings || []).map(normalizeRecording);
 
-    // Supplement with tracks from the artist's official albums
-    if (artist && !release) {
+    // Supplement with tracks from the artist's official albums.
+    // Also run when release was provided but the release-browse path
+    // failed (e.g. rate-limited or too many release-groups) — this way
+    // Lucene results get canonical album data added.
+    if (artist && (!release || releaseBrowseFailed)) {
         try {
             const artistData = await get('artist', { query: `artist:${safeTerm(artist)}`, limit: 3 });
             const best = (artistData.artists || [])[0];
@@ -416,15 +450,16 @@ export async function searchSongs(query, ctx = {}) {
                                 rows.push(t);
                             } else {
                                 // MBID already in Lucene results, but with a
-                                // weaker/compilation album — overwrite with the
-                                // canonical album info from the official release
-                                const idx = rows.findIndex((r) => r.mbid === t.mbid);
-                                if (idx >= 0) {
-                                    rows[idx].album = t.album;
-                                    rows[idx].albumDate = t.albumDate;
-                                    rows[idx].albumYear = t.albumYear;
-                                    rows[idx].matchQuality = Math.max(rows[idx].matchQuality, t.matchQuality);
-                                }
+                            // weaker/compilation album — overwrite with the
+                            // canonical album info from the official release
+                            const existing = rows.find((r) => r.mbid === t.mbid);
+                            if (existing) {
+                                const idx = rows.indexOf(existing);
+                                rows[idx].album = t.album;
+                                rows[idx].albumDate = t.albumDate;
+                                rows[idx].albumYear = t.albumYear;
+                                rows[idx].matchQuality = Math.max(rows[idx].matchQuality, t.matchQuality);
+                            }
                             }
                         }
                         return true;
@@ -441,7 +476,10 @@ export async function searchSongs(query, ctx = {}) {
                 // Fallback: browseReleases(limit=50, newest-first) may not include
                 // the canonical album (e.g. 1971 "Imagine" under hundreds of
                 // compilations). Search for a release matching the song title.
-                if (!found) {
+                // NOTE: Always runs, even when the supplement loop found a match,
+                // because compilations often include the song but we want the
+                // canonical original album for better match quality.
+                {
                     const releaseData = await get('release', {
                         query: `release:${safeTerm(title)} AND artist:${safeTerm(artist)}`,
                         limit: 5,
@@ -502,8 +540,30 @@ export async function albumTracks(album) {
  */
 export async function browseReleases(artistMbid) {
     if (!artistMbid) return [];
-    const data = await get('release', { artist: artistMbid, limit: 50, inc: 'release-groups' });
+    const data = await get('release', { artist: artistMbid, limit: 100, inc: 'release-groups' });
     return (data.releases || []).map(normalizeRelease);
+}
+
+/**
+ * Browse all release-groups (canonical albums) for an artist.
+ * Unlike browseReleases (which returns every format variant),
+ * this returns one entry per logical album, deduplicating
+ * re-releases, remasters, and territory-specific editions.
+ * Results are sorted by first-release-date ascending.
+ * @param {string} artistMbid
+ * @param {object} [opts]
+ * @param {number} [opts.limit=100]
+ * @returns {Promise<object[]>} — { mbid, title, artist, type, firstReleaseDate, year }
+ */
+export async function browseArtistGroups(artistMbid, opts = {}) {
+    if (!artistMbid) return [];
+    const limit = opts.limit || 100;
+    const data = await get('release-group', { artist: artistMbid, limit });
+    const groups = (data['release-groups'] || []).map(normalizeReleaseGroup);
+    // Filter to album type, sort by date ascending
+    const albums = groups.filter((g) => normText(g.type) === 'album');
+    albums.sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
+    return albums;
 }
 
 /**

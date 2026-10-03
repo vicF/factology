@@ -114,10 +114,22 @@
 
                                     <div class="result-info-section">
                                         <div v-if="canEdit && editMode" class="visibility-badge-wrapper">
-                                            <VisibilityBadge
-                                                :visibility="objectVisibility"
-                                                @toggle="cycleVisibility"
-                                            />
+                                            <div class="visibility-dropdown-trigger">
+                                                <span class="visibility-toggle" @click.stop="showVisibilityMenu = !showVisibilityMenu">
+                                                    <VisibilityBadge :visibility="objectVisibility" />
+                                                </span>
+                                                <div v-if="showVisibilityMenu" class="visibility-menu" @mouseleave.stop="showVisibilityMenu = false">
+                                                    <div class="visibility-option" :class="{ active: objectVisibility === 0 }" @click.stop="setVisibility(0)">
+                                                        <IconPrivate /> {{ $t('Private') }}
+                                                    </div>
+                                                    <div class="visibility-option" :class="{ active: objectVisibility === 1 }" @click.stop="setVisibility(1)">
+                                                        <IconPublic /> {{ $t('Public') }}
+                                                    </div>
+                                                    <div class="visibility-option" :class="{ active: objectVisibility === 2 }" @click.stop="setVisibility(2)">
+                                                        <IconGlobal /> {{ $t('Global') }}
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <span class="ms-1 visibility-label">
                                                 {{ visibilityLabel }}
                                             </span>
@@ -473,6 +485,7 @@ import IconExternal from './icons/IconExternal.vue';
 import { getExternalLinkMeta, isInternalUrl, faviconUrl } from '../utils/externalLinks';
 import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
+import IconGlobal from './icons/IconGlobal.vue';
 import IconCheck from './icons/IconCheck.vue';
 import VisibilityBadge from './VisibilityBadge.vue';
 import ConfirmModal from './ConfirmModal.vue';
@@ -600,8 +613,9 @@ const propertyEntries = computed(() =>
     buildPropertyEntries(object.value?.data?.properties, propertyDefinitions.value || [], t)
 );
 
-// ─── Visibility display & quick toggle ──────────────────────────────
+// ─── Visibility display & dropdown selector ─────────────────────────
 const hoveredLink = ref(null);
+const showVisibilityMenu = ref(false);
 let quickMode = false;
 const showConfirmModal = ref(false);
 const confirmTitle = ref('');
@@ -620,13 +634,34 @@ const visibilityLabel = computed(() => {
     return labels[objectVisibility.value] ?? t('Private');
 });
 
-// Cycle visibility 0↔1 (quick toggle; global/group require EditObject)
-const cycleVisibility = () => {
+// Set visibility from dropdown selection
+const setVisibility = (next) => {
     if (!object.value) return;
+    showVisibilityMenu.value = false;
     const current = objectVisibility.value;
-    // 0→1, 1→0, 2→1 (bump to public), 3→1
-    const next = (current === 0 || current === 3) ? 1 : 0;
-    doToggleVisibility(object.value.thing_id, next);
+    if (next === current) return;
+    if (quickMode) {
+        executeVisibilityToggle(object.value.thing_id, next);
+        return;
+    }
+    if (next === 0) {
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this object private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
+        confirmVariant.value = 'danger';
+    } else if (next === 1) {
+        confirmTitle.value = t('Make Public');
+        confirmMessage.value = t('Make this object visible to everyone? Anyone will be able to see it.');
+        confirmButtonText.value = t('Make Public');
+        confirmVariant.value = 'success';
+    } else {
+        confirmTitle.value = t('Make Global');
+        confirmMessage.value = t('Make this object visible globally?');
+        confirmButtonText.value = t('Make Global');
+        confirmVariant.value = 'primary';
+    }
+    pendingToggle = { thingId: object.value.thing_id, nextVisibility: next };
+    showConfirmModal.value = true;
 };
 
 const toggleLinkVisibility = (link, makePublic) => {
@@ -1647,5 +1682,36 @@ button.more-links {
     font-weight: 600;
     text-transform: none;
     letter-spacing: normal;
+}
+.visibility-dropdown-trigger {
+    position: relative;
+    display: inline-flex;
+}
+.visibility-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 2px 0;
+    white-space: nowrap;
+    min-width: 120px;
+}
+.visibility-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+.visibility-option:hover {
+    background: #f0f0f0;
+}
+.visibility-option.active {
+    background: #e8e8e8;
+    font-weight: bold;
 }
 </style>

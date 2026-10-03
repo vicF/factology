@@ -20,8 +20,21 @@
             <div class="node-content">
                 <span class="node-name">
                     <router-link class="dropdown-item" :to="`/object/${id}`">{{ displayName }}</router-link>
-                    <span v-if="authenticated && editMode" class="visibility-toggle" @click.stop="cycleVisibility">
-                        <VisibilityBadge :visibility="nodeVisibility" />
+                    <span v-if="authenticated && editMode && showIcons" class="visibility-toggle-wrapper">
+                        <span class="visibility-toggle" @click.stop="showVisibilityMenu = !showVisibilityMenu">
+                            <VisibilityBadge :visibility="nodeVisibility" />
+                        </span>
+                        <div v-if="showVisibilityMenu" class="visibility-menu" @mouseleave.stop="showVisibilityMenu = false">
+                            <div class="visibility-option" :class="{ active: nodeVisibility === 0 }" @click.stop="setVisibility(0)">
+                                <IconPrivate /> {{ $t('Private') }}
+                            </div>
+                            <div class="visibility-option" :class="{ active: nodeVisibility === 1 }" @click.stop="setVisibility(1)">
+                                <IconPublic /> {{ $t('Public') }}
+                            </div>
+                            <div class="visibility-option" :class="{ active: nodeVisibility === 2 }" @click.stop="setVisibility(2)">
+                                <IconGlobal /> {{ $t('Global') }}
+                            </div>
+                        </div>
                     </span>
                 </span>
                 <span class="action-icons" :class="{ 'visible': authenticated && editMode && showIcons }">
@@ -72,7 +85,7 @@ import { fieldText } from '../utils/localized.js';
 import { collectSubtreeIds, nodeSelectionState } from '../utils/classTree';
 import { useTreeState } from "../composables/useTreeState";
 import Image from "./Image.vue";
-import {IconPrivate, IconPublic} from "./icons";
+import {IconPrivate, IconPublic, IconGlobal} from "./icons";
 import VisibilityBadge from './VisibilityBadge.vue';
 import ConfirmModal from './ConfirmModal.vue';
 
@@ -139,7 +152,7 @@ const showChildren = ref(treeState.isOpen(props.id, props.depth));
 console.log('[TreeMenu] MOUNT', props.id, 'depth', props.depth, 'showChildren:', showChildren.value);
 const showIcons = ref(false);
 
-// ─── Quick visibility toggle state ─────────────────────────────────
+const showVisibilityMenu = ref(false);
 let quickMode = false;
 const showConfirmModal = ref(false);
 const confirmTitle = ref('');
@@ -154,24 +167,29 @@ const nodeVisibility = computed(() => {
     return props.public ? 1 : 0;
 });
 
-const cycleVisibility = () => {
+const setVisibility = (next) => {
+    showVisibilityMenu.value = false;
     const current = nodeVisibility.value;
-    // 0→1, 1→0, 2→1, 3→1
-    const next = (current === 0 || current === 3) ? 1 : 0;
+    if (next === current) return;
     if (quickMode) {
         executeVisibilityToggle(next);
         return;
     }
-    if (next === 1) {
+    if (next === 0) {
+        confirmTitle.value = t('Make Private');
+        confirmMessage.value = t('Make this class private? Only you will be able to see it.');
+        confirmButtonText.value = t('Make Private');
+        confirmVariant.value = 'danger';
+    } else if (next === 1) {
         confirmTitle.value = t('Make Public');
         confirmMessage.value = t('Make this class visible to everyone?');
         confirmButtonText.value = t('Make Public');
         confirmVariant.value = 'success';
     } else {
-        confirmTitle.value = t('Make Private');
-        confirmMessage.value = t('Make this class private? Only you will be able to see it.');
-        confirmButtonText.value = t('Make Private');
-        confirmVariant.value = 'danger';
+        confirmTitle.value = t('Make Global');
+        confirmMessage.value = t('Make this class visible globally?');
+        confirmButtonText.value = t('Make Global');
+        confirmVariant.value = 'primary';
     }
     pendingToggle = next;
     showConfirmModal.value = true;
@@ -358,5 +376,36 @@ input[type="checkbox"] {
 }
 .children {
     padding-left: 0;
+}
+.visibility-toggle-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+.visibility-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 2px 0;
+    white-space: nowrap;
+    min-width: 120px;
+}
+.visibility-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+.visibility-option:hover {
+    background: #f0f0f0;
+}
+.visibility-option.active {
+    background: #e8e8e8;
+    font-weight: bold;
 }
 </style>
