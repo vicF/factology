@@ -13,6 +13,9 @@ const API_BASE = 'https://musicbrainz.org/ws/2';
 
 const MB_MIN_INTERVAL_MS = 1100;
 let lastMbCallAt = 0;
+
+/** Recognised release-group types that represent song-bearing releases. */
+const ALBUM_TYPES = new Set(['album', 'single', 'ep', 'compilation', 'live', 'soundtrack', 'remix']);
 let blockedUntilMs = 0;
 let blockedNote = '';
 let consecutiveFailures = 0;
@@ -390,16 +393,23 @@ export async function searchSongs(query, ctx = {}) {
                 const groups = (rgData['release-groups'] || []).map(normalizeReleaseGroup);
                 // Step 3: filter by album-type, exact name match, earliest year
                 const q = normText(release);
-                const albums = groups.filter((g) => normText(g.name) === q && normText(g.type) === 'album');
+                const albums = groups.filter((g) => normText(g.name) === q && ALBUM_TYPES.has(normText(g.type)));
                 if (albums.length) {
                     albums.sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
                     const bestGroup = albums[0];
-                    // Step 4: get an official release within this group for tracklist browsing
-                    const relData = await get('release', {
+                    // Step 4: get a release within this group for tracklist browsing
+                    // Try official first, then fall back to any status
+                    let relData = await get('release', {
                         'release-group': bestGroup.mbid,
                         status: 'official',
                         limit: 1,
                     }).catch(() => null);
+                    if (!relData?.releases?.length) {
+                        relData = await get('release', {
+                            'release-group': bestGroup.mbid,
+                            limit: 1,
+                        }).catch(() => null);
+                    }
                     const chosen = relData ? (relData.releases || []).map(normalizeRelease)[0] : null;
                     if (chosen) {
                         const rows = await albumTracks(chosen);
@@ -410,6 +420,10 @@ export async function searchSongs(query, ctx = {}) {
                         if (rows.length) return rankSongs(dedupeRecordings(rows), title)
                             .map((r) => normalizeToCandidate(r, 'Song', 0.1));
                     }
+                    // Found the matching album group but couldn't browse its tracks
+                    // (rate-limited, no official release, or song not in tracklist).
+                    // Let the supplement path fill in the canonical recording.
+                    releaseBrowseFailed = true;
                 }
             }
         } catch (e) {
@@ -560,8 +574,8 @@ export async function browseArtistGroups(artistMbid, opts = {}) {
     const limit = opts.limit || 100;
     const data = await get('release-group', { artist: artistMbid, limit });
     const groups = (data['release-groups'] || []).map(normalizeReleaseGroup);
-    // Filter to album type, sort by date ascending
-    const albums = groups.filter((g) => normText(g.type) === 'album');
+    // Filter to album-like types (album, single, ep, compilation, etc.)
+    const albums = groups.filter((g) => ALBUM_TYPES.has(normText(g.type)));
     albums.sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
     return albums;
 }

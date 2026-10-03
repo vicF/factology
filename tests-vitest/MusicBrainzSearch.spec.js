@@ -119,7 +119,7 @@ describe('MusicBrainzSearch', () => {
     // ─── browseArtistGroups ────────────────────────────────────────────
 
     describe('browseArtistGroups', () => {
-        it('returns release-groups sorted by date, filtered to album type', async () => {
+        it('returns release-groups sorted by date, filtered to album-like types', async () => {
             fetchSpy.mockImplementation(async (url) => {
                 const href = url instanceof URL ? url.href : String(url);
                 if (href.includes('/release-group?artist=')) {
@@ -137,13 +137,15 @@ describe('MusicBrainzSearch', () => {
 
             const albums = await browseArtistGroups(JOHN_LENNON_MBID);
 
-            // Only album types should be included, singles filtered out
-            expect(albums.length).toBe(2);
-            // Sorted by date ascending
+            // Album, Single, EP, etc. all included — singles no longer filtered out
+            expect(albums.length).toBe(3);
+            // Sorted by date ascending (singles without date go last)
             expect(albums[0].name).toBe('Imagine');
             expect(albums[0].year).toBe('1971');
             expect(albums[1].name).toBe('Double Fantasy');
             expect(albums[1].year).toBe('1980');
+            expect(albums[2].name).toBe('Give Peace a Chance');
+            expect(albums[2].year).toBe('');
         });
     });
 

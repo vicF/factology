@@ -69,7 +69,8 @@
                         <option v-for="a in localArtists" :key="a.thing_id" :value="a.name" />
                     </datalist>
                     <datalist id="match-album-list">
-                        <option v-for="a in albums" :key="a.mbid" :value="a.title" />
+                        <option v-for="a in albums" :key="a.mbid"
+                            :value="a.year ? a.title + ' (' + a.year + ')' : a.title" />
                     </datalist>
 
                     <div class="d-flex gap-2 mb-2 flex-wrap">
@@ -391,6 +392,8 @@ async function doSearch() {
         // canonical album recordings instead of Lucene search
         if (searchAlbum.value.trim()) {
             ctx.release = searchAlbum.value.trim();
+            // Strip trailing year suffix "(YYYY)" added by the datalist
+            ctx.release = ctx.release.replace(/\s*\(\d{4}\)\s*$/, '');
         }
 
         const { songs, artists, albums } = await matchingStore.manualSearchAll(q, ctx);
