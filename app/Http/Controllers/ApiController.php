@@ -1332,6 +1332,7 @@ class ApiController extends BaseController
         if (empty($data['planned'])) {
             $data['planned'] = $confirmed;
         }
+        unset($data['cancelled']); // confirm after cancel = not cancelled anymore
 
         DB::table('things')->where('thing_id', $id)->update([
             'data'           => json_encode($data),
@@ -1341,6 +1342,80 @@ class ApiController extends BaseController
         return response()->json([
             'success' => true,
             'data'    => ['planned' => $data['planned'], 'confirmed' => $confirmed],
+        ]);
+    }
+
+    /**
+     * Cancel a planned object. Owner-only (admins may cancel any planned object).
+     * Records the cancellation date in things.data.cancelled. The event remains
+     * visible — visitors see a "Cancelled" badge — so the announcement stays
+     * accessible. The owner may later hard-delete it if they wish.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cancelPlanned(Request $request, string $id): \Illuminate\Http\JsonResponse
+    {
+        $query = DB::table('things')->where('thing_id', $id);
+        if (!auth()->user()->is_admin) {
+            $query->where('owner', auth()->user()->thing_id);
+        }
+        $thing = $query->first();
+
+        if (!$thing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Object not found or you do not have permission',
+            ], 403);
+        }
+
+        // Only planned objects (those with data.planned or future-dated) may be
+        // cancelled through this endpoint.
+        $data = is_string($thing->data)
+            ? (json_decode($thing->data, true) ?: [])
+            : ($thing->data ?: []);
+
+        $isPlanned = !empty($data['planned']);
+        if (!$isPlanned && !empty($thing->start)) {
+            $nowCanonical = now()->format('YmdHis');
+            $isPlanned = bccomp($thing->start, $nowCanonical) > 0;
+        }
+        // An overdue plan whose date has already passed: was future-dated at
+        // creation (record_created < start) but has no explicit marker.
+        if (!$isPlanned && !empty($thing->start) && !empty($thing->record_created)) {
+            $createdCanonical = preg_replace('/[^\d]/', '', (string) $thing->record_created);
+            $createdCanonical = substr($createdCanonical, 0, 14);
+            $isPlanned = bccomp($createdCanonical, $thing->start) < 0;
+        }
+        if (!$isPlanned) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only planned objects can be cancelled',
+            ], 422);
+        }
+
+        // Cannot cancel an already-confirmed object
+        if (!empty($data['confirmed'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot cancel an object that has already been confirmed',
+            ], 422);
+        }
+
+        // Record cancellation in data — event stays visible with a "Cancelled" badge.
+        $cancelled = now()->format('Y-m-d');
+        $data['cancelled'] = $cancelled;
+        unset($data['confirmed']); // safety: clear confirmed if somehow set
+
+        DB::table('things')->where('thing_id', $id)->update([
+            'data'           => json_encode($data),
+            'record_updated' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['cancelled' => $cancelled],
         ]);
     }
 

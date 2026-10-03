@@ -66,6 +66,7 @@ export const UUID = {
     PHOTO_SESSION:  '4cc9a0fd-1ac2-4bc2-9f10-4fac1f90f376',
     CHECK_IN:       '960e0074-5945-4163-a9ba-576a09ced6da',
     MUSIC_BAND:     'caf05706-c73d-43e9-a496-6069f9aefc99',
+    MUSICIAN:       '860dd2fe-b70f-42b2-a446-20528245eeff',
     MEMBER_OF:      '6c4c2f74-aa7f-4c17-bdbc-87a55fe253cf',
     GROUP_READ_ACCESS: 'ea206516-9e45-482f-89be-05313f52e5e3',
     BELONGS_TO_USER_GROUP: 'e18d73eb-a5d3-47be-a785-106f6f185651',

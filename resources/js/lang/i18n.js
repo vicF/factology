@@ -311,6 +311,13 @@ const messages = {
         "dates.confirm": "Confirm",
         "dates.confirm_hint": "Confirm that this really happened",
         "dates.confirmed_title": "This was confirmed to have happened",
+        "dates.cancel": "Cancel",
+        "dates.cancel_hint": "Cancel this planned event",
+        "dates.cancel_confirm_message": "Cancel this event? It will be marked as cancelled and shown with a \"Cancelled\" badge.",
+        "dates.cancel_error": "Failed to cancel event",
+        "dates.cancelled": "Cancelled",
+        "dates.cancelled_on": "cancelled on",
+        "dates.cancelled_title": "This event has been cancelled",
         "dates.parse_error": "Could not parse this date expression",
         "dates.placeholder": "e.g. {today}, 1650, circa 1650, before 1500, between 1500 and 1600, 7533 AM",
         "dates.placeholder_upper": "upper bound",
@@ -444,7 +451,16 @@ const messages = {
         "Backup phrase split into {total} shares — any {threshold} of them rebuild it. Give exactly one share to each of your trusted people/places. Never send two shares together.": "Backup phrase split into {total} shares — any {threshold} of them rebuild it. Give exactly one share to each of your trusted people/places. Never send two shares together.",
         "Backup phrase recovered. Use it to restore the identity in the tab above.": "Backup phrase recovered. Use it to restore the identity in the tab above.",
 
+        // ── MatchDialog ──
+        "Load albums for this artist": "Load albums for this artist",
+        "Artist matched on MusicBrainz": "Artist matched on MusicBrainz",
+        "Artist candidate selected": "Artist candidate selected",
+        "Albums loaded": "Albums loaded",
+        "Click Albums to load": "Click Albums to load",
+        "Select album to narrow search": "Select album to narrow search",
+
     },
+
     ru: {
         Access: "Доступ",
         Add: "Добавить",
@@ -677,6 +693,13 @@ const messages = {
         "dates.confirm": "Подтвердить",
         "dates.confirm_hint": "Подтвердить, что это действительно произошло",
         "dates.confirmed_title": "Подтверждено, что это произошло",
+        "dates.cancel": "Отменить",
+        "dates.cancel_hint": "Отменить запланированное событие",
+        "dates.cancel_confirm_message": "Отменить это событие? Оно будет отмечено как отменённое и отображаться со значком \"Отменено\".",
+        "dates.cancel_error": "Не удалось отменить событие",
+        "dates.cancelled": "Отменено",
+        "dates.cancelled_on": "отменено",
+        "dates.cancelled_title": "Это событие было отменено",
         "dates.parse_error": "Не удалось разобрать выражение даты",
         "dates.placeholder": "например: {today}, 1650, около 1650, до 1500, между 1500 и 1600, 7533 от сотворения мира",
         "dates.placeholder_upper": "верхняя граница",
@@ -908,6 +931,12 @@ const messages = {
         "Confirm Artist": "Подтвердить исполнителя",
         "Confirm Album": "Подтвердить альбом",
         "No matches found on MusicBrainz.": "Совпадений в MusicBrainz не найдено.",
+        "Load albums for this artist": "Загрузить альбомы этого исполнителя",
+        "Artist matched on MusicBrainz": "Исполнитель найден в MusicBrainz",
+        "Artist candidate selected": "Кандидат выбран",
+        "Albums loaded": "Альбомы загружены",
+        "Click Albums to load": "Нажмите «Альбомы» для загрузки",
+        "Select album to narrow search": "Выберите альбом для уточнения поиска",
 
         // ── ObjectViewSidebar ──
         "Related objects": "Связанные объекты",

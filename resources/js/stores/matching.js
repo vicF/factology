@@ -210,13 +210,26 @@ export const useMatchingStore = defineStore('matching', {
 
         /**
          * Browse albums (release-groups) for a known MusicBrainz artist.
+         * Returns Candidate objects for the MatchDialog album results section.
          * @param {string} artistMbid — MBID of the artist
          * @returns {Promise<import('@factology/engine/external/types').Candidate[]>}
          */
         async browseArtistAlbums(artistMbid) {
-            const { browseReleases } =
+            const { browseArtistGroups } =
                 await import('@factology/engine/external/providers/musicbrainz.js');
-            return await browseReleases(artistMbid);
+            const groups = await browseArtistGroups(artistMbid);
+            const results = groups.map((a) => ({
+                providerKey: 'musicbrainz',
+                externalId: a.mbid,
+                name: a.name,
+                disambiguation: a.disambiguation || '',
+                matchQuality: 0.5,
+                type: 'Album',
+                year: a.year || '',
+                payload: a,
+            }));
+            console.log('browseArtistAlbums debug:', JSON.stringify(results.slice(0, 3).map(r => ({name: r.name, year: r.year, hasPayload: !!r.payload}))));
+            return results;
         },
 
         /**

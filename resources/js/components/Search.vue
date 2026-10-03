@@ -87,7 +87,11 @@
                                                     📅
                                                     {{ $flexibleDateFormatShort(thing.start, thing.end, thing.start_meta, thing.end_meta) }}
                                                 </template>
-                                                <span v-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
+                                                <span v-if="isCancelled(thing)" class="cancelled-badge">
+                                                    {{ $t('dates.cancelled') }}
+                                                    <template v-if="thing.data?.cancelled">({{ thing.data.cancelled }})</template>
+                                                </span>
+                                                <span v-else-if="isOngoing(thing)" class="ongoing-badge">{{ $t('dates.ongoing') }}</span>
                                                 <span
                                                     v-if="isOverduePlan(thing)"
                                                     class="unconfirmed-badge"
@@ -190,23 +194,30 @@ function isOngoing(thing) {
 }
 
 // A "plan" is an object with a future start date that hasn't been confirmed
-// yet. Explicitly-marked plans (data.planned) count even after their date
-// passes; unmarked future-dated objects are derived as plans from their start.
+// or cancelled yet. Explicitly-marked plans (data.planned) count even after their
+// date passes; unmarked future-dated objects are derived as plans from their start.
 function isPlanned(thing) {
+    if (thing.data?.cancelled) return false;
     if (thing.data?.confirmed) return false;
     if (thing.data?.planned) return true;
     return isFutureDate(thing);
 }
 
 // An explicitly-marked plan whose date has already passed without being
-// confirmed. Such rows belong in the past section and read "not confirmed"
-// (amber) instead of "planned", prompting the owner to act. Without a start
-// date there is nothing to judge as passed, so those stay "planned".
+// confirmed (or cancelled). Such rows belong in the past section and read
+// "not confirmed" (amber) instead of "planned", prompting the owner to act.
+// Without a start date there is nothing to judge as passed, so those stay "planned".
 function isOverduePlan(thing) {
+    if (thing.data?.cancelled) return false;
     if (thing.data?.confirmed) return false;
     if (!thing.data?.planned) return false;
     if (!thing.start) return false;
     return !isFutureDate(thing);
+}
+
+// Whether the thing has been cancelled (data.cancelled set).
+function isCancelled(thing) {
+    return !!(thing.data?.cancelled);
 }
 
 const props = defineProps({
@@ -596,6 +607,20 @@ onUnmounted(() => {
     color: #b45309;
     background: rgba(245, 158, 11, 0.14);
     border: 1px solid rgba(245, 158, 11, 0.45);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.cancelled-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.35);
     padding: 1px 6px;
     border-radius: 3px;
     margin-left: 4px;

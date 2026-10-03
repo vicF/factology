@@ -418,6 +418,43 @@ class ExportImportController extends BaseController
             return;
         }
 
+        // ── Confirmed / cancelled semantic conflict detection ──────────────
+        // A planned event that was confirmed (data.confirmed) directly contradicts
+        // one that was cancelled (data.cancelled). Flag as a conflict regardless
+        // of conflictMode so the user must resolve it manually. Also preserve an
+        // existing cancellation against a plain import update (older backup).
+        $existingData = is_string($existingThing->data)
+            ? (json_decode($existingThing->data, true) ?: [])
+            : ($existingThing->data ?: []);
+        $importData = is_string($thing['data'] ?? null)
+            ? (json_decode($thing['data'], true) ?: [])
+            : ($thing['data'] ?? []);
+
+        $existingConfirmed = !empty($existingData['confirmed']);
+        $importConfirmed = !empty($importData['confirmed']);
+        $existingCancelled = !empty($existingData['cancelled']);
+        $importCancelled = !empty($importData['cancelled']);
+
+        // Existing confirmed + import cancelled (and not confirmed) = conflict
+        if ($existingConfirmed && $importCancelled && !$importConfirmed) {
+            $result['errors'][] = 'Object ' . $thing['thing_id'] . ' is confirmed in the database but cancelled in the import';
+            return;
+        }
+
+        // Existing cancelled + import confirmed = conflict
+        if ($existingCancelled && $importConfirmed) {
+            $result['errors'][] = 'Object ' . $thing['thing_id'] . ' is cancelled in the database but confirmed in the import';
+            return;
+        }
+
+        // Existing cancelled + import is a plain update (neither confirmed nor
+        // cancelled) = older backup scenario. Preserve the cancellation so an
+        // old backup does not resurrect the event.
+        if ($existingCancelled && !$importConfirmed && !$importCancelled) {
+            $result['skipped']['things']++;
+            return;
+        }
+
         // Thing exists — apply conflict resolution
         if ($conflictMode === 'keep_existing') {
             $result['skipped']['things']++;
@@ -434,7 +471,7 @@ class ExportImportController extends BaseController
         }
 
         // Handle deletion
-        if (!empty($thing['deleted'])) {
+        if ($importDeleted) {
             DB::table('things')->where('thing_id', $thing['thing_id'])->update(['deleted' => true]);
             $result['deleted']['things']++;
             return;

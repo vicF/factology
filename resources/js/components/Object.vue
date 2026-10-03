@@ -147,7 +147,14 @@
                                                 <span class="date-badge">
                                                     📅 {{ $flexibleDateFormat(object.start, object.end, object.start_meta, object.end_meta) }}
                                                 </span>
-                                                <template v-if="isPlanned || canConfirmPlanned">
+
+                                                <!-- Cancelled badge (takes priority over planned/confirm UI) -->
+                                                <span v-if="cancelledDate" class="cancelled-badge" :title="$t('dates.cancelled_title')">
+                                                    {{ $t('dates.cancelled') }}
+                                                    <template v-if="cancelledDate">({{ cancelledDate }})</template>
+                                                </span>
+
+                                                <template v-else-if="isPlanned || canConfirmPlanned || canCancelPlanned">
                                                     <!-- Viewers who can confirm an overdue plan get the confirm
                                                          action instead of a "not confirmed" warning — it reads as
                                                          something to do. Everyone else sees a plain state label. -->
@@ -167,6 +174,15 @@
                                                         <IconCheck />
                                                         {{ $t('dates.confirm') }}
                                                     </button>
+                                                    <button
+                                                        v-if="canCancelPlanned"
+                                                        class="cancel-badge"
+                                                        :title="$t('dates.cancel_hint')"
+                                                        @click="cancelPlanned"
+                                                    >
+                                                        <IconDelete />
+                                                        {{ $t('dates.cancel') }}
+                                                    </button>
                                                 </template>
                                             </span>
                                             <span v-if="$objectDescription(object)">{{ $objectDescription(object) }}<TranslatedBadge :translations="object.description_translations" /></span>
@@ -181,6 +197,9 @@
                                             </span>
                                             <span v-if="confirmedDate" class="result-meta-row">
                                                 {{ $t('Confirmed') }}: {{ confirmedDate }}
+                                            </span>
+                                            <span v-if="cancelledDate" class="result-meta-row">
+                                                {{ $t('dates.cancelled') }}: {{ cancelledDate }}
                                             </span>
                                             <span v-if="object.owner" class="result-meta-row">
                                                 {{ $t('Owner') }}:
@@ -487,6 +506,7 @@ import IconPrivate from './icons/IconPrivate.vue';
 import IconPublic from './icons/IconPublic.vue';
 import IconGlobal from './icons/IconGlobal.vue';
 import IconCheck from './icons/IconCheck.vue';
+import IconDelete from './icons/IconDelete.vue';
 import VisibilityBadge from './VisibilityBadge.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import MatchStatusIcon from './MatchStatusIcon.vue';
@@ -835,25 +855,26 @@ function canonicalNow() {
 }
 
 const confirmedDate = computed(() => object.value?.data?.confirmed || null);
+const cancelledDate = computed(() => object.value?.data?.cancelled || null);
 const markedPlannedDate = computed(() => object.value?.data?.planned || null);
 const hasFutureStart = computed(() =>
     !!object.value?.start && BigInt(String(object.value.start)) > BigInt(canonicalNow())
 );
 
 // A "plan" is an object with a future start date that hasn't been confirmed
-// yet. Explicitly-marked plans (data.planned) stay plans even after their date
-// passes; unmarked future-dated objects (created before this feature, or via
-// import) are derived as plans from their start date.
+// or cancelled yet. Explicitly-marked plans (data.planned) stay plans even after
+// their date passes; unmarked future-dated objects (created before this feature,
+// or via import) are derived as plans from their start date.
 const isPlanned = computed(() =>
-    !confirmedDate.value && (markedPlannedDate.value || hasFutureStart.value)
+    !confirmedDate.value && !cancelledDate.value && (markedPlannedDate.value || hasFutureStart.value)
 );
 
 // An explicitly-marked plan whose date has already passed without being
-// confirmed. The badge reads "not confirmed" (amber) for these instead of
-// "planned", prompting the owner to confirm or clear it. Without a start date
-// there is nothing to judge as passed, so those stay "planned".
+// confirmed or cancelled. The badge reads "not confirmed" (amber) for these
+// instead of "planned", prompting the owner to confirm or clear it. Without a
+// start date there is nothing to judge as passed, so those stay "planned".
 const isPastPlan = computed(() =>
-    !confirmedDate.value && !!markedPlannedDate.value && !!object.value?.start && !hasFutureStart.value
+    !confirmedDate.value && !cancelledDate.value && !!markedPlannedDate.value && !!object.value?.start && !hasFutureStart.value
 );
 
 // Distinguishes a past-dated *plan* from a backdated record. Pre-feature and
@@ -878,7 +899,15 @@ const wasFutureDatedAtCreation = computed(() => {
 // the date passes, isPlanned goes false but the owner should still be able
 // to confirm.
 const canConfirmPlanned = computed(() =>
-    canEdit.value && !confirmedDate.value && !hasFutureStart.value && (isPlanned.value || wasFutureDatedAtCreation.value)
+    canEdit.value && !confirmedDate.value && !cancelledDate.value && !hasFutureStart.value && (isPlanned.value || wasFutureDatedAtCreation.value)
+);
+
+// The owner (or an admin) may cancel a planned object. Works for both future
+// and past planned events, as long as it hasn't been confirmed or cancelled
+// already. Also covers objects that were future-dated at creation but whose
+// date has since passed (overdue unmarked plans).
+const canCancelPlanned = computed(() =>
+    canEdit.value && !confirmedDate.value && !cancelledDate.value && (markedPlannedDate.value || hasFutureStart.value || wasFutureDatedAtCreation.value)
 );
 
 const confirmPlanned = async () => {
@@ -894,6 +923,23 @@ const confirmPlanned = async () => {
         }
     } catch (error) {
         console.error('Failed to confirm planned object:', error);
+    }
+};
+
+const cancelPlanned = async () => {
+    if (!object.value) return;
+    if (!confirm(t('dates.cancel_confirm_message'))) return;
+    try {
+        const res = await axios.patch(`/object/${object.value.thing_id}/cancel`);
+        if (res.data?.data?.cancelled) {
+            const updatedData = { ...(object.value.data || {}) };
+            updatedData.cancelled = res.data.data.cancelled;
+            delete updatedData.confirmed;
+            object.value.data = updatedData;
+        }
+    } catch (error) {
+        console.error('Failed to cancel planned object:', error);
+        alert(t('dates.cancel_error'));
     }
 };
 
@@ -1435,6 +1481,40 @@ watch(() => object.value, (newObject) => {
 }
 .confirm-badge:hover {
     background: #157347;
+}
+.cancel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #dc3545;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+.cancel-badge:hover {
+    background: #bb2d3b;
+}
+.cancelled-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.35);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
 }
 .link-actions {
     margin-top: 8px;

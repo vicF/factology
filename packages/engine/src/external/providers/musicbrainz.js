@@ -146,7 +146,7 @@ function normalizeToCandidate(item, type, qualityBoost = 0) {
         disambiguation: item.disambiguation || '',
         matchQuality: Math.min(quality, 1),
         type,
-        year: item.albumYear || item.begin || '',
+        year: item.albumYear || item.year || item.begin || '',
         payload: item,
     };
 }

@@ -118,6 +118,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/object/{id}',            [ApiController::class, 'store']);     // update
         Route::patch('/object/{id}/visibility', [ApiController::class, 'toggleVisibility']);
         Route::patch('/object/{id}/confirm',    [ApiController::class, 'confirmPlanned']);
+        Route::patch('/object/{id}/cancel',     [ApiController::class, 'cancelPlanned']);
         Route::delete('/object/{id}',         [ApiController::class, 'delete']);
         Route::post('/object/{id}/clone',         [ApiController::class, 'cloneObject']);
         Route::post('/object/{id}/media-from-url', [ApiController::class, 'createMediaFromUrl']);
