@@ -176,12 +176,15 @@ export const useMatchingStore = defineStore('matching', {
                 lastError = e;
                 return [];
             });
-            const artists = await searchArtists(query, ctx).catch((e) => {
+            // When the user typed an artist, search artists by name — not
+            // by the song query (which would find "Imagine" artists).
+            const artistQuery = ctx.artist || query;
+            const artists = await searchArtists(artistQuery, ctx).catch((e) => {
                 console.error('[matchingStore] artist search failed:', e);
                 lastError = e;
                 return [];
             });
-            const albums = await searchAlbums(query, ctx).catch((e) => {
+            const albums = await searchAlbums(artistQuery, ctx).catch((e) => {
                 console.error('[matchingStore] album search failed:', e);
                 lastError = e;
                 return [];
@@ -228,7 +231,6 @@ export const useMatchingStore = defineStore('matching', {
                 year: a.year || '',
                 payload: a,
             }));
-            console.log('browseArtistAlbums debug:', JSON.stringify(results.slice(0, 3).map(r => ({name: r.name, year: r.year, hasPayload: !!r.payload}))));
             return results;
         },
 
@@ -359,7 +361,22 @@ export const useMatchingStore = defineStore('matching', {
                     providerKey: candidate.providerKey,
                     name: candidate.name,
                 };
-                await axios.put(`/object/${thingId}`, { ...obj, data });
+                // Strip class/classes from the payload — the server returns them
+                // with different field names (thing_id, name) than what the store
+                // validation expects (one_thing_id, link_type_id, other_thing_id).
+                // An update (PUT) doesn't need to re-declare class membership.
+                const payload = { ...obj, data };
+                delete payload.class;
+                delete payload.classes;
+                try {
+                    await axios.put(`/object/${thingId}`, payload);
+                } catch (putErr) {
+                    const detail = putErr.response?.data?.message
+                        || putErr.response?.data?.errors
+                        || (putErr.response?.data ? JSON.stringify(putErr.response.data) : '')
+                        || putErr.message;
+                    throw new Error(`Confirm failed: ${detail}`);
+                }
             }
             this.resultsCache.delete(thingId);
         },
@@ -419,7 +436,10 @@ export const useMatchingStore = defineStore('matching', {
                     name: artistName,
                     type: 'artist',
                 };
-                await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+                const songPayload = { ...song, data: songData };
+                delete songPayload.class;
+                delete songPayload.classes;
+                await axios.put(`/object/${songThingId}`, songPayload);
 
                 return artistId;
             } catch (err) {
@@ -494,7 +514,10 @@ export const useMatchingStore = defineStore('matching', {
                     name: candidate.name,
                     type: 'album',
                 };
-                await axios.put(`/object/${songThingId}`, { ...song, data: songData });
+                const songPayload2 = { ...song, data: songData };
+                delete songPayload2.class;
+                delete songPayload2.classes;
+                await axios.put(`/object/${songThingId}`, songPayload2);
 
                 return albumId;
             } catch (err) {

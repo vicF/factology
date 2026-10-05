@@ -452,6 +452,7 @@ const messages = {
         "Backup phrase recovered. Use it to restore the identity in the tab above.": "Backup phrase recovered. Use it to restore the identity in the tab above.",
 
         // ── MatchDialog ──
+        "Album": "Album",
         "Load albums for this artist": "Load albums for this artist",
         "Artist matched on MusicBrainz": "Artist matched on MusicBrainz",
         "Artist candidate selected": "Artist candidate selected",
@@ -916,6 +917,7 @@ const messages = {
         // ── MatchDialog ──
         "MusicBrainz Match": "Сопоставление с MusicBrainz",
         "Artist": "Исполнитель",
+        "Album": "Альбом",
         "Search MusicBrainz": "Поиск в MusicBrainz",
         "No match exists": "Нет подходящего",
         "Best match": "Лучшее совпадение",

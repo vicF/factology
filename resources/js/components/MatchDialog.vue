@@ -118,7 +118,7 @@
                     </div>
 
                     <!-- ════════════════════ ARTIST SECTION ════════════════════ -->
-                    <div v-if="artistResults.length" class="mb-3">
+                    <div v-if="artistResults.length && !isSongSearch" class="mb-3">
                         <h6 class="mb-1 section-heading">
                             <IconUser class="section-icon" />
                             {{ $t('Artists') }}
@@ -150,7 +150,7 @@
                     </div>
 
                     <!-- ════════════════════ ALBUM SECTION ════════════════════ -->
-                    <div v-if="albumResults.length" class="mb-3">
+                    <div v-if="albumResults.length && !isSongSearch" class="mb-3">
                         <h6 class="mb-1 section-heading">
                             <IconPublic class="section-icon" />
                             {{ $t('Albums') }}
@@ -198,6 +198,7 @@
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue';
 import { useMatchingStore } from '../stores/matching';
+import { UUID } from '@factology/engine/constants/uuid.js';
 import { IconSearch, IconUser, IconPublic } from './icons';
 
 const props = defineProps({
@@ -259,6 +260,16 @@ watch(selectedArtist, (val) => {
 // Track what the user already confirmed so we don't re-show it
 const artistConfirmed = ref(false);
 const albumConfirmed = ref(false);
+
+// Detect what entity type we are searching for based on the object's classes.
+// When searching for a Song, hide the Artists/Albums result sections so the
+// dialog stays focused on song results.
+const isSongSearch = computed(() => {
+    const thing = props.object;
+    if (!thing) return false;
+    const classIds = thing.classIds || thing.classes?.map(c => c.thing_id || c.id) || [];
+    return classIds.some((id) => id === UUID.SONG_CLASS);
+});
 
 async function browseArtistAlbums() {
     if (!selectedArtist.value?.externalId || browsing.value) return;
@@ -392,15 +403,38 @@ async function doSearch() {
         // canonical album recordings instead of Lucene search
         if (searchAlbum.value.trim()) {
             ctx.release = searchAlbum.value.trim();
-            // Strip trailing year suffix "(YYYY)" added by the datalist
+            // Parse year suffix "(YYYY)" so searchSongs can prefer
+            // releases matching the year the user selected.
+            const yr = ctx.release.match(/\s*\((\d{4})\)\s*$/);
+            if (yr) ctx.releaseYear = yr[1];
+            // Strip trailing year suffix — it is display-only, not part of
+            // the album name in MusicBrainz.
             ctx.release = ctx.release.replace(/\s*\(\d{4}\)\s*$/, '');
+            // Resolve release-group MBID from the datalist's albums array
+            // so searchSongs uses the exact album the user picked instead of
+            // re-identifying by name (which can match the wrong release-group).
+            const fmt = (a) => a.year ? `${a.title} (${a.year})` : a.title;
+            const picked = albums.value.find((a) => fmt(a) === searchAlbum.value.trim());
+            if (picked) ctx.releaseGroupMbid = picked.mbid;
         }
 
-        const { songs, artists, albums } = await matchingStore.manualSearchAll(q, ctx);
+        const { songs, artists, albums: albumsResult } = await matchingStore.manualSearchAll(q, ctx);
+
+        // When the user explicitly selected an album year from the datalist
+        // (e.g. "Imagine (1971)"), override the albumYear on song results.
+        // The release-browse path finds whichever release has track data (often
+        // a CD reissue instead of the original vinyl), but the year the user
+        // selected reflects their intended album.
+        if (ctx.releaseYear && songs.length) {
+            for (const s of songs) {
+                if (!s.payload) s.payload = {};
+                s.payload.albumYear = ctx.releaseYear;
+            }
+        }
 
         songResults.value = songs;
         artistResults.value = artists;
-        albumResults.value = albums;
+        albumResults.value = albumsResult;
         searched.value = true;
 
         if (songs.length) selectedSong.value = songs[0];

@@ -18,6 +18,41 @@ import { bootstrapStandalone } from './localDb/standaloneBootstrap';
 // behind a blocking "Error loading class tree" alert.
 
 await bootstrapStandalone();
+
+// Register window focus/blur handler (Electron IPC via preload).
+// On blur: save the database immediately so other apps sharing the
+// same SQLite file read the latest data. On focus: re-read the DB
+// to pick up changes from other processes.
+// Register window focus/blur handler (Electron IPC via preload).
+// On blur: save the database immediately so the .sqlite file on
+// disk is current when another app (SetTempo, Pawlo, etc.) reads
+// it.  This is the critical direction — we never reload on focus
+// because there is no meaningful merge: the entire DB is a single
+// blob, and re-reading from disk would just discard our own state.
+// The correct multi-app sync approach is separate databases with
+// JSON export/import (see docs/DATABASE-DEV-GUIDE.md).
+if (typeof window !== 'undefined' && window.__factology_window_focus) {
+    const { getDb } = await import('@factology/engine/localDb/index.js');
+    window.__factology_window_focus.onWindowFocusChange(async (state) => {
+        if (state === 'blur') {
+            const db = getDb();
+            if (typeof db.save === 'function') await db.save();
+        }
+    });
+} else if (typeof window !== 'undefined') {
+    // Non-Electron (Capacitor, browser): use page-visibility events as
+    // a best-effort approximation.  `visibilitychange` fires on browser
+    // tab switch and device sleep — save the DB so shared-storage peers
+    // see the latest data.
+    const { getDb } = await import('@factology/engine/localDb/index.js');
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            const db = getDb();
+            if (typeof db.save === 'function') db.save();
+        }
+    });
+}
+
 try {
     await import('./app');
 } catch (e) {

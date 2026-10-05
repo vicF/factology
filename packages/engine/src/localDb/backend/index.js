@@ -93,9 +93,28 @@ function isTestEnv() {
  */
 function createNodeFileIO(dbPath) {
     const fs = require('node:fs');
+    // Unique temp path per process so concurrent processes don't clash.
+    // Within one process, writeFileSync is synchronous — no intra-process race.
+    const tmpPath = dbPath + '.tmp.' + process.pid;
+    const bakPath = dbPath + '.bak';
+    const bakTmp = bakPath + '.tmp.' + process.pid;
+    let writeCount = 0;
     return {
         async read() {
+            // Best-effort cleanup of orphaned .tmp file from a prior crash.
+            // Not critical — the .sqlite file is always intact after an atomic
+            // write, the .tmp is just debris.
+            try { fs.removeSync(tmpPath); } catch (e) {}
             if (!fs.existsSync(dbPath)) {
+                // If .sqlite is missing but a .bak exists, restore from backup.
+                // This covers filesystem-level deletion or a corrupt-file recovery
+                // where the caller chose to delete and restart.
+                if (fs.existsSync(bakPath)) {
+                    const bakData = new Uint8Array(fs.readFileSync(bakPath));
+                    fs.writeFileSync(tmpPath, Buffer.from(bakData));
+                    fs.renameSync(tmpPath, dbPath);
+                    return bakData;
+                }
                 throw new Error('DB file not found');
             }
             return new Uint8Array(fs.readFileSync(dbPath));
@@ -105,7 +124,25 @@ function createNodeFileIO(dbPath) {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
-            fs.writeFileSync(dbPath, Buffer.from(data));
+            // Atomic write: write to temp file first, then rename over the
+            // real file.  rename() is atomic on the same filesystem (NTFS,
+            // ext4, APFS), so a power failure during writeFileSync destroys
+            // only the .tmp copy — the .sqlite file is never truncated.
+            // Without this, an in-place overwrite that gets interrupted
+            // corrupts the file irrecoverably.
+            fs.writeFileSync(tmpPath, Buffer.from(data));
+            fs.renameSync(tmpPath, dbPath);
+
+            // Periodic backup: every 30 writes (~60s at 2s auto-save interval),
+            // keep a point-in-time copy that can be restored if the primary DB
+            // file is lost or corrupted by external causes (filesystem bug,
+            // antivirus quarantine, user error).  Uses the same atomic-write
+            // pattern so the backup itself is never half-written.
+            writeCount++;
+            if (writeCount % 30 === 0) {
+                fs.writeFileSync(bakTmp, Buffer.from(data));
+                fs.renameSync(bakTmp, bakPath);
+            }
         },
     };
 }
@@ -122,6 +159,11 @@ function createNodeFileIO(dbPath) {
  */
 function createCapacitorFileIO(dbName, sharedStorage = false, testMode = false) {
     const testDbName = 'factology_test.sqlite';
+    // TODO: Add atomic-write (temp+rename) and periodic-backup support
+    // via the Capacitor Filesystem plugin. The current implementation
+    // writes in-place, which is vulnerable to power-failure corruption
+    // on iOS/Android. Requires plugin support for atomic renames or a
+    // write-then-verify pattern.
     return {
         async read() {
             const { Filesystem, Directory } = await import('@capacitor/filesystem');

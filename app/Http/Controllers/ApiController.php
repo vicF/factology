@@ -518,8 +518,12 @@ class ApiController extends BaseController
         ]);
 
         // Only admins may change an object's owner (system ownership / reassignment).
-        // Non-admins never send it — the model defaults to their own thing_id.
-        if ($request->has('owner') && !Auth::user()->is_admin) {
+        // Non-admins may still claim the canonical shared owners used by external
+        // matching (MusicBrainz artist/album objects) and the owner-less defaults
+        // (SYSTEM_OWNER / VICTOR_FOKIN) that Everything::save() already treats as
+        // claimable by any authenticated user.
+        $nonAdminAllowedOwners = [UUID::MUSICBRAINZ_OWNER, UUID::SYSTEM_OWNER, UUID::VICTOR_FOKIN];
+        if ($request->has('owner') && !Auth::user()->is_admin && !in_array($request->input('owner'), $nonAdminAllowedOwners, true)) {
             throw ValidationException::withMessages(['owner' => 'Only admins can change ownership.']);
         }
 

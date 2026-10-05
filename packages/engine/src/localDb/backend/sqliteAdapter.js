@@ -572,8 +572,22 @@ export class SQLiteAdapter {
         }
 
         if (buffer && buffer.byteLength > 0) {
-            this._db = new this._SQL.Database(buffer);
-        } else {
+            try {
+                this._db = new this._SQL.Database(buffer);
+            } catch (e) {
+                // Buffer exists but is not a valid SQLite database (e.g. file
+                // corruption or an incompatible format).  Create a fresh database
+                // instead of crashing; the corrupted buffer will be overwritten
+                // on the first auto-save (and immediately below at the `null`
+                // check) so the error won't recur on restart.
+                console.warn(
+                    `[SQLiteAdapter] Stored data for "${dbName}" is not a valid `
+                    + `SQLite database (${e.message}). Creating a new database.`
+                );
+                buffer = null;
+            }
+        }
+        if (!buffer || buffer.byteLength === 0) {
             this._db = new this._SQL.Database();
         }
 

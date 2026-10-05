@@ -171,10 +171,33 @@ function normalizeArtist(a) {
 
 // ── Recording (song) helpers ──
 
-function pickRelease(r) {
+function pickRelease(r, preferredGroupMbid) {
     const rels = (r.releases || []).filter((x) => x && (x.title || x.date));
     if (rels.length === 0) return null;
-    const chosen = rels.find((x) => x.date) || rels[0];
+    // When we know which release-group the user selected, prefer releases
+    // that belong to that group — this avoids showing a compilation's title
+    // (e.g. "The Complete Lost Lennon Tapes") instead of the original album.
+    if (preferredGroupMbid) {
+        const inGroup = rels.filter((x) => x['release-group']?.id === preferredGroupMbid);
+        if (inGroup.length) {
+            const chosen = inGroup.find((x) => x.date) || inGroup[0];
+            const date = chosen.date || '';
+            return {
+                album: chosen.title || '',
+                albumDate: date,
+                albumYear: /^\d{4}/.test(date) ? date.slice(0, 4) : '',
+            };
+        }
+    }
+    // No preferred group: prefer OFFICIAL releases (excludes compilations,
+    // promos, bootlegs), then the EARLIEST date. Without this, a 1971 original
+    // recording would show a 1998 compilation's title because that release
+    // happened to appear first in the response.
+    // Note: normText lowercases so real MB "Official" matches "official".
+    const official = rels
+        .filter((x) => !x.status || normText(x.status) === 'official')
+        .sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
+    const chosen = official[0] || rels[0];
     const date = chosen.date || '';
     return {
         album: chosen.title || '',
@@ -183,12 +206,12 @@ function pickRelease(r) {
     };
 }
 
-function normalizeRecording(r) {
+function normalizeRecording(r, preferredGroupMbid) {
     const artist = (r['artist-credit'] || [])
         .filter((c) => c.artist)
         .map((c) => c.name || c.artist?.name)
         .join('');
-    const rel = pickRelease(r);
+    const rel = pickRelease(r, preferredGroupMbid);
     return {
         mbid: r.id,
         title: r.title || '',
@@ -369,11 +392,83 @@ export async function searchArtists(query, _ctx) {
  */
 export async function searchSongs(query, ctx = {}) {
     const title = query;
-    const { artist, release } = ctx;
+    const { artist, release, releaseGroupMbid, releaseYear: ctxYear } = ctx;
 
     let releaseBrowseFailed = false;
+    // Track which release-group we found so Lucene can filter by it directly
+    let bestGroupMbid = null;
 
-    if (release && release.trim()) {
+    if (releaseGroupMbid) {
+        // User explicitly selected a release-group from the dialog's album
+        // datalist — use its MBID directly instead of trying to re-identify
+        // the right group by name (which can match the wrong release when
+        // multiple albums share the same title, e.g. "Imagine 1971" vs "1999").
+        bestGroupMbid = releaseGroupMbid;
+        try {
+            let relData = await get('release', {
+                'release-group': bestGroupMbid,
+                status: 'official',
+                limit: 50,
+            }).catch(() => null);
+            if (!relData?.releases?.length) {
+                relData = await get('release', {
+                    'release-group': bestGroupMbid,
+                    limit: 50,
+                }).catch(() => null);
+            }
+            const releases = relData ? (relData.releases || []).map(normalizeRelease) : [];
+            // Sort by year ascending so we try the original release first
+            releases.sort((a, b) => {
+                if (!a.year && !b.year) return 0;
+                if (!a.year) return 1;
+                if (!b.year) return -1;
+                return String(a.year).localeCompare(String(b.year));
+            });
+            // When the user picked an album with a specific year from the
+            // datalist, prefer releases that match that year so the original
+            // release (1971) is tried before reissues (1999).
+            if (ctxYear) {
+                releases.sort((a, b) => {
+                    const ma = a.year === ctxYear ? 0 : 1;
+                    const mb = b.year === ctxYear ? 0 : 1;
+                    if (ma !== mb) return ma - mb;
+                    if (!a.year && !b.year) return 0;
+                    if (!a.year) return 1;
+                    if (!b.year) return -1;
+                    return String(a.year).localeCompare(String(b.year));
+                });
+            }
+            // Walk releases from earliest (or best year-match) to latest,
+            // use the first one that has the song in its tracklist. Some
+            // older releases may have no track data on MusicBrainz while
+            // a CD reissue does — in that case the next release is better
+            // than falling through to the Lucene supplement path.
+            const q = normText(title);
+            for (const r of releases) {
+                const rows = await albumTracks(r);
+                const exact = rows.filter((rec) => normText(rec.title) === q);
+                if (exact.length) {
+                    return rankSongs(dedupeRecordings(exact), title)
+                        .map((rec) => normalizeToCandidate(rec, 'Song', 0.2));
+                }
+                if (rows.length) {
+                    return rankSongs(dedupeRecordings(rows), title)
+                        .map((rec) => normalizeToCandidate(rec, 'Song', 0.1));
+                }
+            }
+            // No release in this group had the song — let Lucene + supplement
+            // handle it with bestGroupMbid already set for rgid: filtering.
+            releaseBrowseFailed = true;
+        } catch (e) {
+            releaseBrowseFailed = true;
+            console.warn('[MB] Release-group browse (by MBID) failed:', e?.message || String(e));
+        }
+    }
+
+    // When the user explicitly selected a release-group via MBID, skip the
+    // name-based release search — the MBID path above already set bestGroupMbid
+    // and we don't want to accidentally overwrite it with a different group.
+    if (!releaseGroupMbid && release && release.trim()) {
         try {
             // Step 1: resolve artist → MBID for browse endpoint
             let artistMbid = null;
@@ -397,20 +492,32 @@ export async function searchSongs(query, ctx = {}) {
                 if (albums.length) {
                     albums.sort((a, b) => String(a.year || '9999').localeCompare(String(b.year || '9999')));
                     const bestGroup = albums[0];
+                    bestGroupMbid = bestGroup.mbid;
                     // Step 4: get a release within this group for tracklist browsing
                     // Try official first, then fall back to any status
                     let relData = await get('release', {
                         'release-group': bestGroup.mbid,
                         status: 'official',
-                        limit: 1,
+                        limit: 25,
                     }).catch(() => null);
                     if (!relData?.releases?.length) {
                         relData = await get('release', {
                             'release-group': bestGroup.mbid,
-                            limit: 1,
+                            limit: 25,
                         }).catch(() => null);
                     }
-                    const chosen = relData ? (relData.releases || []).map(normalizeRelease)[0] : null;
+                    const releases = relData ? (relData.releases || []).map(normalizeRelease) : [];
+                    // Prefer official releases, then sort by year ascending so the
+                    // original release (1971) is picked over a remaster (1999).
+                    const official = releases.filter((r) => !r.status || normText(r.status) === 'official');
+                    const pool = official.length ? official : releases;
+                    pool.sort((a, b) => {
+                        if (!a.year && !b.year) return 0;
+                        if (!a.year) return 1;
+                        if (!b.year) return -1;
+                        return String(a.year).localeCompare(String(b.year));
+                    });
+                    const chosen = pool[0] || null;
                     if (chosen) {
                         const rows = await albumTracks(chosen);
                         const q = normText(title);
@@ -434,13 +541,21 @@ export async function searchSongs(query, ctx = {}) {
 
     const parts = [`recording:${safeTerm(title)}`];
     if (artist) parts.push(`artist:${safeTerm(artist)}`);
-    if (release) parts.push(`release:${safeTerm(release)}`);
+    // When the release-browse path found the matching album group, use its MBID
+    // as a Lucene filter (rgid:) — this restricts results to recordings from
+    // that specific album, avoiding re-releases/compilations. Much more precise
+    // than release:<name> which matches every reissue with the same name.
+    if (bestGroupMbid) {
+        parts.push(`rgid:${bestGroupMbid}`);
+    } else if (release) {
+        parts.push(`release:${safeTerm(release)}`);
+    }
     const data = await get('recording', {
         query: parts.join(' AND '),
         limit: 25,
         inc: 'artist-credits+releases',
     });
-    let rows = (data.recordings || []).map(normalizeRecording);
+    let rows = (data.recordings || []).map((r) => normalizeRecording(r, bestGroupMbid));
 
     // Supplement with tracks from the artist's official albums.
     // Also run when release was provided but the release-browse path
@@ -481,7 +596,11 @@ export async function searchSongs(query, ctx = {}) {
                     return false;
                 };
                 let found = false;
-                for (const album of albums) {
+                // Cap tracklist iteration — each albumTracks() is a separate API
+                // request, so scanning the full discography could fire 20+ calls.
+                // The targeted release:<title> search below finds the canonical
+                // album when the title match isn't among these earliest covers.
+                for (const album of albums.slice(0, 3)) {
                     if (await supplementRecording(album)) {
                         found = true;
                         break;

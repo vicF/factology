@@ -205,6 +205,16 @@ async function createWindow() {
     mainWindow.webContents.on('did-finish-load', () => {
         console.log('[renderer] did-finish-load');
     });
+    // Window focus/blur — forward to renderer so the database is saved
+    // immediately when the user switches to another app, and re-read on
+    // return. This prevents concurrent-write races between Factology
+    // apps sharing the same SQLite database file.
+    mainWindow.on('blur', () => {
+        mainWindow.webContents.send('window-focus-change', 'blur');
+    });
+    mainWindow.on('focus', () => {
+        mainWindow.webContents.send('window-focus-change', 'focus');
+    });
     // The 'console-message' event changed shape across Electron versions
     // (older: positional (event, level, message, line, sourceId); newer:
     // level/message live on the event object) — read whichever form this

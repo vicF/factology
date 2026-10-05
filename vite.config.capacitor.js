@@ -86,21 +86,28 @@ export default defineConfig({
             '@factology/engine': path.resolve(__dirname, 'packages/engine/src'),
         },
     },
-    // Don't copy the Laravel public directory (huge thumbs, PHP files) into the build
-    publicDir: false,
-    // Relative asset paths so the build works over file:// (Electron desktop)
-    // as well as https://localhost (Capacitor Android/iOS).
+    // Don't copy the Laravel public directory (huge thumbs with broken symlinks).
+    // Vite 6 moved publicDir/copyPublicDir to per-environment config under build:.
+    // Root-level build.copyPublicDir:false is required. Also set at environment
+    // level (environments.client.build.copyPublicDir) since Vite 6 populates
+    // environment build configs separately.
     base: './',
     build: {
         outDir: 'dist-capacitor',
         emptyOutDir: true,
         sourcemap: false,
+        copyPublicDir: false,
         // The SPA uses top-level await (main.capacitor.js awaits the local-DB
         // bootstrap before loading the app) and runs inside a modern Chromium
         // WebView, so target the latest browsers.
         target: 'esnext',
         rollupOptions: {
             input: path.resolve(__dirname, 'index.capacitor.html'),
+        },
+    },
+    environments: {
+        client: {
+            build: { copyPublicDir: false },
         },
     },
     // Load .env.capacitor for VITE_TARGET and VITE_API_URL

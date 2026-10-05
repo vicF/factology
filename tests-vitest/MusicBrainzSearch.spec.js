@@ -307,6 +307,44 @@ describe('MusicBrainzSearch', () => {
             expect(has1971 || hasLucene).toBe(true);
         });
 
+        it('prefers the earliest official release when no album selected', async () => {
+            fetchSpy.mockImplementation(async (url) => {
+                const href = url instanceof URL ? url.href : String(url);
+                // Artist search
+                if (href.includes('/artist?query=')) {
+                    return mbOk({ artists: [{ id: JOHN_LENNON_MBID, name: 'John Lennon', score: 100 }] });
+                }
+                // Lucene recording search — releases listed compilation-first,
+                // then a 1998 remaster, then the 1971 original
+                if (href.includes('/recording?query=')) {
+                    return mbOk({
+                        recordings: [{
+                            id: IMAGINE_RECORDING_MBID, title: 'Imagine', 'first-release-date': '1971-09-09',
+                            length: 187000,
+                            'artist-credit': [{ artist: { id: JOHN_LENNON_MBID, name: 'John Lennon' } }],
+                            releases: [
+                                { id: 'rel-2010', title: 'Gimme Some Truth (Compilation)', status: 'Compilation', date: '2010-10-05' },
+                                { id: 'rel-1998', title: 'Imagine (1998 Remaster)', status: 'Official', date: '1998-09-29' },
+                                { id: IMAGINE_RELEASE_MBID, title: 'Imagine', status: 'Official', date: '1971-09-09' },
+                            ],
+                        }],
+                        count: 1,
+                    });
+                }
+                // No supplements: no official releases to browse, no matching album search
+                if (href.includes('/release')) return mbOk({ releases: [], 'release-groups': [] });
+                return mbOk({});
+            });
+
+            const results = await searchSongs('Imagine', { artist: 'John Lennon' });
+            expect(results.length).toBeGreaterThan(0);
+            const r = results[0];
+            // The canonical 1971 album must win over the 1998 remaster and
+            // the 2010 compilation listed first in the response.
+            expect(r.payload.album).toBe('Imagine');
+            expect(r.year).toBe('1971');
+        });
+
         it('returns results from Lucene when no artist match found', async () => {
             fetchSpy.mockImplementation(async (url) => {
                 const href = url instanceof URL ? url.href : String(url);
