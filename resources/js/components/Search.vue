@@ -106,6 +106,24 @@
                                                     {{ $t('dates.planned') }}
                                                     <template v-if="thing.data?.planned">({{ thing.data.planned }})</template>
                                                 </span>
+                                                <button
+                                                    v-if="!thing.data?.confirmed && searchCanConfirmPlanned(thing)"
+                                                    class="confirm-badge"
+                                                    :title="$t('dates.confirm_hint')"
+                                                    @click="searchConfirmPlanned(thing)"
+                                                >
+                                                    <IconCheck />
+                                                    {{ $t('dates.confirm') }}
+                                                </button>
+                                                <button
+                                                    v-if="searchCanCancelPlanned(thing)"
+                                                    class="cancel-badge"
+                                                    :title="$t('dates.cancel_hint')"
+                                                    @click="searchCancelPlanned(thing)"
+                                                >
+                                                    <IconDelete />
+                                                    {{ $t('dates.cancel') }}
+                                                </button>
                                             </span>
                                             <span v-if="$objectDescription(thing)">{{ truncateText($objectDescription(thing), 120) }}</span>
                                         </div>
@@ -168,6 +186,9 @@ import Image from "./Image.vue";
 import RelatedList from "./RelatedList.vue";
 import LinkDescription from "./LinkDescription.vue";
 import { useRelatedExpansion } from "../composables/useRelatedExpansion";
+import IconCheck from './icons/IconCheck.vue';
+import IconDelete from './icons/IconDelete.vue';
+import { UUID } from '@factology/engine/constants/uuid.js';
 
 // ── Date helpers ────────────────────────────────────────────────────────
 // Canonical "now" for date comparison (same format as the DB stores).
@@ -218,6 +239,37 @@ function isOverduePlan(thing) {
 // Whether the thing has been cancelled (data.cancelled set).
 function isCancelled(thing) {
     return !!(thing.data?.cancelled);
+}
+
+// ── Per-thing confirm/cancel helpers ─────────────────────────────────────
+function wasFutureDatedAtCreation(thing) {
+    const start = thing.start;
+    const created = thing.record_created;
+    if (!start || !created) return false;
+    const createdCanonical = String(created).replace(/[^\d]/g, '').slice(0, 14);
+    return BigInt(createdCanonical) < BigInt(String(start));
+}
+
+function canEditThing(thing) {
+    const auth = authStore;
+    if (!auth?.authenticated) return false;
+    if (auth.user?.is_admin) return true;
+    const uid = thing.owner;
+    if (!uid || uid === UUID.SYSTEM_OWNER) return true;
+    return auth.user?.thing_id === uid;
+}
+
+function searchCanConfirmPlanned(thing) {
+    if (thing.data?.confirmed || thing.data?.cancelled) return false;
+    if (!canEditThing(thing)) return false;
+    if (isFutureDate(thing)) return false; // still in the future, can't confirm yet
+    return isPlanned(thing) || wasFutureDatedAtCreation(thing);
+}
+
+function searchCanCancelPlanned(thing) {
+    if (thing.data?.confirmed || thing.data?.cancelled) return false;
+    if (!canEditThing(thing)) return false;
+    return !!(thing.data?.planned) || isFutureDate(thing) || wasFutureDatedAtCreation(thing);
 }
 
 const props = defineProps({
@@ -374,6 +426,31 @@ const cloneSearchResult = async (thing) => {
         router.push({ name: 'object', params: { uid: newData.data.thing_id }, query: { edit: '1' } });
     } catch (error) {
         console.error('Failed to clone object:', error);
+    }
+};
+
+const searchConfirmPlanned = async (thing) => {
+    try {
+        const res = await axios.patch(`/object/${thing.thing_id}/confirm`);
+        if (res.data?.data?.confirmed) {
+            if (!thing.data) thing.data = {};
+            thing.data.confirmed = res.data.data.confirmed;
+        }
+    } catch (error) {
+        console.error('Failed to confirm planned object:', error);
+    }
+};
+
+const searchCancelPlanned = async (thing) => {
+    try {
+        const res = await axios.patch(`/object/${thing.thing_id}/cancel`);
+        if (res.data?.data?.cancelled) {
+            if (!thing.data) thing.data = {};
+            thing.data.cancelled = res.data.data.cancelled;
+            delete thing.data.confirmed;
+        }
+    } catch (error) {
+        console.error('Failed to cancel planned object:', error);
     }
 };
 
@@ -627,6 +704,50 @@ onUnmounted(() => {
     text-transform: uppercase;
     letter-spacing: 0.3px;
     vertical-align: middle;
+}
+
+.confirm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #198754;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+
+.confirm-badge:hover {
+    background: #157347;
+}
+
+.cancel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: #dc3545;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+
+.cancel-badge:hover {
+    background: #bb2d3b;
 }
 
 .clone-icon-btn {
