@@ -572,22 +572,53 @@ export class SQLiteAdapter {
         }
 
         if (buffer && buffer.byteLength > 0) {
+            // sql.js/sqlite3 does NOT validate the file header on
+            // open — "file is not a database" only surfaces on the
+            // first actual query.  Open first, then validate.
+            this._db = new this._SQL.Database(buffer);
+            let dbOk = true;
             try {
-                this._db = new this._SQL.Database(buffer);
-            } catch (e) {
-                // Buffer exists but is not a valid SQLite database (e.g. file
-                // corruption or an incompatible format).  Create a fresh database
-                // instead of crashing; the corrupted buffer will be overwritten
-                // on the first auto-save (and immediately below at the `null`
-                // check) so the error won't recur on restart.
-                console.warn(
-                    `[SQLiteAdapter] Stored data for "${dbName}" is not a valid `
-                    + `SQLite database (${e.message}). Creating a new database.`
-                );
-                buffer = null;
+                this._db.run('PRAGMA schema_version');
+            } catch (_ignored) {
+                dbOk = false;
             }
-        }
-        if (!buffer || buffer.byteLength === 0) {
+            if (!dbOk) {
+                // Buffer exists but is not a valid SQLite database (e.g.
+                // file corruption or an incompatible format).  Try
+                // restoring from the periodic backup (.bak) if available
+                // before giving up.
+                const backupData = typeof this._fileIO.readBackup === 'function'
+                    ? await this._fileIO.readBackup()
+                    : null;
+                let bakOk = false;
+                if (backupData && backupData.byteLength > 0) {
+                    this._db = new this._SQL.Database(backupData);
+                    try {
+                        this._db.run('PRAGMA schema_version');
+                        bakOk = true;
+                        console.warn(
+                            `[SQLiteAdapter] Restored "${dbName}" from backup after `
+                            + `corruption detected in primary file.`
+                        );
+                    } catch (_bakErrIgnored) {
+                        // Backup is also corrupt — fall through
+                        this._db = null;
+                    }
+                }
+                if (!bakOk) {
+                    console.warn(
+                        `[SQLiteAdapter] Stored data for "${dbName}" is not a valid `
+                        + `SQLite database`
+                        + (backupData ? ', and backup is also corrupted.' : ', no backup available.')
+                        + ' Creating a new database.'
+                    );
+                    this._db = new this._SQL.Database();
+                    buffer = null;
+                }
+            }
+            // else: db is valid — buffer stays truthy so the auto-save
+            // below skips the initial empty-DB persist
+        } else {
             this._db = new this._SQL.Database();
         }
 

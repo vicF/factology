@@ -57,6 +57,13 @@ contextBridge.exposeInMainWorld('__factology_electron_fs', {
     existsSync(filePath) {
         return fs.existsSync(filePath);
     },
+    readBackupSync(filePath) {
+        const bakPath = filePath + '.bak';
+        if (fs.existsSync(bakPath)) {
+            return fs.readFileSync(bakPath);
+        }
+        return null;
+    },
     mkdirSync(dirPath, opts) {
         return fs.mkdirSync(dirPath, opts);
     },

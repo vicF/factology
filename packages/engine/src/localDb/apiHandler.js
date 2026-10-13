@@ -1371,7 +1371,7 @@ async function buildClassTree(classObjects) {
         const obj = thingMap[thingId];
         if (!obj) return null;
 
-        const children = (parentMap[thingId] || [])
+        const children = [...new Set(parentMap[thingId] || [])]
             .map(childId => buildNode(childId, level + 1))
             .filter(Boolean);
 

@@ -24,7 +24,6 @@
 import { createDatabase } from '../schema.js';
 import { SQLiteAdapter } from './sqliteAdapter.js';
 
-const DB_FILENAME = 'factology_local.sqlite';
 const SHARED_DIR = 'factology';              // subdir under Documents (Android)
 const APP_GROUP_ID = 'group.com.factology.shared';
 
@@ -118,6 +117,12 @@ function createNodeFileIO(dbPath) {
                 throw new Error('DB file not found');
             }
             return new Uint8Array(fs.readFileSync(dbPath));
+        },
+        async readBackup() {
+            if (fs.existsSync(bakPath)) {
+                return new Uint8Array(fs.readFileSync(bakPath));
+            }
+            return null;
         },
         async write(data) {
             const dir = dbPath.substring(0, dbPath.lastIndexOf('/'));
@@ -302,6 +307,13 @@ export async function createBackend(options = {}) {
                 const data = fs.readFileSync(resolvedPath);
                 return new Uint8Array(data);
             },
+            async readBackup() {
+                if (typeof fs.readBackupSync === 'function') {
+                    const data = fs.readBackupSync(resolvedPath);
+                    return data ? new Uint8Array(data) : null;
+                }
+                return null;
+            },
             async write(data) {
                 // The preload's writeFileSync handles directory creation itself
                 // (via path.dirname + mkdirSync recursive), so no split-on-slash
@@ -318,7 +330,7 @@ export async function createBackend(options = {}) {
 
     // 3. Node.js / Vitest / Electron main process
     if (hasNodeFS() || isTestEnv()) {
-        const resolvedPath = dbPath || process.env.FACTOLOGY_DB_PATH || `${process.cwd()}/${DB_FILENAME}`;
+        const resolvedPath = dbPath || process.env.FACTOLOGY_DB_PATH || `${process.cwd()}/${dbName}.sqlite`;
         const fileIO = createNodeFileIO(resolvedPath);
         const adapter = new SQLiteAdapter(fileIO, initSqlJsOptions);
         await adapter.init(dbName);
@@ -328,7 +340,7 @@ export async function createBackend(options = {}) {
     // 4. Capacitor (iOS/Android) — uses shared or app-private storage
     if (isCapacitor()) {
         const testMode = isCapacitorTestMode();
-        const fileIO = createCapacitorFileIO(DB_FILENAME, sharedStorage, testMode);
+        const fileIO = createCapacitorFileIO(`${dbName}.sqlite`, sharedStorage, testMode);
         const adapter = new SQLiteAdapter(fileIO, initSqlJsOptions);
         await adapter.init(dbName);
         return adapter;

@@ -371,7 +371,7 @@ const cloneSearchResult = async (thing) => {
 
         const newData = response.data;
 
-        router.push({ name: 'object', params: { uid: newData.thing_id }, query: { edit: '1' } });
+        router.push({ name: 'object', params: { uid: newData.data.thing_id }, query: { edit: '1' } });
     } catch (error) {
         console.error('Failed to clone object:', error);
     }
