@@ -54,6 +54,7 @@ export const UUID = {
     SOURCE_CLASS:   'e1d4c1d1-0002-4c1a-8000-000000000001',
     ARTICLE_CLASS:  'e1d4c1d1-0002-4c1a-8000-000000000002',
     HUMAN:          '4c8ee41a-9912-4dff-8b44-7779a66e4fcf',
+    LIVING_BEING:   '71e49073-503f-4faa-932d-68ab89662420',
     TRIP:           'e3cad1b0-74fa-44b2-9b2f-2adaf36baa14',
     FATHER:         '29cafd84-0fc9-4295-afcc-d73b9613e39f',
     MOTHER:         'b7c887b7-cee4-452d-b491-bd552de79d70',

@@ -55,6 +55,7 @@ const showCalendar = ref(false)
 const showHelp = ref(false)
 const fuzzText = ref('')
 const fuzz = ref(null)
+const showAdvanced = ref(false)
 
 // ── calendar integration ──
 
@@ -294,7 +295,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="flexible-date-field">
+    <div class="flexible-date-field" @focusin="showAdvanced = true" @focusout="showAdvanced = false">
         <div class="flexible-date-label small text-muted">{{ label }}</div>
 
         <!-- ══ VIEW MODE ══ -->
@@ -354,58 +355,60 @@ onMounted(() => {
                     @update:model-value="onCalendarPick"
                 />
 
-                <!-- Between: second bound -->
-                <input
-                    v-if="qualifier === 'between'"
-                    v-model="text2"
-                    type="text"
-                    class="form-control form-control-sm mt-1"
-                    :placeholder="t('dates.placeholder_upper')"
-                    @input="emitValue"
-                />
-
-                <!-- Alternatives: comma-separated list -->
-                <input
-                    v-if="qualifier === 'alternatives'"
-                    v-model="alternativesText"
-                    type="text"
-                    class="form-control form-control-sm mt-1"
-                    :placeholder="t('dates.placeholder_alternatives')"
-                    @input="emitValue"
-                />
-
-                <!-- Live preview / parse error -->
-                <div v-if="error" class="text-danger small mt-1">{{ error }}</div>
-                <div v-else-if="preview" class="text-muted small mt-1">
-                    <IconCheck class="preview-icon" /> <code>{{ preview }}</code>
-                </div>
-
-                <!-- Structured controls -->
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                    <select v-model="qualifier" class="form-select form-select-sm w-auto" @change="onSelectChange">
-                        <option v-for="q in QUALIFIERS" :key="q" :value="q">{{ t('dates.qualifier.' + q) }}</option>
-                    </select>
-                    <select v-model="era" class="form-select form-select-sm w-auto" @change="onSelectChange">
-                        <option v-for="e in ERA_KEYS" :key="e" :value="e">{{ t('era.' + e) }}</option>
-                    </select>
-                    <select v-model="precision" class="form-select form-select-sm w-auto" @change="onSelectChange">
-                        <option v-for="p in PRECISIONS" :key="p" :value="p">{{ t('dates.precision.' + p) }}</option>
-                    </select>
+                <div v-if="showAdvanced">
+                    <!-- Between: second bound -->
                     <input
-                        v-model="fuzzText"
+                        v-if="qualifier === 'between'"
+                        v-model="text2"
                         type="text"
-                        class="form-control form-control-sm w-auto"
-                        :placeholder="t('dates.fuzz_placeholder')"
-                        :title="t('dates.fuzz_title')"
-                        @input="onFuzzInput"
-                    />
-                    <input
-                        v-model="comment"
-                        type="text"
-                        class="form-control form-control-sm flex-grow-1"
-                        :placeholder="t('dates.comment')"
+                        class="form-control form-control-sm mt-1"
+                        :placeholder="t('dates.placeholder_upper')"
                         @input="emitValue"
                     />
+
+                    <!-- Alternatives: comma-separated list -->
+                    <input
+                        v-if="qualifier === 'alternatives'"
+                        v-model="alternativesText"
+                        type="text"
+                        class="form-control form-control-sm mt-1"
+                        :placeholder="t('dates.placeholder_alternatives')"
+                        @input="emitValue"
+                    />
+
+                    <!-- Live preview / parse error -->
+                    <div v-if="error" class="text-danger small mt-1">{{ error }}</div>
+                    <div v-else-if="preview" class="text-muted small mt-1">
+                        <IconCheck class="preview-icon" /> <code>{{ preview }}</code>
+                    </div>
+
+                    <!-- Structured controls -->
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <select v-model="qualifier" class="form-select form-select-sm w-auto" @change="onSelectChange">
+                            <option v-for="q in QUALIFIERS" :key="q" :value="q">{{ t('dates.qualifier.' + q) }}</option>
+                        </select>
+                        <select v-model="era" class="form-select form-select-sm w-auto" @change="onSelectChange">
+                            <option v-for="e in ERA_KEYS" :key="e" :value="e">{{ t('era.' + e) }}</option>
+                        </select>
+                        <select v-model="precision" class="form-select form-select-sm w-auto" @change="onSelectChange">
+                            <option v-for="p in PRECISIONS" :key="p" :value="p">{{ t('dates.precision.' + p) }}</option>
+                        </select>
+                        <input
+                            v-model="fuzzText"
+                            type="text"
+                            class="form-control form-control-sm w-auto"
+                            :placeholder="t('dates.fuzz_placeholder')"
+                            :title="t('dates.fuzz_title')"
+                            @input="onFuzzInput"
+                        />
+                        <input
+                            v-model="comment"
+                            type="text"
+                            class="form-control form-control-sm flex-grow-1"
+                            :placeholder="t('dates.comment')"
+                            @input="emitValue"
+                        />
+                    </div>
                 </div>
             </div>
         </template>

@@ -16,6 +16,11 @@ function setInput(wrapper, value) {
     input.trigger('input')
 }
 
+async function focusField(wrapper) {
+    await wrapper.find('input[name]').trigger('focusin')
+    await nextTick()
+}
+
 describe('FlexibleDateField', () => {
     it('view mode renders a localized flexible date', () => {
         const wrapper = mount(FlexibleDateField, {
@@ -71,12 +76,13 @@ describe('FlexibleDateField', () => {
         expect(payload.meta.qualifier).toBe('between')
     })
 
-    it('structured qualifier select overrides a plain date', () => {
+    it('structured qualifier select overrides a plain date', async () => {
         const wrapper = mount(FlexibleDateField, {
             global: { plugins: [i18n] },
             props: { isEditable: true, side: 'start' },
         })
         setInput(wrapper, '1650')
+        await focusField(wrapper)
         const select = wrapper.find('select')
         select.element.value = 'approx'
         select.trigger('change')
@@ -115,6 +121,7 @@ describe('FlexibleDateField', () => {
         })
 
         await nextTick()
+        await focusField(wrapper)
         const qualifier = wrapper.find('select').element.value
         expect(qualifier).toBe('exact')
         // The preview must echo a plain exact bound, not a "between" range.
@@ -138,6 +145,7 @@ describe('FlexibleDateField', () => {
             },
         })
         await nextTick()
+        await focusField(wrapper)
 
         const selects = wrapper.findAll('select')
         // Structured controls order: qualifier, era, precision.
@@ -183,5 +191,57 @@ describe('FlexibleDateField', () => {
         const expectStart = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + '00'
         expect(payload.start).toBe(expectStart)
         expect(payload.meta.precision).toBe('minute')
+    })
+
+    it('collapsed by default — no selects or preview in edit mode until focus', () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        expect(wrapper.findAll('select').length).toBe(0)
+        expect(wrapper.find('code').exists()).toBe(false)
+    })
+
+    it('focus reveals structured controls and live preview', async () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        setInput(wrapper, '1650')
+        expect(wrapper.find('code').exists()).toBe(false)
+
+        await focusField(wrapper)
+        const selects = wrapper.findAll('select')
+        expect(selects.length).toBeGreaterThan(0)
+        expect(wrapper.find('code').exists()).toBe(true)
+    })
+
+    it('blur collapses the advanced section', async () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        setInput(wrapper, '1650')
+        await focusField(wrapper)
+        expect(wrapper.findAll('select').length).toBeGreaterThan(0)
+
+        await wrapper.trigger('focusout')
+        await nextTick()
+        expect(wrapper.findAll('select').length).toBe(0)
+    })
+
+    it('interaction inside the field keeps advanced section open', async () => {
+        const wrapper = mount(FlexibleDateField, {
+            global: { plugins: [i18n] },
+            props: { isEditable: true, side: 'start' },
+        })
+        await focusField(wrapper)
+        expect(wrapper.findAll('select').length).toBeGreaterThan(0)
+
+        // Click the help button (stays within the field region)
+        const helpButton = wrapper.findAll('button').find(b => b.text().trim() === '?')
+        await helpButton.trigger('click')
+        // Advanced section stays open (selects still rendered)
+        expect(wrapper.findAll('select').length).toBeGreaterThan(0)
     })
 })

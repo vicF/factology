@@ -283,30 +283,32 @@
                                     <button type="button" class="btn btn-outline-secondary btn-sm" @click="addExtraLanguage">{{ $t('Add') }}</button>
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <FlexibleDateField
-                                    side="start"
-                                    :start="formData.start"
-                                    :end="formData.end"
-                                    :startMeta="formData.start_meta"
-                                    :endMeta="formData.end_meta"
-                                    :isEditable="true"
-                                    :label="$t('Start')"
-                                    @update:value="applyStartDate"
-                                />
-                            </div>
-                            <div class="mb-3">
-                                <FlexibleDateField
-                                    side="end"
-                                    :start="formData.start"
-                                    :end="formData.end"
-                                    :startMeta="formData.start_meta"
-                                    :endMeta="formData.end_meta"
-                                    :isEditable="true"
-                                    :label="$t('End')"
-                                    :disabled="startSpansDates"
-                                    @update:value="applyEndDate"
-                                />
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <FlexibleDateField
+                                        side="start"
+                                        :start="formData.start"
+                                        :end="formData.end"
+                                        :startMeta="formData.start_meta"
+                                        :endMeta="formData.end_meta"
+                                        :isEditable="true"
+                                        :label="startLabel"
+                                        @update:value="applyStartDate"
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <FlexibleDateField
+                                        side="end"
+                                        :start="formData.start"
+                                        :end="formData.end"
+                                        :startMeta="formData.start_meta"
+                                        :endMeta="formData.end_meta"
+                                        :isEditable="true"
+                                        :label="endLabel"
+                                        :disabled="startSpansDates"
+                                        @update:value="applyEndDate"
+                                    />
+                                </div>
                             </div>
 
                             <!-- Visibility selection -->
@@ -635,13 +637,13 @@ import ObjectField from './Fields/ObjectField.vue';
 import FieldLanguageSelect from './Fields/FieldLanguageSelect.vue';
 
 import { CLASS_TYPE, LINK_TO_CLASS, LINK_TO_PARENT, LINK_TO_RELATED, LINK_TYPE, SERVER_TYPE, THING_TYPE } from "../constants.js";
+import { UUID } from '@factology/engine/constants/uuid.js';
 import { eventBus } from "@factology/engine/eventBus.js";
 import ErrorModal from "./ErrorModal.vue";
 import ObjectImageEditor from "./ObjectImageEditor.vue";
 import { useObjectsStore } from '@/stores/objects';
 import { useObjectCacheStore } from '@/stores/objectCache.js';
 import { useAuthStore } from '@/stores/auth';
-import { UUID } from '@factology/engine/constants/uuid.js';
 import { currentLocale, changeSourceLang, objectName } from '../utils/localized.js';
 import { GEO_TYPES, appendVertex, closePolygon, extractCoordinates, isGeoPropertyName, isLegacyLatLng, latLngToPoint, stripBlankCoords } from '../utils/geo.js';
 import GeoPicker from './GeoPicker.vue';
@@ -1032,6 +1034,11 @@ const selectedClassIds = computed({
         });
     },
 });
+
+const isLivingBeing = computed(() =>
+    selectedClassIds.value.some(id => id === UUID.HUMAN || id === UUID.LIVING_BEING))
+const startLabel = computed(() => (isLivingBeing.value ? t('Birth') : t('Start')))
+const endLabel = computed(() => (isLivingBeing.value ? t('Death') : t('End')))
 
 const pendingCreateClassRequestId = ref(null);
 const openCreateClassModal = () => {

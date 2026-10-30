@@ -631,6 +631,27 @@ describe('EditObject', () => {
 
     // ── Owner (system ownership) — admins only ──
 
+    it('shows Start/End labels by default for non-living objects', async () => {
+        await mountEditObject()
+        expect(wrapper.vm.startLabel).toBe('Start')
+        expect(wrapper.vm.endLabel).toBe('End')
+    })
+
+    it('shows Birth/Death labels when Human class is selected', async () => {
+        await mountEditObject()
+        // Add the Human class to the object's class list
+        wrapper.vm.classLinksData.push({
+            one_thing_id: EDIT_ID,
+            other_thing_id: '4c8ee41a-9912-4dff-8b44-7779a66e4fcf',
+            link_type_id: DEFAULT_LINK_TYPE,
+            description: '',
+            link_id: null,
+        })
+        await nextTick()
+        expect(wrapper.vm.startLabel).toBe('Birth')
+        expect(wrapper.vm.endLabel).toBe('Death')
+    })
+
     it('hides the Owner select for non-admins', async () => {
         await mountEditObject({ object: OBJECT })
 
