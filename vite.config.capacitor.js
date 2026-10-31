@@ -128,5 +128,10 @@ export default defineConfig({
         // the device/app can never find the server.
         strictPort: true,
         cors: true,
+        // Dev server runs natively on Windows (run-android.sh / run-electron.sh).
+        // Node 24's fs.watch floods the event loop when the dep optimizer performs
+        // its .vite -> .vite-temp rename dance, hard-blocking the server after the
+        // first few requests (nodejs/node#65837). Stat-polling avoids that entirely.
+        watch: { usePolling: true, interval: 300 },
     },
 });

@@ -247,20 +247,18 @@ start_devserver() {
         # dependency scanner and never answer HTTP. A clean cold start takes ~3 s.
         rm -rf "$SCRIPT_DIR/node_modules/.vite"
         echo "==> Starting Vite dev server (port $VITE_PORT, attempt $attempt/2)..."
-        (
-            cd "$SCRIPT_DIR"
-            export VITE_API_URL
-            nohup npm run dev:capacitor >"$VITE_LOG" 2>&1 &
-            echo $! > "$VITE_PID_FILE"
-        )
         echo "    log: $VITE_LOG"
+        rm -f "$VITE_PID_FILE"
+        cd "$SCRIPT_DIR"
+        VITE_API_URL="$VITE_API_URL" nohup npm run dev:capacitor >"$VITE_LOG" 2>&1 &
+        echo $! > "$VITE_PID_FILE"
+        cd - >/dev/null || true
         for i in $(seq 1 60); do
             sleep 1
             devserver_up && break
-            # Vite exits quickly on fatal errors (strictPort: busy port, bad config).
-            if [ -f "$VITE_PID_FILE" ] && ! kill -0 "$(cat "$VITE_PID_FILE")" 2>/dev/null; then
-                break
-            fi
+            # On Git Bash, $! may not survive subshells; vite_listener_pid is authoritative.
+            # If no process claims the port within 10 s, Vite likely died on startup.
+            if [ "$i" -ge 10 ] && [ -z "$(vite_listener_pid || true)" ]; then break; fi
         done
         if devserver_up; then
             write_marker_and_pid
