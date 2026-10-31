@@ -670,6 +670,12 @@ class ApiController extends BaseController
                 ->get();
 
             foreach ($links as $link) {
+                // Don't copy CLONED_FROM links — the new link to the original
+                // is created below and we don't want to inherit transitive clone chains.
+                if ($link->link_type_id === UUID::CLONED_FROM) {
+                    continue;
+                }
+
                 $newLink = (array) $link;
                 unset($newLink['link_id'], $newLink['record_updated']);
                 $newLink['link_uuid'] = (string) \Illuminate\Support\Str::uuid();
